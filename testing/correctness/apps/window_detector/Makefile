@@ -77,10 +77,8 @@ window_detector_test_python:
 		--validation-cmd 'python _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
-		--sender-interval 0.05 \
 		--workers 1 \
-		--sink-expect 4 \
-		--sink-expect-allow-more
+		--sink-expect 200
 
 #window_detector_test_python_gen_source:
 #	cd $(WINDOW_DETECTOR_PATH) && \
