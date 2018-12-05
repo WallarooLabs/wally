@@ -28,7 +28,8 @@ def application_setup(args):
     transactions = wallaroo.source("Alerts (windowed)", gen_source)
     pipeline = (transactions
         .key_by(extract_user)
-        .to(wallaroo.range_windows(wallaroo.seconds(5))
+        .to(wallaroo.range_windows(wallaroo.seconds(9))
+            .with_slide(wallaroo.seconds(3))
             .over(TotalAggregation()))
         .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encode_alert)))
 
@@ -69,12 +70,7 @@ def extract_user(transaction):
     return transaction.user
 
 
-#@wallaroo.aggregation(name="Total Aggregation")
 class TotalAggregation(wallaroo.Aggregation):
-    def name(self):
-        #return self.__class__.__name__
-        return "Total Aggregation"
-
     def initial_accumulator(self):
         return TransactionTotal()
 
@@ -87,6 +83,7 @@ class TotalAggregation(wallaroo.Aggregation):
         return new_t
 
     def output(self, user, t):
+        print("!@TotalAggregation: Triggering output")
         if t.total > 2000:
             return DepositAlert(user, t.total)
         elif t.total < -2000:
@@ -106,14 +103,11 @@ class TransactionsGenerator(object):
         self.user_idx = 0
         self.user_totals = [1, 0, 0, 0, 0]
         self.users = ["Fido", "Rex", "Dr. Whiskers", "Feathers", "Mountaineer"]
-        print("!@ TransactionsGenerator:__init__")
 
     def initial_value(self):
-        print("!@TransactionsGenerator:initial_value")
         return Transaction("Fido", 1)
 
     def apply(self, v):
-        print("!@TransactionsGenerator:apply")
         # A simplistic way to get some numbers above, below, and within our
         # thresholds.
         amount = ((((v.amount * 2305843009213693951) + 7) % 2500) - 1250)
@@ -125,5 +119,4 @@ class TransactionsGenerator(object):
         elif total < -5000:
             amount = 6000
         self.user_totals[self.user_idx] = total + amount
-        print("!@ -- TransactionsGenerator: " + user)
         return Transaction(user, amount)

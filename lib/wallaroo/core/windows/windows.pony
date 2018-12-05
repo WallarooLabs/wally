@@ -52,6 +52,15 @@ class RangeWindowsBuilder
   fun ref over[In: Any val, Out: Any val, S: State ref](
     agg: Aggregation[In, Out, S]): StateInitializer[In, Out, S]
   =>
+    if _slide > _range then
+      FatalUserError("A window's slide cannot be greater than its range. " +
+        "But found slide " + _slide.string() + " for range " + _range.string())
+    end
+    if (_range % _slide) != 0 then
+      FatalUserError("A window's range must be evenly divisible by its " +
+        "slide. But found slide " + _slide.string() + " for range " +
+        _range.string())
+    end
     if _slide == _range then
       TumblingWindowsStateInitializer[In, Out, S](agg, _range, _delay)
     else

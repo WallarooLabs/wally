@@ -252,6 +252,27 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
         else:
             C.compute = comp
 
+    # !@
+    # elif issubclass(base_cls, Aggregation):
+    #     class C(base_cls):
+    #         def __init__(self, agg_class):
+    #             self.agg = agg_class()
+
+    #         def name(self):
+    #             return name
+
+    #         def initial_accumulator(self):
+    #             return self.agg.initial_accumulator()
+
+    #         def update(self, data, acc):
+    #             return self.agg.update(data, acc)
+
+    #         def combine(self, acc1, acc2):
+    #             return self.agg.combine(acc1, acc2)
+
+    #         def output(self, key, acc):
+    #             return self.agg.output(key, acc)
+
     # Case 2: Partition
     elif issubclass(base_cls, KeyExtractor):
         class C(base_cls):
