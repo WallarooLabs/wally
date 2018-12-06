@@ -434,6 +434,18 @@ class val PyAggregation is
   fun name(): String =>
     _name
 
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_aggregation)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_aggregation, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _aggregation = recover Machida.user_deserialization(bytes) end
+
+  fun _final() =>
+    Machida.dec_ref(_aggregation)
+
 class PyTCPEncoder is TCPSinkEncoder[PyData val]
   var _sink_encoder: Pointer[U8] val
 
