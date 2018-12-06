@@ -56,7 +56,7 @@ defmodule MonitoringHubUtils.Stores.AppConfigStoreTest do
   end
 
   test "it adds a metrics channel to an existing app config" do
-  	app_config = AppConfigStore.get_or_create_app_config "metrics-app-config"
+    _app_config = AppConfigStore.get_or_create_app_config "metrics-app-config"
 
     {:ok, _updated_app_config} = AppConfigStore.add_metrics_channel_to_app_config "metrics-app-config", "computation", "step1"
     {:ok, updated_app_config} = AppConfigStore.get_app_config "metrics-app-config"

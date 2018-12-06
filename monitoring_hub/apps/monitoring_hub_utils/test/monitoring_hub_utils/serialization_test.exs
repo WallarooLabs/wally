@@ -34,7 +34,6 @@ defmodule MonitoringHubUtils.SerializationTest do
     {:ok, parsed} = HubProtocol.decode(packet)
     assert parsed == %{
       "event" => "metrics",
-      "event" => "metrics",
       "payload" => %{
         "category" => "computation",
         "id" => "1",
