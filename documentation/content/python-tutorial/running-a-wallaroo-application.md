@@ -6,9 +6,9 @@ menu:
     weight: 1
 toc: true
 ---
-## Setting Up Wallaroo
-
-You should have already completed the [setup instructions](({< ref "choosing-an-installation-option.md" >}}) in the "Python Installation" guide.
+{{% note %}}
+You should have already completed the [setup instructions]({{< ref "choosing-an-installation-option.md" >}}) in the "Python Installation" guide.
+{{% /note %}}
 
 ## Running the Application
 
