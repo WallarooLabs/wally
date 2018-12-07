@@ -28,7 +28,13 @@ preserveTaxonomyNames = true
   url = "/core-concepts"
 
 [[menu.docs]]
+  name = "Python Installation Guide"
+  weight = 2
+  identifier = "pyinstallation"
+  url = "/python-installation"
+
+[[menu.docs]]
   name = "Python Tutorial"
-  weight = 1
+  weight = 3
   identifier = "pytutorial"
   url = "/python-tutorial"
