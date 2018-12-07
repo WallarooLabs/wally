@@ -801,7 +801,11 @@ primitive _SourceConfig
         PyFramedSourceHandler(d)?
       end
 
-      TCPSourceConfig[(PyData val | None)](decoder, host, port)
+      let parallelism = recover val
+        USize.from[I64](@PyInt_AsLong(@PyTuple_GetItem(source_config_tuple, 4)))
+      end
+
+      TCPSourceConfig[(PyData val | None)](decoder, host, port, parallelism)
     | "kafka-internal" =>
       let kafka_source_name = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))

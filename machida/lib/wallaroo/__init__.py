@@ -391,13 +391,14 @@ def encoder(func):
     return C()
 
 class TCPSourceConfig(object):
-    def __init__(self, host, port, decoder):
+    def __init__(self, host, port, decoder, parallelism=10):
         self._host = host
         self._port = port
         self._decoder = decoder
+        self._parallelism = parallelism
 
     def to_tuple(self):
-        return ("tcp", self._host, self._port, self._decoder)
+        return ("tcp", self._host, self._port, self._decoder, self._parallelism)
 
 class GenSourceConfig(object):
     def __init__(self, gen_instance):
