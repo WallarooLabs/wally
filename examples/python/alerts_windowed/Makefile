@@ -71,3 +71,49 @@ alerts_windowed_py3_test:
 		--command 'machida3 --application-module alerts $(RUN_WITH_RESILIENCE)' \
 		--sink-mode newlines
 endif
+
+killall:
+	-for x in machida data_receiver ; do  pkill $$x; done
+	-docker rm grafana
+	true
+
+clear-resilience:
+	rm -rf /tmp/Alerts*
+	rm -rf /tmp/metrics-*
+
+start-grafana:
+	if !(docker volume list | grep grafana-volume); then\
+		docker volume create --name=grafana-volume; fi
+	(cd grafana && docker-compose up -d)
+
+log:
+	mkdir -p log
+
+start-app: killall clear-resilience log start-grafana
+	data_receiver --listen 127.0.0.1:9999 > log/alerts.recv.log 2>&1 &
+
+	machida3 --ponythreads 1 --application-module alerts \
+	--cluster-initializer --out 127.0.0.1:9999 \
+	--metrics 127.0.0.1:5001 --data 127.0.0.1:6000 \
+	--control 127.0.0.1:6500 --external 127.0.0.1:5050 \
+	--worker-count=1 \
+	--name initializer > log/alerts.0.log 2>&1 &
+	sleep 1
+	#for n in $$(seq 1 1); do \
+        #  machida3 --ponythreads 1 --application-module alerts \
+        #  --out 127.0.0.1:9999 \
+        #  --metrics 127.0.0.1:5001 \
+        #  --control 127.0.0.1:6500 \
+        #  --my-control 127.0.0.1:$$((6501+n)) \
+        #  --my-data 127.0.0.1:$$((6001+n)) \
+        #  --name worker$${n} > log/alerts.$${n}.log 2>&1 &\
+	#done
+
+	exec machida3 --ponythreads 1 --application-module metrics \
+	--cluster-initializer --in 127.0.0.1:5001 --out 127.0.0.1:2003 \
+	--metrics 127.0.0.1:15001 --data 127.0.0.1:61000 \
+	--control:127.0.0.1:16500 --external 127.0.0.1:15050\
+	--name initializer
+
+unit:
+	python3 -m unittest hub_protocol

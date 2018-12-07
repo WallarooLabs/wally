@@ -33,7 +33,7 @@ def application_setup(args):
             .over(TotalAggregation()))
         .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encode_alert)))
 
-    return wallaroo.build_application("Alerts (windowed)", pipeline)
+    return wallaroo.build_application("Alerts_windowed", pipeline)
 
 
 class Transaction(object):
