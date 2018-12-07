@@ -224,27 +224,31 @@ notify(StreamId, StreamName, PointOfRef) ->
         point_of_reference(PointOfRef)
     ]).
 
--spec message(Message, MessageId, Flags) -> frame() when
+-spec message(Message, MessageId, StreamId, Flags) -> frame() when
     Message :: boundary | {non_neg_integer(), iodata()} | iodata(),
     MessageId :: non_neg_integer(),
+    StreamId :: non_neg_integer(),
     Flags :: non_neg_integer(). % See message bit flag definitions above
-message(_Message=boundary, MessageId Flags) ->
+message(_Message=boundary, MessageId, StreamId, Flags) ->
     frame([
         ?MESSAGE,
+        u64(StreamId),
         u16(Flags bor ?BOUNDARY),
         u64(MessageId)
     ]);
-message({EventTime, Message}, MessageId, Flags) ->
+message({EventTime, Message}, MessageId, StreamId, Flags) ->
     frame([
         ?MESSAGE,
+        u64(StreamId),
         u16(Flags bor ?EVENT_TIME),
         u64(MessageId),
         u64(EventTime),
         Message
     ]);
-message(Message, MessageId, Flags) ->
+message(Message, MessageId, StreamId, Flags) ->
     frame([
         ?MESSAGE,
+        u64(StreamId),
         u16(Flags),
         u64(MessageId),
         Message
