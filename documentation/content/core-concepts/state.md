@@ -28,28 +28,19 @@ So what is a state object? Let's explain via an example. Imagine we are writing 
 
 Wallaroo allows you to define your own state objects that match your domain. For example, our example application might define a state object as:
 
-{{< tabs >}}
-{{< tab name="Python" codelang="python" >}}
+```python
 class Stock(object):
-    def __init__(self, symbol, price):
-        self.symbol = symbol
-        self.price = price
-{{< /tab >}}
-{{< tab name="Go" codelang="go" >}}
-type Stock struct {
-  Symbol string
-  Price float64
-}
-{{< /tab >}}
-{{< /tabs >}}
+    last_price_seen = None
+    highest_price_seen = 0.0
+```
 
 State objects can be arbitrarily complex. Our example is two fields. If your application required it, you could build a deeply nested series of objects.
 
 ## Wallaroo, state, and parallelization
 
-In our stock market example, we can read from and write to each state object independently. Our state objects are a unit of parallelization. If we have 3,000 different state objects and 3,000 CPUS then we can update all our state objects concurrently. Odds are, we are going to have more state objects than we have CPUs. Wallaroo handles all parallelization and routing of messages to state objects.
+In our stock market example, we can read from and write to each state object independently. Our state objects are a unit of parallelization. If we have 3,000 different state objects and 3,000 CPUs then we can update all our state objects concurrently. Odds are, we are going to have more state objects than we have CPUs. Wallaroo handles all parallelization and routing of messages to state objects.
 
-The Wallaroo API features a concept called a "partitioning function" that allows you to examine a message indicate how it should be routed. For example, imagine a message in our stock market application is:
+The Wallaroo API features a concept called a "key extractor function" that allows you to examine a message and return a key that will be used for partitioning state. For example, imagine a message in our stock market application is:
 
 ```json
 {
@@ -58,7 +49,7 @@ The Wallaroo API features a concept called a "partitioning function" that allows
 }
 ```
 
-Our partitioning function would take a message as input and return `IBM` as output. This would, in turn, be used by Wallaroo to route the message.
+Our key extractor function would take a message as input and could return `IBM` as output. This would, in turn, be used by Wallaroo to route the message to the correct partition.
 
 ## Conclusion
 
