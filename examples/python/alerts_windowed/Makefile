@@ -89,6 +89,7 @@ start-grafana:
 log:
 	mkdir -p log
 
+CLUSTER_SIZE := 10
 start-app: killall clear-resilience log start-grafana
 	data_receiver --listen 127.0.0.1:9999 > log/alerts.recv.log 2>&1 &
 
@@ -96,18 +97,18 @@ start-app: killall clear-resilience log start-grafana
 	--cluster-initializer --out 127.0.0.1:9999 \
 	--metrics 127.0.0.1:5001 --data 127.0.0.1:6000 \
 	--control 127.0.0.1:6500 --external 127.0.0.1:5050 \
-	--worker-count=1 \
+	--worker-count=$(CLUSTER_SIZE) \
 	--name initializer > log/alerts.0.log 2>&1 &
 	sleep 1
-	#for n in $$(seq 1 1); do \
-        #  machida3 --ponythreads 1 --application-module alerts \
-        #  --out 127.0.0.1:9999 \
-        #  --metrics 127.0.0.1:5001 \
-        #  --control 127.0.0.1:6500 \
-        #  --my-control 127.0.0.1:$$((6501+n)) \
-        #  --my-data 127.0.0.1:$$((6001+n)) \
-        #  --name worker$${n} > log/alerts.$${n}.log 2>&1 &\
-	#done
+	for n in $$(seq 1 $$(($(CLUSTER_SIZE)-1))); do \
+          machida3 --ponythreads 1 --application-module alerts \
+          --out 127.0.0.1:9999 \
+          --metrics 127.0.0.1:5001 \
+          --control 127.0.0.1:6500 \
+          --my-control 127.0.0.1:$$((6501+n)) \
+          --my-data 127.0.0.1:$$((6001+n)) \
+          --name worker$${n} > log/alerts.$${n}.log 2>&1 &\
+	done
 
 	exec machida3 --ponythreads 1 --application-module metrics \
 	--cluster-initializer --in 127.0.0.1:5001 --out 127.0.0.1:2003 \
