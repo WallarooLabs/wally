@@ -1170,6 +1170,8 @@ primitive _SinkConfig
         let key_extractor = PyKeyExtractor(raw_key_extractor)
         Machida.inc_ref(raw_key_extractor)
         pipeline = pipeline.key_by(key_extractor)
+      | "collect" =>
+        pipeline = pipeline.collect()
       | "to_sink" =>
         pipeline = pipeline.to_sink(
           _SinkConfig.from_tuple(@PyTuple_GetItem(stage, 1), env)?)

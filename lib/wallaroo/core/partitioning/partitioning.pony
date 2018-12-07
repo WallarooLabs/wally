@@ -27,6 +27,15 @@ use "wallaroo_labs/mort"
 interface val KeyExtractor[In: Any val]
   fun apply(input: In): Key
 
+class val CollectKeyExtractor[In: Any val]
+  let _constant_key: Key
+
+  new val create(c_key: Key) =>
+    _constant_key = c_key
+
+  fun apply(input: In): Key =>
+    _constant_key
+
 trait Partitioner
   // Takes an input and the current key associated with that input.
   // Based on a new partitioning scheme, it might replace this old key with

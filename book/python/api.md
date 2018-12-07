@@ -51,14 +51,14 @@ You create complete pipeline by terminating a partial pipeline with a call to `t
 ```python
 inputs = wallaroo.source("Source Name", source_config)
 complete_pipeline = (inputs
-    .to(my_computation)
+    .to(my_stateless_computation)
     .to_sink(sink_config))
 ```
 
 Our pipeline is now complete:
 
 ```
-Source -> my_computation -> Sink
+Source -> my_stateless_computation -> Sink
 ```
 
 Unless a call to `to` using a stateless computation is preceded by a call to `key_by` (which partitions messages by key), there are no guarantees around the order in which messages will be processed. That's because Wallaroo might parallelize a stateless computation if that is beneficial for scaling. That means the execution graph for the above pipeline could look like this:
@@ -73,9 +73,27 @@ Source ----> my_stateless_computation ----> Sink
 
 Some messages will be routed to each of the parallel computation instances. When they merge again at the sink, these messages will be interleaved in a non-deterministic fashion.
 
+If you want to ensure that all messages are sent to the same target, then use
+the `collect` API call. For example,
+
+```python
+inputs = wallaroo.source("Source Name", source_config)
+complete_pipeline = (inputs
+    .collect()
+    .to(my_stateless_computation)
+    .to_sink(sink_config))
+```
+
+will cause all messages from the source to be sent to the same 
+stateless computation instance:
+
+```
+Source -> my_stateless_computation -> Sink
+```
+
 #### Merging Partial Pipelines
 
-You can merge two partial pipelines to form a new partial pipline. For example:
+You can merge two partial pipelines to form a new partial pipeline. For example:
 
 ```python
 inputs1 = wallaroo.source("Source 1", source_config)
@@ -161,6 +179,55 @@ Add a computation _function_ to the partial pipeline. This will either be a [sta
 Partition messages at this point based on the key extracted using the key_extractor function. A call to `key_by` returns a new partial pipeline object.
 
 `key_extractor` must be a [KeyExtractor](#key_extractor).
+
+##### `collect()`
+
+Interleave all partitions from the previous stage into one partition for all subsequent computations. This can be overridden later with `key_by`. The effect
+of `collect()` is similar to using a `key_by` that returns a constant key.
+
+This code:
+
+```
+(inputs
+    .key_by(extract_key)
+    .to(f)
+    .to(g)
+    .to_sink(sink_config))
+```
+
+will partition the inputs into one partition per key. This scheme
+will apply to both `f` and `g`, which would look something like this:
+
+```
+         /-> f -> g -\
+        /             \
+Source ----> f -> g ----> Sink
+        \             /
+         \-> f -> g -/
+```
+
+If we want to ensure that all the results from every instance of `f`
+are sent to a single instance of `g` (perhaps `g` is used to keep track
+of some information about all the outputs), we would write:
+
+```
+(inputs
+    .key_by(extract_key)
+    .to(f)
+    .collect()
+    .to(g)
+    .to_sink(sink_config))
+```
+
+which would look something like:
+
+```
+         /-> f -\
+        /        \
+Source ----> f ----> g -> Sink
+        \        /
+         \-> f -/
+```
 
 ##### `to_sink(sink_config)`
 

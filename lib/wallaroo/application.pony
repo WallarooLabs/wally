@@ -198,6 +198,10 @@ class Pipeline[Out: Any val] is BasicPipeline
       Pipeline[Out](_stages, _dag_sink_ids)
     end
 
+  fun ref collect(): Pipeline[Out] =>
+    let collect_key = CollectKeyGenerator()
+    key_by(CollectKeyExtractor[Out](collect_key))
+
   fun graph(): this->Dag[Stage] => _stages
 
   fun size(): USize => _stages.size()
