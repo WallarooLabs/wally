@@ -17,3 +17,7 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 type Key is String
+
+primitive CollectKeyGenerator
+  fun apply(): Key =>
+    "collect-key-" + RoutingIdGenerator().string()

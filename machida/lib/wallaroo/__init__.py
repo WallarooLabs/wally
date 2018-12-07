@@ -63,7 +63,7 @@ def source(name, source_config):
 
 
 def build_application(app_name, pipeline):
-    if not pipeline.__is_closed__():
+    if not pipeline._is_closed():
         print("\nAPI_Error: An application must end with to_sink/s.")
         raise WallarooParameterError()
     return pipeline.__to_tuple__(app_name)
@@ -81,13 +81,13 @@ class Pipeline(object):
     def __to_tuple__(self, app_name):
         return self._pipeline_tree.to_tuple(app_name)
 
-    def __is_closed__(self):
+    def _is_closed(self):
         return self._pipeline_tree.is_closed
 
     def to(self, computation):
-        return self.clone().__to__(computation)
+        return self.clone()._to(computation)
 
-    def __to__(self, computation):
+    def _to(self, computation):
         if isinstance(computation, StateComputation):
             self._pipeline_tree.add_stage(("to_state", computation))
         else:
@@ -95,16 +95,16 @@ class Pipeline(object):
         return self
 
     def to_sink(self, sink_config):
-        return self.clone().__to_sink__(sink_config)
+        return self.clone()._to_sink(sink_config)
 
-    def __to_sink__(self, sink_config):
+    def _to_sink(self, sink_config):
         self._pipeline_tree.add_stage(("to_sink", sink_config.to_tuple()))
         return self
 
     def to_sinks(self, sink_configs):
-        return self.clone().__to_sinks__(sink_configs)
+        return self.clone()._to_sinks(sink_configs)
 
-    def __to_sinks__(self, sink_configs):
+    def _to_sinks(self, sink_configs):
         sinks = []
         for sc in sink_configs:
             sinks.append(sc.to_tuple())
@@ -112,16 +112,23 @@ class Pipeline(object):
         return self
 
     def key_by(self, key_extractor):
-        return self.clone().__key_by__(key_extractor)
+        return self.clone()._key_by(key_extractor)
 
-    def __key_by__(self, key_extractor):
+    def _key_by(self, key_extractor):
         self._pipeline_tree.add_stage(("key_by", key_extractor))
         return self
 
-    def merge(self, pipeline):
-        return self.clone().__merge__(pipeline.clone())
+    def collect(self):
+        return self.clone()._collect()
 
-    def __merge__(self, pipeline):
+    def _collect(self):
+        self._pipeline_tree.add_stage(("collect", ""))
+        return self
+
+    def merge(self, pipeline):
+        return self.clone()._merge(pipeline.clone())
+
+    def _merge(self, pipeline):
         self._pipeline_tree.merge(pipeline._pipeline_tree)
         return self
 

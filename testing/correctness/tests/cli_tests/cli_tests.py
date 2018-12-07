@@ -113,7 +113,7 @@ def _test_state_entity_query(command):
                     continue
         # Check we have as many state keys as input items
         assert(len(part_ids) == INPUT_ITEMS)
-        assert(single_part_id == 'single-partition-key')
+        assert(single_part_id.split("-")[0] == 'collect')
         # check that there are two computation ids
         comp_ids = set()
         for w in got.values():

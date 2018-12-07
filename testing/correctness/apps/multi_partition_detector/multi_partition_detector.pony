@@ -92,7 +92,6 @@ actor Main
           env.out.print("Adding level " + x.string())
           p = p.key_by(WindowPartitionFunction)
           p = p.to[t.Message](TraceID(x.string()))
-          p = p.key_by(WindowPartitionFunction)
           p = p.to[t.Message](TraceWindow(x.string()))
         end
         p.to_sink(TCPSinkConfig[t.Message].from_options(MessageEncoder,

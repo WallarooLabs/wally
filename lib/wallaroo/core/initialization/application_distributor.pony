@@ -147,21 +147,12 @@ actor ApplicationDistributor is Distributor
               PassthroughPartitionerBuilder
             end
 
-          // We initially set this to None. If it's a state computation
-          // and there's no prior key_by, then we use direct routing, set
-          // later on.
-          var input_partitioner_builder: (PartitionerBuilder | None) = None
-
           // Create the StepBuilder for this stage. If the stage is a state
           // computation, then we can simply create it. If the stage is
           // a stateless computation, we try to coalesce it onto predecessor
           // stateless computations if we can.
           let s_builder =
             if rb.is_stateful() then
-              // If this stage is preceded by a key_by, this will be
-              // ignored. If not, then this default will be used so that
-              // all non-partitioned messages go to the same state.
-              input_partitioner_builder = SinglePartitionerBuilder
               StepBuilder(_app_name, rb, node.id, rb.routing_group(),
                 partitioner_builder, rb.is_stateful())
             else
@@ -265,15 +256,6 @@ actor ApplicationDistributor is Distributor
             consume worker_map
 
           for i_node in node.ins() do
-            // TODO: Does this check make sense, or should we override
-            // sometimes?
-            if not partitioner_builders.contains(i_node.id) then
-              match input_partitioner_builder
-              | let pb: PartitionerBuilder =>
-                partitioner_builders(i_node.id) = pb
-              end
-            end
-
             if not frontier.contains(i_node.id) and
               not processed.contains(i_node.id)
             then
