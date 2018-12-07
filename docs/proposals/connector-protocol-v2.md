@@ -309,13 +309,13 @@ Messages can be marked as ephemeral denoting that the identity and content of th
 
 ### Points of Reference
 
-NOTE: This section is under revision and should be considered slightly out of date. Please ask in the integrations slack channel for more up to date information.
+Each message id may be remembered but it can be expensive to remember them all. Thus we have points of reference to define position in a stream relative to its content, assuming there is some determinism in the ordering each time the content is replayed. This involves the guarantee that messages sorted before and after that point of reference form a disjoint set. Certain mediums can only provide coarser granularity during replay. The whole stream itself may not have a total order but the disjoint sets formed by each point of reference do have a total order. The observation should be that all points of reference form a total order of legal places one can resume from.
 
-Each message id may be remembered but it can be expensive to remember them all. Thus we have points of reference to define position in a stream relative to its content, assuming there is some determinism in the ordering each time the content is replayed. The issue with determinism is what drives this to be selective. Certain mediums can only provide coarser granularity during replay. This involves the guarantee that messages sorted before and after that point of reference form a disjoint set. The whole stream itself may not have a total order but the disjoint sets formed by each point of reference do have a total order.
-
-This course grained ordering can be thought of in terms of ranges where the bounds are the message ids in the frames. The starting bound is inclusive and the ending bound is exclusive. This should allow Wallaroo to note where streaming should resume without losing messages.
+This course grained ordering can be thought of in terms of ranges where the bounds are the message ids in the frames. The starting bound is inclusive and the ending bound is exclusive. This *should* allow Wallaroo to note where streaming *should* resume without losing messages.
 
 If Wallaroo is not able to support unreferenced messages with resilience turned on then it may be wise to send an error back to the connector when this occurs. Discussion around supporting this may take time and so Wallaroo will make no guarantees around supported variants in this mode, only that the streams should use this correctly so silent failures during recovery don't bite late into the application's lifetime.
+
+(See extended discussion section for notes on why this might not work very well.)
 
 ### End of Stream
 
@@ -464,3 +464,13 @@ TODO: Decide if this protocol should define a few frames that require a debug fl
 - consider a section on TLS and transport setup
     - even though it was out of scope for this there is plenty to discuss there in a way that can relate to this doc
 - ??? I've rewritten this about three times and it's changing less each time so perhaps it's good enough now but are there any other ideas we should write down somewhere for future work? Things I left out that might be worth revisiting in some future iteration?
+
+## Extended Discussion
+
+This document has plenty of points left out because of the original scope of the cancelled and now resumed/revised work plan. I'll try to add more points of discussion below to expand on various areas. Trade-offs were made so many of these sections will be dedicated to various trades that come up in discussion.
+
+### Points of Reference vs Acknowledgments
+
+Acknowledgments should ideally use points of reference but this is not a trivial requirement. Committed progress would be predicated a regular flow of references. We can certainly still ack credits without message ids but it still leaves some edge cases where progress might look to be standing still while the system is under full load. This unintuitive result could be explained with good UI choices but it's still a con. So we allow acks to pick up any message id.
+
+A possible improvement would be to include a message id and a count. We can maintain a counter for each stream which helps minimize the outstanding state on the connector side (we no longer need to relate message ids as sets which may or may not have structure). We can get away with this even in unordered case because we understand the count between points of reference so we should be able to infer when committable references are hit by filling in order (note: this implies we're relying on transmission order for a stream, under recovery and migration cases, we'll need to be careful to manage the count appropriately, more on this in a bit).
