@@ -27,6 +27,12 @@
   }
 }
 
+@media screen and (min-width: 60em) {
+  .measure-wide-l {
+    max-width: 42em;
+  }
+}
+
 /* documentation styles */
 .note,
 .warning {
