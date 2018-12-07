@@ -1,0 +1,40 @@
+{{ define "header" }}
+   {{/* We can override any block in the baseof file be defining it in the template */}}
+  {{ partial "page-header.html" . }}
+{{ end }}
+
+{{ define "main" }}
+  <article class="flex-l flex-wrap justify-between mw8 center ph3 ph0-l">
+
+    <header class="mt4 w-100">
+      <p class="f6 b helvetica tracked">
+          {{/*
+          CurrentSection allows us to use the section title instead of inferring from the folder.
+          https://gohugo.io/variables/page/#section-variables-and-methods
+          */}}
+        {{with .CurrentSection.Title }}{{. | upper }}{{end}}
+      </p>
+      <h1 class="f1 athelas mb1">
+        {{- .Title -}}
+      </h1>
+      {{/* Hugo uses Go's date formatting is set by example. Here are two formats */}}
+      <time class="f6 mv4 dib tracked" datetime="{{ .Date.Format "2006-01-02T15:04:05Z07:00" }}">
+        {{- .Date.Format "January 2, 2006" -}}
+      </time>
+    </header>
+
+    <main class="nested-copy-line-height lh-copy serif f4 nested-links nested-img mid-gray pr4-l w-two-thirds-l">
+        {{- .Content -}}
+      {{- partial "tags.html" . -}}
+      <div class="mt6">
+        {{ template "_internal/disqus.html" . }}
+      </div>
+    </main>
+
+    <aside class="w-30-l mt6-l">
+      {{- partial "menu-contextual.html" . -}}
+      {{- partial "nav-links-docs.html" . -}}
+    </aside>
+
+  </article>
+{{ end }}

@@ -1,8 +1,8 @@
 # Wallaroo Python Examples
 
-In this section you will find the complete examples from the [Wallaroo Python](https://docs.wallaroolabs.com/book/python/intro.html) section, as well as some additional examples. Each example includes a README describing its purpose and how to set it up and run it.
+In this section you will find the complete examples from the [Wallaroo Python](https://docs.wallaroolabs.com/python-tutorial/) section, as well as some additional examples. Each example includes a README describing its purpose and how to set it up and run it.
 
-To get set up for running examples, if you haven't already, refer to [Choosing an Installation Option for Wallaroo](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html).
+To get set up for running examples, if you haven't already, refer to [Choosing an Installation Option for Wallaroo](https://docs.wallaroolabs.com/python-installation/).
 
 ## Examples by Category
 

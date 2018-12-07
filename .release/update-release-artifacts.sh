@@ -27,4 +27,4 @@ done
 HERE=$(dirname "$(readlink -f "${0}")")
 echo y | "$HERE/bintray-artifacts-release.sh" "$for_version" "$commit"
 echo y | "$HERE/docker-release.sh" "$for_version" "$commit"
-echo y | "$HERE/gitbook-release.sh" "$for_version" "$commit"
+echo y | "$HERE/documentation-release.sh" "$for_version" "$commit"

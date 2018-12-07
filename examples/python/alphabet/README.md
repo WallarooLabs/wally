@@ -6,7 +6,7 @@ This is an example application that takes "votes" for different letters of the a
 
 ### Input
 
-The inputs to the "Alphabet" application are the letter receiving the vote followed by a 32-bit integer representing the number of votes for this message, with the whole thing encoded in the [source message framing protocol](https://docs.wallaroolabs.com/book/appendix/tcp-decoders-and-encoders.html#framed-message-protocols). Here's an example input message, written as a Python string:
+The inputs to the "Alphabet" application are the letter receiving the vote followed by a 32-bit integer representing the number of votes for this message, with the whole thing encoded in the [source message framing protocol](https://docs.wallaroolabs.com/python-tutorial/tcp-decoders-and-encoders/#framed-message-protocols). Here's an example input message, written as a Python string:
 
 ```
 "\x00\x00\x00\x05A\x00\x00\x15\x34"
@@ -26,10 +26,10 @@ The `decoder` function creates a `Votes` object with the letter being voted on a
 
 ## Running Alphabet
 
-In order to run the application you will need Machida, Giles Sender, Data Receiver, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
+In order to run the application you will need Machida, Giles Sender, Data Receiver, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/python-installation/) instructions to choose one of these options if you have not already done so.
 If you are using Python 3, replace all instances of `machida` with `machida3` in your commands.
 
-You will need five separate shells to run this application (please see [starting a new shell](https://docs.wallaroolabs.com/book/getting-started/starting-a-new-shell.html) for details depending on your installation choice). Open each shell and go to the `examples/python/alphabet` directory.
+You will need five separate shells to run this application (please see [starting a new shell](https://docs.wallaroolabs.com/python-tutorial/starting-a-new-shell/) for details depending on your installation choice). Open each shell and go to the `examples/python/alphabet` directory.
 
 ### Shell 1: Metrics
 
