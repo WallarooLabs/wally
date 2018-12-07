@@ -103,7 +103,9 @@ You're going to set up our "Alerts" example application. We will use an internal
 
 The Metrics UI process will be run in the background. The other two processes (data_receiver and Wallaroo) will run in the foreground. We recommend that you run each process in a separate terminal.
 
-NOTE: If you haven't set up Docker to run without root, you will need to use `sudo` with your Docker commands.
+{{% note %}}
+If you haven't set up Docker to run without root, you will need to use `sudo` with your Docker commands.
+{{% /note %}}
 
 Let's get started!
 
@@ -119,7 +121,7 @@ docker run --rm -it --privileged -p 4000:4000 \
 --name wally \
 wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
 {{< /tab >}}
-{{< tab name="Windows Powershell" codelang="bash" >}}
+{{< tab name="Powershell" codelang="bash" >}}
 docker run --rm -it --privileged -p 4000:4000 `
 -v c:/wallaroo-docker/wallaroo--{{% wallaroo-version %}}/wallaroo-src:/src/wallaroo `
 -v c:/wallaroo-docker/wallaroo-{{% wallaroo-version %}}/python-virtualenv-machida:/src/python-virtualenv `
@@ -145,7 +147,7 @@ docker run --rm -it --privileged -p 4000:4000 \
 --name wally \
 wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }} -p python3
 {{< /tab >}}
-{{< tab name="Windows Powershell" codelang="bash" >}}docker run --rm -it --privileged -p 4000:4000 `
+{{< tab name="Powershell" codelang="bash" >}}docker run --rm -it --privileged -p 4000:4000 `
 -v c:/wallaroo-docker/wallaroo--{{% wallaroo-version %}}/wallaroo-src:/src/wallaroo `
 -v c:/wallaroo-docker/wallaroo-{{% wallaroo-version %}}/python-virtualenv-machida3:/src/python-virtualenv `
 --name wally `
