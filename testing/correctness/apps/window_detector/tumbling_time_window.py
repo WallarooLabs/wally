@@ -18,6 +18,7 @@
 import argparse
 import json
 import time
+import datetime
 import struct
 
 import wallaroo
@@ -103,7 +104,7 @@ class Collect(wallaroo.Aggregation):
         keys = set(m.key for m in accumulator)
         values = tuple(m.value for m in accumulator)
         ts = time.time()
-        print("Collect.output", ts, key, [str(m) for m in accumulator])
+        print("Collect.output", datetime.datetime.now(), ts, key, [str(m) for m in accumulator])
         assert(len(keys) == 1)
         assert(keys.pop().split(".")[0] == key)
         return (key, values, ts)
@@ -126,6 +127,6 @@ def decoder(bs):
 
 @wallaroo.encoder
 def encoder(msg):
-    print("encoder", msg)
+    print("encoder", datetime.datetime.now(), msg)
     s = json.dumps({'key': msg[0], 'value': msg[1], 'ts': msg[2]})
     return struct.pack(">I{}s".format(len(s)), len(s), s)

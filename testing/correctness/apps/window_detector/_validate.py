@@ -21,10 +21,12 @@ import struct
 parser = argparse.ArgumentParser("Alerts Windowed validator")
 parser.add_argument("--output", type=argparse.FileType("rb"),
                     help="The output file of the application.")
+parser.add_argument("--window-type", default="tumbling",
+                    choices=["tumbling", "sliding", "counting"])
 args = parser.parse_args()
 
 f = args.output
-sequences = {}
+windows = {}
 while True:
     header_bytes = f.read(4)
     if not header_bytes:
@@ -33,9 +35,25 @@ while True:
     payload = f.read(header)
     assert(len(payload) > 0)
     obj = loads(payload)
-    sequences.setdefault(obj['key'], []).append(obj['value'])
+    windows.setdefault(obj['key'], {}).setdefault(obj['ts'], []).append(obj['value'])
 
-for k, v in sequences.items():
-    print("key: {}".format(k))
-    print("values: {}".format(v))
-    assert(v == range(1, len(v) + 1))
+# flatten windows to sequences
+sequences = {}
+for k in windows.keys():
+    for w in sorted(windows[k].keys()):
+        sequences.setdefault(k, []).extend(windows[k][w])
+
+if args.window_type in ('tumbling', 'counting'):
+    for k, v in sequences.items():
+        expected = list(range(1, len(v) + 1))
+        assert(v == expected)
+
+else: # window_type == 'sliding'
+    for k, v in sequences.items():
+        processed = sorted(list(set(v)))
+        expected = list(range(1, len(processed) + 1))
+        # unique items are natural sequences per key:
+        assert(processed == expected)
+        # there should duplicates from the sliding:
+        assert(len(v) > len(expected))
+
