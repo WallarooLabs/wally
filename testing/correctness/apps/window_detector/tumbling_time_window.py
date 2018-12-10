@@ -100,10 +100,10 @@ class Collect(wallaroo.Aggregation):
         return accumulator1 + accumulator2
 
     def output(self, key, accumulator):
-        print(key, [str(m) for m in accumulator])
         keys = set(m.key for m in accumulator)
         values = tuple(m.value for m in accumulator)
         ts = time.time()
+        print("Collect.output", ts, key, [str(m) for m in accumulator])
         assert(len(keys) == 1)
         assert(keys.pop().split(".")[0] == key)
         return (key, values, ts)
@@ -120,10 +120,12 @@ def decoder(bs):
     # Expecting a 64-bit unsigned int in big endian followed by a string
     val, key = struct.unpack(">Q", bs[:8])[0], bs[8:]
     key = key.decode("utf-8")  # python3 compat in downstream string concat
+    print("decoder", key, val, time.time())
     return Message(key, val)
 
 
 @wallaroo.encoder
 def encoder(msg):
+    print("encoder", msg)
     s = json.dumps({'key': msg[0], 'value': msg[1], 'ts': msg[2]})
     return struct.pack(">I{}s".format(len(s)), len(s), s)
