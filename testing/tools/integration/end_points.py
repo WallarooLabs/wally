@@ -196,7 +196,7 @@ class TCPReceiver(StoppableThread):
                         else:
                             raise err
                     except OSError as err:
-                        if err.errno == 53:
+                        if err.errno == errno.ECONNABORTED:
                             # [ECONNABORTED] A connection arrived, but it was
                             # closed while waiting on the listen queue.
                             # This happens on macOS during normal
@@ -229,6 +229,8 @@ class TCPReceiver(StoppableThread):
                 self.sock.shutdown(socket.SHUT_RDWR)
             except OSError as err:
                 if err.errno == errno.ENOTCONN:
+                    # [ENOTCONN] Connection is already closed or unopened
+                    # and can't be shutdown.
                     pass
                 else:
                     raise
