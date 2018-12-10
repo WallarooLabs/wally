@@ -530,7 +530,7 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     // Normalize delay to units of slide.
     let delay_slide_units = (delay.f64() / _slide.f64()).ceil()
     _delay = _slide * delay_slide_units.u64()
-    @printf[I32]("!@ DELAY:%s\n".cstring(), _delay.string().cstring())
+    // @printf[I32]("!@ DELAY:%s\n".cstring(), _delay.string().cstring())
 
     // Calculate how many panes we need. The delay tells us how long we
     // wait after the close of a window to trigger and clear it. We need
@@ -621,7 +621,7 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
         end
 
       var stopped = false
-      @printf[I32]("\n#######\n!@ attempt_to_trigger\n".cstring())
+      // @printf[I32]("\n#######\n!@ attempt_to_trigger\n".cstring())
       while not stopped do
         (let next_out, let next_output_watermark_ts, stopped) =
           _check_first_window(watermark_ts, end_ts_diff)
@@ -647,7 +647,7 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     try
       let earliest_ts = _panes_start_ts(_earliest_window_idx)?
       let window_end_ts = earliest_ts + _range
-      @printf[I32]("!@ -- Should we trigger earliest:%s, watermark:%s, _earliest_window_idx:%s?\n".cstring(), (earliest_ts / 1_000_000_000).string().cstring(), (watermark_ts / 1_000_000_000).string().cstring(), _earliest_window_idx.string().cstring())
+      // @printf[I32]("!@ -- Should we trigger earliest:%s, watermark:%s, _earliest_window_idx:%s?\n".cstring(), (earliest_ts / 1_000_000_000).string().cstring(), (watermark_ts / 1_000_000_000).string().cstring(), _earliest_window_idx.string().cstring())
       if _should_trigger(earliest_ts, watermark_ts) then
         var running_acc = _identity_acc
         var pane_idx = _earliest_window_idx
@@ -681,9 +681,9 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
 
         output_watermark_ts = window_end_ts
         stopped = false
-        @printf[I32]("!@ -- -- TRIGGERED!! window_end:%s, New _earliest_window_idx:%s\n".cstring(), (output_watermark_ts / 1_000_000_000).string().cstring(), _earliest_window_idx.string().cstring())
-      else
-        @printf[I32]("!@ -- -- NOT TRIGGERED\n".cstring())
+        // @printf[I32]("!@ -- -- TRIGGERED!! window_end:%s, New _earliest_window_idx:%s\n".cstring(), (output_watermark_ts / 1_000_000_000).string().cstring(), _earliest_window_idx.string().cstring())
+      // else
+        // @printf[I32]("!@ -- -- NOT TRIGGERED\n".cstring())
       end
     else
       Fail()
