@@ -9,7 +9,7 @@ def application_setup(args):
     incoming_metrics = wallaroo.source("Incoming metrics",
                          wallaroo.TCPSourceConfig(in_host, in_port,
                                                   decode_metrics,
-                                                  parallelism=100))
+                                                  parallelism=20))
 
     pipeline = (incoming_metrics
         .key_by(extract_name)
@@ -28,7 +28,7 @@ def extract_name(metric):
 
 @wallaroo.computation(name="print everything")
 def just_print_everything(metric):
-    print(metric.worker, metric.pipeline, metric.timestamp)
+    # print(metric.worker, metric.pipeline, metric.timestamp)
     return metric
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")

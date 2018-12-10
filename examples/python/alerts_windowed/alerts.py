@@ -75,7 +75,6 @@ class TotalAggregation(wallaroo.Aggregation):
         return TransactionTotal()
 
     def update(self, transaction, t_total):
-        printf("update happened here")
         t_total.total = t_total.total + transaction.amount
 
     def combine(self, t1, t2):
@@ -84,7 +83,7 @@ class TotalAggregation(wallaroo.Aggregation):
         return new_t
 
     def output(self, user, t):
-        print("!@TotalAggregation: Triggering output")
+        # print("!@TotalAggregation: Triggering output")
         if t.total > 2000:
             return DepositAlert(user, t.total)
         elif t.total < -2000:
@@ -101,12 +100,14 @@ def encode_alert(alert):
 ############################################
 class TransactionsGenerator(object):
     def __init__(self):
+        n_users = 1000
         self.user_idx = 0
-        self.user_totals = [1, 0, 0, 0, 0]
-        self.users = ["Fido", "Rex", "Dr. Whiskers", "Feathers", "Mountaineer"]
+        self.users = [ "User{}".format(n) for n in range(n_users)]
+        self.user_totals = [ 0 for _ in range(n_users) ]
+        self.user_totals[0] = 1
 
     def initial_value(self):
-        return Transaction("Fido", 1)
+        return Transaction(self.users[0], self.user_totals[0])
 
     def apply(self, v):
         # A simplistic way to get some numbers above, below, and within our
