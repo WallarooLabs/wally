@@ -13,6 +13,7 @@
 #  permissions and limitations under the License.
 
 import datetime
+import errno
 import io
 import logging
 import threading
@@ -224,7 +225,13 @@ class TCPReceiver(StoppableThread):
     def stop(self, *args, **kwargs):
         if not self.stopped():
             super(TCPReceiver, self).stop(*args, **kwargs)
-            self.sock.shutdown(socket.SHUT_RDWR)
+            try:
+                self.sock.shutdown(socket.SHUT_RDWR)
+            except OSError as err:
+                if err.errno == errno.ENOTCONN:
+                    pass
+                else:
+                    raise
             self.sock.close()
             for cl in self.clients:
                 cl.stop()
