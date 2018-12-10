@@ -32,6 +32,7 @@ actor Main is TestList
   fun tag tests(test: PonyTest) =>
     test(_TestTumblingWindows)
     test(_TestSlidingWindows)
+    test(_TestSlidingWindowsGCD)
     test(_TestCountWindows)
 
 class iso _TestTumblingWindows is UnitTest
@@ -40,8 +41,7 @@ class iso _TestTumblingWindows is UnitTest
   fun apply(h: TestHelper) ? =>
     let range: U64 = Seconds(10)
     let delay: U64 = Seconds(10)
-    let tw = TumblingWindows[USize, USize, _Total]("key", _Sum, range, delay
-      where current_ts = Seconds(100))
+    let tw = TumblingWindows[USize, USize, _Total]("key", _Sum, range, delay)
 
     var res: (Array[USize] val, U64) = (recover Array[USize] end, 0)
 
@@ -82,6 +82,11 @@ class iso _TestTumblingWindows is UnitTest
 
     true
 
+  fun _array(res: (USize | Array[USize] val | None)): Array[USize] val ? =>
+    match res
+    | let a: Array[USize] val => a
+    else error end
+
 class iso _TestSlidingWindows is UnitTest
   fun name(): String => "bytes/_TestSlidingWindows"
 
@@ -90,72 +95,239 @@ class iso _TestSlidingWindows is UnitTest
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(10)
     let sw = SlidingWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay where current_ts = Seconds(100))
+      delay)
 
-    var res: (Array[USize] val, U64) = (recover Array[USize] end, 0)
+    var res: ((USize | Array[USize] val | None), U64) =
+      (recover Array[USize] end, 0)
 
     // First 2 windows values
-    res = sw(2, Seconds(92), Seconds(101))
-    h.assert_eq[USize](res._1.size(), 1)
-    h.assert_eq[USize](res._1(0)?, 0)
+    res = sw(2, Seconds(92), Seconds(100))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
 
     res = sw(3, Seconds(93), Seconds(102))
-    h.assert_eq[USize](res._1.size(), 0)
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 0)
 
     res = sw(4, Seconds(94), Seconds(103))
-    h.assert_eq[USize](res._1.size(), 1)
-    h.assert_eq[USize](res._1(0)?, 0)
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 0)
 
     res = sw(5, Seconds(95), Seconds(104))
-    h.assert_eq[USize](res._1.size(), 0)
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
 
     // Second 2 windows with values
     res = sw(1, Seconds(102), Seconds(106))
-    h.assert_eq[USize](res._1.size(), 1)
-    h.assert_eq[USize](res._1(0)?, 5)
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 5)
 
     res = sw(2, Seconds(103), Seconds(107))
-    h.assert_eq[USize](res._1.size(), 1)
-    h.assert_eq[USize](res._1(0)?, 14)
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 14)
 
     res = sw(3, Seconds(104), Seconds(108))
-    h.assert_eq[USize](res._1.size(), 0)
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
 
     res = sw(4, Seconds(105), Seconds(109))
-    h.assert_eq[USize](res._1.size(), 1)
-    h.assert_eq[USize](res._1(0)?, 14)
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 14)
 
     // Third 2 windows with values.
     res = sw(10, Seconds(111), Seconds(112))
-    h.assert_eq[USize](res._1.size(), 1)
-    h.assert_eq[USize](res._1(0)?, 14)
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 14)
 
     res = sw(20, Seconds(112), Seconds(113))
-    h.assert_eq[USize](res._1.size(), 1)
-    h.assert_eq[USize](res._1(0)?, 14)
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 14)
 
     res = sw(30, Seconds(113), Seconds(114))
-    h.assert_eq[USize](res._1.size(), 0)
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
 
     res = sw(40, Seconds(114), Seconds(115))
-    h.assert_eq[USize](res._1.size(), 1)
-    h.assert_eq[USize](res._1(0)?, 12)
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 12)
 
+    // Fourth set of windows
     // Use this message to trigger 10 windows.
-    res = sw(1, Seconds(200), Seconds(201))
-    h.assert_eq[USize](res._1.size(), 10)
-    h.assert_eq[USize](res._1(0)?, 10)
-    h.assert_eq[USize](res._1(1)?, 10)
-    h.assert_eq[USize](res._1(2)?, 10)
-    h.assert_eq[USize](res._1(3)?, 20)
-    h.assert_eq[USize](res._1(4)?, 67)
-    h.assert_eq[USize](res._1(5)?, 100)
-    h.assert_eq[USize](res._1(6)?, 100)
-    h.assert_eq[USize](res._1(7)?, 100)
-    h.assert_eq[USize](res._1(8)?, 90)
-    h.assert_eq[USize](res._1(9)?, 40)
+    res = sw(2, Seconds(192), Seconds(200))
+    h.assert_eq[USize](_array(res._1)?.size(), 10)
+    h.assert_eq[USize](_array(res._1)?(0)?, 10)
+    h.assert_eq[USize](_array(res._1)?(1)?, 10)
+    h.assert_eq[USize](_array(res._1)?(2)?, 10)
+    h.assert_eq[USize](_array(res._1)?(3)?, 20)
+    h.assert_eq[USize](_array(res._1)?(4)?, 67)
+    h.assert_eq[USize](_array(res._1)?(5)?, 100)
+    h.assert_eq[USize](_array(res._1)?(6)?, 100)
+    h.assert_eq[USize](_array(res._1)?(7)?, 100)
+    h.assert_eq[USize](_array(res._1)?(8)?, 90)
+    h.assert_eq[USize](_array(res._1)?(9)?, 40)
+
+    res = sw(3, Seconds(193), Seconds(202))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 0)
+
+    res = sw(4, Seconds(194), Seconds(203))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 0)
+
+    res = sw(5, Seconds(195), Seconds(204))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    // Fifth 2 windows with values
+    res = sw(1, Seconds(202), Seconds(206))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 5)
+
+    res = sw(2, Seconds(203), Seconds(207))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 14)
+
+    res = sw(3, Seconds(204), Seconds(208))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    res = sw(4, Seconds(205), Seconds(209))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 14)
+
+    // Sixth 2 windows with values.
+    res = sw(10, Seconds(211), Seconds(212))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 14)
+
+    res = sw(20, Seconds(212), Seconds(213))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 14)
+
+    res = sw(30, Seconds(213), Seconds(214))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    res = sw(40, Seconds(214), Seconds(215))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 12)
 
     true
+
+  fun _array(res: (USize | Array[USize] val | None)): Array[USize] val ? =>
+    match res
+    | let a: Array[USize] val => a
+    else error end
+
+class iso _TestSlidingWindowsGCD is UnitTest
+  fun name(): String => "bytes/_TestSlidingWindowsGCD"
+
+  fun apply(h: TestHelper) ? =>
+    let range: U64 = Seconds(10)
+    let slide: U64 = Seconds(3)
+    let delay: U64 = Seconds(10)
+    let sw = SlidingWindows[USize, USize, _Total]("key", _Sum, range, slide,
+      delay)
+
+    var res: ((USize | Array[USize] val | None), U64) =
+      (recover Array[USize] end, 0)
+
+    // First set of windows values
+    res = sw(2, Seconds(92), Seconds(100))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    res = sw(3, Seconds(93), Seconds(102))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 0)
+
+    res = sw(4, Seconds(94), Seconds(103))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    res = sw(5, Seconds(95), Seconds(104))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 0)
+
+    // Second set of windows with values
+    res = sw(1, Seconds(102), Seconds(106))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    res = sw(2, Seconds(103), Seconds(107))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 5)
+
+    res = sw(3, Seconds(104), Seconds(108))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    res = sw(4, Seconds(105), Seconds(109))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    // Third set of windows with values.
+    res = sw(10, Seconds(111), Seconds(112))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 14)
+
+    res = sw(20, Seconds(112), Seconds(113))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 14)
+
+    res = sw(30, Seconds(113), Seconds(114))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    res = sw(40, Seconds(114), Seconds(115))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    // Fourth set of windows
+    // Use this message to trigger 8 windows.
+    res = sw(2, Seconds(192), Seconds(200))
+    h.assert_eq[USize](_array(res._1)?.size(), 8)
+    h.assert_eq[USize](_array(res._1)?(0)?, 13)
+    h.assert_eq[USize](_array(res._1)?(1)?, 10)
+    h.assert_eq[USize](_array(res._1)?(2)?, 10)
+    h.assert_eq[USize](_array(res._1)?(3)?, 20)
+    h.assert_eq[USize](_array(res._1)?(4)?, 104)
+    h.assert_eq[USize](_array(res._1)?(5)?, 100)
+    h.assert_eq[USize](_array(res._1)?(6)?, 100)
+    h.assert_eq[USize](_array(res._1)?(7)?, 40)
+
+    res = sw(3, Seconds(193), Seconds(202))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    res = sw(4, Seconds(194), Seconds(203))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 0)
+
+    res = sw(5, Seconds(195), Seconds(204))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    // Fifth set of windows with values
+    res = sw(1, Seconds(202), Seconds(206))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 2)
+
+    res = sw(2, Seconds(203), Seconds(207))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    res = sw(3, Seconds(204), Seconds(208))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    res = sw(4, Seconds(205), Seconds(209))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 14)
+
+    // Sixth set of windows with values.
+    res = sw(10, Seconds(211), Seconds(212))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 14)
+
+    res = sw(20, Seconds(212), Seconds(213))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    res = sw(30, Seconds(213), Seconds(214))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    res = sw(40, Seconds(214), Seconds(215))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 14)
+
+    true
+
+  fun _array(res: (USize | Array[USize] val | None)): Array[USize] val ? =>
+    match res
+    | let a: Array[USize] val => a
+    else error end
 
 class iso _TestCountWindows is UnitTest
   fun name(): String => "bytes/_TestCountWindows"
