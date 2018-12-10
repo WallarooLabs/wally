@@ -70,7 +70,7 @@ alerts_windowed_py3_test:
 		--log-level error \
 		--command 'machida3 --application-module alerts $(RUN_WITH_RESILIENCE)' \
 		--sink-mode newlines
-endif
+
 
 killall:
 	-for x in machida data_receiver ; do  pkill $$x; done
@@ -89,8 +89,11 @@ start-grafana:
 log:
 	mkdir -p log
 
-CLUSTER_SIZE := 10
-start-app: killall clear-resilience log start-grafana
+clean-log: log
+	rm -rf $</*
+
+CLUSTER_SIZE := 2
+start-app: killall clear-resilience clean-log start-grafana
 	data_receiver --listen 127.0.0.1:9999 > log/alerts.recv.log 2>&1 &
 
 	machida3 --ponythreads 1 --application-module alerts \
@@ -118,3 +121,5 @@ start-app: killall clear-resilience log start-grafana
 
 unit:
 	python3 -m unittest hub_protocol
+
+endif

@@ -33,7 +33,7 @@ def application_setup(args):
             .over(TotalAggregation()))
         .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encode_alert)))
 
-    return wallaroo.build_application("Alerts_windowed", pipeline)
+    return wallaroo.build_application("Alerts (windowed)", pipeline)
 
 
 class Transaction(object):
@@ -75,6 +75,7 @@ class TotalAggregation(wallaroo.Aggregation):
         return TransactionTotal()
 
     def update(self, transaction, t_total):
+        printf("update happened here")
         t_total.total = t_total.total + transaction.amount
 
     def combine(self, t1, t2):
