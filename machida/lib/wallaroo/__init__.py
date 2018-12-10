@@ -229,7 +229,6 @@ def attach_to_module(cls, cls_name, func, idx=None):
 
 _C = Counter()
 def _wallaroo_wrap(name, func, base_cls, **kwargs):
-    print("_wallaroo_wrap", name, func, base_cls, kwargs)
     # Case 1: Computations
     if issubclass(base_cls, Computation):
         # Create the appropriate computation signature
