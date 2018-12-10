@@ -17,6 +17,7 @@
 
 import argparse
 import json
+import time
 import struct
 
 import wallaroo
@@ -102,15 +103,16 @@ class Collect(wallaroo.Aggregation):
         print(key, [str(m) for m in accumulator])
         keys = set(m.key for m in accumulator)
         values = tuple(m.value for m in accumulator)
+        ts = time.time()
         assert(len(keys) == 1)
         assert(keys.pop().split(".")[0] == key)
-        return (key, values)
+        return (key, values, ts)
 
 
 @wallaroo.computation_multi(name="Split Accumulated")
 def split_accumulated(data):
-    key, values = data
-    return [(key, v) for v in values]
+    key, values, ts = data
+    return [(key, v, ts) for v in values]
 
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
@@ -123,5 +125,5 @@ def decoder(bs):
 
 @wallaroo.encoder
 def encoder(msg):
-    s = json.dumps({'key': msg[0], 'value': msg[1]})
+    s = json.dumps({'key': msg[0], 'value': msg[1], 'ts': msg[2]})
     return struct.pack(">I{}s".format(len(s)), len(s), s)
