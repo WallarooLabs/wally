@@ -1261,6 +1261,15 @@ primitive _SinkConfig
                                 .over[PyData val, PyData val, PyState](
                                   aggregation)
         pipeline = pipeline.to[PyData val](windows)
+      | "to_count_windows" =>
+        let count = @PyLong_AsLong(@PyTuple_GetItem(stage, 1)).usize()
+        let raw_aggregation = @PyTuple_GetItem(stage, 2)
+        let aggregation = PyAggregation(raw_aggregation)
+        Machida.inc_ref(raw_aggregation)
+        let windows = Wallaroo.count_windows(count)
+                                .over[PyData val, PyData val, PyState](
+                                  aggregation)
+        pipeline = pipeline.to[PyData val](windows)
       | "key_by" =>
         let raw_key_extractor = @PyTuple_GetItem(stage, 1)
         let key_extractor = PyKeyExtractor(raw_key_extractor)
