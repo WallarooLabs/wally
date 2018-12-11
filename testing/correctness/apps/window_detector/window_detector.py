@@ -18,24 +18,55 @@
 import argparse
 import json
 import time
-import datetime
 import struct
 
 import wallaroo
 
 
 def application_setup(args):
+    parser = argparse.ArgumentParser("Window Detector")
+    parser.add_argument("--window-type", default="tumbling",
+                        choices=["tumbling", "sliding", "counting"])
+    parser.add_argument("--window-delay", type=int, default=0,
+                        help=("Window delay"
+                              "size in milliseconds. (Default: 0)"))
+    parser.add_argument("--window-size", type=int, default=50,
+                        help=("Window size in"
+                              "milliseconds or units. (Default: 50)"))
+    parser.add_argument("--window-slide", type=int, default=0,
+                        help=("Window slide size, in milliseconds. "
+                              "(Default: 25)"))
+    pargs, _ = parser.parse_known_args(args)
 
     print("Using TCP Source")
     in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     source = wallaroo.TCPSourceConfig(in_host, in_port, decoder)
 
-    p = wallaroo.source("tumbling time window", source)
+    p = wallaroo.source("{} window".format(pargs.window_type), source)
     p = p.key_by(extract_key)
     p = p.to(trace_id)
     p = p.key_by(extract_key)
-    p = p.to(wallaroo.range_windows(wallaroo.milliseconds(50))
-             .over(Collect()))
+
+    # Programmatically construct the window type and arguments
+    if pargs.window_type == 'counting':
+        # TODO: remove this when counting windows are supported
+        #       and update the API call below to match implementation
+        raise NotImplementedError("Counting windows are not supported "
+                                  "at this time.")
+        print("Using window size: {} units".format(pargs.window_size))
+        window = wallaroo.count_windows(pargs.window_size)
+    else:
+        print("Using window size: {} ms".format(pargs.window_size))
+        window = wallaroo.range_windows(wallaroo.milliseconds(pargs.window_size))
+    if pargs.window_delay:
+        print("Using window_delay: {} ms".format(pargs.window_delay))
+        window = window.with_delay(wallaroo.milliseconds(pargs.window_delay))
+    if pargs.window_type == 'sliding':
+        print("Using window_slide: {} ms".format(pargs.window_slide))
+        window = window.with_slide(wallaroo.milliseconds(pargs.window_slide))
+    # add the window to the topology
+    p = p.to(window.over(Collect))
+
     p = p.to(split_accumulated)
 
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
@@ -104,7 +135,7 @@ class Collect(wallaroo.Aggregation):
         keys = set(m.key for m in accumulator)
         values = tuple(m.value for m in accumulator)
         ts = time.time()
-        print("Collect.output", datetime.datetime.now(), ts, key, [str(m) for m in accumulator])
+        print("Collect.output", time.time(), ts, key, [str(m) for m in accumulator])
         assert(len(keys) == 1)
         assert(keys.pop().split(".")[0] == key)
         return (key, values, ts)
@@ -127,6 +158,6 @@ def decoder(bs):
 
 @wallaroo.encoder
 def encoder(msg):
-    print("encoder", datetime.datetime.now(), msg)
+    print("encoder", time.time(), msg)
     s = json.dumps({'key': msg[0], 'value': msg[1], 'ts': msg[2]})
     return struct.pack(">I{}s".format(len(s)), len(s), s)
