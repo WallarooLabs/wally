@@ -73,14 +73,12 @@ alerts_windowed_py3_test:
 
 
 killall:
-	-for x in machida data_receiver ; do  pkill $$x; done
-	-docker stop grafana
-	-docker rm -f grafana
-	true
+	-for p in machida data_receiver ; do  pkill $$p; done
+	-for c in grafana graphite ; do  docker stop $$c ; docker rm $$c ; done
 
 clear-resilience:
 	rm -rf /tmp/Alerts*
-	rm -rf /tmp/metrics-*
+	rm -rf /tmp/Metrics*
 
 start-grafana:
 	if !(docker volume list | grep grafana-volume); then\
@@ -96,6 +94,7 @@ clean-log: log
 CLUSTER_SIZE := 4
 start-app: killall clear-resilience clean-log start-grafana
 	data_receiver --listen 127.0.0.1:9999 > log/alerts.recv.log 2>&1 &
+
 	machida3 --ponythreads 1 --application-module metrics \
 	--cluster-initializer --in 127.0.0.1:5001 --out 127.0.0.1:2003 \
 	--metrics 127.0.0.1:15001 --data 127.0.0.1:61000 \
@@ -110,6 +109,7 @@ start-app: killall clear-resilience clean-log start-grafana
 	--worker-count=$(CLUSTER_SIZE) \
 	--name initializer > log/alerts.0.log 2>&1 &
 	while !(nc -z 127.0.0.1 6500); do printf . ; sleep 1; done
+
 	for n in $$(seq 1 $$(($(CLUSTER_SIZE)-1))); do \
           machida3 --ponythreads 1 --application-module alerts \
           --out 127.0.0.1:9999 \
@@ -126,5 +126,6 @@ reset:	 killall
 
 unit:
 	python3 -m unittest hub_protocol
+	python3 -m unittest metric
 
 endif

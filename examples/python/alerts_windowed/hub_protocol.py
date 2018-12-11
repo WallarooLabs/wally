@@ -1,19 +1,6 @@
+from metric import Metric
 import struct
 import unittest
-
-class Metric(object):
-    def __init__(self, name, cat, worker, pipeline, id,
-                 latencies, min, max, period, ts):
-        self.name = name
-        self.category = cat
-        self.worker = worker
-        self.pipeline = pipeline
-        self.id = str(int(id))
-        self.latencies = latencies
-        self.min = min
-        self.max = max
-        self.period = period
-        self.timestamp = ts
 
 class MetricParser(object):
     @classmethod
