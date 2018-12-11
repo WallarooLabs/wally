@@ -65,4 +65,10 @@ else: # window_type == 'sliding'
         for i in range(len(subwindows)-1):
             counter = Counter(windows[k][subwindows[i]] +
                               windows[k][subwindows[i+1]])
-            assert(counter.most_common(1)[0][1] == 2)
+            most_common = counter.most_common(3)
+            first = most_common[0][1]
+            second = most_common[1][1]
+            third = most_common[2][1]
+            assert(first >= 1 and first <= 2)
+            assert(second >= 1 and second <= 2)
+            assert(third >= 1 and third <= 2)

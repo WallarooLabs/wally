@@ -33,7 +33,7 @@ def application_setup(args):
     parser.add_argument("--window-size", type=int, default=50,
                         help=("Window size in"
                               "milliseconds or units. (Default: 50)"))
-    parser.add_argument("--window-slide", type=int, default=0,
+    parser.add_argument("--window-slide", type=int, default=25,
                         help=("Window slide size, in milliseconds. "
                               "(Default: 25)"))
     pargs, _ = parser.parse_known_args(args)
@@ -49,10 +49,6 @@ def application_setup(args):
 
     # Programmatically construct the window type and arguments
     if pargs.window_type == 'counting':
-        # TODO: remove this when counting windows are supported
-        #       and update the API call below to match implementation
-        raise NotImplementedError("Counting windows are not supported "
-                                  "at this time.")
         print("Using window size: {} units".format(pargs.window_size))
         window = wallaroo.count_windows(pargs.window_size)
     else:
