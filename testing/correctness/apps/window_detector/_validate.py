@@ -14,6 +14,7 @@
 
 
 import argparse
+from collections import Counter
 from json import loads
 import struct
 
@@ -46,7 +47,7 @@ for k in windows.keys():
 if args.window_type in ('tumbling', 'counting'):
     for k, v in sequences.items():
         expected = list(range(1, len(v) + 1))
-        assert(v == expected)
+        assert(v == expected), "Expect natural sequence"
 
 else: # window_type == 'sliding'
     for k, v in sequences.items():
@@ -55,5 +56,13 @@ else: # window_type == 'sliding'
         # unique items are natural sequences per key:
         assert(processed == expected)
         # there should duplicates from the sliding:
-        assert(len(v) > len(expected))
-
+        assert(len(v) > len(expected)), "Expect duplication in sliding windows"
+    for k in windows.keys():
+        # Check that for each window, there are at most 2 duplicates per item
+        # e.g. the duplicates are plausibly caused by the sub window overlap,
+        # rather than by output duplications due to other factors
+        subwindows = sorted(windows[k].keys())
+        for i in range(len(subwindows)-1):
+            counter = Counter(windows[k][subwindows[i]] +
+                              windows[k][subwindows[i+1]])
+            assert(counter.most_common(1)[0][1] == 2)

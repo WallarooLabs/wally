@@ -52,141 +52,55 @@ integration-tests-testing-correctness-apps-window_detector: window_detector_test
 # Pony
 
 # Python
-window_detector_tests_python: window_detector_test_python
-#window_detector_tests_python: window_detector_test_python_gen_source
-#window_detector_tests_python: window_detector_test_python_10_worker
-#window_detector_tests_python: window_detector_test_python_gen_source_10_worker
+window_detector_tests_python: window_detector_tumbling_test_python
+#window_detector_tests_python: window_detector_sliding_test_python
+#window_detector_tests_python: window_detector_counting_test_python
+
 
 # Python3
-#window_detector_tests_python3: window_detector_test_python3
-#window_detector_tests_python3: window_detector_test_python3_gen_source
-#window_detector_tests_python3: window_detector_test_python3_10_worker
-#window_detector_tests_python3: window_detector_test_python3_gen_source_10_worker
 
 
 # Individual test definitions below
 #
 # Python tests
-window_detector_test_python:
+window_detector_tumbling_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
 	  --sequence-sender '(0,100]' 0 '>I' key_0 \
 	  --sequence-sender '(0,100]' 0 '>I' key_1 \
 	  --log-level error \
-		--command 'machida --application-module tumbling_time_window $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--command 'machida --application-module window_detector --window-type tumbling $(RUN_WITH_RESILIENCE)' \
+		--validation-cmd 'python _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 1 \
 		--sink-expect 200
 
-#window_detector_test_python_gen_source:
-#	cd $(WINDOW_DETECTOR_PATH) && \
-#	integration_test \
-#	  --log-level error \
-#		--sources 0 \
-#		--command 'machida --application-module window_detector --gen-source $(RUN_WITH_RESILIENCE)' \
-#		--validation-cmd './validator/validator -a -i' \
-#		--output 'received.txt' \
-#		--batch-size 10 \
-#		--workers 10 \
-#		--sink-expect 200 \
-#		--sink-expect-allow-more
-#
-#window_detector_test_python_10_worker:
-#	cd $(WINDOW_DETECTOR_PATH) && \
-#	integration_test \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_0 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_1 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_2 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_3 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_4 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_5 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_6 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_7 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_8 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_9 \
-#	  --log-level error \
-#		--command 'machida --application-module window_detector $(RUN_WITH_RESILIENCE)' \
-#		--validation-cmd './validator/validator -e 1000 -a -i' \
-#		--output 'received.txt' \
-#		--batch-size 10 \
-#		--workers 10 \
-#		--sink-expect 10000
-#
-#window_detector_test_python_gen_source_10_worker:
-#	cd $(WINDOW_DETECTOR_PATH) && \
-#	integration_test \
-#	  --log-level error \
-#		--sources 0 \
-#		--command 'machida --application-module window_detector --gen-source $(RUN_WITH_RESILIENCE)' \
-#		--validation-cmd './validator/validator -a -i' \
-#		--output 'received.txt' \
-#		--batch-size 10 \
-#		--workers 10 \
-#		--sink-expect 10000 \
-#		--sink-expect-allow-more
-#
-## Python3 tests
-#window_detector_test_python3:
-#	cd $(WINDOW_DETECTOR_PATH) && \
-#	integration_test \
-#	  --sequence-sender '(0,100]' 0 '>I' key_0 \
-#	  --sequence-sender '(0,100]' 0 '>I' key_1 \
-#	  --log-level error \
-#		--command 'machida3 --application-module window_detector $(RUN_WITH_RESILIENCE)' \
-#		--validation-cmd './validator/validator -e 100 -a -i' \
-#		--output 'received.txt' \
-#		--batch-size 10 \
-#		--workers 2 \
-#		--sink-expect 200
-#
-#window_detector_test_python3_gen_source:
-#	cd $(WINDOW_DETECTOR_PATH) && \
-#	integration_test \
-#	  --log-level error \
-#		--sources 0 \
-#		--command 'machida3 --application-module window_detector --gen-source $(RUN_WITH_RESILIENCE)' \
-#		--validation-cmd './validator/validator -a -i' \
-#		--output 'received.txt' \
-#		--batch-size 10 \
-#		--workers 10 \
-#		--sink-expect 200 \
-#		--sink-expect-allow-more
-#
-#window_detector_test_python3_10_worker:
-#	cd $(WINDOW_DETECTOR_PATH) && \
-#	integration_test \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_0 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_1 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_2 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_3 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_4 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_5 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_6 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_7 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_8 \
-#	  --sequence-sender '(0,1000]' 0 '>I' key_9 \
-#	  --log-level error \
-#		--command 'machida3 --application-module window_detector $(RUN_WITH_RESILIENCE)' \
-#		--validation-cmd './validator/validator -e 1000 -a -i' \
-#		--output 'received.txt' \
-#		--batch-size 10 \
-#		--workers 10 \
-#		--sink-expect 10000
-#
-#window_detector_test_python3_gen_source_10_worker:
-#	cd $(WINDOW_DETECTOR_PATH) && \
-#	integration_test \
-#	  --log-level error \
-#		--sources 0 \
-#		--command 'machida3 --application-module window_detector --gen-source $(RUN_WITH_RESILIENCE)' \
-#		--validation-cmd './validator/validator -a -i' \
-#		--output 'received.txt' \
-#		--batch-size 10 \
-#		--workers 10 \
-#		--sink-expect 10000 \
-#		--sink-expect-allow-more
+window_detector_counting_test_python:
+	cd $(WINDOW_DETECTOR_PATH) && \
+	integration_test \
+	  --sequence-sender '(0,100]' 0 '>I' key_0 \
+	  --sequence-sender '(0,100]' 0 '>I' key_1 \
+	  --log-level error \
+		--command 'machida --application-module window_detector --window-type counting $(RUN_WITH_RESILIENCE)' \
+		--validation-cmd 'python _validate.py --window-type counting --output' \
+		--output 'received.txt' \
+		--batch-size 50 \
+		--workers 1 \
+		--sink-expect 200
+
+window_detector_sliding_test_python:
+	cd $(WINDOW_DETECTOR_PATH) && \
+	integration_test \
+	  --sequence-sender '(0,100]' 0 '>I' key_0 \
+	  --sequence-sender '(0,100]' 0 '>I' key_1 \
+	  --log-level error \
+		--command 'machida --application-module window_detector --window-type sliding $(RUN_WITH_RESILIENCE)' \
+		--validation-cmd 'python _validate.py --window-type sliding --output' \
+		--output 'received.txt' \
+		--batch-size 50 \
+		--workers 1 \
+		--sink-expect 200
 
 # end of prevent rules from being evaluated/included multiple times
 endif
