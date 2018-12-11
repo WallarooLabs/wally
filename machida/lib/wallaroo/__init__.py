@@ -76,6 +76,10 @@ def range_windows(wrange):
     return RangeWindowsBuilder(wrange)
 
 
+def count_windows(wrange):
+    return CountWindowsBuilder(wrange)
+
+
 class Pipeline(object):
     def __init__(self, pipeline_tree):
         self._pipeline_tree = pipeline_tree
@@ -103,6 +107,10 @@ class Pipeline(object):
                                            computation.range,
                                            computation.slide,
                                            computation.delay,
+                                           computation.aggregation))
+        elif isinstance(computation, CountWindows):
+            self._pipeline_tree.add_stage(("to_count_windows",
+                                           computation.count,
                                            computation.aggregation))
         else:
             self._pipeline_tree.add_stage(("to", computation))
@@ -780,6 +788,21 @@ class RangeWindows(object):
         self.range = wrange
         self.slide = slide
         self.delay = delay
+        _validate_aggregation(agg)
+        self.aggregation = agg
+
+
+class CountWindowsBuilder(object):
+    def __init__(self, count):
+        self.count = count
+
+    def over(self, aggregation_cls):
+        return CountWindows(self.count, aggregation_cls())
+
+
+class CountWindows(object):
+    def __init__(self, count, agg):
+        self.count = count
         _validate_aggregation(agg)
         self.aggregation = agg
 
