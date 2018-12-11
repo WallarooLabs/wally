@@ -53,8 +53,8 @@ integration-tests-testing-correctness-apps-window_detector: window_detector_test
 
 # Python
 window_detector_tests_python: window_detector_tumbling_test_python
-#window_detector_tests_python: window_detector_sliding_test_python
-#window_detector_tests_python: window_detector_counting_test_python
+window_detector_tests_python: window_detector_sliding_test_python
+window_detector_tests_python: window_detector_counting_test_python
 
 
 # Python3
@@ -100,7 +100,7 @@ window_detector_sliding_test_python:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 1 \
-		--sink-expect 200
+		--sink-expect 398
 
 # end of prevent rules from being evaluated/included multiple times
 endif
