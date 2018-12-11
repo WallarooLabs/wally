@@ -124,7 +124,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
 
     match _runner
     | let tr: TimeoutTriggeringRunner =>
-      tr.set_trigger(StepTimeoutTrigger(this))
+      tr.set_triggers(StepTimeoutTrigger(this), _watermarks)
     end
 
   //

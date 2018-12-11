@@ -70,6 +70,9 @@ interface val StateComputation[In: Any val, Out: Any val, S: State ref] is
     let state = encoder_decoder().decode(in_reader, auth)?
     StateComputationWrapper[In, Out, S](this, state)
 
+  fun timeout_interval(): U64 =>
+    0
+
 class StateComputationWrapper[In: Any val, Out: Any val, S: State ref] is
   StateWrapper[In, Out, S]
   let _comp: StateComputation[In, Out, S]

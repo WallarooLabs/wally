@@ -29,6 +29,7 @@ use "wallaroo/core/invariant"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/state"
+use "wallaroo/core/windows"
 use "wallaroo/ent/recovery"
 use "wallaroo_labs/guid"
 use "wallaroo_labs/mort"
@@ -313,10 +314,13 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
   fun ref rollback(payload: ByteSeq val) =>
     replace_serialized_state(payload)
 
-  fun ref set_trigger(stt: StepTimeoutTrigger) =>
+  fun ref set_triggers(stt: StepTimeoutTrigger, watermarks: StageWatermarks) =>
     _step_timeout_trigger = stt
-    //!@ Where do we first set the trigger?
-    stt.set_timeout(5_000_000_000)
+    let ti = _state_initializer.timeout_interval()
+    if ti > 0 then
+      stt.set_timeout(ti)
+      watermarks.update_last_heard_threshold(ti * 2)
+    end
 
   fun ref on_timeout(producer_id: RoutingId, producer: Producer ref,
     router: Router, metrics_reporter: MetricsReporter ref)
@@ -364,7 +368,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     //!@ How do we configure this timeout and where does this go?
     match _step_timeout_trigger
     | let stt: StepTimeoutTrigger =>
-      stt.set_timeout(5_000_000_000)
+      stt.set_timeout(1_000_000_000)
     else
       ifdef debug then
         @printf[I32](("StateRunner: on_timeout was called but we have no " +
