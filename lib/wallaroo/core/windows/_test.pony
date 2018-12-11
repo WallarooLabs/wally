@@ -40,45 +40,51 @@ class iso _TestTumblingWindows is UnitTest
 
   fun apply(h: TestHelper) ? =>
     let range: U64 = Seconds(10)
+    // Tumbling windows have the same slide as range
+    let slide = range
     let delay: U64 = Seconds(10)
-    let tw = TumblingWindows[USize, USize, _Total]("key", _Sum, range, delay)
+    let tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+      delay)
 
-    var res: (Array[USize] val, U64) = (recover Array[USize] end, 0)
+    var res: ((USize | Array[USize] val | None), U64) =
+      (recover Array[USize] end, 0)
 
     // First window's data
     res = tw(2, Seconds(96), Seconds(101))
-    h.assert_eq[USize](res._1.size(), 0)
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
     res = tw(3, Seconds(97), Seconds(102))
-    h.assert_eq[USize](res._1.size(), 0)
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 0)
     res = tw(4, Seconds(98), Seconds(103))
-    h.assert_eq[USize](res._1.size(), 0)
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
     res = tw(5, Seconds(99), Seconds(104))
-    h.assert_eq[USize](res._1.size(), 0)
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
 
     // Second window's data
     res = tw(1, Seconds(105), Seconds(106))
-    h.assert_eq[USize](res._1.size(), 0)
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
     res = tw(2, Seconds(106), Seconds(107))
-    h.assert_eq[USize](res._1.size(), 0)
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
     res = tw(3, Seconds(107), Seconds(108))
-    h.assert_eq[USize](res._1.size(), 0)
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
     res = tw(4, Seconds(108), Seconds(109))
-    h.assert_eq[USize](res._1.size(), 0)
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
 
     // Third window's data. This first message should trigger
     // first window.
     res = tw(10, Seconds(110), Seconds(111))
-    h.assert_eq[USize](res._1.size(), 1)
-    h.assert_eq[USize](res._1(0)?, 14)
-    tw(20, Seconds(111), Seconds(112))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+    res = tw(20, Seconds(111), Seconds(112))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 14)
     tw(30, Seconds(112), Seconds(113))
     tw(40, Seconds(113), Seconds(114))
 
     // Use this message to trigger windows 2 and 3
     res = tw(1, Seconds(200), Seconds(201))
-    h.assert_eq[USize](res._1.size(), 2)
-    h.assert_eq[USize](res._1(0)?, 10)
-    h.assert_eq[USize](res._1(1)?, 100)
+    h.assert_eq[USize](_array(res._1)?.size(), 2)
+    h.assert_eq[USize](_array(res._1)?(0)?, 20)
+    h.assert_eq[USize](_array(res._1)?(1)?, 90)
 
     true
 
@@ -94,7 +100,7 @@ class iso _TestSlidingWindows is UnitTest
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(10)
-    let sw = SlidingWindows[USize, USize, _Total]("key", _Sum, range, slide,
+    let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
       delay)
 
     var res: ((USize | Array[USize] val | None), U64) =
@@ -219,7 +225,7 @@ class iso _TestSlidingWindowsGCD is UnitTest
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(3)
     let delay: U64 = Seconds(10)
-    let sw = SlidingWindows[USize, USize, _Total]("key", _Sum, range, slide,
+    let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
       delay)
 
     var res: ((USize | Array[USize] val | None), U64) =

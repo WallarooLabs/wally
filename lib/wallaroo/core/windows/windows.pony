@@ -57,11 +57,8 @@ class RangeWindowsBuilder
       FatalUserError("A window's slide cannot be greater than its range. " +
         "But found slide " + _slide.string() + " for range " + _range.string())
     end
-    if _slide == _range then
-      TumblingWindowsStateInitializer[In, Out, S](agg, _range, _delay)
-    else
-      SlidingWindowsStateInitializer[In, Out, S](agg, _range, _slide, _delay)
-    end
+
+    RangeWindowsStateInitializer[In, Out, S](agg, _range, _slide, _delay)
 
 class CountWindowsBuilder
   var _count: USize
@@ -106,6 +103,9 @@ trait WindowsWrapper[In: Any val, Out: Any val, Acc: State ref]
 
   fun ref attempt_to_trigger(watermark_ts: U64): (Array[Out] val, U64)
 
+///////////////////////////
+// GLOBAL WINDOWS
+///////////////////////////
 class val GlobalWindowStateInitializer[In: Any val, Out: Any val,
   Acc: State ref] is StateInitializer[In, Out, Acc]
   let _agg: Aggregation[In, Out, Acc]
@@ -176,218 +176,9 @@ class GlobalWindow[In: Any val, Out: Any val, Acc: State ref] is
     end
 
 ///////////////////////////
-// TUMBLING RANGE WINDOWS
+// RANGE WINDOWS
 ///////////////////////////
-class val TumblingWindowsStateInitializer[In: Any val, Out: Any val,
-  Acc: State ref] is StateInitializer[In, Out, Acc]
-  let _agg: Aggregation[In, Out, Acc]
-  let _range: U64
-  let _delay: U64
-
-  new val create(agg: Aggregation[In, Out, Acc], range: U64, delay: U64) =>
-    _agg = agg
-    _range = range
-    _delay = delay
-
-  fun state_wrapper(key: Key): StateWrapper[In, Out, Acc] =>
-    TumblingWindows[In, Out, Acc](key, _agg, _range, _delay)
-
-  fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
-    RunnerBuilder
-  =>
-    StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelization)
-
-  fun timeout_interval(): U64 =>
-    (_range + _delay) * 2
-
-  fun val decode(in_reader: Reader, auth: AmbientAuth):
-    StateWrapper[In, Out, Acc] ?
-  =>
-    try
-      let data: Array[U8] iso = in_reader.block(in_reader.size())?
-      match Serialised.input(InputSerialisedAuth(auth), consume data)(
-        DeserialiseAuth(auth))?
-      | let tw: TumblingWindows[In, Out, Acc] => tw
-      else
-        error
-      end
-    else
-      error
-    end
-
-  fun name(): String =>
-    _agg.name()
-
-class TumblingWindows[In: Any val, Out: Any val, Acc: State ref] is
-  Windows[In, Out, Acc]
-  let _key: Key
-  let _agg: Aggregation[In, Out, Acc]
-
-  let _windows: Array[(Acc | EmptyWindow)]
-  let _windows_start_ts: Array[U64]
-  var _earliest_window_idx: USize
-  let _range: U64
-  let _delay: U64
-
-  new create(key: Key, agg: Aggregation[In, Out, Acc], range: U64, delay: U64)
-  =>
-    _key = key
-    _agg = agg
-    _range = range
-    // Normalize delay to units of range. Since we are using tumbling windows,
-    // this simplifies calculations.
-    let delay_range_units = (delay.f64() / range.f64()).ceil()
-    // let delay_range_units = delay / range
-    _delay = range * delay_range_units.u64()
-    // Calculate how many windows we need. The delay tells us how long we
-    // wait after the close of a window to trigger and clear it. We need
-    // enough extra windows to account for this delay.
-    let extra_windows = delay_range_units.usize()
-    let window_count = 1 + extra_windows
-    _windows = Array[(Acc | EmptyWindow)](window_count)
-    _windows_start_ts = Array[U64](window_count)
-    _earliest_window_idx = 0
-    var window_start: U64 = 0
-    for i in Range(0, window_count) do
-      _windows.push(EmptyWindow)
-      _windows_start_ts.push(window_start)
-      window_start = window_start + range
-    end
-
-  fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
-    (Array[Out] val, U64)
-  =>
-    try
-      let earliest_ts = _windows_start_ts(_earliest_window_idx)?
-      let end_ts = earliest_ts + (_windows.size().u64() * _range)
-      var applied = false
-      if (event_ts >= earliest_ts) and (event_ts < end_ts) then
-        _apply_input(input, event_ts, earliest_ts)
-        applied = true
-      end
-
-      // Check if we need to trigger and clear windows
-      (let outs, let output_watermark_ts) = _attempt_to_trigger(watermark_ts)
-
-      // If we haven't already applied the input, do it now.
-      if not applied and _is_valid_ts(event_ts, watermark_ts) then
-        let new_earliest_ts = _windows_start_ts(_earliest_window_idx)?
-        _apply_input(input, event_ts, new_earliest_ts)
-      end
-
-      (outs, output_watermark_ts)
-    else
-      Fail()
-      (recover Array[Out] end, watermark_ts)
-    end
-
-  fun ref on_timeout(watermark_ts: U64): (Array[Out] val, U64) =>
-    _attempt_to_trigger(watermark_ts)
-
-  fun ref encode(auth: AmbientAuth): ByteSeq =>
-    try
-      Serialised(SerialiseAuth(auth), this)?.output(OutputSerialisedAuth(
-        auth))
-    else
-      Fail()
-      recover Array[U8] end
-    end
-
-  fun ref _apply_input(input: In, event_ts: U64, earliest_ts: U64) =>
-    // Should we ensure the event_ts is in the correct range?
-
-    if event_ts >= earliest_ts then
-      let window_idx_offset = ((event_ts - earliest_ts) / _range).usize()
-      let window_idx =
-        (_earliest_window_idx + window_idx_offset) % _windows.size()
-      try
-        match _windows(window_idx)?
-        | let ew: EmptyWindow =>
-          let acc = _agg.initial_accumulator()
-          _agg.update(input, acc)
-          _windows(window_idx)? = acc
-        | let acc: Acc =>
-          _agg.update(input, acc)
-        end
-      else
-        Fail()
-      end
-    else
-      // !TODO!: Should we keep this debug message? Too-early messages can be
-      // expected.
-      ifdef debug then
-        @printf[I32]("Event ts %s is earlier than earliest window %s. Ignoring\n".cstring(), event_ts.string().cstring(), earliest_ts.string().cstring())
-      end
-    end
-
-  fun ref _attempt_to_trigger(watermark_ts: U64): (Array[Out] val, U64)
-  =>
-    let outs = recover iso Array[Out] end
-    var output_watermark_ts: U64 = 0
-    try
-      let earliest_ts = _windows_start_ts(_earliest_window_idx)?
-      let end_ts = earliest_ts + (_windows.size().u64() * _range)
-      // Convert to range units
-      let end_ts_diff =
-        ((watermark_ts - end_ts).f64() / _range.f64()).ceil().u64()
-      var stopped = false
-      while not stopped do
-        (let next_out, let next_output_watermark_ts, stopped) =
-          _check_first_window(watermark_ts, end_ts_diff)
-        if next_output_watermark_ts > output_watermark_ts then
-          output_watermark_ts = next_output_watermark_ts
-        end
-        match next_out
-        | let out: Out =>
-          outs.push(out)
-        end
-      end
-    else
-      Fail()
-    end
-    (consume outs, output_watermark_ts)
-
-  fun ref _check_first_window(watermark_ts: U64, end_ts_diff: U64):
-    ((Out | None), U64, Bool)
-  =>
-    var out: (Out | None) = None
-    var output_watermark_ts: U64 = 0
-    var stopped: Bool = true
-    try
-      let earliest_ts = _windows_start_ts(_earliest_window_idx)?
-      let window_end_ts = earliest_ts + _range
-      if _should_trigger(earliest_ts, watermark_ts) then
-        match _windows(_earliest_window_idx)?
-        | let acc: Acc =>
-          out = _agg.output(_key, acc)
-        end
-        _windows(_earliest_window_idx)? = EmptyWindow
-        let all_window_range = _windows.size().u64() * _range
-        if end_ts_diff > all_window_range then
-          _windows_start_ts(_earliest_window_idx)? = window_end_ts
-        else
-          _windows_start_ts(_earliest_window_idx)? = earliest_ts +
-            all_window_range
-        end
-        output_watermark_ts = window_end_ts
-        stopped = false
-        _earliest_window_idx = (_earliest_window_idx + 1) % _windows.size()
-      end
-    else
-      Fail()
-    end
-    (out, output_watermark_ts, stopped)
-
-  fun _is_valid_ts(event_ts: U64, watermark_ts: U64): Bool =>
-    event_ts > (watermark_ts - (_delay + _range))
-
-  fun _should_trigger(window_start_ts: U64, watermark_ts: U64): Bool =>
-    (window_start_ts + _range) < (watermark_ts - _delay)
-
-///////////////////////////
-// SLIDING RANGE WINDOWS
-///////////////////////////
-class val SlidingWindowsStateInitializer[In: Any val, Out: Any val,
+class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
   Acc: State ref] is StateInitializer[In, Out, Acc]
   let _agg: Aggregation[In, Out, Acc]
   let _range: U64
@@ -403,7 +194,7 @@ class val SlidingWindowsStateInitializer[In: Any val, Out: Any val,
     _delay = delay
 
   fun state_wrapper(key: Key): StateWrapper[In, Out, Acc] =>
-    SlidingWindows[In, Out, Acc](key, _agg, _range, _slide, _delay)
+    RangeWindows[In, Out, Acc](key, _agg, _range, _slide, _delay)
 
   fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
     RunnerBuilder
@@ -420,7 +211,7 @@ class val SlidingWindowsStateInitializer[In: Any val, Out: Any val,
       let data: Array[U8] iso = in_reader.block(in_reader.size())?
       match Serialised.input(InputSerialisedAuth(auth), consume data)(
         DeserialiseAuth(auth))?
-      | let sw: SlidingWindows[In, Out, Acc] => sw
+      | let sw: RangeWindows[In, Out, Acc] => sw
       else
         error
       end
@@ -431,7 +222,7 @@ class val SlidingWindowsStateInitializer[In: Any val, Out: Any val,
   fun name(): String =>
     _agg.name()
 
-class SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
+class RangeWindows[In: Any val, Out: Any val, Acc: State ref] is
   Windows[In, Out, Acc]
   var _phase: WindowsPhase[In, Out, Acc] = EmptyWindowsPhase[In, Out, Acc]
 
@@ -736,7 +527,7 @@ class val TumblingCountWindowsStateInitializer[In: Any val, Out: Any val,
       let data: Array[U8] iso = in_reader.block(in_reader.size())?
       match Serialised.input(InputSerialisedAuth(auth), consume data)(
         DeserialiseAuth(auth))?
-      | let tw: TumblingWindows[In, Out, Acc] => tw
+      | let tw: TumblingCountWindows[In, Out, Acc] => tw
       else
         error
       end
