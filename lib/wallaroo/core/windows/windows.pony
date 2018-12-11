@@ -188,6 +188,12 @@ class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
   new val create(agg: Aggregation[In, Out, Acc], range: U64, slide: U64,
     delay: U64)
   =>
+    if range == 0 then
+      FatalUserError("Range windows must have a range greater than 0!\n")
+    end
+    if slide == 0 then
+      FatalUserError("Range windows must have a slide greater than 0!\n")
+    end
     _agg = agg
     _range = range
     _slide = slide
