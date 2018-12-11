@@ -56,6 +56,7 @@ interface val StateInitializer[In: Any val, Out: Any val, S: State ref] is
   Computation[In, Out]
   fun val state_wrapper(key: Key): StateWrapper[In, Out, S]
   fun name(): String
+  fun timeout_interval(): U64
   fun val decode(in_reader: Reader, auth: AmbientAuth):
     StateWrapper[In, Out, S] ?
 

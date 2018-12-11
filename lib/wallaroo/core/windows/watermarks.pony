@@ -52,7 +52,7 @@ class StageWatermarks
 
   // Used to determine if we should start ignoring an upstream we haven't
   // heard from in a while when calculating input_watermark
-  let _last_heard_threshold: U64
+  var _last_heard_threshold: U64
 
   //!@ Where do we determine the threshold?
   new create(last_heard_threshold: U64 = 10_000_000_000) =>
@@ -100,6 +100,9 @@ class StageWatermarks
       _output_watermark = w
     end
     (_output_watermark, old)
+
+  fun ref update_last_heard_threshold(t: U64) =>
+    _last_heard_threshold = t
 
   fun _still_relevant(last_heard: U64, current_ts: U64): Bool =>
     (current_ts - last_heard) < _last_heard_threshold

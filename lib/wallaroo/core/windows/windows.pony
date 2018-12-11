@@ -121,6 +121,10 @@ class val GlobalWindowStateInitializer[In: Any val, Out: Any val,
   =>
     StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelization)
 
+  fun timeout_interval(): U64 =>
+    // Triggers on every message, so we don't need timeouts.
+    0
+
   fun val decode(in_reader: Reader, auth: AmbientAuth):
     StateWrapper[In, Out, Acc] ?
   =>
@@ -192,6 +196,9 @@ class val TumblingWindowsStateInitializer[In: Any val, Out: Any val,
     RunnerBuilder
   =>
     StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelization)
+
+  fun timeout_interval(): U64 =>
+    (_range + _delay) * 2
 
   fun val decode(in_reader: Reader, auth: AmbientAuth):
     StateWrapper[In, Out, Acc] ?
@@ -402,6 +409,9 @@ class val SlidingWindowsStateInitializer[In: Any val, Out: Any val,
     RunnerBuilder
   =>
     StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelization)
+
+  fun timeout_interval(): U64 =>
+    (_range + _delay) * 2
 
   fun val decode(in_reader: Reader, auth: AmbientAuth):
     StateWrapper[In, Out, Acc] ?
@@ -715,6 +725,9 @@ class val TumblingCountWindowsStateInitializer[In: Any val, Out: Any val,
     RunnerBuilder
   =>
     StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelization)
+
+  fun timeout_interval(): U64 =>
+    5_000_000_000
 
   fun val decode(in_reader: Reader, auth: AmbientAuth):
     StateWrapper[In, Out, Acc] ?

@@ -19,10 +19,11 @@ Copyright 2018 The Wallaroo Authors.
 use "time"
 use "wallaroo/core/common"
 use "wallaroo/core/metrics"
+use "wallaroo/core/windows"
 
 
 trait TimeoutTriggeringRunner
-  fun ref set_trigger(stt: StepTimeoutTrigger)
+  fun ref set_triggers(stt: StepTimeoutTrigger, watermarks: StageWatermarks)
   fun ref on_timeout(producer_id: RoutingId, producer: Producer ref,
     router: Router, metrics_reporter: MetricsReporter ref)
 
