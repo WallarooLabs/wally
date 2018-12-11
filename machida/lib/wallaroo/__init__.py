@@ -709,7 +709,7 @@ class RangeWindowsBuilder(object):
         self.default_delay = 0
 
     def with_slide(self, slide):
-        if self.slide == None:
+        if self.slide is None:
             self.slide = slide
         else:
             print("API_Error: Only call `with_slide()` once per window specification.")
@@ -717,25 +717,25 @@ class RangeWindowsBuilder(object):
         return self
 
     def with_delay(self, delay):
-        if self.delay == None:
+        if self.delay is None:
             self.delay = delay
         else:
             print("API_Error: Only call `with_delay()` once per window specification.")
             raise WallarooParameterError()
         return self
 
-    def over(self, aggregation):
-        if self.slide == None:
+    def over(self, aggregation_cls):
+        if self.slide is None:
             slide = self.range
         else:
             slide = self.slide
 
-        if self.delay == None:
+        if self.delay is None:
             delay = 0
         else:
             delay = self.delay
 
-        return RangeWindows(self.range, slide, delay, aggregation)
+        return RangeWindows(self.range, slide, delay, aggregation_cls())
 
 
 

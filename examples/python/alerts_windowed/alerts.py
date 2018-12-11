@@ -30,7 +30,7 @@ def application_setup(args):
         .key_by(extract_user)
         .to(wallaroo.range_windows(wallaroo.seconds(9))
             .with_slide(wallaroo.seconds(3))
-            .over(TotalAggregation()))
+            .over(TotalAggregation))
         .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encode_alert)))
 
     return wallaroo.build_application("Alerts (windowed)", pipeline)
