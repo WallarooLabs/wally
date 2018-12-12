@@ -234,6 +234,51 @@ extern PyObject *initial_state(PyObject *computation)
   return pState;
 }
 
+extern PyObject *initial_accumulator(PyObject *aggregation)
+{
+  PyObject *pFunc, *pState;
+
+  pFunc = PyObject_GetAttrString(aggregation, "initial_accumulator");
+  pState = PyObject_CallFunctionObjArgs(pFunc, NULL);
+  Py_DECREF(pFunc);
+
+  return pState;
+}
+
+extern void aggregation_update(PyObject *aggregation, PyObject *data, PyObject *acc)
+{
+  PyObject *pFunc, *pState;
+
+  pFunc = PyObject_GetAttrString(aggregation, "update");
+  PyObject_CallFunctionObjArgs(pFunc, data, acc, NULL);
+  Py_DECREF(pFunc);
+}
+
+extern PyObject *aggregation_combine(PyObject *aggregation, PyObject *acc1, PyObject *acc2)
+{
+  PyObject *pFunc, *pState;
+
+  pFunc = PyObject_GetAttrString(aggregation, "combine");
+  pState = PyObject_CallFunctionObjArgs(pFunc, acc1, acc2, NULL);
+  Py_DECREF(pFunc);
+
+  return pState;
+}
+
+extern PyObject *aggregation_output(PyObject *aggregation, char *key, PyObject *acc)
+{
+  PyObject *pFunc, *pData, *pKey;
+
+  pKey = PyUnicode_FromString(key);
+
+  pFunc = PyObject_GetAttrString(aggregation, "output");
+  pData = PyObject_CallFunctionObjArgs(pFunc, pKey, acc, NULL);
+  Py_DECREF(pKey);
+  Py_DECREF(pFunc);
+
+  return pData;
+}
+
 extern long key_hash(PyObject *key)
 {
   return PyObject_Hash(key);
