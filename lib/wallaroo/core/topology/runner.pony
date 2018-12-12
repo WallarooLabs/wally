@@ -326,41 +326,47 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     router: Router, metrics_reporter: MetricsReporter ref)
   =>
     @printf[I32]("!@ on_timeout called on StateRunner\n".cstring())
-    let current_ts = Time.nanos()
+    let on_timeout_ts = Time.nanos()
     for (key, sw) in _state_map.pairs() do
-      let watermark_ts = producer.check_effective_input_watermark(current_ts)
+      let watermark_ts = producer.check_effective_input_watermark(
+        on_timeout_ts)
 
       (let out, let output_watermark_ts) = sw.on_timeout(watermark_ts)
       (let new_watermark_ts, let old_watermark_ts) =
         producer.update_output_watermark(output_watermark_ts)
 
-      //!@ How do we assign msg ids to window outputs?
+      // TODO: Is this sufficient for assigning msg ids to window outputs?
       let new_i_msg_uid = _msg_id_gen()
+
+      let latest_ts = Time.nanos()
+
+      // !@ TODO: For metrics info, we need to pass along a worker_ingress_ts,
+      // metrics_name, metrics_id, and pipeline_time_spent value per window
+      // output. We could save this metadata per window.  It seems onerous
+      // but also the clearest option.
       match out
       | let o: Out =>
         OutputProcessor[Out](
-          //!@ real
           _next_runner,
-          //!@ fake values
-          "", 0,
+          //!@ metric_name, pipeline_time_spent
+          "", latest_ts - on_timeout_ts,
           //!@ real
           o, key, current_ts, new_watermark_ts, old_watermark_ts,
-          producer_id, producer, router,
-          //!@ fake values
-          new_i_msg_uid, None, current_ts, 0, 0,
+          producer_id, producer, router, new_i_msg_uid, None, latest_ts,
+          //!@ metrics_id, worker_ingress_ts
+          0, on_timeout_ts,
           //!@ real
           metrics_reporter)
       | let os: Array[Out] val =>
         OutputProcessor[Out](
-          //!@ real
           _next_runner,
-          //!@ fake values
-          "", 0,
+          //!@ metric_name, pipeline_time_spent
+          "", latest_ts - on_timeout_ts,
           //!@ real
           os, key, current_ts, new_watermark_ts, old_watermark_ts,
-          producer_id,  producer, router,
-          //!@ fake values
-          new_i_msg_uid, None, current_ts, 0, 0,
+          producer_id,  producer, router, new_i_msg_uid, None, latest_ts,
+          //!@ metrics_id, worker_ingress_ts
+          0, on_timeout_ts,
           //!@ real
           metrics_reporter)
       end
