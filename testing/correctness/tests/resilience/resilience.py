@@ -257,7 +257,7 @@ def lowest_point(ops):
 
 
 def _test_resilience(command, ops=[], initial=None, sources=1,
-                     partition_multiplier=5, cycles=1, validate_output=True,
+                     partition_multiplier=5, cycles=1, validation_cmd=None,
                      sender_mps=1000, sender_interval=0.01,
                      retry_count=5,
                      api=None):
@@ -271,7 +271,8 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
     `partition_multiplier` - multiply number of workers by this to determine
       how many partitiosn to use
     `cycles` - how many times to repeat the list of operations
-    `validate_output` - whether or not to validate the output
+    `validation_cmd` - The command to use for validation. Default is:
+        'validator -i {out_file} -a [-e {expect}]'
     `sender_mps` - messages per second to send from the sender (default 1000)
     `sender_interval` - seconds between sender batches (default 0.01)
     `retry_count` - number of times to retry a test after RunnerHasntStartedError
@@ -293,7 +294,7 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
                 initial=initial,
                 sources=sources,
                 partition_multiplier=partition_multiplier,
-                validate_output=validate_output,
+                validation_cmd=validation_cmd,
                 sender_mps=sender_mps,
                 sender_interval=sender_interval)
         except:
@@ -313,7 +314,7 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
                         sources=sources,
                         partition_multiplier=partition_multiplier,
                         cycles=cycles,
-                        validate_output=validate_output,
+                        validation_cmd=validation_cmd,
                         sender_mps=sender_mps,
                         sender_interval=sender_interval,
                         retry_count=retry_count-1)
@@ -360,14 +361,20 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
 # Test Runner
 #############
 
+VALIDATION_CMD = 'validator -i {out_file} -a'
+EXPECT_STUB = ' -e {expect}'
 def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
-         partition_multiplier=1, validate_output=True,
+         partition_multiplier=1, validation_cmd=None,
          sender_mps=1000, sender_interval=0.01):
     host = '127.0.0.1'
     sinks = 1
     sink_mode = 'framed'
     batch_size = int(sender_mps * sender_interval)
     logging.debug("batch_size is {}".format(batch_size))
+
+    # If validation_cmd is False, it remains False and no validation is run
+    if validation_cmd is None:
+        validation_cmd = VALIDATION_CMD
 
     if not isinstance(ops, (list, tuple)):
         raise TypeError("ops must be a list or tuple of operations")
@@ -466,21 +473,18 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
 
         # Use validator to validate the data in at-least-once mode
         # save sink data to a file
-        if validate_output:
+        if validation_cmd:
             # TODO: move to validations.py
             out_file = os.path.join(cluster.res_dir, 'received.txt')
             cluster.sinks[0].save(out_file)
 
             # Validate captured output
             logging.info("Validating output")
+            cmd_validate = validation_cmd.format(out_file = out_file)
             # if senders == 0, using internal source
+            # else: add expect stub '-e {expect value}'
             if cluster.senders:
-                cmd_validate = ('validator -i {out_file} -e {expect} -a'
-                                .format(out_file = out_file,
-                                        expect = stop_value))
-            else:
-                cmd_validate = ('validator -i {out_file} -a'
-                                .format(out_file = out_file))
+                cmd_validate += EXPECT_STUB.format(expect = stop_value)
             res = run_shell_cmd(cmd_validate)
             try:
                 assert(res.success)

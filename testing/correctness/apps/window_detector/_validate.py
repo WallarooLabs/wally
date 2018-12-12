@@ -44,12 +44,7 @@ for k in windows.keys():
     for w in sorted(windows[k].keys()):
         sequences.setdefault(k, []).extend(windows[k][w])
 
-if args.window_type in ('tumbling', 'counting'):
-    for k, v in sequences.items():
-        expected = list(range(1, len(v) + 1))
-        assert(v == expected), "Expect natural sequence"
-
-else: # window_type == 'sliding'
+if args.window_type == 'sliding':
     for k, v in sequences.items():
         processed = sorted(list(set(v)))
         expected = list(range(1, len(processed) + 1))
