@@ -73,7 +73,6 @@ def build_application(app_name, pipeline):
 
 
 def range_windows(wrange):
-    print("!@ called range_windows")
     return RangeWindowsBuilder(wrange)
 
 
@@ -100,13 +99,11 @@ class Pipeline(object):
         if isinstance(computation, StateComputation):
             self._pipeline_tree.add_stage(("to_state", computation))
         elif isinstance(computation, RangeWindows):
-            print("!@ Adding to_range_windows stage")
             self._pipeline_tree.add_stage(("to_range_windows",
                                            computation.range,
                                            computation.slide,
                                            computation.delay,
                                            computation.aggregation))
-            print("!@ -- Added to_range_windows stage")
         else:
             self._pipeline_tree.add_stage(("to", computation))
         return self
@@ -750,8 +747,6 @@ class RangeWindowsBuilder(object):
             delay = 0
         else:
             delay = self.delay
-
-        print("!@Creating RangeWindows: " + str(self.range) + "," + str(slide) + "," + str(delay))
 
         return RangeWindows(self.range, slide, delay, aggregation)
 
