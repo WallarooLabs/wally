@@ -47,11 +47,8 @@ for k in windows.keys():
 if args.window_type == 'sliding':
     for k, v in sequences.items():
         processed = sorted(list(set(v)))
-        expected = list(range(1, len(processed) + 1))
-        # unique items are natural sequences per key:
-        assert(processed == expected)
-        # there should duplicates from the sliding:
-        assert(len(v) > len(expected)), "Expect duplication in sliding windows"
+        size = processed[-1] - processed[0] + 1 # Assumption: processed is a natural sequence
+        assert(len(processed) == size), "Expect: sorted unique window elements form a subsegement of the natural sequence"
     for k in sorted(windows.keys(), key=lambda k: int(k.replace('key_',''))):
         # Check that for each window, there are at most 2 duplicates per item
         # e.g. the duplicates are plausibly caused by the sub window overlap,
