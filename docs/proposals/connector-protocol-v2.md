@@ -42,7 +42,7 @@ The protocol has been given plenty of room to grow and may be optimized over tim
 
 ## Wire Format
 
-Each frame transmitted by either side uses a 32bit little endian <sup>B0</sup> length denoting all bytes that come after the 4 bytes comprising the length <sup>B1</sup>. This makes it much easier to consistently split up data which might be captured and recorded for analysis after the fact and could speed the development of other tools which can do primitive routing and management of frames without requiring a full description of the format of each frame type.
+Each frame transmitted by either side uses a 32bit big endian/network byte order <sup>B0</sup> length denoting all bytes that come after the 4 bytes comprising the length <sup>B1</sup>. This makes it much easier to consistently split up data which might be captured and recorded for analysis after the fact and could speed the development of other tools which can do primitive routing and management of frames without requiring a full description of the format of each frame type.
 
 This framing mechanism applies to all messages including the handshake. The worker reading the hello frame should be careful to check the version and cookie value placed in fixed locations at the start before continuing the decoding. This allows the protocol to sidestep any unintended behaviors if the framing changes in the future <sup>B0</sup>.
 
@@ -78,6 +78,7 @@ Message bit-flags:
 -define(EOS, 4).
 -define(UNSTABLE_REFERENCE, 8).
 -define(EVENT_TIME, 16).
+-define(KEY, 32).
 ```
 
 #### Framing
@@ -87,12 +88,10 @@ Type specs:
 ```erlang
 -type frame() :: iolist().
 -type point_of_reference() ::
-    non_neg_integer() |
-    binary() |
-    undefined.
+    non_neg_integer().
 ```
 
-Constructors:
+Constructors follow.  Note that all integers larger than 8 bits are encoded in little endian byte order.
 
 ```erlang
 -spec frame(iodata()) -> iolist().
@@ -156,15 +155,18 @@ hello(Revision, Cookie, ProgramName, InstanceName) ->
         short_bytes(InstanceName)
     ]).
 
--spec ok(positive_integer(), list(points_of_reference())) -> frame().
+-spec ok(positive_integer(), list(stream_info())) -> frame()
+  when
+    stream_info = {StreamId::non_neg_integer, StreamName::String,
+                   Ref::point_of_reference()}.
 ok(InitialCredits, PointsOfReference) ->
     frame([
         ?OK,
         u32(InitialCredits),
         % This encodes each point of reference in sequence using the
         % remaining bytes in the frame.
-        lists:map(fun ({Stream, Ref}) ->
-            [u64(Stream), point_of_reference(Ref)]
+        lists:map(fun ({StreamId, StreamName, Ref}) ->
+            [u64(StreamId), short_bytes(StreamName), point_of_reference(Ref)]
         end, PointsOfReference)
     ]).
 
@@ -224,58 +226,53 @@ notify(StreamId, StreamName, PointOfRef) ->
         point_of_reference(PointOfRef)
     ]).
 
--spec message(Message, MessageId, StreamId, Flags) -> frame() when
-    Message :: boundary | {non_neg_integer(), iodata()} | iodata(),
-    MessageId :: non_neg_integer(),
+-spec message(Flags, StreamId, MessageId, EventTime, Key, Message) -> frame()
+  when
+    Flags :: non_neg_integer(),      % See message bit flag definitions above
     StreamId :: non_neg_integer(),
-    Flags :: non_neg_integer(). % See message bit flag definitions above
-message(_Message=boundary, MessageId, StreamId, Flags) ->
+    MessageId :: non_neg_integer(),
+    EventTime :: non_neg_integer(),
+    Key :: string(),
+    Message :: iodata().
+message(Flags, StreamId, MessageId, EventTime, Key, Message) ->
     frame([
-        ?MESSAGE,
-        u64(StreamId),
-        u16(Flags bor ?BOUNDARY),
-        u64(MessageId)
-    ]);
-message({EventTime, Message}, MessageId, StreamId, Flags) ->
-    frame([
-        ?MESSAGE,
-        u64(StreamId),
-        u16(Flags bor ?EVENT_TIME),
-        u64(MessageId),
-        u64(EventTime),
-        Message
-    ]);
-message(Message, MessageId, StreamId, Flags) ->
-    frame([
-        ?MESSAGE,
-        u64(StreamId),
         u16(Flags),
-        u64(MessageId),
-        Message
+        u64(StreamId),
+        if Flags band ?EPHEMERAL /= 0 then
+            <<>>
+        else
+            u64(MessageId)
+        end,
+        if Flags band ?EVENT_TIME /= 0 then
+            u64(EventTime)
+        else
+            <<>>
+        end,
+        if Flags band ?KEY /= 0 then
+            short_bytes(Key)
+        else
+            <<>>
+        end,
+        if Flags band ?BOUNDARY /= 0 then
+            <<>>
+        else
+            Message
+        end
     ]).
 
 ack(Credits, MessageAcks) ->
     framed([
         ?ACK,
         u32(Credits),
-        lists:map(fun ({StreamId, MessageId}) ->
-            [u64(StreamId), u64(MessageId)]
+        u32(length(MessageAcks)),
+        lists:map(fun ({StreamId, PointofRef}) ->
+            [u64(StreamId), u64(PointOfRef)]
         end, MessageAcks)
     ]).
 
-nack(Credits, StreamId, undefined) ->
+nack() ->
     frame([
-        ?NACK,
-        u32(Credits),
-        u64(StreamId),
-        point_of_reference(0)
-    ]);
-nack(Credits, StreamId, PointOfRef) ->
-    frame([
-        ?NACK,
-        u32(Credits),
-        u64(StreamId),
-        point_of_reference(PointOfRef)
+        ?NACK
     ]).
 ```
 
@@ -307,6 +304,8 @@ Messages currently have a 16bit field for bit-flags. Most of the bits are reserv
 
 Messages can be marked as ephemeral denoting that the identity and content of the message may not be retrieved later. The message id is still provided for correlation purposes but should not be treated as a unique identifier by itself. Each should be unique within a session but will not guarantee this property across sessions. This feature is designed to be used for one-shot mediums like UDP or trivial TCP.
 
+Early implementations may reject and/or mishandle streams with ephemeral and non-ephemeral messages in the same stream.
+
 ### Points of Reference
 
 Each message id may be remembered but it can be expensive to remember them all. Thus we have points of reference to define position in a stream relative to its content, assuming there is some determinism in the ordering each time the content is replayed. This involves the guarantee that messages sorted before and after that point of reference form a disjoint set. Certain mediums can only provide coarser granularity during replay. The whole stream itself may not have a total order but the disjoint sets formed by each point of reference do have a total order. The observation should be that all points of reference form a total order of legal places one can resume from.
@@ -325,13 +324,9 @@ This is a newer feature and it aligns nicely with GenSource. Generators and batc
 
 The worker should acknowledge frames of all types. These do not need to be 1-1 acknowledgments but it may be convenient to write it as such initially since all frames take one credit and each session needs to have these continuously replenished to avoid stuttered flow <sup>D2</sup>. Ack frames serve this purpose, almost like a regular heartbeat. Technically an ack could be sent with zero credits but we don't currently see this as a very useful feature <sup>D3</sup>.
 
-Acks also provide a list of message ids for each stream which have completed some safe level of processing in Wallaroo <sup>D4</sup>.
+When Wallaroo has processed a barrier and completed a checkpoint, then, for each stream, the last received MessageId prior to the barrier will be sent to the connector client in an ACK message to report processing progress <sup>D4</sup>.  All messages with MessageIds less than the reported point of reference are included in the checkpoint.
 
-NOTE: All messages ids must be sent back as ack'ed but it may be enough to leverage transmission ordering and ack only the last transmitted in the set for each stream. This may be a future optimization to consider.
-
-Nacks are slightly different from an ack. They provide credits to allow new frames to be transmitted but not represent forward progress. This happens when Wallaroo needs to reset a given stream's state to a specific point of reference after the session has already been started. The stream is put into a nack'ed state in the worker which effectively causes all message frames to be ignored for that stream until a new notify message is sent for that stream to reset it to an open state with a specific point of reference to continue from.
-
-If the connector is unable to resume from the given point of reference then it should not notify but instead send an error and exit the session <sup>D5</sup>.
+When a connector receives a NACK message from the worker, the connector must close the connection.  In order to resume sending data to the worker, the connector must open a new connection + handshake + notify for each stream.  The worker cannot assume that any messages sent with MessageIds larger than the last ACK's point of reference were received by the worker.
 
 ---
 
@@ -344,8 +339,6 @@ If the connector is unable to resume from the given point of reference then it s
 <sup>D3</sup> An idle link carries some risks but we currently expect local networking so we'll not worry about this for now. The main issue with relying on timeliness is that the current Pony mute/unmute system can create a bit of a problem when paired with head of line blocking issues. Alternative solutions exist to allow multiplexing to get around this problem but the complexity is not worth the benefit at the moment.
 
 <sup>D4</sup> One might assume the pipeline has completed processing messages up to that point of reference across all pipelines that use that source. There are plenty of other ways this could be configured to work, depending on the trade-offs an application requires and which options are enabled in Wallaroo.
-
-<sup>D5</sup> Wallaroo does not have very sophisticated error handling at the application level for cases like these so we'll assume the connector script has been customized to do the right thing in most cases. An error here should always mean halt. If that is not expected then it should not continue sending from that stream and should not notify to reset the stream until the stream state itself has been repaired in some way.
 
 
 ## Protocol State Machine
@@ -400,21 +393,19 @@ Each stream during a session must be in one of the following states:
                   +-------------+--------------+
                   |             |              |
                   |             |              V
- +-------+     +------+     +--------+     +-------+
- | Intro +---->| Open +---->| Closed +---->| Reset |
- +-------+     +------+     +--------+     +-------+
-                  ^             |              |
-                  |             |              |
-                  +-------------+--------------+
+ +-------+     +------+     +--------+     +------------+
+ | Start +---->| Open +---->| Closed +---->| Terminated |
+ +-------+     +------+     +--------+     +------------+
+                  ^             |
+                  |             |
+                  +-------------+
 ```
 
-New streams must be introduced and reset streams must be reintroduced. The connector may not know if a notification is the first reintroduction or not. If it's a reintroduction, the handshake may include information on where to resume from. The state machine will always end up in the open state after a notification.
+New streams must be introduced and reset streams must be reintroduced. The connector may not know if a notification is the first use of a stream or not. If the StreamId has been used before, the handshake will include information on where to resume from. The state machine will always end up in the open state after a notification.
 
 In the intro state, the following actions are valid:
 
     - NOTIFY: Connector -> Worker (provide a stream id and a fully qualified name)
-
-If a notify is received in the introduction state, it should assume that it should be processed as in the open state and a reintroduction should follow appropriately.
 
 In the open state, the following actions are valid:
 
@@ -422,25 +413,19 @@ In the open state, the following actions are valid:
     * if the EOS flag is set the next state is closed
 - ACK: Worker -> Connector
     * the are not 1-1 with MESSAGE frames
-- NACK: Worker -> Connector (next state is reset)
+- NACK: Worker -> Connector (next state is terminated)
+    * worker is requesting that the stream be reprocessed in some way
 
 In the closed state, the following actions are valid:
 
 - NOTIFY: Connector -> Worker (next state is open)
     * reopens the stream
-- NACK: Worker -> Connector (next state is reset)
+- NACK: Worker -> Connector (next state is terminated)
     * worker is requesting that the stream be reprocessed in some way
 - ACK: Worker -> Connector
     * these can arrive asynchronously and should be processed accordingly
 
-In the reset state, the following actions are valid:
-
-- NOTIFY: Connector -> Worker (next state is open)
-- ACK: Worker -> Connector
-    * these can arrive asynchronously and should be processed accordingly
-
-NACKs may be handled when in invalid states but they MUST be treated as if there was a stack of NACKs. Each NACK will require a NOTIFY. If the connector or worker is unable to satisfy this, and error should be used and the session should be reset by disconnecting and redoing the handshake.
-
+In the terminated state, no actions are valid: the worker will close the session and ignore any messages received after the NACK has been sent.
 
 ## Debugging
 
