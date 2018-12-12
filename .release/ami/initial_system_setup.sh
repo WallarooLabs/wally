@@ -1,7 +1,14 @@
 #!/bin/sh
+set -x #echo on
+export DEBIAN_FRONTEND=noninteractive
+export TERM=linux
 
+# grub-pc currently causes apt-get upgrade to pause indefinitely
+# holding so it does not get upgraded
+sudo apt-mark hold grub-pc
 # Install common tools
-sudo apt-get update && sudo apt-get -y upgrade
+sudo apt-get -y update
+sudo apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade
 sudo apt-get install -y python3-dev build-essential python3-pip unzip zip curl \
                         libsnappy-dev liblz4-dev libz-dev libssl-dev \
                         cpuset numactl
