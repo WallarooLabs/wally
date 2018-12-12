@@ -57,7 +57,7 @@ else: # window_type == 'sliding'
         assert(processed == expected)
         # there should duplicates from the sliding:
         assert(len(v) > len(expected)), "Expect duplication in sliding windows"
-    for k in windows.keys():
+    for k in sorted(windows.keys(), key=int):
         # Check that for each window, there are at most 2 duplicates per item
         # e.g. the duplicates are plausibly caused by the sub window overlap,
         # rather than by output duplications due to other factors
@@ -66,9 +66,7 @@ else: # window_type == 'sliding'
             counter = Counter(windows[k][subwindows[i]] +
                               windows[k][subwindows[i+1]])
             most_common = counter.most_common(3)
-            first = most_common[0][1]
-            second = most_common[1][1]
-            third = most_common[2][1]
-            assert(first >= 1 and first <= 2)
-            assert(second >= 1 and second <= 2)
-            assert(third >= 1 and third <= 2)
+            assert(len(most_common) > 0)
+            for key, count in most_common:
+                assert(count in (1,2))
+
