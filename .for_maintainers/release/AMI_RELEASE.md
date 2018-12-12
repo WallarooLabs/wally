@@ -49,7 +49,7 @@ This will `ssh` you into the running Wallaroo box.
 This will do the following:
 
 1. Check out Wallaroo at `<BRANCH>`
-2. Clean up and then build: `machida`,`cluster_shutdown`,
+2. Clean up and then build: `machida3`,`cluster_shutdown`,
   `data_receiver`, and `sender`.
 3. Launch an EC2 instance of Ubuntu 16.04 and install the
    minimum necessary set of packages to run Wallaroo apps
@@ -94,7 +94,7 @@ The build process comprises the following files:
 * [`template.json`](../../.release/ami/template.json): The [Packer template][packer_template] for the AMI
 * [`ami/initial_system_setup.sh`](../../.release/ami/initial_system_setup.sh):
   This script is run on the EC2 instance. It is responsible for installing the
-  runtime dependencies for `machida`, and setting up an `/etc/rc.local` script to run
+  runtime dependencies for `machida3`, and setting up an `/etc/rc.local` script to run
   on system startup.
 * [`regions`](../../.release/ami/regions): A text file listing the AWS regions
   where the public AMI will be available.
