@@ -67,7 +67,7 @@ Frame tags (`$H` = ASCII value of H):
 -define(MESSAGE, $M).
 
 -define(ACK, $A).
--define(NACK, $!).
+-define(RESTART, $!).
 ```
 
 Message bit-flags:
@@ -100,22 +100,22 @@ frame(Message) ->
 
 -spec short_bytes(iodata() | undefined) -> iolist().
 short_bytes(undefined) ->
-    [<<0:16/little-unsigned>>];
+    [<<0:16/big-unsigned>>];
 short_bytes(Data) ->
     Size = iolist_size(Data),
-    [<<Size:16/little-unsigned, Data].
+    [<<Size:16/big-unsigned, Data].
 
 -spec u16(non_neg_integer()) -> binary().
 u16(N) ->
-    <<N:16/little-unsigned>>.
+    <<N:16/big-unsigned>>.
 
 -spec u32(non_neg_integer()) -> binary().
 u32(N) ->
-    <<N:32/little-unsigned>>.
+    <<N:32/big-unsigned>>.
 
 -spec u64(non_neg_integer()) -> binary().
 u64(N) ->
-    <<N:64/little-unsigned>>.
+    <<N:64/big-unsigned>>.
 
 -define(U64_MAX, 1 bsl 64 - 1).
 -spec point_of_reference(point_of_reference()) -> iodata().
@@ -123,7 +123,7 @@ point_of_reference(PointOfRef)
     when is_integer(PointOfRef)
     andalso PointOfRef >= 0
     andalso PointOfRef <= U64_MAX ->
-        <<PointofRef:64/little-unsigned>>;
+        <<PointofRef:64/big-unsigned>>;
 point_of_reference(_) ->
     error({unsupported, "64bit reference expected"}).
 
@@ -202,7 +202,7 @@ If no error has occurred and the connection has remained opened, the protocol no
 
 <sup>C1</sup> These pairs use the stream id as set by the notify frame. This should always be a deterministic mapping and the convention is set by the connector implementation. They are not unique stream id's across the application but instead only apply to that connector instance, so for example, a partition number could be used or a hash of the topic name and partition could be used if multiple topics are being used under the name of a single source.
 
-<sup>C2</sup> Because this protocol is asynchronous, we must assume that this data is eventually consistent but not always perfectly up to date. These values are meant as hints for the connector. Right now we also don't dot the point of reference with some generational counter. This prevents certain advanced scenarios to be played out. It's out of scope for now the first few revisions of this protocol. Further issues with reprocessing are handled with nack frames discussed in the streaming section.
+<sup>C2</sup> Because this protocol is asynchronous, we must assume that this data is eventually consistent but not always perfectly up to date. These values are meant as hints for the connector. Right now we also don't dot the point of reference with some generational counter. This prevents certain advanced scenarios to be played out. It's out of scope for now the first few revisions of this protocol. Further issues with reprocessing are handled with RESTART frames discussed in the streaming section.
 
 
 ## Streaming
@@ -270,9 +270,9 @@ ack(Credits, MessageAcks) ->
         end, MessageAcks)
     ]).
 
-nack() ->
+restart() ->
     frame([
-        ?NACK
+        ?RESTART
     ]).
 ```
 
@@ -320,13 +320,15 @@ If Wallaroo is not able to support unreferenced messages with resilience turned 
 
 This is a newer feature and it aligns nicely with GenSource. Generators and batch workloads sometimes need to signal the completion of a dataset that is being streamed and this allows that to be expressed. It's not currently decided how this will be exposed but for now it is assumed that the worker should treat this end state strictly to help detect problems with connector behavior early.
 
-### Acks and Nacks
+### ACK
 
 The worker should acknowledge frames of all types. These do not need to be 1-1 acknowledgments but it may be convenient to write it as such initially since all frames take one credit and each session needs to have these continuously replenished to avoid stuttered flow <sup>D2</sup>. Ack frames serve this purpose, almost like a regular heartbeat. Technically an ack could be sent with zero credits but we don't currently see this as a very useful feature <sup>D3</sup>.
 
 When Wallaroo has processed a barrier and completed a checkpoint, then, for each stream, the last received MessageId prior to the barrier will be sent to the connector client in an ACK message to report processing progress <sup>D4</sup>.  All messages with MessageIds less than the reported point of reference are included in the checkpoint.
 
-When a connector receives a NACK message from the worker, the connector must close the connection.  In order to resume sending data to the worker, the connector must open a new connection + handshake + notify for each stream.  The worker cannot assume that any messages sent with MessageIds larger than the last ACK's point of reference were received by the worker.
+### RESTART
+
+When a connector receives a RESTART message from the worker, the connector must close the connection.  In order to resume sending data to the worker, the connector must open a new connection + handshake + notify for each stream.  The worker cannot assume that any messages sent with MessageIds larger than the last ACK's point of reference were received by the worker.
 
 ---
 
@@ -377,7 +379,7 @@ In the streaming state the following frame types are valid:
    - NOFITY: Connector -> Worker
    - MESSAGE: Connector -> Worker
    - ACK: Worker -> Connector
-   - NACK: Worker -> Connector
+   - RESTART: Worker -> Connector
    - ERROR: * -> * (next state = error)
 
 In the error state no frames are valid. It is recommended that the transport be closed properly, though any local processing may be completed if there are bits of work that are still in progress. Any data received after the error frame should be discarded.
@@ -413,19 +415,19 @@ In the open state, the following actions are valid:
     * if the EOS flag is set the next state is closed
 - ACK: Worker -> Connector
     * the are not 1-1 with MESSAGE frames
-- NACK: Worker -> Connector (next state is terminated)
+- RESTART: Worker -> Connector (next state is terminated)
     * worker is requesting that the stream be reprocessed in some way
 
 In the closed state, the following actions are valid:
 
 - NOTIFY: Connector -> Worker (next state is open)
     * reopens the stream
-- NACK: Worker -> Connector (next state is terminated)
+- RESTART: Worker -> Connector (next state is terminated)
     * worker is requesting that the stream be reprocessed in some way
 - ACK: Worker -> Connector
     * these can arrive asynchronously and should be processed accordingly
 
-In the terminated state, no actions are valid: the worker will close the session and ignore any messages received after the NACK has been sent.
+In the terminated state, no actions are valid: the worker will close the session and ignore any messages received after the RESTART has been sent.
 
 ## Debugging
 
