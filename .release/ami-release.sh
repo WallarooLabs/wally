@@ -32,18 +32,18 @@ compile_for_sandy_bridge() {
   git checkout "$RC_BRANCH_NAME"
   make clean
 
-  make build-machida "$PONYC_OPTS" resilience=on
-  mv machida/build/machida machida-resilience
-  make clean-machida
-  make build-machida "$PONYC_OPTS" resilience=off
+  make build-machida3 "$PONYC_OPTS" resilience=on
+  mv machida3/build/machida3 machida3-resilience
+  make clean-machida3
+  make build-machida3 "$PONYC_OPTS" resilience=off
   (cd utils/data_receiver && make "$PONYC_OPTS")
   (cd utils/cluster_shutdown && make "$PONYC_OPTS")
   (cd utils/cluster_shrinker && make "$PONYC_OPTS")
   (cd giles/sender && make "$PONYC_OPTS")
 
   zip -j9 .release/wallaroo_bin.zip \
-      machida/build/machida \
-      machida-resilience \
+      machida3/build/machida3 \
+      machida3-resilience \
       utils/data_receiver/data_receiver \
       utils/cluster_shutdown/cluster_shutdown \
       utils/cluster_shrinker/cluster_shrinker \
