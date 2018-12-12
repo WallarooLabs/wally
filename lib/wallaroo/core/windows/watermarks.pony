@@ -19,6 +19,7 @@ Copyright 2018 The Wallaroo Authors.
 use "collections"
 use "time"
 use "wallaroo/core/common"
+use "wallaroo_labs/mort"
 
 
 class StageWatermarks
@@ -54,6 +55,13 @@ class StageWatermarks
   // heard from in a while when calculating input_watermark
   var _last_heard_threshold: U64
 
+  // If we remove upstreams midway through iterating over _upstreams.pairs,
+  // it will sometimes cause us to skip keys. We keep this array so that we
+  // can remove them after iterating through all pairs.
+  // !TODO!: This causes us to do extra work in the common case where there
+  // is nothing to remove. We should replace this approach.
+  let _upstreams_marked_remove: Array[RoutingId] = Array[RoutingId]
+
   //!@ Where do we determine the threshold?
   new create(last_heard_threshold: U64 = 10_000_000_000) =>
     _last_heard_threshold = last_heard_threshold
@@ -71,31 +79,45 @@ class StageWatermarks
     end
 
   fun ref check_effective_input_watermark(current_ts: U64): U64 =>
-    var update = false
+    var found_live_value = false
 
     var new_min: U64 = U64.max_value()
+
     for (u, (next_w, last_heard)) in _upstreams.pairs() do
       if _still_relevant(last_heard, current_ts) then
         if next_w < new_min then
           new_min = next_w
-          update = true
+          found_live_value = true
         end
       else
+        _upstreams_marked_remove.push(u)
+      end
+    end
+
+    if _upstreams_marked_remove.size() > 0 then
+      for u in _upstreams_marked_remove.values() do
         try
           _upstreams.remove(u)?
         end
       end
+      _upstreams_marked_remove.clear()
     end
-    if update then _input_watermark = new_min end
-    // This might be higher than our actual input watermark. This happens in
-    // the case that we haven't heard from any upstream past our threshold,
-    // in which case we will trigger all windows. But we keep our input
-    // watermark at its former value in that case.
-    new_min
+
+    if new_min > _input_watermark then
+      if found_live_value then
+        _input_watermark = new_min
+      end
+      // This might be higher than our actual input watermark. This happens in
+      // the case that we haven't heard from any upstream past our threshold,
+      // in which case we will trigger all windows. But we keep our input
+      // watermark at its former value in that case.
+      new_min
+    else
+      _input_watermark
+    end
 
   fun ref update_output_watermark(w: U64): (U64, U64) =>
     let old = _output_watermark
-    // !@ Will this check ever be needed?
     if (w > _output_watermark) and (w < U64.max_value()) then
       _output_watermark = w
     end
