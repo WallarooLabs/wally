@@ -36,11 +36,19 @@ def application_setup(args):
     parser.add_argument("--window-slide", type=int, default=25,
                         help=("Window slide size, in milliseconds. "
                               "(Default: 25)"))
+    parser.add_argument("--gen-source", action='store_true',
+                    help="Use an internal source for resilience tests")
+    parser.add_argument("--partitions", type=int, default=40,
+                    help="Number of partitions for use with internal source")
     pargs, _ = parser.parse_known_args(args)
 
-    print("Using TCP Source")
-    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
-    source = wallaroo.TCPSourceConfig(in_host, in_port, decoder)
+    if pargs.gen_source:
+        print("Using internal source generator")
+        source = wallaroo.GenSourceConfig(MultiPartitionGenerator(pargs.partitions))
+    else:
+        print("Using TCP Source")
+        in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+        source = wallaroo.TCPSourceConfig(in_host, in_port, decoder)
 
     p = wallaroo.source("{} window".format(pargs.window_type), source)
     p = p.key_by(extract_key)
@@ -128,10 +136,15 @@ class Collect(wallaroo.Aggregation):
         return accumulator1 + accumulator2
 
     def output(self, key, accumulator):
+        if not accumulator:
+            return None
+        print("accum", accumulator)
         keys = set(m.key for m in accumulator)
         values = tuple(m.value for m in accumulator)
         ts = time.time()
         print("Collect.output", time.time(), ts, key, [str(m) for m in accumulator])
+        print("keys", keys)
+        print("values", values)
         assert(len(keys) == 1)
         assert(keys.pop().split(".")[0] == key)
         return (key, values, ts)
@@ -155,5 +168,5 @@ def decoder(bs):
 @wallaroo.encoder
 def encoder(msg):
     print("encoder", time.time(), msg)
-    s = json.dumps({'key': msg[0], 'value': msg[1], 'ts': msg[2]})
+    s = json.dumps({'key': msg[0], 'value': msg[1], 'ts': msg[2]}).encode()
     return struct.pack(">I{}s".format(len(s)), len(s), s)
