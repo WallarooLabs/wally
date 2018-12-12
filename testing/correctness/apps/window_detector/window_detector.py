@@ -136,17 +136,15 @@ class Collect(wallaroo.Aggregation):
         return accumulator1 + accumulator2
 
     def output(self, key, accumulator):
-        if not accumulator:
-            return None
-        print("accum", accumulator)
         keys = set(m.key for m in accumulator)
         values = tuple(m.value for m in accumulator)
         ts = time.time()
-        print("Collect.output", time.time(), ts, key, [str(m) for m in accumulator])
-        print("keys", keys)
-        print("values", values)
-        assert(len(keys) == 1)
-        assert(keys.pop().split(".")[0] == key)
+        print("Collect.output", ts, key, [str(m) for m in accumulator])
+        assert(len(keys) <= 1)
+        try:
+            assert(keys.pop().split(".")[0] == key)
+        except KeyError: # key set is empty because accumulator is empty
+            return None
         return (key, values, ts)
 
 
