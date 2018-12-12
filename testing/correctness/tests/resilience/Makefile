@@ -35,7 +35,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 RESILIENCE_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 resilience_tests : CUSTOM_PATH = $(MULTI_PARTITION_DETECTOR_PATH):$(MULTI_PART_VALIDATOR_PATH):$(CLUSTER_SHRINKER_PATH)
-resilience_tests : CUSTOM_PYTHONPATH = $(MULTI_PARTITION_DETECTOR_PATH)
+resilience_tests : CUSTOM_PYTHONPATH = $(MULTI_PARTITION_DETECTOR_PATH):$(WINDOW_DETECTOR_PATH)
 
 # standard rules generation makefile
 include $(rules_mk_path)
