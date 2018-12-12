@@ -503,6 +503,7 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   fun _should_trigger(window_start_ts: U64, watermark_ts: U64): Bool =>
     (window_start_ts + _range) < (watermark_ts - _delay)
 
+
 ////////////////////////////
 // TUMBLING COUNT WINDOWS
 ////////////////////////////
