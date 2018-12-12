@@ -521,6 +521,7 @@ class TCPSourceConfig(object):
         return ("tcp", self._host, self._port, self._decoder, self._parallelism)
 
 
+
 class GenSourceConfig(object):
     def __init__(self, gen_instance):
         self._gen = gen_instance
@@ -781,6 +782,7 @@ class RangeWindowsBuilder(object):
             delay = self.delay
 
         return RangeWindows(self.range, slide, delay, aggregation)
+
 
 
 class RangeWindows(object):
