@@ -351,7 +351,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
           //!@ metric_name, pipeline_time_spent
           "", latest_ts - on_timeout_ts,
           //!@ real
-          o, key, current_ts, new_watermark_ts, old_watermark_ts,
+          o, key, on_timeout_ts, new_watermark_ts, old_watermark_ts,
           producer_id, producer, router, new_i_msg_uid, None, latest_ts,
           //!@ metrics_id, worker_ingress_ts
           0, on_timeout_ts,
@@ -363,7 +363,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
           //!@ metric_name, pipeline_time_spent
           "", latest_ts - on_timeout_ts,
           //!@ real
-          os, key, current_ts, new_watermark_ts, old_watermark_ts,
+          os, key, on_timeout_ts, new_watermark_ts, old_watermark_ts,
           producer_id,  producer, router, new_i_msg_uid, None, latest_ts,
           //!@ metrics_id, worker_ingress_ts
           0, on_timeout_ts,
@@ -374,7 +374,10 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     //!@ How do we configure this timeout and where does this go?
     match _step_timeout_trigger
     | let stt: StepTimeoutTrigger =>
-      stt.set_timeout(1_000_000_000)
+      let ti = _state_initializer.timeout_interval()
+      if ti > 0 then
+        stt.set_timeout(ti)
+      end
     else
       ifdef debug then
         @printf[I32](("StateRunner: on_timeout was called but we have no " +
