@@ -31,6 +31,7 @@ actor Main is TestList
 
   fun tag tests(test: PonyTest) =>
     test(_TestTumblingWindows)
+    test(_TestSlidingWindows)
     test(_TestCountWindows)
 
 class iso _TestTumblingWindows is UnitTest
@@ -78,6 +79,81 @@ class iso _TestTumblingWindows is UnitTest
     h.assert_eq[USize](res.size(), 2)
     h.assert_eq[USize](res(0)?, 10)
     h.assert_eq[USize](res(1)?, 100)
+
+    true
+
+class iso _TestSlidingWindows is UnitTest
+  fun name(): String => "bytes/_TestSlidingWindows"
+
+  fun apply(h: TestHelper) ? =>
+    let range: U64 = Seconds(10)
+    let slide: U64 = Seconds(2)
+    let delay: U64 = Seconds(10)
+    let sw = SlidingWindows[USize, USize, _Total]("key", _Sum, range, slide,
+      delay where current_ts = Seconds(100))
+
+    var res: Array[USize] val = recover Array[USize] end
+
+    // First 2 windows values
+    res = sw(2, Seconds(92), Seconds(101))
+    h.assert_eq[USize](res.size(), 1)
+    h.assert_eq[USize](res(0)?, 0)
+
+    res = sw(3, Seconds(93), Seconds(102))
+    h.assert_eq[USize](res.size(), 0)
+
+    res = sw(4, Seconds(94), Seconds(103))
+    h.assert_eq[USize](res.size(), 1)
+    h.assert_eq[USize](res(0)?, 0)
+
+    res = sw(5, Seconds(95), Seconds(104))
+    h.assert_eq[USize](res.size(), 0)
+
+    // Second 2 windows with values
+    res = sw(1, Seconds(102), Seconds(106))
+    h.assert_eq[USize](res.size(), 1)
+    h.assert_eq[USize](res(0)?, 5)
+
+    res = sw(2, Seconds(103), Seconds(107))
+    h.assert_eq[USize](res.size(), 1)
+    h.assert_eq[USize](res(0)?, 14)
+
+    res = sw(3, Seconds(104), Seconds(108))
+    h.assert_eq[USize](res.size(), 0)
+
+    res = sw(4, Seconds(105), Seconds(109))
+    h.assert_eq[USize](res.size(), 1)
+    h.assert_eq[USize](res(0)?, 14)
+
+    // Third 2 windows with values.
+    res = sw(10, Seconds(111), Seconds(112))
+    h.assert_eq[USize](res.size(), 1)
+    h.assert_eq[USize](res(0)?, 14)
+
+    res = sw(20, Seconds(112), Seconds(113))
+    h.assert_eq[USize](res.size(), 1)
+    h.assert_eq[USize](res(0)?, 14)
+
+    res = sw(30, Seconds(113), Seconds(114))
+    h.assert_eq[USize](res.size(), 0)
+
+    res = sw(40, Seconds(114), Seconds(115))
+    h.assert_eq[USize](res.size(), 1)
+    h.assert_eq[USize](res(0)?, 12)
+
+    // Use this message to trigger 10 windows.
+    res = sw(1, Seconds(200), Seconds(201))
+    h.assert_eq[USize](res.size(), 10)
+    h.assert_eq[USize](res(0)?, 10)
+    h.assert_eq[USize](res(1)?, 10)
+    h.assert_eq[USize](res(2)?, 10)
+    h.assert_eq[USize](res(3)?, 20)
+    h.assert_eq[USize](res(4)?, 67)
+    h.assert_eq[USize](res(5)?, 100)
+    h.assert_eq[USize](res(6)?, 100)
+    h.assert_eq[USize](res(7)?, 100)
+    h.assert_eq[USize](res(8)?, 90)
+    h.assert_eq[USize](res(9)?, 40)
 
     true
 

@@ -411,22 +411,17 @@ class val PyAggregation is
     _name = Machida.get_name(_aggregation)
 
   fun initial_accumulator(): PyState =>
-    @printf[I32]("!@ PyAggregation:initial_accumulator\n".cstring())
     Machida.initial_accumulator(_aggregation)
 
   fun update(data: PyData val, acc: PyState) =>
-    @printf[I32]("!@ PyAggregation:update\n".cstring())
     Machida.aggregation_update(_aggregation, data.obj(), acc.obj())
-    @printf[I32]("!@ -- PyAggregation:updated\n".cstring())
 
   fun combine(acc1: PyState, acc2: PyState): PyState =>
     Machida.aggregation_combine(_aggregation, acc1.obj(), acc2.obj())
 
   fun output(key: Key, acc: PyState): (PyData val | None) =>
-    @printf[I32]("!@ PyAggregation:output\n".cstring())
     let data =
       Machida.aggregation_output(_aggregation, key.cstring(), acc.obj())
-    @printf[I32]("!@ -- PyAggregation:output got data\n".cstring())
 
     recover if Machida.is_py_none(data) then
         Machida.dec_ref(data)
@@ -437,7 +432,6 @@ class val PyAggregation is
     end
 
   fun name(): String =>
-    @printf[I32]("!@ PyAggregation:name\n".cstring())
     _name
 
 class PyTCPEncoder is TCPSinkEncoder[PyData val]

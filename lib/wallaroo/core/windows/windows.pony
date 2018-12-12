@@ -28,6 +28,7 @@ use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
 primitive EmptyWindow
+primitive EmptyPane
 
 class RangeWindowsBuilder
   var _range: U64
@@ -322,6 +323,10 @@ class TumblingWindows[In: Any val, Out: Any val, Acc: State ref] is
     end
     (out, stopped)
 
+  //!@ This means that even if there's a window open that's prior to
+  //current_ts - (delay + range) then we'll drop the message that we could
+  //have put in there. It's probably preferable to check that the event_ts
+  //is greater than the earliest window start_ts we have available instead.
   fun _is_valid_ts(event_ts: U64, current_ts: U64): Bool =>
     event_ts > (current_ts - (_delay + _range))
 
@@ -398,21 +403,18 @@ class SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       recover Array[U8] end
     end
 
-  fun ref _apply_input(input: In, event_ts: U64, earliest_ts: U64) =>
-    _windows.apply_input(input, event_ts, earliest_ts)
-
   fun ref _attempt_to_trigger(wall_time: U64): Array[Out] val =>
     _windows.attempt_to_trigger(wall_time)
 
-class _SlidingWindows
+class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref]
   """
   An inefficient sliding windows implementation that always recalculates
   the combination of all lowest level partial aggregations stored in panes.
   """
-  let _panes: Array[Acc]
+  let _panes: Array[(Acc | EmptyPane)]
   let _panes_start_ts: Array[U64]
-  let _panes_start_idxs: Array[USize]
   let _panes_per_window: USize
+  var _earliest_window_idx: USize
 
   let _key: Key
   let _agg: Aggregation[In, Out, Acc]
@@ -435,7 +437,7 @@ class _SlidingWindows
     let delay_range_units = (delay.f64() / slide.f64()).ceil()
     _delay = slide * delay_range_units.u64()
 
-    _panes_per_window = range / slide
+    _panes_per_window = (range / slide).usize()
 
     // Calculate how many windows we need. The delay tells us how long we
     // wait after the close of a window to trigger and clear it. We need
@@ -443,23 +445,46 @@ class _SlidingWindows
     let extra_panes = delay_range_units.usize()
     let pane_count = _panes_per_window + extra_panes
 
-    let total_length = pane_count * slide
+    let total_length = pane_count.u64() * slide
     let last_window_start = total_length - range
-    let window_count = (last_window_start / slide) + 1
+    let window_count = (last_window_start / slide).usize() + 1
 
-    _panes = Array[Acc](pane_count)
+    _panes = Array[(Acc | EmptyPane)](pane_count)
     _panes_start_ts = Array[U64](pane_count)
-    _panes_start_idxs = Array[U64](pane_count)
     _earliest_window_idx = 0
-    _last_window_idx = window_count - 1
     var pane_start: U64 = current_ts - (slide * pane_count.u64())
     for i in Range(0, pane_count) do
-      _panes.push(_identity_acc)
+      _panes.push(EmptyPane)
       _panes_start_ts.push(pane_start)
       pane_start = pane_start + slide
     end
 
-  fun ref apply_input(input: In, event_ts: U64, earliest_ts: U64) =>
+  fun ref apply(input: In, event_ts: U64, wall_time: U64): Array[Out] val =>
+    try
+      let earliest_ts = _panes_start_ts(_earliest_window_idx)?
+      let end_ts = earliest_ts + (_panes.size().u64() * _slide)
+      var applied = false
+      if (event_ts >= earliest_ts) and (event_ts < end_ts) then
+        _apply_input(input, event_ts, earliest_ts)
+        applied = true
+      end
+
+      // Check if we need to trigger and clear windows
+      let outs = attempt_to_trigger(wall_time)
+
+      // If we haven't already applied the input, do it now.
+      if not applied and _is_valid_ts(event_ts, wall_time) then
+        let new_earliest_ts = _panes_start_ts(_earliest_window_idx)?
+        _apply_input(input, event_ts, new_earliest_ts)
+      end
+
+      outs
+    else
+      Fail()
+      recover Array[Out] end
+    end
+
+  fun ref _apply_input(input: In, event_ts: U64, earliest_ts: U64) =>
     // Should we ensure the event_ts is in the correct range?
 
     if event_ts >= earliest_ts then
@@ -467,7 +492,14 @@ class _SlidingWindows
       let pane_idx =
         (_earliest_window_idx + pane_idx_offset) % _panes.size()
       try
-        _agg.update(input, _panes(pane_idx)?)
+        match _panes(pane_idx)?
+        | let acc: Acc =>
+          _agg.update(input, acc)
+        else
+          let new_acc = _agg.initial_accumulator()
+          _agg.update(input, new_acc)
+          _panes(pane_idx)? = new_acc
+        end
       else
         Fail()
       end
@@ -485,8 +517,8 @@ class _SlidingWindows
       let earliest_ts = _panes_start_ts(_earliest_window_idx)?
       let end_ts = earliest_ts + (_panes.size().u64() * _slide)
       // Convert to range units
-      let end_ts_diff =
-        ((wall_time - end_ts).f64() / _slide.f64()).ceil().u64()
+      let end_ts_diff = wall_time - end_ts
+        // ((wall_time - end_ts).f64() / _slide.f64()).ceil().u64()
       var stopped = false
       while not stopped do
         (let next_out, stopped) = _check_first_window(wall_time, end_ts_diff)
@@ -511,12 +543,14 @@ class _SlidingWindows
         var running_acc = _identity_acc
         var pane_idx = _earliest_window_idx
         for i in Range(0, _panes_per_window) do
-          let next_acc = _panes(pane_idx)?
-          running_acc = _agg.combine(running_acc, next_acc)
+          // If we find an EmptyPane, then we ignore it.
+          match _panes(pane_idx)?
+          | let next_acc: Acc =>
+            running_acc = _agg.combine(running_acc, next_acc)
+          end
           pane_idx = (pane_idx + 1) % _panes.size()
         end
         out = _agg.output(_key, running_acc)
-        _panes(_earliest_window_idx) = _identity_acc
         let all_pane_range = _panes.size().u64() * _slide
         if end_ts_diff > all_pane_range then
           _panes_start_ts(_earliest_window_idx)? = earliest_ts + end_ts_diff
@@ -525,12 +559,20 @@ class _SlidingWindows
             all_pane_range
         end
         stopped = false
+        _panes(_earliest_window_idx)? = EmptyPane
         _earliest_window_idx = (_earliest_window_idx + 1) % _panes.size()
       end
     else
       Fail()
     end
     (out, stopped)
+
+  //!@ This means that even if there's a window open that's prior to
+  //current_ts - (delay + range) then we'll drop the message that we could
+  //have put in there. It's probably preferable to check that the event_ts
+  //is greater than the earliest pane start_ts we have available instead.
+  fun _is_valid_ts(event_ts: U64, current_ts: U64): Bool =>
+    event_ts > (current_ts - (_delay + _range))
 
   fun _should_trigger(window_start_ts: U64, current_ts: U64): Bool =>
     (window_start_ts + _range) < (current_ts - _delay)
