@@ -51,6 +51,7 @@ use "wallaroo_labs/mort"
 use "wallaroo_labs/queue"
 use "wallaroo_labs/string_set"
 
+use "wallaroo/core/source/connector_source"
 
 class val LocalTopology
   let _app_name: String
@@ -247,6 +248,8 @@ actor LocalTopologyInitializer is LayoutInitializer
   // once EventLog signals we're ready
   let sl_builders: Array[SourceListenerBuilder] =
     recover iso Array[SourceListenerBuilder] end
+  let sl_actors: Array[SourceListener] =
+    recover iso Array[SourceListener] end
 
   // Cluster Management
   var _cluster_manager: (ClusterManager | None) = None
@@ -857,6 +860,11 @@ actor LocalTopologyInitializer is LayoutInitializer
             nodes_to_initialize.push(next_node)
           end
         end
+        for b in sl_builders.values() do
+          @printf[I32]("^*#^*#^*# sl_builders starting early\n".cstring())
+          let ba = b.apply(_env)
+          sl_actors.push(ba)
+        end
 
         //////////////////////////////////////////////////////////////////////
         // 3. Create DataRouter, register components with RouterRegistry,
@@ -1087,8 +1095,8 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
 
   fun ref _spin_up_source_listeners() =>
-    for builder in sl_builders.values() do
-      let sl = builder(_env)
+    for sl in sl_actors.values() do
+      sl.start_listening()
       _router_registry.register_source_listener(sl)
     end
 
