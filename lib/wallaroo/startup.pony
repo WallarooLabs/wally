@@ -75,6 +75,7 @@ actor Startup
   var _worker_names_file: String = ""
   var _connection_addresses_file: String = ""
   var _checkpoint_ids_file: String = ""
+  var _active_stream_ids_file: String = ""
 
   var _connections: (Connections | None) = None
   var _router_registry: (RouterRegistry | None) = None
@@ -252,6 +253,9 @@ actor Startup
 
       let checkpoint_ids_filepath: FilePath = FilePath(auth,
         _checkpoint_ids_file)?
+
+      let active_stream_ids_filepath: FilePath = FilePath(auth,
+        _active_stream_ids_file)?
 
       _event_log = ifdef "resilience" then
         if _startup_options.log_rotation then
@@ -679,6 +683,8 @@ actor Startup
       _app_name + "-" + _startup_options.worker_name + ".connection-addresses"
     _checkpoint_ids_file = _startup_options.resilience_dir + "/" + _app_name +
       "-" + _startup_options.worker_name + ".checkpoint_ids"
+    _active_stream_ids_file = _startup_options.resilience_dir + "/" + _app_name +
+      "-" + _startup_options.worker_name + ".active_stream_ids"
 
   fun is_recovering(auth: AmbientAuth): Bool =>
     // check to see if we can recover
@@ -744,6 +750,12 @@ actor Startup
         existing_files.set(checkpoint_ids_filepath.path)
       end
 
+      let active_stream_ids_filepath: FilePath = FilePath(auth,
+        _active_stream_ids_file)?
+      if active_stream_ids_filepath.exists() then
+        existing_files.set(active_stream_ids_filepath.path)
+      end
+
       let required_files: Set[String] = Set[String]
       ifdef "resilience" then
         required_files.set(event_log_filepath.path)
@@ -757,6 +769,7 @@ actor Startup
         required_files.set(data_channel_filepath.path)
         required_files.set(connection_addresses_filepath.path)
       end
+      // _active_stream_ids_file is not required
 
       // Only validate _all_ files exist if _any_ files exist.
       if existing_files.size() > 0 then
@@ -805,6 +818,7 @@ actor Startup
     _remove_file(_worker_names_file)
     _remove_file(_connection_addresses_file)
     _remove_file(_checkpoint_ids_file)
+    _remove_file(_active_stream_ids_file)
 
     try
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
