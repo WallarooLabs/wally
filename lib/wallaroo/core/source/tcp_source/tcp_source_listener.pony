@@ -70,7 +70,7 @@ actor TCPSourceListener[In: Any val] is SourceListener
   let _service: String
   let _valid: Bool
 
-  var _fd: U32 = 0
+  var _fd: U32 = U32.max_value()
   var _event: AsioEventID = AsioEvent.none()
   var _limit: USize = 0
   var _count: USize = 0
@@ -137,7 +137,6 @@ actor TCPSourceListener[In: Any val] is SourceListener
       @printf[I32]((pipeline_name + " source attempting to listen on "
         + _host + ":" + _service +
         "\n").cstring())
-      _notify_listening()
 
       for i in Range(0, _limit) do
         let source_id = _routing_id_gen()
@@ -162,6 +161,16 @@ actor TCPSourceListener[In: Any val] is SourceListener
 
         _available_sources.push(source)
       end
+    end
+
+  be start_listening() =>
+    _event = @pony_os_listen_tcp[AsioEventID](this,
+      _host.cstring(), _service.cstring())
+    _fd = @pony_asio_event_fd(_event)
+    _notify_listening()
+    ifdef debug then
+      @printf[I32]("Socket for %s now listening on %s:%s\n".cstring(),
+        _pipeline_name.cstring(), _host, _service)
     end
 
   be recovery_protocol_complete() =>
