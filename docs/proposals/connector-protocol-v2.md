@@ -19,7 +19,7 @@ The worker that receives the handshake <sup>A3</sup> will respond with an ok or 
 
 With a credit count established for this session, we may start pushing frames for our streams. Before we send messages streams are introduced with notification frame types to establish a mapping between the stream's fully qualified name and the id which message frames will use when transmitting messages <sup>A6</sup>. Stream notifications do consume one credit.
 
-Once a stream notification as been sent, the open stream can have any number of messages for that stream sent so long as the credit count remains above zero. In order to replenish credits, Wallaroo is expected to send ack frames to the connector. This will include the number of credits to be added to the session's current count as well as a list of stream id * message id pairs that have been properly processed. This allows the connector to do bookkeeping and make progress as long as Wallaroo is keeping up.
+Once a stream notification as been sent, the open stream can have any number of messages for that stream sent so long as the credit count remains above zero. In order to replenish credits, Wallaroo is expected to send ack frames to the connector. This will include the number of credits to be added to the session's current count as well as a list of {stream id, maximum message id} pairs that have been properly processed. This allows the connector to do bookkeeping and make progress as long as Wallaroo is keeping up.
 
 The protocol has been given plenty of room to grow and may be optimized over time. Most of the machinery is designed to allow trivial implementations which can be replaced with more sophisticated algorithms later. An example is credit flow can be adjusted in order to achieve target buffer sizes while avoiding pipeline stalls by using a PID controller rather than a fixed pipeline depth upon session initialization.
 
@@ -42,7 +42,7 @@ The protocol has been given plenty of room to grow and may be optimized over tim
 
 ## Wire Format
 
-Each frame transmitted by either side uses a 32bit little endian <sup>B0</sup> length denoting all bytes that come after the 4 bytes comprising the length <sup>B1</sup>. This makes it much easier to consistently split up data which might be captured and recorded for analysis after the fact and could speed the development of other tools which can do primitive routing and management of frames without requiring a full description of the format of each frame type.
+Each frame transmitted by either side uses a 32bit big endian/network byte order <sup>B0</sup> length denoting all bytes that come after the 4 bytes comprising the length <sup>B1</sup>. This makes it much easier to consistently split up data which might be captured and recorded for analysis after the fact and could speed the development of other tools which can do primitive routing and management of frames without requiring a full description of the format of each frame type.
 
 This framing mechanism applies to all messages including the handshake. The worker reading the hello frame should be careful to check the version and cookie value placed in fixed locations at the start before continuing the decoding. This allows the protocol to sidestep any unintended behaviors if the framing changes in the future <sup>B0</sup>.
 
@@ -67,7 +67,7 @@ Frame tags (`$H` = ASCII value of H):
 -define(MESSAGE, $M).
 
 -define(ACK, $A).
--define(NACK, $!).
+-define(RESTART, $!).
 ```
 
 Message bit-flags:
@@ -78,6 +78,7 @@ Message bit-flags:
 -define(EOS, 4).
 -define(UNSTABLE_REFERENCE, 8).
 -define(EVENT_TIME, 16).
+-define(KEY, 32).
 ```
 
 #### Framing
@@ -87,12 +88,10 @@ Type specs:
 ```erlang
 -type frame() :: iolist().
 -type point_of_reference() ::
-    non_neg_integer() |
-    binary() |
-    undefined.
+    non_neg_integer().
 ```
 
-Constructors:
+Constructors follow.  Note that all integers larger than 8 bits are encoded in little endian byte order.
 
 ```erlang
 -spec frame(iodata()) -> iolist().
@@ -101,22 +100,22 @@ frame(Message) ->
 
 -spec short_bytes(iodata() | undefined) -> iolist().
 short_bytes(undefined) ->
-    [<<0:16/little-unsigned>>];
+    [<<0:16/big-unsigned>>];
 short_bytes(Data) ->
     Size = iolist_size(Data),
-    [<<Size:16/little-unsigned, Data].
+    [<<Size:16/big-unsigned, Data].
 
 -spec u16(non_neg_integer()) -> binary().
 u16(N) ->
-    <<N:16/little-unsigned>>.
+    <<N:16/big-unsigned>>.
 
 -spec u32(non_neg_integer()) -> binary().
 u32(N) ->
-    <<N:32/little-unsigned>>.
+    <<N:32/big-unsigned>>.
 
 -spec u64(non_neg_integer()) -> binary().
 u64(N) ->
-    <<N:64/little-unsigned>>.
+    <<N:64/big-unsigned>>.
 
 -define(U64_MAX, 1 bsl 64 - 1).
 -spec point_of_reference(point_of_reference()) -> iodata().
@@ -124,7 +123,7 @@ point_of_reference(PointOfRef)
     when is_integer(PointOfRef)
     andalso PointOfRef >= 0
     andalso PointOfRef <= U64_MAX ->
-        <<PointofRef:64/little-unsigned>>;
+        <<PointofRef:64/big-unsigned>>;
 point_of_reference(_) ->
     error({unsupported, "64bit reference expected"}).
 
@@ -156,15 +155,18 @@ hello(Revision, Cookie, ProgramName, InstanceName) ->
         short_bytes(InstanceName)
     ]).
 
--spec ok(positive_integer(), list(points_of_reference())) -> frame().
+-spec ok(positive_integer(), list(stream_info())) -> frame()
+  when
+    stream_info = {StreamId::non_neg_integer, StreamName::String,
+                   Ref::point_of_reference()}.
 ok(InitialCredits, PointsOfReference) ->
     frame([
         ?OK,
         u32(InitialCredits),
         % This encodes each point of reference in sequence using the
         % remaining bytes in the frame.
-        lists:map(fun ({Stream, Ref}) ->
-            [u64(Stream), point_of_reference(Ref)]
+        lists:map(fun ({StreamId, StreamName, Ref}) ->
+            [u64(StreamId), short_bytes(StreamName), point_of_reference(Ref)]
         end, PointsOfReference)
     ]).
 
@@ -180,7 +182,7 @@ Aside: Erlang requires capitalized variable names. `%` introduces a comment till
 
 This section assumes transport discovery and configuration has been handled elsewhere.
 
-Upon connection, the connector must send a hello frame which establishes the protocol version and includes some descriptive metadata about the script as well as a preconfigured nonce called a cookie. These fields allows the wallaroo worker to determine if it belongs with to the application or cluster and if so, how to route messages.
+Upon connection, the connector must send a hello frame which establishes the protocol version and includes some descriptive metadata about the script as well as a preconfigured nonce called a cookie. These fields allows the Wallaroo worker to determine if it belongs with to the application or cluster and if so, how to route messages.
 
 The cookie is optional and can have it's length set to zero if you haven't configured one somewhere <sup>C0</sup>. This will be default for easy development but it'll be encouraged to be used in a deployed cluster to prevent accidental and unwanted connections from being made, especially in the case where more than one cluster may be run. It is not a strong security mechanism by itself but designing by the rule of defense in depth, this becomes a reasonable mitigation.
 
@@ -198,9 +200,9 @@ If no error has occurred and the connection has remained opened, the protocol no
 
 <sup>C0</sup> Both sides are required to set this to an empty value. If the worker does not expect a cookie but the connector gives one, this might signal a configuration error and it'd be better to fail loudly rather than continue silently.
 
-<sup>C1</sup> These pairs use the stream id as set by the notify frame. This should always be a deterministic mapping and the convention is set by the connector implementation. They are not unique stream id's across the application but instead only apply to that connector instance, so for example, a partition number could be used or a hash of the topic name and partition could be used if multiple topics are being used under the name of a single source.
+<sup>C1</sup> These pairs use the stream id as set by the notify frame(s) sent by previous sessions.
 
-<sup>C2</sup> Because this protocol is asynchronous, we must assume that this data is eventually consistent but not always perfectly up to date. These values are meant as hints for the connector. Right now we also don't dot the point of reference with some generational counter. This prevents certain advanced scenarios to be played out. It's out of scope for now the first few revisions of this protocol. Further issues with reprocessing are handled with nack frames discussed in the streaming section.
+<sup>C2</sup> Because this protocol is asynchronous, we must assume that this data is eventually consistent but not always perfectly up to date. These values are meant as hints for the connector. Right now we also don't dot the point of reference with some generational counter. This prevents certain advanced scenarios to be played out. It's out of scope for now the first few revisions of this protocol. Further issues with reprocessing are handled with RESTART frames discussed in the streaming section.
 
 
 ## Streaming
@@ -224,68 +226,65 @@ notify(StreamId, StreamName, PointOfRef) ->
         point_of_reference(PointOfRef)
     ]).
 
--spec message(Message, MessageId, StreamId, Flags) -> frame() when
-    Message :: boundary | {non_neg_integer(), iodata()} | iodata(),
-    MessageId :: non_neg_integer(),
+-spec message(Flags, StreamId, MessageId, EventTime, Key, Message) -> frame()
+  when
+    Flags :: non_neg_integer(),      % See message bit flag definitions above
     StreamId :: non_neg_integer(),
-    Flags :: non_neg_integer(). % See message bit flag definitions above
-message(_Message=boundary, MessageId, StreamId, Flags) ->
+    MessageId :: non_neg_integer(),
+    EventTime :: non_neg_integer(),
+    Key :: string(),
+    Message :: iodata().
+message(Flags, StreamId, MessageId, EventTime, Key, Message) ->
     frame([
-        ?MESSAGE,
-        u64(StreamId),
-        u16(Flags bor ?BOUNDARY),
-        u64(MessageId)
-    ]);
-message({EventTime, Message}, MessageId, StreamId, Flags) ->
-    frame([
-        ?MESSAGE,
-        u64(StreamId),
-        u16(Flags bor ?EVENT_TIME),
-        u64(MessageId),
-        u64(EventTime),
-        Message
-    ]);
-message(Message, MessageId, StreamId, Flags) ->
-    frame([
-        ?MESSAGE,
-        u64(StreamId),
         u16(Flags),
-        u64(MessageId),
-        Message
+        u64(StreamId),
+        if Flags band ?EPHEMERAL /= 0 then
+            <<>>
+        else
+            u64(MessageId)
+        end,
+        if Flags band ?EVENT_TIME /= 0 then
+            u64(EventTime)
+        else
+            <<>>
+        end,
+        if Flags band ?KEY /= 0 then
+            short_bytes(Key)
+        else
+            <<>>
+        end,
+        if Flags band ?BOUNDARY /= 0 then
+            <<>>
+        else
+            Message
+        end
     ]).
 
 ack(Credits, MessageAcks) ->
     framed([
         ?ACK,
         u32(Credits),
-        lists:map(fun ({StreamId, MessageId}) ->
-            [u64(StreamId), u64(MessageId)]
+        u32(length(MessageAcks)),
+        lists:map(fun ({StreamId, PointofRef}) ->
+            [u64(StreamId), u64(PointOfRef)]
         end, MessageAcks)
     ]).
 
-nack(Credits, StreamId, undefined) ->
+restart() ->
     frame([
-        ?NACK,
-        u32(Credits),
-        u64(StreamId),
-        point_of_reference(0)
-    ]);
-nack(Credits, StreamId, PointOfRef) ->
-    frame([
-        ?NACK,
-        u32(Credits),
-        u64(StreamId),
-        point_of_reference(PointOfRef)
+        ?RESTART
     ]).
 ```
 
 Aside: Erlang uses the `bor` operator to express bitwise OR.
 
-NOTE: Each connector may provide a number of streams as a source. Each stream only has order and consistency relative to itself as far as Wallaroo is concerned. The source itself is not really a stream as much as a class of streams which all behave in a similar manner. Usually this denotes that the source is implemented using a single medium but it's not necessarily the case. An example of this is a connector which has an active medium which is periodically purged and an archive for when progress must resume from data that is too old to be kept in the active medium. Allowing the wallaroo application to treat this as a single source is a convenient allowance.
+NOTE: Each connector may provide a number of streams as a source. Each stream only has order and consistency relative to itself as far as Wallaroo is concerned. The source itself is not really a stream as much as a class of streams which all behave in a similar manner. Usually this denotes that the source is implemented using a single medium but it's not necessarily the case. An example of this is a connector which has an active medium which is periodically purged and an archive for when progress must resume from data that is too old to be kept in the active medium. Allowing the Wallaroo application to treat this as a single source is a convenient allowance.
 
-The connector should now be ready to start processing data but before it can send messages to wallaroo it needs to notify wallaroo of each new logical stream. These notifications need only come before the first message in that specific stream. This allows the following messages to omit the fully qualified name.
+Before the connector can send messages to Wallaroo, it needs to notify Wallaroo of each new logical stream. These notifications need only come before the first message in that specific stream. This allows the following messages to omit the fully qualified name.
 
-Sending a message with a stream id that has not been properly described using a notification is an error and Wallaroo should signal such and close the connection. The generation of an id should be unique. Failure to do so is not an error but will allow parallelism in processing where it may be unintended. For cases where simple numbering can't be done, it's recommended to use a good hash function on the fully qualified name (64bit's is large enough to avoid birthday paradox issues).
+The choice of stream id is the connector's responsibility.  The stream name is advisory/debugging information only; the stream id alone is used by the protocol to identify data messages.  The stream id should always be a deterministic mapping. For example, a partition number could be used or a hash of the {topic name, partition} could be used if multiple topics are being used under the name of a single source. The generation of an id should be unique. Failure to do so is not an error but will allow parallelism in processing where it may be unintended. For cases where simple numbering can't be done, it's recommended to use a good hash function on the fully qualified name (64bit's is large enough to avoid birthday paradox issues).
+
+Sending a message with a stream id that has not been properly described using a notification is an error and Wallaroo should signal such and close the connection.
 
 If a connector is resuming from Wallaroo's provided point of reference it should provide that reference in the notification for the stream. Otherwise it should provide the value zero.
 
@@ -307,6 +306,8 @@ Messages currently have a 16bit field for bit-flags. Most of the bits are reserv
 
 Messages can be marked as ephemeral denoting that the identity and content of the message may not be retrieved later. The message id is still provided for correlation purposes but should not be treated as a unique identifier by itself. Each should be unique within a session but will not guarantee this property across sessions. This feature is designed to be used for one-shot mediums like UDP or trivial TCP.
 
+Early implementations may reject and/or mishandle streams with ephemeral and non-ephemeral messages in the same stream.
+
 ### Points of Reference
 
 Each message id may be remembered but it can be expensive to remember them all. Thus we have points of reference to define position in a stream relative to its content, assuming there is some determinism in the ordering each time the content is replayed. This involves the guarantee that messages sorted before and after that point of reference form a disjoint set. Certain mediums can only provide coarser granularity during replay. The whole stream itself may not have a total order but the disjoint sets formed by each point of reference do have a total order. The observation should be that all points of reference form a total order of legal places one can resume from.
@@ -321,17 +322,15 @@ If Wallaroo is not able to support unreferenced messages with resilience turned 
 
 This is a newer feature and it aligns nicely with GenSource. Generators and batch workloads sometimes need to signal the completion of a dataset that is being streamed and this allows that to be expressed. It's not currently decided how this will be exposed but for now it is assumed that the worker should treat this end state strictly to help detect problems with connector behavior early.
 
-### Acks and Nacks
+### ACK
 
 The worker should acknowledge frames of all types. These do not need to be 1-1 acknowledgments but it may be convenient to write it as such initially since all frames take one credit and each session needs to have these continuously replenished to avoid stuttered flow <sup>D2</sup>. Ack frames serve this purpose, almost like a regular heartbeat. Technically an ack could be sent with zero credits but we don't currently see this as a very useful feature <sup>D3</sup>.
 
-Acks also provide a list of message ids for each stream which have completed some safe level of processing in Wallaroo <sup>D4</sup>.
+When Wallaroo has processed a barrier and completed a checkpoint, then, for each stream, the last received MessageId prior to the barrier will be sent to the connector client in an ACK message to report processing progress <sup>D4</sup>.  All messages with MessageIds less than the reported point of reference are included in the checkpoint.
 
-NOTE: All messages ids must be sent back as ack'ed but it may be enough to leverage transmission ordering and ack only the last transmitted in the set for each stream. This may be a future optimization to consider.
+### RESTART
 
-Nacks are slightly different from an ack. They provide credits to allow new frames to be transmitted but not represent forward progress. This happens when Wallaroo needs to reset a given stream's state to a specific point of reference after the session has already been started. The stream is put into a nack'ed state in the worker which effectively causes all message frames to be ignored for that stream until a new notify message is sent for that stream to reset it to an open state with a specific point of reference to continue from.
-
-If the connector is unable to resume from the given point of reference then it should not notify but instead send an error and exit the session <sup>D5</sup>.
+When a connector receives a RESTART message from the worker, the connector must close the connection.  In order to resume sending data to the worker, the connector must open a new connection + handshake + notify for each stream.  The worker cannot assume that any messages sent with MessageIds larger than the last ACK's point of reference were received by the worker.
 
 ---
 
@@ -344,8 +343,6 @@ If the connector is unable to resume from the given point of reference then it s
 <sup>D3</sup> An idle link carries some risks but we currently expect local networking so we'll not worry about this for now. The main issue with relying on timeliness is that the current Pony mute/unmute system can create a bit of a problem when paired with head of line blocking issues. Alternative solutions exist to allow multiplexing to get around this problem but the complexity is not worth the benefit at the moment.
 
 <sup>D4</sup> One might assume the pipeline has completed processing messages up to that point of reference across all pipelines that use that source. There are plenty of other ways this could be configured to work, depending on the trade-offs an application requires and which options are enabled in Wallaroo.
-
-<sup>D5</sup> Wallaroo does not have very sophisticated error handling at the application level for cases like these so we'll assume the connector script has been customized to do the right thing in most cases. An error here should always mean halt. If that is not expected then it should not continue sending from that stream and should not notify to reset the stream until the stream state itself has been repaired in some way.
 
 
 ## Protocol State Machine
@@ -384,7 +381,7 @@ In the streaming state the following frame types are valid:
    - NOFITY: Connector -> Worker
    - MESSAGE: Connector -> Worker
    - ACK: Worker -> Connector
-   - NACK: Worker -> Connector
+   - RESTART: Worker -> Connector
    - ERROR: * -> * (next state = error)
 
 In the error state no frames are valid. It is recommended that the transport be closed properly, though any local processing may be completed if there are bits of work that are still in progress. Any data received after the error frame should be discarded.
@@ -400,21 +397,19 @@ Each stream during a session must be in one of the following states:
                   +-------------+--------------+
                   |             |              |
                   |             |              V
- +-------+     +------+     +--------+     +-------+
- | Intro +---->| Open +---->| Closed +---->| Reset |
- +-------+     +------+     +--------+     +-------+
-                  ^             |              |
-                  |             |              |
-                  +-------------+--------------+
+ +-------+     +------+     +--------+     +------------+
+ | Start +---->| Open +---->| Closed +---->| Terminated |
+ +-------+     +------+     +--------+     +------------+
+                  ^             |
+                  |             |
+                  +-------------+
 ```
 
-New streams must be introduced and reset streams must be reintroduced. The connector may not know if a notification is the first reintroduction or not. If it's a reintroduction, the handshake may include information on where to resume from. The state machine will always end up in the open state after a notification.
+New streams must be introduced and reset streams must be reintroduced. The connector may not know if a notification is the first use of a stream or not. If the StreamId has been used before, the handshake will include information on where to resume from. The state machine will always end up in the open state after a notification.
 
 In the intro state, the following actions are valid:
 
     - NOTIFY: Connector -> Worker (provide a stream id and a fully qualified name)
-
-If a notify is received in the introduction state, it should assume that it should be processed as in the open state and a reintroduction should follow appropriately.
 
 In the open state, the following actions are valid:
 
@@ -422,25 +417,19 @@ In the open state, the following actions are valid:
     * if the EOS flag is set the next state is closed
 - ACK: Worker -> Connector
     * the are not 1-1 with MESSAGE frames
-- NACK: Worker -> Connector (next state is reset)
+- RESTART: Worker -> Connector (next state is terminated)
+    * worker is requesting that the stream be reprocessed in some way
 
 In the closed state, the following actions are valid:
 
 - NOTIFY: Connector -> Worker (next state is open)
     * reopens the stream
-- NACK: Worker -> Connector (next state is reset)
+- RESTART: Worker -> Connector (next state is terminated)
     * worker is requesting that the stream be reprocessed in some way
 - ACK: Worker -> Connector
     * these can arrive asynchronously and should be processed accordingly
 
-In the reset state, the following actions are valid:
-
-- NOTIFY: Connector -> Worker (next state is open)
-- ACK: Worker -> Connector
-    * these can arrive asynchronously and should be processed accordingly
-
-NACKs may be handled when in invalid states but they MUST be treated as if there was a stack of NACKs. Each NACK will require a NOTIFY. If the connector or worker is unable to satisfy this, and error should be used and the session should be reset by disconnecting and redoing the handshake.
-
+In the terminated state, no actions are valid: the worker will close the session and ignore any messages received after the RESTART has been sent.
 
 ## Debugging
 
