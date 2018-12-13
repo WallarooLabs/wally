@@ -27,6 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+use "assert"
 use "buffered"
 use "collections"
 use "net"
@@ -116,6 +117,9 @@ actor ConnectorSource[In: Any val] is Source
   // Checkpoint
   var _next_checkpoint_id: CheckpointId = 1
 
+  // Active Stream Registry
+  let _active_stream_registry: ConnectorSourceListener[In]
+
   new create(source_id: RoutingId, auth: AmbientAuth,
     listen: ConnectorSourceListener[In], notify: ConnectorSourceNotify[In] iso,
     event_log: EventLog, router': Router,
@@ -127,6 +131,9 @@ actor ConnectorSource[In: Any val] is Source
     A new connection accepted on a server.
     """
     _source_id = source_id
+                @printf[I32]("^*^* %s.%s my source_id = %s\n".cstring(),
+                  __loc.type_name().cstring(), __loc.method_name().cstring(),
+                  _source_id.string().cstring())
     _auth = auth
     _event_log = event_log
     _metrics_reporter = consume metrics_reporter'
@@ -134,6 +141,8 @@ actor ConnectorSource[In: Any val] is Source
     _notify = consume notify
     _layout_initializer = layout_initializer
     _router_registry = router_registry
+    _active_stream_registry = listen
+    _notify.set_active_stream_registry(_active_stream_registry, this)
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
@@ -436,6 +445,7 @@ actor ConnectorSource[In: Any val] is Source
 
       match token
       | let sbt: CheckpointBarrierToken =>
+        _notify.initiate_barrier(sbt.id)
         checkpoint_state(sbt.id)
       end
       for (o_id, o) in _outputs.pairs() do
@@ -453,6 +463,28 @@ actor ConnectorSource[In: Any val] is Source
       @printf[I32]("barrier_complete at ConnectorSource %s\n".cstring(),
         _source_id.string().cstring())
     end
+    match token
+    | let sbt: CheckpointBarrierToken =>
+      _notify.barrier_complete(sbt.id)
+    | let srt: CheckpointRollbackBarrierToken =>
+      if not _muted then
+        @printf[I32]("^*^* %s.%s not muted when %s\n".cstring(),
+          __loc.type_name().cstring(), __loc.method_name().cstring(),
+          token.string().cstring())
+      end
+      None // SLF TODO
+    | let srt: CheckpointRollbackResumeBarrierToken =>
+      if not _muted then
+        @printf[I32]("^*^* %s.%s not muted when %s\n".cstring(),
+          __loc.type_name().cstring(), __loc.method_name().cstring(),
+          token.string().cstring())
+      end
+      None // SLF TODO
+    else
+      @printf[I32]("^*^* %s.%s other token %s\n".cstring(),
+        __loc.type_name().cstring(), __loc.method_name().cstring(), token.string().cstring())
+      Fail()
+    end
     None
 
   //////////////
@@ -460,24 +492,40 @@ actor ConnectorSource[In: Any val] is Source
   //////////////
   fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
     """
+    SLF TODO: .....
     ConnectorSources don't currently write out any data as part of the checkpoint.
     """
     _next_checkpoint_id = checkpoint_id + 1
-    _event_log.checkpoint_state(_source_id, checkpoint_id,
-      recover val Array[ByteSeq] end)
+    let state = _notify.create_checkpoint_state()
+    _event_log.checkpoint_state(_source_id, checkpoint_id, state)
 
   be prepare_for_rollback() =>
     _prepare_for_rollback()
 
   fun ref _prepare_for_rollback() =>
-    None
+    _notify.prepare_for_rollback()
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
   =>
     """
+    SLF TODO: .....
     There is nothing for a ConnectorSource to rollback to.
     """
+    let p: String ref = p.create()
+    match payload
+    | let ss: String =>
+      p.append(ss)
+    | let ia: Array[U8] val =>
+      for c in ia.values() do
+        p.push(c)
+      end
+    end
+    @printf[I32]("^*^* %s.%s my source_id = %s, payload.size = %d\n".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      _source_id.string().cstring(), p.size())
+
+    _notify.rollback(checkpoint_id, payload)
     _next_checkpoint_id = checkpoint_id + 1
     event_log.ack_rollback(_source_id)
 
@@ -782,3 +830,13 @@ actor ConnectorSource[In: Any val] is Source
     """
     // TODO: verify that removal of "in_sent" check is harmless
     _expect = _notify.expect(this, qty)
+
+  be stream_notify_result(session_tag: USize, success: Bool,
+    stream_id: U64, point_of_reference: U64, last_message_id: U64) =>
+    // SLF TODO
+    @printf[I32]("^*^* %s.%s(%s, %lu, %lu, %lu)\n".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      success.string().cstring(), stream_id, point_of_reference,
+      last_message_id)
+    _notify.stream_notify_result(session_tag, success,
+      stream_id, point_of_reference, last_message_id)
