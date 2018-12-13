@@ -172,7 +172,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
 
   let _notify: KafkaSourceListenerNotify[In]
 
-  let _kc: (KafkaClient tag | None)
+  var _kc: (KafkaClient tag | None) = None
   let _kafka_topic_partition_sources:
     Map[String, Map[KafkaPartitionId, KafkaSource[In]]] =
     _kafka_topic_partition_sources.create()
@@ -220,7 +220,8 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
         spr.partition_routing_id(), this)
     end
 
-    // create kafka config
+  be start_listening() =>
+    // create kafka client
     _kc = match KafkaConfigFactory(_ksco, _env.out)
     | let kc: KafkaConfig val =>
       for topic in kc.consumer_topics.values() do
@@ -233,6 +234,10 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
       @printf[U32]("%s\n".cstring(), ksce.message().cstring())
       Fail()
       None
+    end
+    ifdef debug then
+      @printf[I32]("Client for %s now created\n".cstring(),
+        _pipeline_name.cstring())
     end
 
   be recovery_protocol_complete() =>

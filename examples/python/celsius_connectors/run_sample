@@ -38,7 +38,7 @@ class UDPHandler(SocketServer.BaseRequestHandler):
 def send_feed():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     value = 0.0
-    while value < 100:
+    while value < 13:
         packet = struct.pack(">f", value)
         sock.sendto(packet, ('127.0.0.1', 8801))
         value += 1
@@ -118,7 +118,7 @@ try:
         "--data", "127.0.0.1:6001",
         "--name", "worker-name",
         "--external", "127.0.0.1:5050",
-        "--cluster-initializer",
+        "--cluster-initializer", "--run-with-resilience",
         "--ponythreads=1", "--ponynoblock"])
 except:
     print("Unable to run %s. Has the wallaroo environment "

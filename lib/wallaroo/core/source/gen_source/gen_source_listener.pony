@@ -143,6 +143,9 @@ actor GenSourceListener[In: Any val] is SourceListener
     end
     _sources.push(source)
 
+  be start_listening() =>
+    None // SLF TODO
+
   be recovery_protocol_complete() =>
     for s in _sources.values() do
       s.unmute(this)
