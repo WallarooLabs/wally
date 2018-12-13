@@ -19,7 +19,7 @@ The worker that receives the handshake <sup>A3</sup> will respond with an ok or 
 
 With a credit count established for this session, we may start pushing frames for our streams. Before we send messages streams are introduced with notification frame types to establish a mapping between the stream's fully qualified name and the id which message frames will use when transmitting messages <sup>A6</sup>. Stream notifications do consume one credit.
 
-Once a stream notification as been sent, the open stream can have any number of messages for that stream sent so long as the credit count remains above zero. In order to replenish credits, Wallaroo is expected to send ack frames to the connector. This will include the number of credits to be added to the session's current count as well as a list of stream id * message id pairs that have been properly processed. This allows the connector to do bookkeeping and make progress as long as Wallaroo is keeping up.
+Once a stream notification as been sent, the open stream can have any number of messages for that stream sent so long as the credit count remains above zero. In order to replenish credits, Wallaroo is expected to send ack frames to the connector. This will include the number of credits to be added to the session's current count as well as a list of {stream id, maximum message id} pairs that have been properly processed. This allows the connector to do bookkeeping and make progress as long as Wallaroo is keeping up.
 
 The protocol has been given plenty of room to grow and may be optimized over time. Most of the machinery is designed to allow trivial implementations which can be replaced with more sophisticated algorithms later. An example is credit flow can be adjusted in order to achieve target buffer sizes while avoiding pipeline stalls by using a PID controller rather than a fixed pipeline depth upon session initialization.
 
@@ -182,7 +182,7 @@ Aside: Erlang requires capitalized variable names. `%` introduces a comment till
 
 This section assumes transport discovery and configuration has been handled elsewhere.
 
-Upon connection, the connector must send a hello frame which establishes the protocol version and includes some descriptive metadata about the script as well as a preconfigured nonce called a cookie. These fields allows the wallaroo worker to determine if it belongs with to the application or cluster and if so, how to route messages.
+Upon connection, the connector must send a hello frame which establishes the protocol version and includes some descriptive metadata about the script as well as a preconfigured nonce called a cookie. These fields allows the Wallaroo worker to determine if it belongs with to the application or cluster and if so, how to route messages.
 
 The cookie is optional and can have it's length set to zero if you haven't configured one somewhere <sup>C0</sup>. This will be default for easy development but it'll be encouraged to be used in a deployed cluster to prevent accidental and unwanted connections from being made, especially in the case where more than one cluster may be run. It is not a strong security mechanism by itself but designing by the rule of defense in depth, this becomes a reasonable mitigation.
 
@@ -200,7 +200,7 @@ If no error has occurred and the connection has remained opened, the protocol no
 
 <sup>C0</sup> Both sides are required to set this to an empty value. If the worker does not expect a cookie but the connector gives one, this might signal a configuration error and it'd be better to fail loudly rather than continue silently.
 
-<sup>C1</sup> These pairs use the stream id as set by the notify frame. This should always be a deterministic mapping and the convention is set by the connector implementation. They are not unique stream id's across the application but instead only apply to that connector instance, so for example, a partition number could be used or a hash of the topic name and partition could be used if multiple topics are being used under the name of a single source.
+<sup>C1</sup> These pairs use the stream id as set by the notify frame(s) sent by previous sessions.
 
 <sup>C2</sup> Because this protocol is asynchronous, we must assume that this data is eventually consistent but not always perfectly up to date. These values are meant as hints for the connector. Right now we also don't dot the point of reference with some generational counter. This prevents certain advanced scenarios to be played out. It's out of scope for now the first few revisions of this protocol. Further issues with reprocessing are handled with RESTART frames discussed in the streaming section.
 
@@ -278,11 +278,13 @@ restart() ->
 
 Aside: Erlang uses the `bor` operator to express bitwise OR.
 
-NOTE: Each connector may provide a number of streams as a source. Each stream only has order and consistency relative to itself as far as Wallaroo is concerned. The source itself is not really a stream as much as a class of streams which all behave in a similar manner. Usually this denotes that the source is implemented using a single medium but it's not necessarily the case. An example of this is a connector which has an active medium which is periodically purged and an archive for when progress must resume from data that is too old to be kept in the active medium. Allowing the wallaroo application to treat this as a single source is a convenient allowance.
+NOTE: Each connector may provide a number of streams as a source. Each stream only has order and consistency relative to itself as far as Wallaroo is concerned. The source itself is not really a stream as much as a class of streams which all behave in a similar manner. Usually this denotes that the source is implemented using a single medium but it's not necessarily the case. An example of this is a connector which has an active medium which is periodically purged and an archive for when progress must resume from data that is too old to be kept in the active medium. Allowing the Wallaroo application to treat this as a single source is a convenient allowance.
 
-The connector should now be ready to start processing data but before it can send messages to wallaroo it needs to notify wallaroo of each new logical stream. These notifications need only come before the first message in that specific stream. This allows the following messages to omit the fully qualified name.
+Before the connector can send messages to Wallaroo, it needs to notify Wallaroo of each new logical stream. These notifications need only come before the first message in that specific stream. This allows the following messages to omit the fully qualified name.
 
-Sending a message with a stream id that has not been properly described using a notification is an error and Wallaroo should signal such and close the connection. The generation of an id should be unique. Failure to do so is not an error but will allow parallelism in processing where it may be unintended. For cases where simple numbering can't be done, it's recommended to use a good hash function on the fully qualified name (64bit's is large enough to avoid birthday paradox issues).
+The choice of stream id is the connector's responsibility.  The stream name is advisory/debugging information only; the stream id alone is used by the protocol to identify data messages.  The stream id should always be a deterministic mapping. For example, a partition number could be used or a hash of the {topic name, partition} could be used if multiple topics are being used under the name of a single source. The generation of an id should be unique. Failure to do so is not an error but will allow parallelism in processing where it may be unintended. For cases where simple numbering can't be done, it's recommended to use a good hash function on the fully qualified name (64bit's is large enough to avoid birthday paradox issues).
+
+Sending a message with a stream id that has not been properly described using a notification is an error and Wallaroo should signal such and close the connection.
 
 If a connector is resuming from Wallaroo's provided point of reference it should provide that reference in the notification for the stream. Otherwise it should provide the value zero.
 
