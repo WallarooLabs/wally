@@ -108,6 +108,7 @@ class SourceConnector(BaseConnector):
         super(SourceConnector, self).__init__(args, required_params,
                                               optional_params)
         self._conn = None
+        self.count = 0
 
     def connect(self, host=None, port=None):
         while True:
@@ -127,6 +128,13 @@ class SourceConnector(BaseConnector):
             raise RuntimeError("Please call connect before writing")
         payload = self._encoder.encode(message, event_time, key)
         self._conn.sendall(payload)
+        self.count = self.count + 1
+        if self.count > 3:
+            self._conn.close()
+            self._conn = None
+            self.count = 0
+            time.sleep(0.25)
+            self.connect()
 
 
 Stream = namedtuple('Stream', ['id', 'name', 'point_of_ref', 'is_open'])

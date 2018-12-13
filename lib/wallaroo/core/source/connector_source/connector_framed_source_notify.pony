@@ -16,6 +16,7 @@ Copyright 2017-2019 The Wallaroo Authors.
 
 */
 
+use "buffered"
 use "collections"
 use "time"
 use "wallaroo_labs/time"
@@ -32,6 +33,27 @@ use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
+primitive _MyStream
+  fun apply(): U64 => 4242
+
+class _StreamState
+  var pending_query: Bool
+  var base_point_of_reference: U64
+  var last_message_id: U64
+  var filter_message_id: U64
+  var barrier_last_message_id: U64
+  var barrier_checkpoint_id: CheckpointId
+
+  new ref create(pending_query': Bool, base_point_of_reference': U64,
+    last_message_id': U64, filter_message_id': U64,
+    barrier_last_message_id': U64, barrier_checkpoint_id': CheckpointId)
+=>
+  pending_query = pending_query'
+  base_point_of_reference = base_point_of_reference'
+  last_message_id = last_message_id'
+  filter_message_id = filter_message_id'
+  barrier_last_message_id = barrier_last_message_id'
+  barrier_checkpoint_id = barrier_checkpoint_id'
 
 class ConnectorSourceNotify[In: Any val]
   let _source_id: RoutingId
@@ -46,6 +68,13 @@ class ConnectorSourceNotify[In: Any val]
   var _router: Router
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
+  var _active_stream_registry: (None|ConnectorSourceListener[In]) = None
+  var _connector_source: (None|ConnectorSource[In]) = None
+
+  let _stream_map: Map[U64, _StreamState] = _stream_map.create()
+  var _body_count: U64 = 0
+  var _session_active: Bool = false
+  var _session_tag: USize = 0
 
   // Watermark !TODO! How do we handle this respecting per-connector-type
   // policies
@@ -111,14 +140,66 @@ class ConnectorSourceNotify[In: Any val]
           let key_bytes = recover val data'.slice(12, 12+key_length.usize()) end
           let key_string = String.from_array(key_bytes)
           let decoder_data = recover val data'.slice(12+key_length.usize()) end
-          let decoded = try
-            _handler.decode(decoder_data)?
-          else
-            ifdef debug then
-              @printf[I32]("Error decoding message at source\n".cstring())
-            end
-            error
-          end
+
+          // SLF TODO: deal with error msg from client
+          // SLF NOTE: _handler = decoder from machida/machida3 yo
+          //      let decoder = recover val
+          //        let d = @PyTuple_GetItem(source_config_tuple, 5)
+          //        Machida.inc_ref(d)
+          //        PyFramedSourceHandler(d)?
+          //      end
+          // SLF TODO: decode connector-protocol-v2.md protocol first
+          // SLF TODO: _body_count & _last_message_id is a hack for scaffolding, remove it
+          let decoded =
+            if true then
+              if (_body_count == 0) then
+                try
+                  // SLF TODO: We may get data from the connector before we
+                  // have been told about the first checkpoint.  How do we
+                  // know 100% of the time what the last CheckpointId is?
+                  (_active_stream_registry as ConnectorSourceListener[In]).
+                    stream_notify(_session_tag, _MyStream(), 0,
+                      _connector_source as ConnectorSource[In])
+                  _stream_map(_MyStream()) = _StreamState(true, 0, 0, 0, 0, 0)
+                  // SLF TODO: return _continue_perhaps()
+                else
+                  Fail()
+                end
+              end
+
+              _body_count = _body_count + 1
+              try
+                let s = _stream_map(_MyStream())?
+                s.last_message_id = s.base_point_of_reference + _body_count
+                @printf[I32]("^*^* %s.%s got pseudo-msg-id %lu\n".cstring(),
+                  __loc.type_name().cstring(), __loc.method_name().cstring(),
+                  s.last_message_id)
+                if s.pending_query then
+                  // SLF TODO: No reply yet from active stream registry.
+                  // This is an error: tell the client, etc etc.
+                  @printf[I32]("^*^* %s.%s synchronous protocol error: client didn't wait for NOTIFY_ACK for stream id %lu\n".cstring(),
+                    __loc.type_name().cstring(), __loc.method_name().cstring(),
+                    _MyStream())
+                end
+                if s.last_message_id < s.filter_message_id then
+                  @printf[I32]("^*^* %s.%s DEDUPLICATE %lu < %lu\n".cstring(),
+                    __loc.type_name().cstring(), __loc.method_name().cstring(),
+                    s.last_message_id, s.filter_message_id)
+                  return _continue_perhaps()
+                else
+                  _handler.decode(decoder_data)?
+                end
+              else
+                @printf[I32]("^*^* %s.%s StreamId %lu map lookup failure\n".cstring(), _MyStream())
+                // SLF TODO send error
+                return _continue_perhaps()
+              end
+            else // if true
+              ifdef debug then
+                @printf[I32]("Error decoding message at source\n".cstring())
+              end
+              error
+            end // if true
 
           let decode_end_ts = WallClock.nanoseconds()
           _metrics_reporter.step_metric(_pipeline_name,
@@ -185,11 +266,14 @@ class ConnectorSourceNotify[In: Any val]
       source.expect(_header_size)
       _header = true
 
-      ifdef linux then
-        true
-      else
-        false
-      end
+      _continue_perhaps()
+    end
+
+  fun _continue_perhaps(): Bool =>
+    ifdef linux then
+      true
+    else
+      false
     end
 
   fun ref update_router(router': Router) =>
@@ -210,10 +294,16 @@ class ConnectorSourceNotify[In: Any val]
   fun ref accepted(source: ConnectorSource[In] ref) =>
     @printf[I32]((_source_name + ": accepted a connection\n").cstring())
     _header = true
+    _session_active = true
+    _session_tag = _session_tag + 1
+    _stream_map.clear()
+    _body_count = 0
     source.expect(_header_size)
 
   fun ref closed(source: ConnectorSource[In] ref) =>
     @printf[I32]("ConnectorSource connection closed\n".cstring())
+    _session_active = false
+    _clear_stream_map()
 
   fun ref connecting(conn: ConnectorSource[In] ref, count: U32) =>
     """
@@ -244,3 +334,117 @@ class ConnectorSourceNotify[In: Any val]
     allows a lower level protocol to handle any framing (e.g. SSL).
     """
     qty
+
+  fun ref _clear_stream_map() =>
+    for s in _stream_map.values() do
+      try
+        (_active_stream_registry as ConnectorSourceListener[In]).stream_update(
+          _MyStream(), s.barrier_checkpoint_id, s.barrier_last_message_id,
+          s.last_message_id, None)
+      else
+        Fail()
+      end
+    end
+    _stream_map.clear()
+
+  fun ref set_active_stream_registry(
+    active_stream_registry: ConnectorSourceListener[In],
+    connector_source: ConnectorSource[In]) =>
+    @printf[I32]("^*^* %s.%s\n".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring())
+    _active_stream_registry = active_stream_registry
+    _connector_source = connector_source
+
+  fun create_checkpoint_state(): Array[ByteSeq val] val =>
+    // recover val ["<{stand-in for state for ConnectorSource with routing id="; _source_id.string(); "}>"] end
+    let w: Writer = w.create()
+    for (stream_id, s) in _stream_map.pairs() do
+      w.u64_be(stream_id)
+      w.u64_be(s.barrier_checkpoint_id)
+      w.u64_be(s.barrier_last_message_id)
+      w.u64_be(s.last_message_id)
+    end
+    w.done()
+
+  fun ref prepare_for_rollback() =>
+    // SLF TODO
+    if _session_active then
+      _clear_stream_map()
+      @printf[I32]("^*^* %s.%s\n".cstring(),
+        __loc.type_name().cstring(), __loc.method_name().cstring())
+    end
+
+  fun ref rollback(checkpoint_id: CheckpointId, payload: ByteSeq val) =>
+    @printf[I32]("^*^* %s.%s(%lu)\n".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      checkpoint_id)
+
+    // SLF TODO: invalidate/clear/destroy items in active stream registry
+    // that we inserted into the registry.
+    let r = Reader
+    r.append(payload)
+    try
+      while true do
+        let stream_id = r.u64_be()?
+        let barrier_checkpoint_id = r.u64_be()?
+        let barrier_last_message_id = r.u64_be()?
+        let last_message_id = r.u64_be()?
+        @printf[I32]("^*^* read = s-id %lu b-ckp-id %lu b-l-msg-id %lu l-msg-id %lu\n".cstring(),
+          stream_id, barrier_checkpoint_id, barrier_last_message_id, last_message_id)
+        (_active_stream_registry as ConnectorSourceListener[In]).stream_update(stream_id, barrier_checkpoint_id,
+            barrier_last_message_id, last_message_id, None)
+      end
+    end
+
+  fun ref initiate_barrier(checkpoint_id: CheckpointId) =>
+    // SLF TODO
+    if _session_active then
+      for s in _stream_map.values() do
+        s.barrier_checkpoint_id = checkpoint_id
+        s.barrier_last_message_id = s.last_message_id
+        @printf[I32]("^*^* %s.%s(%lu) _barrier_last_message_id = %lu\n".cstring(),
+          __loc.type_name().cstring(), __loc.method_name().cstring(),
+          checkpoint_id, s.barrier_last_message_id)
+      end
+    end
+
+  fun ref barrier_complete(checkpoint_id: CheckpointId) =>
+    // SLF TODO
+    if _session_active then
+      for s in _stream_map.values() do
+        @printf[I32]("^*^* %s.%s(%lu) _barrier_last_message_id = %lu, _last_message_id = %lu\n".cstring(),
+          __loc.type_name().cstring(), __loc.method_name().cstring(),
+          checkpoint_id, s.barrier_last_message_id, s.last_message_id)
+        try
+          (_active_stream_registry as ConnectorSourceListener[In]).stream_update(
+            _MyStream(), checkpoint_id, s.barrier_last_message_id,
+            s.last_message_id,
+            recover tag (_connector_source as ConnectorSource[In]) end)
+        else
+          Fail()
+        end
+      end
+    end
+
+  fun ref stream_notify_result(session_tag: USize, success: Bool,
+    stream_id: U64, point_of_reference: U64, last_message_id: U64) =>
+    if (session_tag != _session_tag) or (not _session_active) then
+      return
+    end
+
+    // SLF TODO
+    @printf[I32]("^*^* %s.%s(%s, %lu, p-o-r %lu, l-msgid %lu)\n".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      success.string().cstring(),
+      stream_id, point_of_reference, last_message_id)
+    try
+      let s = _stream_map(stream_id)?
+      s.pending_query = false
+      s.base_point_of_reference = point_of_reference
+      s.base_point_of_reference = last_message_id // TODO simulation HACK, deleteme!
+      s.filter_message_id = last_message_id
+      // SLF TODO: SEND REPLY TO CONNECTOR CLIENT
+    else
+      Fail()
+    end
+
