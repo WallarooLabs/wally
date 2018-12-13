@@ -48,6 +48,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   """
   # ConnectorSourceListener
   """
+  var _hack_counter: U128 = 65
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _env: Env
   let _worker_name: WorkerName
@@ -69,7 +70,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   let _host: String
   let _service: String
 
-  var _fd: U32
+  var _fd: U32 = U32.max_value()
   var _event: AsioEventID = AsioEvent.none()
   let _limit: USize
   var _count: USize = 0
@@ -79,6 +80,14 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
 
   let _connected_sources: SetIs[ConnectorSource[In]] = _connected_sources.create()
   let _available_sources: Array[ConnectorSource[In]] = _available_sources.create()
+
+  // Active Stream Registry
+  // SLF TODO: bogus map to bool isn't useful, yet
+  // SLF TODO: log all map mutations to resilience dir
+  // SLF TODO: add DOS server mirroring of resilience dir writes
+  // SLF TODO: slurp in map state from resilience dir
+  let _active_streams: Map[U64, (String,Any tag,U64,U64)] =
+    _active_streams.create()
 
   new create(env: Env, worker_name: WorkerName, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
@@ -115,12 +124,9 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     _host = host
     _service = service
 
-    _event = @pony_os_listen_tcp[AsioEventID](this,
-      host.cstring(), service.cstring())
     _limit = parallelism
     _init_size = init_size
     _max_size = max_size
-    _fd = @pony_asio_event_fd(_event)
 
     match router
     | let pr: StatePartitionRouter =>
@@ -131,12 +137,13 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
         spr.partition_routing_id(), this)
     end
 
-    @printf[I32]((pipeline_name + " source attempting to listen on "
+    @printf[I32]((pipeline_name + " source will listen (but not yet) on "
       + host + ":" + service + "\n").cstring())
-    _notify_listening()
 
     for i in Range(0, _limit) do
-      let source_id = _routing_id_gen()
+      //let source_id = _routing_id_gen() // SLF TODO: HACK JOHN SAID SO
+      let source_id = _hack_counter
+      _hack_counter = _hack_counter + 1
       let notify = ConnectorSourceNotify[In](source_id, _pipeline_name,
         _env, _auth, _handler, _runner_builder, _partitioner_builder, _router,
         _metrics_reporter.clone(), _event_log, _target_router)
@@ -157,6 +164,16 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       end
 
       _available_sources.push(source)
+    end
+
+  be start_listening() =>
+    _event = @pony_os_listen_tcp[AsioEventID](this,
+      _host.cstring(), _service.cstring())
+    _fd = @pony_asio_event_fd(_event)
+    _notify_listening()
+    ifdef debug then
+      @printf[I32]("Socket for %s now listening on %s:%s\n".cstring(),
+        _pipeline_name.cstring(), _host.cstring(), _service.cstring())
     end
 
   be recovery_protocol_complete() =>
@@ -323,3 +340,112 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       @pony_os_socket_close[None](_fd)
       _fd = -1
     end
+
+  // Active Stream Registry
+
+  be get_all_streams(session_tag: USize,
+    connector_source: ConnectorSource[In] tag)
+  =>
+    let data: Array[(U64,String,U64)] trn = recover data.create() end
+
+    for (stream_id, (stream_name, _, p_o_r, last_message_id)) in _active_streams.pairs()
+    do
+      data.push((stream_id, stream_name, p_o_r))
+    end
+    connector_source.get_all_streams_result(session_tag, consume data)
+
+  be stream_notify(session_tag: USize,
+    stream_id: U64, stream_name: String, point_of_reference: U64,
+    connector_source: ConnectorSource[In] tag)
+  =>
+    // TODO pass in GUID instead?  Hmmmm, the implementation of the source
+    // connector limits the total # of TCP connections to some limit, and
+    // all of the connector_source actors and connector_framed_source_notify
+    // objects are allocated ahead of time ... so, using their address
+    // should be unique enough?
+
+    // SLF: TODO
+    @printf[I32]("^*^* %s.%s(%lu, %lu, ...)\n".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      stream_id, point_of_reference)
+    if _active_streams.contains(stream_id) then
+      try
+        (let stream_name': String, let tag_or_none: Any tag,
+          let p_o_r, let last_message_id) = _active_streams(stream_id)?
+        @printf[I32]("^*^* %s.%s existing stream_id %lu @ p-o-r %lu l-msgid %lu in-use %s\n".cstring(),
+          __loc.type_name().cstring(), __loc.method_name().cstring(),
+          stream_id, p_o_r, last_message_id, (not (tag_or_none is None)).string().cstring())
+        if stream_name' != stream_name then
+          Fail()
+        end
+
+        if tag_or_none is None then
+          // SLF TODO: what if the connector's PoR doesn't agree with our
+          // last recorded PoR?
+          // SLF TODO: should we also be saving checkpoint_id?
+          _active_streams(stream_id) =
+            (stream_name, connector_source, p_o_r, last_message_id)
+          connector_source.stream_notify_result(session_tag, true,
+            stream_id, p_o_r, last_message_id)
+          @printf[I32]("^*^* %s.%s existing stream_id %lu is ok\n".cstring(),
+            __loc.type_name().cstring(), __loc.method_name().cstring(),
+            stream_id)
+        else
+          connector_source.stream_notify_result(session_tag, false,
+            0, 0, 0) // TODO args
+          @printf[I32]("^*^* %s.%s existing stream_id %lu is rejected\n".cstring(),
+            __loc.type_name().cstring(), __loc.method_name().cstring(),
+            stream_id)
+        end
+      else
+        Fail()
+      end
+    else
+      @printf[I32]("^*^* %s.%s new stream_id %lu @ p-o-r %lu\n".cstring(),
+        __loc.type_name().cstring(), __loc.method_name().cstring(),
+        stream_id, point_of_reference)
+      // SLF TODO: should we also be saving checkpoint_id?
+      _active_streams(stream_id) =
+        (stream_name, connector_source, point_of_reference, point_of_reference)
+      connector_source.stream_notify_result(session_tag, true,
+        stream_id, point_of_reference, point_of_reference)
+    end
+
+  be stream_update(stream_id: U64, checkpoint_id: CheckpointId,
+    point_of_reference: U64, last_message_id: U64,
+    connector_source: (ConnectorSource[In] tag|None))
+  =>
+    // SLF: TODO
+    @printf[I32]("^*^* %s.%s(stmid %lu, chkp %lu, p-o-r %lu, l-msgid %lu, conn %s)\n".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      stream_id, checkpoint_id, point_of_reference, last_message_id,
+      (if connector_source is None then
+        "None"
+      else
+        "not None"
+      end).cstring())
+
+    if connector_source is None then
+      None // fall through
+    else
+      try
+        if _active_streams(stream_id)?._2 is None then
+          return // session is not active
+        else
+          None // fall through
+        end
+      else
+        return // stream_id not found
+      end
+    end
+    @printf[I32]("^*^* %s.%s(stmid %lu, chkp %lu, p-o-r %lu, l-msgid %lu, conn %s) UPDATED\n".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      stream_id, checkpoint_id, point_of_reference, last_message_id,
+      (if connector_source is None then
+        "None"
+      else
+        "not None"
+      end).cstring())
+    let stream_name = try _active_streams(stream_id)?._1 else Fail(); "" end
+    _active_streams(stream_id) =
+      (stream_name, connector_source, point_of_reference, last_message_id)

@@ -27,6 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+use "assert"
 use "buffered"
 use "collections"
 use "net"
@@ -54,6 +55,7 @@ use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
+use @pony_asio_event_set_writeable[None](event: AsioEventID, writeable: Bool)
 
 actor ConnectorSource[In: Any val] is Source
   """
@@ -91,10 +93,20 @@ actor ConnectorSource[In: Any val] is Source
   var _connected: Bool = false
   var _closed: Bool = false
   var _event: AsioEventID = AsioEvent.none()
+  // _pending is used to avoid GC prematurely reaping memory.
+  // See GitHub bug 2526 for more.  It looks like a write-only
+  // data structure, but its use is vital to avoid GC races:
+  // _pending_writev's C pointers are invisible to ORCA.
+  embed _pending: Array[ByteSeq] = _pending.create()
+  embed _pending_writev: Array[USize] = _pending_writev.create()
+  var _pending_sent: USize = 0
+  var _pending_writev_total: USize = 0
   var _read_buf: Array[U8] iso = recover Array[U8] end
   var _read_buf_offset: USize = 0
   var _shutdown_peer: Bool = false
   var _readable: Bool = false
+  var _writeable: Bool = false
+  var _throttled: Bool = false
   var _reading: Bool = false
   var _shutdown: Bool = false
   // Start muted. Wait for unmute to begin processing
@@ -116,6 +128,9 @@ actor ConnectorSource[In: Any val] is Source
   // Checkpoint
   var _next_checkpoint_id: CheckpointId = 1
 
+  // Active Stream Registry
+  let _active_stream_registry: ConnectorSourceListener[In]
+
   new create(source_id: RoutingId, auth: AmbientAuth,
     listen: ConnectorSourceListener[In], notify: ConnectorSourceNotify[In] iso,
     event_log: EventLog, router': Router,
@@ -127,6 +142,9 @@ actor ConnectorSource[In: Any val] is Source
     A new connection accepted on a server.
     """
     _source_id = source_id
+                @printf[I32]("^*^* %s.%s my source_id = %s\n".cstring(),
+                  __loc.type_name().cstring(), __loc.method_name().cstring(),
+                  _source_id.string().cstring())
     _auth = auth
     _event_log = event_log
     _metrics_reporter = consume metrics_reporter'
@@ -134,6 +152,8 @@ actor ConnectorSource[In: Any val] is Source
     _notify = consume notify
     _layout_initializer = layout_initializer
     _router_registry = router_registry
+    _active_stream_registry = listen
+    _notify.set_active_stream_registry(_active_stream_registry, this)
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
@@ -170,6 +190,11 @@ actor ConnectorSource[In: Any val] is Source
       _event = @pony_asio_event_create(this, fd,
         AsioEvent.read_write_oneshot(), 0, true)
       _connected = true
+      ifdef not windows then
+        @pony_asio_event_set_writeable(_event, true)
+      end
+      _writeable = true
+      _throttled = false
       _read_buf = recover Array[U8].>undefined(init_size) end
       _read_buf_offset = 0
       _next_size = init_size
@@ -180,8 +205,152 @@ actor ConnectorSource[In: Any val] is Source
       _shutdown = false
       _shutdown_peer = false
 
+      _pending.clear()
+      _pending_writev.clear()
+      _pending_sent = 0
+      _pending_writev_total = 0
+
       _pending_reads()
     end
+
+  fun ref writev_final(datav: ByteSeqIter) =>
+    if _connected and not _closed then
+      ifdef windows then
+        Fail()
+      else
+        for data in datav.values() do
+          _pending_writev .> push(data.cpointer().usize()) .> push(data.size())
+          _pending_writev_total = _pending_writev_total + data.size()
+          _pending.push(data)
+        end
+      end
+      _pending_writes()
+    end
+
+  fun ref _complete_writes(len: U32) =>
+    """
+    The OS has informed us that `len` bytes of pending writes have completed.
+    This occurs only with IOCP on Windows.
+    """
+    ifdef windows then
+      Fail()
+    end
+
+  fun ref _pending_writes(): Bool =>
+    """
+    Send pending data. If any data can't be sent, keep it and mark as not
+    writeable. On an error, dispose of the connection. Returns whether
+    it sent all pending data or not.
+    """
+    ifdef not windows then
+      // TODO: Make writev_batch_size user configurable
+      let writev_batch_size: USize = @pony_os_writev_max[I32]().usize()
+      var num_to_send: USize = 0
+      var bytes_to_send: USize = 0
+      while _writeable and (_pending_writev_total > 0) do
+        try
+          // Determine number of bytes and buffers to send.
+          if (_pending_writev.size() / 2) < writev_batch_size then
+            num_to_send = _pending_writev.size() / 2
+            bytes_to_send = _pending_writev_total
+          else
+            // Have more buffers than a single writev can handle.
+            // Iterate over buffers being sent to add up total.
+            num_to_send = writev_batch_size
+            bytes_to_send = 0
+            for d in Range[USize](1, num_to_send * 2, 2) do
+              bytes_to_send = bytes_to_send + _pending_writev(d)?
+            end
+          end
+
+          // Write as much data as possible.
+          var len = @pony_os_writev[USize](_event,
+            _pending_writev.cpointer(), num_to_send.i32()) ?
+
+          if _manage_pending_buffer(len, bytes_to_send, num_to_send)? then
+            return true
+          end
+        else
+          // Non-graceful shutdown on error.
+          _hard_close()
+        end
+      end
+    end
+
+    false
+
+  fun ref _manage_pending_buffer(
+    bytes_sent: USize,
+    bytes_to_send: USize,
+    num_to_send: USize)
+    : Bool ?
+  =>
+    """
+    Manage pending buffer for data sent. Returns a boolean of whether
+    the pending buffer is empty or not.
+    """
+    var len = bytes_sent
+    if len < bytes_to_send then
+      while len > 0 do
+        let iov_p =
+          ifdef windows then
+            _pending_writev(1)?
+          else
+            _pending_writev(0)?
+          end
+        let iov_s =
+          ifdef windows then
+            _pending_writev(0)?
+          else
+            _pending_writev(1)?
+          end
+        if iov_s <= len then
+          len = len - iov_s
+          _pending_writev.shift()?
+          _pending_writev.shift()?
+          _pending.shift()?
+          ifdef windows then
+            _pending_sent = _pending_sent - 1
+          end
+          _pending_writev_total = _pending_writev_total - iov_s
+        else
+          ifdef windows then
+            _pending_writev.update(1, iov_p+len)?
+            _pending_writev.update(0, iov_s-len)?
+          else
+            _pending_writev.update(0, iov_p+len)?
+            _pending_writev.update(1, iov_s-len)?
+          end
+          _pending_writev_total = _pending_writev_total - len
+          len = 0
+        end
+      end
+      ifdef not windows then
+        _apply_backpressure()
+      end
+    else
+      // sent all data we requested in this batch
+      _pending_writev_total = _pending_writev_total - bytes_to_send
+      if _pending_writev_total == 0 then
+        _pending_writev.clear()
+        _pending.clear()
+        ifdef windows then
+          _pending_sent = 0
+        end
+        return true
+      else
+        for d in Range[USize](0, num_to_send, 1) do
+          _pending_writev.shift()?
+          _pending_writev.shift()?
+          _pending.shift()?
+          ifdef windows then
+            _pending_sent = _pending_sent - 1
+          end
+        end
+      end
+    end
+
+    false
 
   be first_checkpoint_complete() =>
     """
@@ -436,6 +605,7 @@ actor ConnectorSource[In: Any val] is Source
 
       match token
       | let sbt: CheckpointBarrierToken =>
+        _notify.initiate_barrier(sbt.id)
         checkpoint_state(sbt.id)
       end
       for (o_id, o) in _outputs.pairs() do
@@ -453,6 +623,28 @@ actor ConnectorSource[In: Any val] is Source
       @printf[I32]("barrier_complete at ConnectorSource %s\n".cstring(),
         _source_id.string().cstring())
     end
+    match token
+    | let sbt: CheckpointBarrierToken =>
+      _notify.barrier_complete(sbt.id)
+    | let srt: CheckpointRollbackBarrierToken =>
+      if not _muted then
+        @printf[I32]("^*^* %s.%s not muted when %s\n".cstring(),
+          __loc.type_name().cstring(), __loc.method_name().cstring(),
+          token.string().cstring())
+      end
+      None // SLF TODO
+    | let srt: CheckpointRollbackResumeBarrierToken =>
+      if not _muted then
+        @printf[I32]("^*^* %s.%s not muted when %s\n".cstring(),
+          __loc.type_name().cstring(), __loc.method_name().cstring(),
+          token.string().cstring())
+      end
+      None // SLF TODO
+    else
+      @printf[I32]("^*^* %s.%s other token %s\n".cstring(),
+        __loc.type_name().cstring(), __loc.method_name().cstring(), token.string().cstring())
+      Fail()
+    end
     None
 
   //////////////
@@ -460,24 +652,40 @@ actor ConnectorSource[In: Any val] is Source
   //////////////
   fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
     """
+    SLF TODO: .....
     ConnectorSources don't currently write out any data as part of the checkpoint.
     """
     _next_checkpoint_id = checkpoint_id + 1
-    _event_log.checkpoint_state(_source_id, checkpoint_id,
-      recover val Array[ByteSeq] end)
+    let state = _notify.create_checkpoint_state()
+    _event_log.checkpoint_state(_source_id, checkpoint_id, state)
 
   be prepare_for_rollback() =>
     _prepare_for_rollback()
 
   fun ref _prepare_for_rollback() =>
-    None
+    _notify.prepare_for_rollback()
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
   =>
     """
+    SLF TODO: .....
     There is nothing for a ConnectorSource to rollback to.
     """
+    let p: String ref = p.create()
+    match payload
+    | let ss: String =>
+      p.append(ss)
+    | let ia: Array[U8] val =>
+      for c in ia.values() do
+        p.push(c)
+      end
+    end
+    @printf[I32]("^*^* %s.%s my source_id = %s, payload.size = %d\n".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      _source_id.string().cstring(), p.size())
+
+    _notify.rollback(checkpoint_id, payload)
     _next_checkpoint_id = checkpoint_id + 1
     event_log.ack_rollback(_source_id)
 
@@ -510,6 +718,7 @@ actor ConnectorSource[In: Any val] is Source
             _fd = fd
             _event = event
             _connected = true
+            _writeable = true
             _readable = true
 
             _notify.connected(this)
@@ -534,6 +743,18 @@ actor ConnectorSource[In: Any val] is Source
         end
       end
     else
+      // At this point, it's our event.
+      if AsioEvent.writeable(flags) then
+        _writeable = true
+        _complete_writes(arg)
+        ifdef not windows then
+          if _pending_writes() then
+            // Sent all data. Release backpressure.
+            _release_backpressure()
+          end
+        end
+      end
+
       if _connected and not _shutdown_peer then
         if AsioEvent.readable(flags) then
           _readable = true
@@ -609,6 +830,7 @@ actor ConnectorSource[In: Any val] is Source
     // Unsubscribe immediately and drop all pending writes.
     @pony_asio_event_unsubscribe(_event)
     _readable = false
+    _writeable = false
     @pony_asio_event_set_readable[None](_event, false)
 
     @pony_os_socket_close[None](_fd)
@@ -621,6 +843,26 @@ actor ConnectorSource[In: Any val] is Source
     _notify.closed(this)
 
     _listen._conn_closed(this)
+
+  fun ref _apply_backpressure() =>
+    if not _throttled then
+      _throttled = true
+      _notify.throttled(this)
+    end
+    ifdef not windows then
+      _writeable = false
+
+      // this is safe because asio thread isn't currently subscribed
+      // for a write event so will not be writing to the readable flag
+      @pony_asio_event_set_writeable(_event, false)
+      @pony_asio_event_resubscribe_write(_event)
+    end
+
+  fun ref _release_backpressure() =>
+    if _throttled then
+      _throttled = false
+      _notify.unthrottled(this)
+    end
 
   fun ref _pending_reads() =>
     """
@@ -782,3 +1024,22 @@ actor ConnectorSource[In: Any val] is Source
     """
     // TODO: verify that removal of "in_sent" check is harmless
     _expect = _notify.expect(this, qty)
+
+  be stream_notify_result(session_tag: USize, success: Bool,
+    stream_id: U64, point_of_reference: U64, last_message_id: U64) =>
+    // SLF TODO
+    @printf[I32]("^*^* %s.%s(%s, %lu, %lu, %lu)\n".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      success.string().cstring(), stream_id, point_of_reference,
+      last_message_id)
+    _notify.stream_notify_result(session_tag, success,
+      stream_id, point_of_reference, last_message_id)
+
+  be get_all_streams_result(session_tag: USize,
+    data: Array[(U64,String,U64)] val)
+  =>
+    @printf[I32]("^*^* %s.%s(%lu, ...%d...)\n".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      session_tag, data.size())
+    _notify.get_all_streams_result(session_tag, data)
+

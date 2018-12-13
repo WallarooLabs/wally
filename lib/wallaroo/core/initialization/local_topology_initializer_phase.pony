@@ -117,8 +117,13 @@ class _ApplicationAwaitingInitializationPhase is LocalTopologyInitializerPhase
     checkpoint_target: (CheckpointId | None),
     recovering_without_resilience: Bool, worker_count: (USize | None))
   =>
+                @printf[I32]("^*^* %s.%s _initializables.size() = %d\n".cstring(),
+                  __loc.type_name().cstring(), __loc.method_name().cstring(),
+                  _initializables.size())
     lti._initialize(_initializables, cluster_initializer, checkpoint_target,
       recovering_without_resilience)
+                @printf[I32]("^*^* %s.%s done\n".cstring(),
+                  __loc.type_name().cstring(), __loc.method_name().cstring())
 
 class _ApplicationBeginReportingPhase is LocalTopologyInitializerPhase
   let _lti: LocalTopologyInitializer ref
