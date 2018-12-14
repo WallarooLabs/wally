@@ -236,7 +236,7 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
         # ConnectorEncoder
         if issubclass(base_cls, ConnectorEncoder):
             class C(base_cls):
-                def encode(self, data, event_time=0):
+                def encode(self, data, event_time=0, key=None):
                     encoded = func(data)
                     if isinstance(event_time, dt.datetime):
                         # We'll assume naive datetime values should be treated as
@@ -249,10 +249,13 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
                         # Convert to an integer number of ms from the floating
                         # point seconds that Python uses.
                         event_time = int(event_time.timestamp() * 1000)
+                    encoded_key = key.encode() if key else ''.encode()
                     return struct.pack(
-                        '<Iq{}s'.format(len(encoded)),
-                        len(encoded) + 8, # total frame size
+                        '<IqI{}s{}s'.format(len(encoded_key), len(encoded)),
+                        len(encoded) + 8 + len(encoded_key) + 8, # total frame size
                         event_time, # 64bit event_time
+                        len(encoded_key),
+                        encoded_key,
                         encoded) # final payload, variable size as formatted above
 
         # OctetEncoder
@@ -286,8 +289,7 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
                 def decode(self, bs):
                     # We're dropping event_time for now. Pony will pick this up
                     # itself. Slice bytes off the front: struct.calcsize('<q') = 8
-                    message_data = bs[8:]
-                    return func(message_data)
+                    return func(bs)
                 def decoder(self):
                     return func
 
