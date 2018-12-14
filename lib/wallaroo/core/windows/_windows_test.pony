@@ -572,6 +572,120 @@ class iso _TestSlidingWindowsEarlyData is UnitTest
     | let a: Array[USize] val => a
     else error end
 
+// class iso _TestSlidingWindowsSequence is UnitTest
+//   fun name(): String => "bytes/_TestSlidingWindowsSequence"
+
+//   fun apply(h: TestHelper) ? =>
+//     let range: U64 = Seconds(50)
+//     let slide: U64 = Seconds(25)
+//     let delay: U64 = Seconds(0)
+//     let sw = RangeWindows[USize, Array[USize] val, Array[USize]]("key",
+//       _Collect, range, slide, delay)
+
+//     var res: ((Array[USize] val | Array[Array[USize] val] val | None), U64) =
+//       (recover Array[Array[USize] val] end, 0)
+
+//     // First values
+//     res = sw(, Seconds(28), Seconds(528))
+//     res = sw(, Seconds(), Seconds())
+//     res = sw(, Seconds(), Seconds())
+//     res = sw(, Seconds(), Seconds())
+//     res = sw(, Seconds(), Seconds())
+
+
+
+
+//     h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+//     // Send in a bunch of early values
+//     res = sw(1, Seconds(102), Seconds(100))
+//     h.assert_eq[USize](_array(res._1)?.size(), 0)
+//     res = sw(2, Seconds(103), Seconds(100))
+//     h.assert_eq[USize](_array(res._1)?.size(), 0)
+//     res = sw(3, Seconds(104), Seconds(100))
+//     h.assert_eq[USize](_array(res._1)?.size(), 0)
+//     res = sw(4, Seconds(105), Seconds(100))
+//     h.assert_eq[USize](_array(res._1)?.size(), 0)
+//     res = sw(10, Seconds(108), Seconds(100))
+//     h.assert_eq[USize](_array(res._1)?.size(), 0)
+//     res = sw(20, Seconds(109), Seconds(100))
+//     h.assert_eq[USize](_array(res._1)?.size(), 0)
+//     res = sw(30, Seconds(110), Seconds(100))
+//     h.assert_eq[USize](_array(res._1)?.size(), 0)
+//     res = sw(40, Seconds(111), Seconds(100))
+//     h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+//     // Send in more normal values
+//     res = sw(3, Seconds(93), Seconds(102))
+//     h.assert_eq[USize](_array(res._1)?.size(), 1)
+//     h.assert_eq[USize](_array(res._1)?(0)?, 0)
+
+//     res = sw(4, Seconds(94), Seconds(103))
+//     h.assert_eq[USize](_array(res._1)?.size(), 1)
+//     h.assert_eq[USize](_array(res._1)?(0)?, 0)
+
+//     res = sw(5, Seconds(95), Seconds(104))
+//     h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+//     // Send in late values just to trigger stuff
+//     res = sw(0, Seconds(1), Seconds(106))
+//     h.assert_eq[USize](_array(res._1)?.size(), 1)
+//     h.assert_eq[USize](_array(res._1)?(0)?, 5)
+
+//     res = sw(0, Seconds(1), Seconds(107))
+//     h.assert_eq[USize](_array(res._1)?.size(), 1)
+//     h.assert_eq[USize](_array(res._1)?(0)?, 14)
+
+//     res = sw(0, Seconds(1), Seconds(108))
+//     h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+//     res = sw(0, Seconds(1), Seconds(109))
+//     h.assert_eq[USize](_array(res._1)?.size(), 1)
+//     h.assert_eq[USize](_array(res._1)?(0)?, 14)
+
+//     res = sw(0, Seconds(1), Seconds(112))
+//     h.assert_eq[USize](_array(res._1)?.size(), 1)
+//     h.assert_eq[USize](_array(res._1)?(0)?, 14)
+
+//     res = sw(0, Seconds(1), Seconds(113))
+//     h.assert_eq[USize](_array(res._1)?.size(), 1)
+//     h.assert_eq[USize](_array(res._1)?(0)?, 14)
+
+//     res = sw(0, Seconds(1), Seconds(114))
+//     h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+//     res = sw(0, Seconds(1), Seconds(115))
+//     h.assert_eq[USize](_array(res._1)?.size(), 1)
+//     h.assert_eq[USize](_array(res._1)?(0)?, 12)
+
+//     // Fourth set of windows
+//     // Use this message to trigger 10 windows.
+//     res = sw(2, Seconds(192), Seconds(200))
+//     h.assert_eq[USize](_array(res._1)?.size(), 22)
+//     h.assert_eq[USize](_array(res._1)?(0)?, 10)
+//     h.assert_eq[USize](_array(res._1)?(1)?, 10)
+//     h.assert_eq[USize](_array(res._1)?(2)?, 40)
+//     h.assert_eq[USize](_array(res._1)?(3)?, 110)
+//     h.assert_eq[USize](_array(res._1)?(4)?, 107)
+//     h.assert_eq[USize](_array(res._1)?(5)?, 100)
+//     h.assert_eq[USize](_array(res._1)?(6)?, 100)
+//     h.assert_eq[USize](_array(res._1)?(7)?, 70)
+//     h.assert_eq[USize](_array(res._1)?(8)?, 0)
+//     h.assert_eq[USize](_array(res._1)?(9)?, 0)
+//     // Extra windows added because of expansion to cover early data
+//     for i in Range(10, 22) do
+//       h.assert_eq[USize](_array(res._1)?(i)?, 0)
+//     end
+
+//     true
+
+//   fun _array(res: (Array[USize] val | Array[Array[USize] val] val | None)):
+//     Array[Array[USize] val] val ?
+//   =>
+//     match res
+//     | let a: Array[Array[USize] val] val => a
+//     else error end
+
 class iso _TestCountWindows is UnitTest
   fun name(): String => "bytes/_TestCountWindows"
 
@@ -644,3 +758,44 @@ class _Sum is Aggregation[USize, USize, _Total]
   fun output(key: Key, acc: _Total): (USize | None) =>
     acc.v
   fun name(): String => "_Sum"
+
+// class _Collect is Aggregation[USize, Array[USize] val, Array[USize]]
+//   fun initial_accumulator(): Array[USize] => Array[USize]
+//   fun update(input: USize, acc: Array[USize]) =>
+//     acc.push(input)
+//   fun combine(acc1: Array[USize], acc2: Array[USize]): Array[USize] =>
+//     let new_arr = Array[USize]
+//     for m1 in acc1.values() do
+//       new_arr.push(m1)
+//     end
+//     for m2 in acc2.values() do
+//       new_arr.push(m2)
+//     end
+//     new_arr
+//   fun output(key: Key, acc: Array[USize]): Array[USize] val =>
+//     let arr: Array[USize] iso = recover Array[USize] end
+//     for m in acc.values() do
+//       arr.push(m)
+//     end
+//     consume arr
+//   fun name(): String => "_Collect"
+
+// primitive CollectCheck
+//   fun apply(arr: Array[USize]): Bool =>
+//     try
+//       var last = arr(0)?
+//       for i in Range(1, arr.size()) do
+//         let v = arr(i)?
+//         if not ((v == (last + 1)) or (v <= last)) then
+//           return false
+//         end
+//         last = v
+//       end
+//     else
+//       false
+//     end
+//     true
+
+
+
+

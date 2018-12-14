@@ -84,7 +84,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   var _next_checkpoint_id: CheckpointId = 1
 
   // Watermarks
-  let _watermarks: StageWatermarks = _watermarks.create()
+  var _watermarks: StageWatermarks = _watermarks.create()
 
   let _timers: Timers = Timers
 
@@ -554,7 +554,8 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
     _next_checkpoint_id = checkpoint_id + 1
     ifdef "resilience" then
-      StepStateCheckpointer(_runner, _id, checkpoint_id, _event_log)
+      StepStateCheckpointer(_runner, _id, checkpoint_id, _event_log,
+        _watermarks, _auth)
     end
 
   be prepare_for_rollback() =>
@@ -568,9 +569,18 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   =>
     _next_checkpoint_id = checkpoint_id + 1
     ifdef "resilience" then
-      StepRollbacker(payload, _runner)
+      StepRollbacker(payload, _runner, this)
     end
     event_log.ack_rollback(_id)
+
+  fun ref rollback_watermarks(bs: ByteSeq val) =>
+    @printf[I32]("!@ Rolling back watermarks on %s\n".cstring(), _id.string().cstring())
+    try
+      _watermarks = StageWatermarksDeserializer(bs as Array[U8] val, _auth)?
+    else
+      Fail()
+    end
+    @printf[I32]("!@ -- Successfully rolled back watermarks on %s\n".cstring(), _id.string().cstring())
 
   ///////////////
   // WATERMARKS
@@ -588,9 +598,13 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     _timers(Timer(StepTimeoutNotify(this), t))
 
   be trigger_timeout() =>
-    match _runner
-    | let tr: TimeoutTriggeringRunner =>
-      tr.on_timeout(_id, this, _router, _metrics_reporter)
+    match _step_message_processor
+    | let d: DisposedStepMessageProcessor => None
     else
-      Fail()
+      match _runner
+      | let tr: TimeoutTriggeringRunner =>
+        tr.on_timeout(_id, this, _router, _metrics_reporter)
+      else
+        Fail()
+      end
     end

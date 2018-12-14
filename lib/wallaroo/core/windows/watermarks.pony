@@ -17,6 +17,7 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 use "collections"
+use "serialise"
 use "time"
 use "wallaroo/core/common"
 use "wallaroo_labs/mort"
@@ -129,3 +130,54 @@ class StageWatermarks
   fun _still_relevant(last_heard: U64, current_ts: U64): Bool =>
     (current_ts - last_heard) < _last_heard_threshold
 
+  //!@
+  fun print() =>
+    var o = ""
+    o = o + "!@############################################\n"
+    o = o + "!@ StageWatermarks\n"
+    o = o + "!@#################\n"
+    o = o + "!@ -- upstreams\n"
+    for (u, (a, b)) in _upstreams.pairs() do
+      o = o + "!@ -- -- u: " + u.string() + ", (" + a.string() + ", " + b.string() + ")\n"
+    end
+    o = o + "!@ -- input_watermark: " + _input_watermark.string() + "\n"
+    o = o + "!@ -- output_watermark: " + _output_watermark.string() + "\n"
+    o = o + "!@ -- last_heard_threshold " + _last_heard_threshold.string() + "\n"
+    o = o + "!@ -- _upstreams_marked_remove\n"
+    for id in _upstreams_marked_remove.values() do
+      o = o + "!@ -- -- id: " + id.string() + "\n"
+    end
+
+    o = o + "!@############################################\n"
+    @printf[I32]("%s\n".cstring(), o.cstring())
+
+primitive StageWatermarksSerializer
+  fun apply(w: StageWatermarks, auth: AmbientAuth): ByteSeq val =>
+    @printf[I32]("!@ StageWatermarksSerializer: about to apply\n".cstring())
+    //!@
+    w.print()
+
+    try
+      //!@
+      let s = Serialised(SerialiseAuth(auth), w)?.output(OutputSerialisedAuth(
+        auth))
+      @printf[I32]("!@ Got s\n".cstring())
+      s
+    else
+      @printf[I32]("!@ - FAILED TO SERIALIZE (segfault won't get here)!\n".cstring())
+      Fail()
+      recover Array[U8] end
+    end
+
+primitive StageWatermarksDeserializer
+  fun apply(bs: Array[U8] val, auth: AmbientAuth): StageWatermarks ? =>
+    try
+      match Serialised.input(InputSerialisedAuth(auth), bs)(
+        DeserialiseAuth(auth))?
+      | let w: StageWatermarks => w
+      else
+        error
+      end
+    else
+      error
+    end
