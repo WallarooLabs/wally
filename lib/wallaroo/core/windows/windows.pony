@@ -304,8 +304,8 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   An inefficient sliding windows implementation that always recalculates
   the combination of all lowest level partial aggregations stored in panes.
   """
-  let _panes: Array[(Acc | EmptyPane)]
-  let _panes_start_ts: Array[U64]
+  var _panes: Array[(Acc | EmptyPane)]
+  var _panes_start_ts: Array[U64]
   // How many panes make up a complete window
   let _panes_per_window: USize
   // How large is a single pane in nanoseconds
@@ -367,6 +367,7 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       let end_ts = earliest_ts + (_panes.size().u64() * _pane_size)
       var applied = false
       if (event_ts >= earliest_ts) and (event_ts < end_ts) then
+        // @printf[I32]("!@ Windows: preapply\n".cstring())
         _apply_input(input, event_ts, earliest_ts)
         applied = true
       end
@@ -375,9 +376,16 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       (let outs, let output_watermark_ts) = attempt_to_trigger(watermark_ts)
 
       // If we haven't already applied the input, do it now.
-      if not applied and _is_valid_ts(event_ts, watermark_ts) then
+      if not applied then
+        // @printf[I32]("!@ Windows: postapply\n".cstring())
         let new_earliest_ts = _panes_start_ts(_earliest_window_idx)?
-        _apply_input(input, event_ts, new_earliest_ts)
+        let new_end_ts = new_earliest_ts + (_panes.size().u64() * _pane_size)
+        if (event_ts >= new_earliest_ts) then
+          if (event_ts >= new_end_ts) then
+            _expand_windows(event_ts, new_end_ts)?
+          end
+          _apply_input(input, event_ts, new_earliest_ts)
+        end
       end
 
       (outs, output_watermark_ts)
@@ -396,8 +404,10 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       try
         match _panes(pane_idx)?
         | let acc: Acc =>
+          // @printf[I32]("!@ Windows: _apply_update: event_ts: %s, window_ts: %s, _earliest_window_idx: %s\n".cstring(), event_ts.string().cstring(), _panes_start_ts(pane_idx)?.string().cstring(), _earliest_window_idx.string().cstring())
           _agg.update(input, acc)
         else
+          // @printf[I32]("!@ Windows: _apply_update: event_ts: %s, window_ts: %s, _earliest_window_idx: %s\n".cstring(), event_ts.string().cstring(), _panes_start_ts(pane_idx)?.string().cstring(), _earliest_window_idx.string().cstring())
           let new_acc = _agg.initial_accumulator()
           _agg.update(input, new_acc)
           _panes(pane_idx)? = new_acc
@@ -496,6 +506,49 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       Fail()
     end
     (out, output_watermark_ts, stopped)
+
+  fun ref _expand_windows(event_ts: U64, end_ts: U64) ? =>
+    // How many panes do we need to add to accommodate event_ts?
+    let min_new_panes = ((event_ts - end_ts) / _pane_size).usize() + 1
+    // How many panes do we need to add to that so we end on a slide boundary?
+    let extra_panes = _calculate_extra_panes_for_slide(min_new_panes)
+    // New total
+    let new_pane_count = _panes.size() + (min_new_panes + extra_panes)
+
+    let expanded_panes: Array[(Acc | EmptyPane)] =
+      Array[(Acc | EmptyPane)](new_pane_count)
+    let old_panes = (_panes = expanded_panes)
+    let expanded_panes_start_ts: Array[U64] = Array[U64](new_pane_count)
+    let old_panes_start_ts = (_panes_start_ts = expanded_panes_start_ts)
+
+    // Use working_idx so we add panes to expanded_panes from earliest to
+    // latest.
+    var working_idx = _earliest_window_idx
+    var pane_start: U64 = old_panes_start_ts(_earliest_window_idx)?
+    let old_panes_size = old_panes.size()
+    for i in Range(0, old_panes_size) do
+      _panes.push(old_panes(working_idx)?)
+      pane_start = old_panes_start_ts(working_idx)?
+      _panes_start_ts.push(pane_start)
+      working_idx = (working_idx + 1) % old_panes_size
+    end
+
+    // Add the new panes
+    pane_start = pane_start + _pane_size
+    for i in Range(old_panes_size, new_pane_count) do
+      _panes.push(EmptyPane)
+      _panes_start_ts.push(pane_start)
+      pane_start = pane_start + _pane_size
+    end
+    _earliest_window_idx = 0
+
+  fun _calculate_extra_panes_for_slide(pane_count: USize): USize =>
+    // Calculate how many extra panes we need to add to ensure we end on a
+    // slide boundary. Find the next nearest multiple of _panes_per_slide above
+    // our pane_count and then find the difference.
+    let multiplier = (pane_count / _panes_per_slide) + 1
+    let next_nearest_multiple = multiplier * _panes_per_slide
+    next_nearest_multiple - pane_count
 
   fun _is_valid_ts(event_ts: U64, watermark_ts: U64): Bool =>
     event_ts > (watermark_ts - (_delay + _range))
