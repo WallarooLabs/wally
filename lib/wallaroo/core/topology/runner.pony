@@ -56,7 +56,7 @@ trait SerializableStateRunner
   fun ref replace_serialized_state(s: ByteSeq val)
 
 trait RollbackableRunner
-  fun ref rollback(payload: ByteSeq val)
+  fun ref rollback(state_bytes: ByteSeq val)
   fun ref set_step_id(id: U128)
 
 trait val RunnerBuilder

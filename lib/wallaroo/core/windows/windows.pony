@@ -367,7 +367,7 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       let end_ts = earliest_ts + (_panes.size().u64() * _pane_size)
       var applied = false
       if (event_ts >= earliest_ts) and (event_ts < end_ts) then
-        // @printf[I32]("!@ Windows: preapply\n".cstring())
+        @printf[I32]("!@ Windows: preapply, watermark_ts: %s\n".cstring(), watermark_ts.string().cstring())
         _apply_input(input, event_ts, earliest_ts)
         applied = true
       end
@@ -377,15 +377,14 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
 
       // If we haven't already applied the input, do it now.
       if not applied then
-        // @printf[I32]("!@ Windows: postapply\n".cstring())
+        @printf[I32]("!@ Windows: postapply, watermark_ts: %s\n".cstring(), watermark_ts.string().cstring())
         let new_earliest_ts = _panes_start_ts(_earliest_window_idx)?
         let new_end_ts = new_earliest_ts + (_panes.size().u64() * _pane_size)
-        if (event_ts >= new_earliest_ts) then
-          if (event_ts >= new_end_ts) then
-            _expand_windows(event_ts, new_end_ts)?
-          end
-          _apply_input(input, event_ts, new_earliest_ts)
+        if (event_ts >= new_end_ts) then
+          @printf[I32]("!@ Windows: Expanding windows\n".cstring())
+          _expand_windows(event_ts, new_end_ts)?
         end
+        _apply_input(input, event_ts, new_earliest_ts)
       end
 
       (outs, output_watermark_ts)
@@ -404,10 +403,10 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       try
         match _panes(pane_idx)?
         | let acc: Acc =>
-          // @printf[I32]("!@ Windows: _apply_update: event_ts: %s, window_ts: %s, _earliest_window_idx: %s\n".cstring(), event_ts.string().cstring(), _panes_start_ts(pane_idx)?.string().cstring(), _earliest_window_idx.string().cstring())
+          @printf[I32]("!@ Windows: _apply_update: event_ts: %s, window_ts: %s, _earliest_window_idx: %s\n".cstring(), event_ts.string().cstring(), _panes_start_ts(pane_idx)?.string().cstring(), _earliest_window_idx.string().cstring())
           _agg.update(input, acc)
         else
-          // @printf[I32]("!@ Windows: _apply_update: event_ts: %s, window_ts: %s, _earliest_window_idx: %s\n".cstring(), event_ts.string().cstring(), _panes_start_ts(pane_idx)?.string().cstring(), _earliest_window_idx.string().cstring())
+          @printf[I32]("!@ Windows: _apply_update: event_ts: %s, window_ts: %s, _earliest_window_idx: %s\n".cstring(), event_ts.string().cstring(), _panes_start_ts(pane_idx)?.string().cstring(), _earliest_window_idx.string().cstring())
           let new_acc = _agg.initial_accumulator()
           _agg.update(input, new_acc)
           _panes(pane_idx)? = new_acc
