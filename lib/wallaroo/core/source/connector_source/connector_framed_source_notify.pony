@@ -133,7 +133,6 @@ class ConnectorSourceNotify[In: Any val]
           // for any particular connector. For example, the Kafka connector
           // needs a way to provide the Kafka key here.
 
-          // TODO: Match to see if key exists and if it does use that for initial key instead
           let initial_key =
             if key_string isnt None then
               key_string.string()

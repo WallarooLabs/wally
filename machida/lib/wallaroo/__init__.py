@@ -251,7 +251,7 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
                         event_time = int(event_time.timestamp() * 1000)
                     encoded_key = key.encode() if key else ''.encode()
                     return struct.pack(
-                        '<IqI{}s{}s'.format(len(encoded_key), len(encoded)),
+                        '>IqI{}s{}s'.format(len(encoded_key), len(encoded)),
                         len(encoded) + 8 + len(encoded_key) + 8, # total frame size
                         event_time, # 64bit event_time
                         len(encoded_key),
@@ -285,7 +285,7 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
                     # struct.calcsize('<I')
                     return 4
                 def payload_length(self, bs):
-                    return struct.unpack("<I", bs)[0]
+                    return struct.unpack(">I", bs)[0]
                 def decode(self, bs):
                     # We're dropping event_time for now. Pony will pick this up
                     # itself. Slice bytes off the front: struct.calcsize('<q') = 8
