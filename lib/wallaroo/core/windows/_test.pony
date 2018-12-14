@@ -38,6 +38,7 @@ actor Main is TestList
     test(_TestSlidingWindowsOutOfOrder)
     test(_TestSlidingWindowsGCD)
     test(_TestSlidingWindowsLateData)
+    test(_TestSlidingWindowsEarlyData)
     test(_TestCountWindows)
 
     // Watermarks
