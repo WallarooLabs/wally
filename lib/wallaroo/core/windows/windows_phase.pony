@@ -27,6 +27,9 @@ trait WindowsPhase[In: Any val, Out: Any val, Acc: State ref]
   fun ref attempt_to_trigger(watermark_ts: U64):
     ((Out | Array[Out] val | None), U64)
 
+  fun check_panes_increasing(): Bool =>
+    false
+
 class EmptyWindowsPhase[In: Any val, Out: Any val, Acc: State ref] is
   WindowsPhase[In, Out, Acc]
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
@@ -79,3 +82,5 @@ class ProcessingWindowsPhase[In: Any val, Out: Any val, Acc: State ref] is
   fun ref attempt_to_trigger(watermark_ts: U64): (Array[Out] val, U64) =>
     _windows_wrapper.attempt_to_trigger(watermark_ts)
 
+  fun check_panes_increasing(): Bool =>
+    _windows_wrapper.check_panes_increasing()

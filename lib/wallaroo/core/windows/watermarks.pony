@@ -66,6 +66,10 @@ class StageWatermarks
   //!@ Where do we determine the threshold?
   new create(last_heard_threshold: U64 = 10_000_000_000) =>
     _last_heard_threshold = last_heard_threshold
+    // TODO: Remove this hack. We are keeping a 0 in this array to avoid
+    // running into this ponyc bug:
+    // https://github.com/ponylang/ponyc/issues/2868
+    _upstreams_marked_remove.push(0)
 
   fun ref receive_watermark(u: RoutingId, w: U64, current_ts: U64): U64 =>
     _upstreams(u) = (w, current_ts)
@@ -95,13 +99,20 @@ class StageWatermarks
       end
     end
 
-    if _upstreams_marked_remove.size() > 0 then
+    // TODO: Remove our hack and check that size is > 0 here. For now, we are
+    // keeping a 0 in this array to avoid running into this ponyc bug:
+    // https://github.com/ponylang/ponyc/issues/2868
+    if _upstreams_marked_remove.size() > 1 then
       for u in _upstreams_marked_remove.values() do
         try
           _upstreams.remove(u)?
         end
       end
       _upstreams_marked_remove.clear()
+      // TODO: Remove this hack. We are keeping a 0 in this array to avoid
+      // running into this ponyc bug:
+      // https://github.com/ponylang/ponyc/issues/2868
+      _upstreams_marked_remove.push(0)
     end
 
     if new_min > _input_watermark then

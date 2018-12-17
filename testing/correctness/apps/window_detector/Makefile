@@ -107,7 +107,7 @@ window_detector_sliding_test_python:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 398
+		--sink-expect 400
 
 window_detector_tumbling_gensource_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -145,7 +145,7 @@ window_detector_sliding_gensource_test_python:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 398 \
+		--sink-expect 400 \
 		--sink-expect-allow-more
 
 # Python3 tests
@@ -186,7 +186,7 @@ window_detector_sliding_test_python3:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 398
+		--sink-expect 400
 
 window_detector_tumbling_gensource_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -224,7 +224,7 @@ window_detector_sliding_gensource_test_python3:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 398 \
+		--sink-expect 400 \
 		--sink-expect-allow-more
 
 # end of prevent rules from being evaluated/included multiple times

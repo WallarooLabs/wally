@@ -26,7 +26,7 @@ use "wallaroo_labs/time"
 
 
 class iso _TestStageWatermarks is UnitTest
-  fun name(): String => "bytes/_TestStageWatermarks"
+  fun name(): String => "watermarks/_TestStageWatermarks"
 
   fun apply(h: TestHelper) =>
     // Upstream Ids

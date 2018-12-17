@@ -39,7 +39,11 @@ actor Main is TestList
     test(_TestSlidingWindowsGCD)
     test(_TestSlidingWindowsLateData)
     test(_TestSlidingWindowsEarlyData)
+    test(_TestSlidingWindowsSequence)
     test(_TestCountWindows)
 
-    // Watermarks
+    // Expand Windows
+    test(_TestExpandSlidingWindow)
+
+    // // Watermarks
     test(_TestStageWatermarks)
