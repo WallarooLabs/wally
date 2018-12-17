@@ -64,6 +64,7 @@ Frame tags (`$H` = ASCII value of H):
 -define(ERROR, $E).
 
 -define(NOTIFY, $N).
+-define(NOTIFY_ACK, $n).
 -define(MESSAGE, $M).
 
 -define(ACK, $A).
@@ -226,6 +227,17 @@ notify(StreamId, StreamName, PointOfRef) ->
         point_of_reference(PointOfRef)
     ]).
 
+-spec notify_ack(non_neg_integer(), bool(), point_of_reference()) -> frame().
+notify_ack(StreamId, NotifySuccess, PointOfRef) ->
+    framed([
+        ?NOTIFY_ACK,
+        if NotifySuccess -> <<1>>;
+           true          -> <<0>>
+        end,
+        u64(StreamId),
+        u64(PointOfRef)
+    ]).
+
 -spec message(Flags, StreamId, MessageId, EventTime, Key, Message) -> frame()
   when
     Flags :: non_neg_integer(),      % See message bit flag definitions above
@@ -379,6 +391,7 @@ In the handshake state the following frame types are valid:
 In the streaming state the following frame types are valid:
 
    - NOFITY: Connector -> Worker
+   - NOTIFY_ACK: Worker -> Connector
    - MESSAGE: Connector -> Worker
    - ACK: Worker -> Connector
    - RESTART: Worker -> Connector
@@ -394,22 +407,38 @@ The disconnected state has no communication but it is recommended that the conne
 Each stream during a session must be in one of the following states:
 
 ```
-                  +-------------+--------------+
-                  |             |              |
-                  |             |              V
- +-------+     +------+     +--------+     +------------+
- | Start +---->| Open +---->| Closed +---->| Terminated |
- +-------+     +------+     +--------+     +------------+
-                  ^             |
-                  |             |
-                  +-------------+
+                  +------------+-------------+--------------+
+                  |            | +--------+  |              |
+                  |            | |        |  |              |
+                  |            | |        V  |              V
+ +-------+     +------+     +------+     +--------+     +------------+
+ | Start +---->|Notify|---->| Open +---->| Closed +---->| Terminated |
+ +-------+     | Sent |     |      |     |        |     |            |
+               +------+     +------+     +--------+     +------------+
+                  ^  |                     ^ |
+                  |  |                     | |
+                  |  +---------------------+ |
+                  +--------------------------+
 ```
 
 New streams must be introduced and reset streams must be reintroduced. The connector may not know if a notification is the first use of a stream or not. If the StreamId has been used before, the handshake will include information on where to resume from. The state machine will always end up in the open state after a notification.
 
-In the intro state, the following actions are valid:
+In the start state, the following actions are valid:
 
-    - NOTIFY: Connector -> Worker (provide a stream id and a fully qualified name)
+- NOTIFY: Connector -> Worker (provide a stream id and a fully qualified name)
+
+In the notify-sent state, the following actions are valid:
+
+- NOTIFY_ACK: Worker -> Connector
+    * The `NotifySuccess` byte indicates whether the connector has successfully processed the NOTIFY message.  Value values are:
+        - 1: The connector may send MESSAGE actions for this stream id.
+            * Next state is open
+        - 0: The connector may not send MESSAGE actions for this stream id.  The worker (or, in a future Wallaroo release, another worker) has this stream id in use by another connection and therefore prohibits use by this connection.
+            * Next state is closed
+    * NOTE: The point of reference in this ACK may differ from the point of reference sent by the connector in the NOTIFY message.  The connector must use the point of reference given in the NOTIFY_ACK message.
+    * The connector must not send MESSAGE for any stream id before the connector receives a successful NOTIFY_ACK for the stream id.
+- RESTART: Worker -> Connector (next state is terminated)
+    * worker is requesting that the stream be reprocessed in some way
 
 In the open state, the following actions are valid:
 
