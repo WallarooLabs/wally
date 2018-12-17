@@ -93,10 +93,10 @@ class SourceConnector(object):
                 else:
                     raise
 
-    def write(self, message, event_time=0):
+    def write(self, message, event_time=0, key=None):
         if self._conn == None:
             raise RuntimeError("Please call connect before writing")
-        payload = self._encoder.encode(message, event_time)
+        payload = self._encoder.encode(message, event_time, key)
         self._conn.sendall(payload)
 
 

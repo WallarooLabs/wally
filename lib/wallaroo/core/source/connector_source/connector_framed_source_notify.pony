@@ -19,6 +19,7 @@ Copyright 2017-2019 The Wallaroo Authors.
 use "collections"
 use "time"
 use "wallaroo_labs/time"
+use "wallaroo_labs/bytes"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/partitioning"
@@ -94,15 +95,31 @@ class ConnectorSourceNotify[In: Any val]
 
       (let is_finished, let last_ts) =
         try
-          let decoded =
-            try
-              _handler.decode(consume data)?
+          let data': Array[U8] val = consume data
+          // TODO: John use this variable
+          let event_timestamp: U64 = try
+              Bytes.to_u64(data'(0)?, data'(1)?, data'(2)?, data'(3)?, data'(4)?,
+                  data'(5)?, data'(6)?, data'(7)?)
             else
-              ifdef debug then
-                @printf[I32]("Error decoding message at source\n".cstring())
-              end
-              error
+              0
             end
+          let key_length: U32 = try
+              Bytes.to_u32(data'(8)?, data'(9)?, data'(10)?, data'(11)?)
+            else
+              0
+            end
+          let key_bytes = recover val data'.slice(12, 12+key_length.usize()) end
+          let key_string = String.from_array(key_bytes)
+          let decoder_data = recover val data'.slice(12+key_length.usize()) end
+          let decoded = try
+            _handler.decode(decoder_data)?
+          else
+            ifdef debug then
+              @printf[I32]("Error decoding message at source\n".cstring())
+            end
+            error
+          end
+
           let decode_end_ts = WallClock.nanoseconds()
           _metrics_reporter.step_metric(_pipeline_name,
             "Decode Time in Connector Source", latest_metrics_id, ingest_ts,
@@ -119,7 +136,6 @@ class ConnectorSourceNotify[In: Any val]
           // TODO: We need a way to determine the key based on the policy
           // for any particular connector. For example, the Kafka connector
           // needs a way to provide the Kafka key here.
-          let initial_key = msg_uid.string()
 
           // TOOD: We need a way to assign watermarks based on the policy
           // for any particular connector.
@@ -127,7 +143,14 @@ class ConnectorSourceNotify[In: Any val]
             _watermark_ts = ingest_ts
           end
 
-          if decoded isnt None then
+          let initial_key =
+            if key_string isnt None then
+              key_string
+            else
+              msg_uid.string()
+            end
+
+          if decoder_data isnt None then
             _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
               consume initial_key, ingest_ts, _watermark_ts, _source_id,
               source, _router, msg_uid, None, decode_end_ts,
