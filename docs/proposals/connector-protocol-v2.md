@@ -227,7 +227,7 @@ notify(StreamId, StreamName, PointOfRef) ->
 
 -spec notify_ack(non_neg_integer(), bool(), point_of_reference()) -> frame().
 notify_ack(StreamId, NotifySuccess, PointOfRef) ->
-    framed([
+    frame([
         ?NOTIFY_ACK,
         if NotifySuccess -> <<1>>;
            true          -> <<0>>
@@ -271,7 +271,7 @@ message(Flags, StreamId, MessageId, EventTime, Key, Message) ->
     ]).
 
 ack(Credits, MessageAcks) ->
-    framed([
+    frame([
         ?ACK,
         u32(Credits),
         u32(length(MessageAcks)),
