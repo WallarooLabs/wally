@@ -287,8 +287,6 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
                 def payload_length(self, bs):
                     return struct.unpack(">I", bs)[0]
                 def decode(self, bs):
-                    # We're dropping event_time for now. Pony will pick this up
-                    # itself. Slice bytes off the front: struct.calcsize('<q') = 8
                     return func(bs)
                 def decoder(self):
                     return func

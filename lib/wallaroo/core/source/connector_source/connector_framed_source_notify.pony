@@ -106,7 +106,7 @@ class ConnectorSourceNotify[In: Any val]
             end
           let key_bytes = recover val data'.slice(12, 12+key_length.usize()) end
           let key_string = String.from_array(key_bytes)
-          let decoder_data = recover val data'.slice(8+4+key_length.usize()) end
+          let decoder_data = recover val data'.slice(12+key_length.usize()) end
           let decoded = try
             _handler.decode(decoder_data)?
           else
@@ -135,7 +135,7 @@ class ConnectorSourceNotify[In: Any val]
 
           let initial_key =
             if key_string isnt None then
-              key_string.string()
+              key_string
             else
               msg_uid.string()
             end
