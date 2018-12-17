@@ -56,19 +56,17 @@ This document uses Erlang code to describe the frame format and content. You don
 
 #### Constants
 
-Frame tags (`$H` = ASCII value of H):
-
 ```erlang
--define(HELLO, $H).
--define(OK, $O).
--define(ERROR, $E).
+-define(HELLO, 0).
+-define(OK, 1).
+-define(ERROR, 2).
 
--define(NOTIFY, $N).
--define(NOTIFY_ACK, $n).
--define(MESSAGE, $M).
+-define(NOTIFY, 3).
+-define(NOTIFY_ACK, 4).
+-define(MESSAGE, 5).
 
--define(ACK, $A).
--define(RESTART, $!).
+-define(ACK, 6).
+-define(RESTART, 7).
 ```
 
 Message bit-flags:
