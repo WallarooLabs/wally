@@ -287,8 +287,26 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
             # the ConnectorEncoder class definition
             class C(base_cls):
                 def encode(self, data, event_time=0, key=None):
-                    encoded_data = func(data)
-                    return self._encode(encoded_data, event_time, key)
+                    encoded = func(data)
+                    if isinstance(event_time, dt.datetime):
+                        # We'll assume naive datetime values should be treated as
+                        # UTC. Python's brain-dead datetime package is mostly
+                        # useless for fixing this without a mountain of caveats
+                        # like improper DST handling. We'll assume the user can
+                        # import a library that handles this better than Python
+                        # does itself.
+                        #
+                        # Convert to an integer number of ms from the floating
+                        # point seconds that Python uses.
+                        event_time = int(event_time.timestamp() * 1000)
+                    encoded_key = key.encode() if key else ''.encode()
+                    return struct.pack(
+                        '>IqI{}s{}s'.format(len(encoded_key), len(encoded)),
+                        len(encoded) + 8 + len(encoded_key) + 8, # total frame size
+                        event_time, # 64bit event_time
+                        len(encoded_key),
+                        encoded_key,
+                        encoded) # final payload, variable size as formatted above
 
         # OctetEncoder
         elif issubclass(base_cls, OctetEncoder):
