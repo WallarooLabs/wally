@@ -62,12 +62,12 @@ def application_setup(args):
     else:
         print("Using window size: {} ms".format(pargs.window_size))
         window = wallaroo.range_windows(wallaroo.milliseconds(pargs.window_size))
-    if pargs.window_delay:
-        print("Using window_delay: {} ms".format(pargs.window_delay))
-        window = window.with_delay(wallaroo.milliseconds(pargs.window_delay))
-    if pargs.window_type == 'sliding':
-        print("Using window_slide: {} ms".format(pargs.window_slide))
-        window = window.with_slide(wallaroo.milliseconds(pargs.window_slide))
+        if pargs.window_delay:
+            print("Using window_delay: {} ms".format(pargs.window_delay))
+            window = window.with_delay(wallaroo.milliseconds(pargs.window_delay))
+        if pargs.window_type == 'sliding':
+            print("Using window_slide: {} ms".format(pargs.window_slide))
+            window = window.with_slide(wallaroo.milliseconds(pargs.window_slide))
     # add the window to the topology
     p = p.to(window.over(Collect))
 
@@ -117,6 +117,9 @@ class Message(object):
     def __str__(self):
         return "({},{})".format(self.key, self.value)
 
+    def __repr__(self):
+        return str(self)
+
 
 @wallaroo.computation(name="TraceID")
 def trace_id(msg):
@@ -129,11 +132,15 @@ class Collect(wallaroo.Aggregation):
         return []
 
     def update(self, msg, accumulator):
+        print("!@ Collect.update: append '", msg.key, "':", str(msg.value), "... appended to ", accumulator)
         # tag data key, then add it to accumulator
         accumulator.append(Message(msg.key + ".Collect", msg.value))
 
     def combine(self, accumulator1, accumulator2):
-        return accumulator1 + accumulator2
+        new_acc = accumulator1 + accumulator2
+        print("!@ Collect.combine:", accumulator1, " + ", accumulator2, " == ", new_acc)
+        # return accumulator1 + accumulator2
+        return new_acc
 
     def output(self, key, accumulator):
         keys = set(m.key for m in accumulator)

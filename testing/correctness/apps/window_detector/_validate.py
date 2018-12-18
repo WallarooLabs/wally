@@ -48,7 +48,17 @@ if args.window_type == 'sliding':
     for k, v in sequences.items():
         processed = sorted(list(set(v)))
         size = processed[-1] - processed[0] + 1 # Assumption: processed is a natural sequence
-        assert(len(processed) == size), "Expect: sorted unique window elements form a subsegement of the natural sequence"
+
+        #!@
+        if len(processed) != size:
+            print("!@ GAP IN PROCESSED FOR KEY " + k)
+            old = processed[0]
+            for i in range(1, len(processed)):
+                if processed[i] != old + 1:
+                    print("!@ -- ", old, " followed by ", processed[i])
+                old = processed[i]
+
+        assert(len(processed) == size), "Expect: sorted unique window elements form a subsegement of the natural sequence but for key {}".format(k)
     for k in sorted(windows.keys(), key=lambda k: int(k.replace('key_',''))):
         # Check that for each window, there are at most 2 duplicates per item
         # e.g. the duplicates are plausibly caused by the sub window overlap,
@@ -69,5 +79,10 @@ for key in sequences:
     assert(sequences[key])
     old = sequences[key][0]
     for v in sequences[key][1:]:
+        #!@
+        if not ((v == old + 1) or (v <= old)):
+            print("!@ Old for key " + key + ": " + str(old))
+            print("!@ Cur for key " + key + ": " + str(v))
+
         assert((v == old + 1) or (v <= old))
         old = v

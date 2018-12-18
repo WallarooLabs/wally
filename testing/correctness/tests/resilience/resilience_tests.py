@@ -27,6 +27,7 @@ this = sys.modules[__name__]  # Passed to create_test
 
 TC = Creator(this)
 
+
 # multi_partition_detector
 APIS = {
     'pony': [
@@ -38,28 +39,27 @@ APIS = {
          'cmd': 'machida --application-module multi_partition_detector --depth 1 --gen-source --run-with-resilience',
          'validation_cmd': None},
         {'app': 'window_detector_tumbling',
-         'cmd': 'machida --application-module window_detector --gen-source --window-type tumbling --run-with-resilience',
+         'cmd': 'machida --application-module window_detector --gen-source --window-type tumbling --window-delay 100 --run-with-resilience',
          'validation_cmd': 'python ../../apps/window_detector/_validate.py --window-type tumbling --output {out_file}'},
         {'app': 'window_detector_counting',
          'cmd': 'machida --application-module window_detector --gen-source --window-type counting --run-with-resilience',
          'validation_cmd': 'python ../../apps/window_detector/_validate.py --window-type counting --output {out_file}'},
         {'app': 'window_detector_sliding',
-         'cmd': 'machida --application-module window_detector --gen-source --window-type sliding --run-with-resilience',
+         'cmd': 'machida --application-module window_detector --gen-source --window-type sliding --window-delay 100 --run-with-resilience',
          'validation_cmd': 'python ../../apps/window_detector/_validate.py --window-type sliding --output {out_file}'}],
     'python3': [
         {'app': 'multi_partition_detector',
          'cmd': 'machida3 --application-module multi_partition_detector --depth 1 --gen-source --run-with-resilience',
          'validation_cmd': None},
         {'app': 'window_detector_tumbling',
-         'cmd': 'machida3 --application-module window_detector --gen-source --window-type tumbling --run-with-resilience',
+         'cmd': 'machida3 --application-module window_detector --gen-source --window-type tumbling --window-delay 100 --run-with-resilience',
          'validation_cmd': 'python3 ../../apps/window_detector/_validate.py --window-type tumbling --output {out_file}'},
         {'app': 'window_detector_counting',
          'cmd': 'machida3 --application-module window_detector --gen-source --window-type counting --run-with-resilience',
          'validation_cmd': 'python3 ../../apps/window_detector/_validate.py --window-type counting --output {out_file}'},
         {'app': 'window_detector_sliding',
-         'cmd': 'machida3 --application-module window_detector --gen-source --window-type sliding --run-with-resilience',
+         'cmd': 'machida3 --application-module window_detector --gen-source --window-type sliding --window-delay 100 --run-with-resilience',
          'validation_cmd': 'python3 ../../apps/window_detector/_validate.py --window-type sliding --output {out_file}'}]}
-
 
 
 ##############
@@ -81,7 +81,8 @@ RESILIENCE_SEQS = [
     [Wait(2), Crash(1), Wait(2), Recover(1), Wait(5)],
 
     # crash2, recover2
-    [Wait(2), Crash(2), Wait(2), Recover(2), Wait(5)]]
+    [Wait(2), Crash(2), Wait(2), Recover(2), Wait(5)]
+    ]
 
 # Generate resilience test functions for each api, for each of the op seqs
 for api, group in APIS.items():
