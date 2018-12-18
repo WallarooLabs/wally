@@ -35,10 +35,13 @@ actor Main is TestList
     // Windows
     test(_TestTumblingWindows)
     test(_TestSlidingWindows)
+    test(_TestSlidingWindowsNoDelay)
     test(_TestSlidingWindowsOutOfOrder)
     test(_TestSlidingWindowsGCD)
     test(_TestSlidingWindowsLateData)
     test(_TestSlidingWindowsEarlyData)
+    test(_TestSlidingWindowsStragglers)
+    test(_TestSlidingWindowsStragglersSequence)
     test(_TestSlidingWindowsSequence)
     test(_TestCountWindows)
 

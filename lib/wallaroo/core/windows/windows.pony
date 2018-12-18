@@ -42,7 +42,6 @@ class RangeWindowsBuilder
     _delay = 0
 
   fun ref with_slide(slide: U64): RangeWindowsBuilder =>
-    //!@ Check that slide divides evenly into range
     _slide = slide
     this
 
@@ -76,7 +75,8 @@ trait Windows[In: Any val, Out: Any val, Acc: State ref] is
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
     ((Out | Array[Out] val | None), U64)
 
-  fun ref on_timeout(wall_time: U64): ((Out | Array[Out] val | None), U64)
+  fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64,
+    watermarks: StageWatermarks): ((Out | Array[Out] val | None), U64)
 
   /////////
   // _initial_* methods for windows that behave differently the first time
@@ -88,20 +88,23 @@ trait Windows[In: Any val, Out: Any val, Acc: State ref] is
   =>
     (None, 0)
 
-  fun ref _initial_attempt_to_trigger(watermark_ts: U64,
-    windows_wrapper: WindowsWrapper[In, Out, Acc]):
-    ((Out | Array[Out] val | None), U64)
+  fun ref _initial_attempt_to_trigger(input_watermark_ts: U64,
+    output_watermark_ts: U64, windows_wrapper: WindowsWrapper[In, Out, Acc],
+    watermarks: StageWatermarks): ((Out | Array[Out] val | None), U64)
   =>
     (None, 0)
 
 trait WindowsWrapperBuilder[In: Any val, Out: Any val, Acc: State ref]
-  fun apply(watermark_ts: U64): WindowsWrapper[In, Out, Acc]
+  fun ref apply(watermark_ts: U64): WindowsWrapper[In, Out, Acc]
 
 trait WindowsWrapper[In: Any val, Out: Any val, Acc: State ref]
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
     (Array[Out] val, U64)
 
   fun ref attempt_to_trigger(watermark_ts: U64): (Array[Out] val, U64)
+
+  fun ref trigger_all(output_watermark_ts: U64, watermarks: StageWatermarks):
+    (Array[Out] val, U64) ?
 
   fun check_panes_increasing(): Bool =>
     false
@@ -165,9 +168,11 @@ class GlobalWindow[In: Any val, Out: Any val, Acc: State ref] is
     let res = _agg.output(_key, _acc)
     (res, watermark_ts)
 
-  fun ref on_timeout(watermark_ts: U64): (Array[Out] val, U64) =>
+  fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64,
+    watermarks: StageWatermarks): ((Out | Array[Out] val | None), U64)
+  =>
     // We trigger per message, so we do nothing on the timer
-    (recover val Array[Out] end, watermark_ts)
+    (recover val Array[Out] end, input_watermark_ts)
 
   fun ref encode(auth: AmbientAuth): ByteSeq =>
     try
@@ -211,7 +216,14 @@ class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
     StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelization)
 
   fun timeout_interval(): U64 =>
-    (_range + _delay) * 2
+    let range_delay_based = (_range + _delay) * 2
+    // if range_delay_based > Seconds(1) then
+    //   range_delay_based
+    // else
+    //   Seconds(1)
+    // end
+    //!@
+    range_delay_based
 
   fun val decode(in_reader: Reader, auth: AmbientAuth):
     StateWrapper[In, Out, Acc] ?
@@ -254,10 +266,11 @@ class RangeWindows[In: Any val, Out: Any val, Acc: State ref] is
     _phase = ProcessingWindowsPhase[In, Out, Acc](windows_wrapper)
     _phase(input, event_ts, watermark_ts)
 
-  fun ref on_timeout(watermark_ts: U64):
-    ((Out | Array[Out] val| None), U64)
+  fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64,
+    watermarks: StageWatermarks): ((Out | Array[Out] val | None), U64)
   =>
-    _attempt_to_trigger(watermark_ts)
+    _attempt_to_trigger(input_watermark_ts, output_watermark_ts,
+      watermarks)
 
   fun ref encode(auth: AmbientAuth): ByteSeq =>
     try
@@ -268,17 +281,20 @@ class RangeWindows[In: Any val, Out: Any val, Acc: State ref] is
       recover Array[U8] end
     end
 
-  fun ref _attempt_to_trigger(watermark_ts: U64):
+  fun ref _attempt_to_trigger(input_watermark_ts: U64,
+    output_watermark_ts: U64, watermarks: StageWatermarks):
     ((Out | Array[Out] val | None), U64)
   =>
-    _phase.attempt_to_trigger(watermark_ts)
+    _phase.attempt_to_trigger(input_watermark_ts, output_watermark_ts,
+      watermarks)
 
-  fun ref _initial_attempt_to_trigger(watermark_ts: U64,
-    windows_wrapper: WindowsWrapper[In, Out, Acc]):
-    ((Out | Array[Out] val | None), U64)
+  fun ref _initial_attempt_to_trigger(input_watermark_ts: U64,
+    output_watermark_ts: U64, windows_wrapper: WindowsWrapper[In, Out, Acc],
+    watermarks: StageWatermarks): ((Out | Array[Out] val | None), U64)
   =>
     _phase = ProcessingWindowsPhase[In, Out, Acc](windows_wrapper)
-    _phase.attempt_to_trigger(watermark_ts)
+    _phase.attempt_to_trigger(input_watermark_ts, output_watermark_ts,
+      watermarks)
 
   fun check_panes_increasing(): Bool =>
     _phase.check_panes_increasing()
@@ -300,7 +316,7 @@ class _SlidingWindowsWrapperBuilder[In: Any val, Out: Any val, Acc: State ref]
     _slide = slide
     _delay = delay
 
-  fun apply(watermark_ts: U64): _SlidingWindows[In, Out, Acc] =>
+  fun ref apply(watermark_ts: U64): _SlidingWindows[In, Out, Acc] =>
     _SlidingWindows[In, Out, Acc](_key, _agg, _range, _slide, _delay,
       watermark_ts)
 
@@ -343,7 +359,6 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     // Normalize delay to units of slide.
     let delay_slide_units = (delay.f64() / _slide.f64()).ceil()
     _delay = _slide * delay_slide_units.u64()
-    // @printf[I32]("!@ DELAY:%s\n".cstring(), _delay.string().cstring())
 
     // Calculate how many panes we need. The delay tells us how long we
     // wait after the close of a window to trigger and clear it. We need
@@ -368,6 +383,7 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
     (Array[Out] val, U64)
   =>
+    @printf[I32]("!@ _SlidingWindows:apply()\n".cstring())
     try
       let earliest_ts = _panes_start_ts(_earliest_window_idx)?
       let end_ts = earliest_ts + (_panes.size().u64() * _pane_size)
@@ -378,7 +394,6 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       var applied = false
 
       //!@
-      // if (next_earliest_ts - earliest_ts) > 25_000_000 then
       if not check_panes_increasing() then
         @printf[I32]("!@ !!!!!PANES!!!!!!\n".cstring())
         for i in Range(0, _panes.size()) do
@@ -415,6 +430,9 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
           new_earliest_ts = _panes_start_ts(_earliest_window_idx)?
         end
         _apply_input(input, event_ts, new_earliest_ts)
+      //!@
+      else
+        @printf[I32]("!@ Skipping postapply because applied already\n".cstring())
       end
 
       (outs, output_watermark_ts)
@@ -452,7 +470,8 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       end
     end
 
-  fun ref attempt_to_trigger(watermark_ts: U64): (Array[Out] val, U64) =>
+  fun ref attempt_to_trigger(input_watermark_ts: U64): (Array[Out] val, U64)
+  =>
     let outs = recover iso Array[Out] end
     var output_watermark_ts: U64 = 0
     try
@@ -460,16 +479,16 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       let end_ts = earliest_ts + (_panes.size().u64() * _pane_size)
 
       let end_ts_diff =
-        if watermark_ts > end_ts then
-          watermark_ts - end_ts
+        if input_watermark_ts > end_ts then
+          input_watermark_ts - end_ts
         else
           0
         end
 
       let trigger_range = _range + _delay
       let trigger_diff =
-        if (watermark_ts - trigger_range) > end_ts then
-          (watermark_ts - trigger_range) - end_ts
+        if (input_watermark_ts - trigger_range) > end_ts then
+          (input_watermark_ts - trigger_range) - end_ts
         else
           0
         end
@@ -489,7 +508,7 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       // @printf[I32]("\n#######\n!@ attempt_to_trigger\n".cstring())
       while not stopped do
         (let next_out, let next_output_watermark_ts, stopped) =
-          _check_first_window(watermark_ts, trigger_diff)
+          _check_first_window(input_watermark_ts, trigger_diff)
         if next_output_watermark_ts > output_watermark_ts then
           output_watermark_ts = next_output_watermark_ts
         end
@@ -503,64 +522,80 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     end
     (consume outs, output_watermark_ts)
 
+  fun ref trigger_all(output_watermark_ts: U64, watermarks: StageWatermarks):
+    (Array[Out] val, U64) ?
+  =>
+    let last_input_watermark = watermarks.input_watermark()
+    var latest_output_watermark_ts = output_watermark_ts
+
+    let earliest_ts = _panes_start_ts(_earliest_window_idx)?
+    let all_pane_range = _pane_size * _panes.size().u64()
+    let last_trigger_boundary = earliest_ts + all_pane_range + _delay
+
+    let normalized_last_trigger_boundary =
+      ((last_trigger_boundary / _pane_size) + 1) * _pane_size
+
+    let outs: Array[Out] iso = recover Array[Out] end
+    try
+      while normalized_last_trigger_boundary >= latest_output_watermark_ts do
+        (let out, latest_output_watermark_ts) =
+          _trigger_next(_panes_start_ts(_earliest_window_idx)?, 0)?
+        match out
+        | let o: Out => outs.push(o)
+        end
+      end
+    else
+      Fail()
+    end
+    (consume outs, latest_output_watermark_ts)
+
   fun ref _check_first_window(watermark_ts: U64, trigger_diff: U64):
     ((Out | None), U64, Bool)
   =>
-    var out: (Out | None) = None
-    var output_watermark_ts: U64 = 0
-    var stopped: Bool = true
     try
       let earliest_ts = _panes_start_ts(_earliest_window_idx)?
       let window_end_ts = earliest_ts + _range
 
       if _should_trigger(earliest_ts, watermark_ts) then
-        @printf[I32]("!@ -- Trigger first window: earliest:%s, watermark:%s, _earliest_window_idx:%s\n".cstring(), earliest_ts.string().cstring(), watermark_ts.string().cstring(), _earliest_window_idx.string().cstring())
-        var running_acc = _identity_acc
-        var pane_idx = _earliest_window_idx
-        for i in Range(0, _panes_per_window) do
-          // If we find an EmptyPane, then we ignore it.
-          match _panes(pane_idx)?
-          | let next_acc: Acc =>
-            running_acc = _agg.combine(running_acc, next_acc)
-          end
-          pane_idx = (pane_idx + 1) % _panes.size()
-        end
-        out = _agg.output(_key, running_acc)
-
-
-        var next_start_ts =
-          earliest_ts + (_panes.size().u64() * _pane_size) + trigger_diff
-
-        // let all_pane_range = _panes.size().u64() * _pane_size
-        // var next_start_ts = earliest_ts + wrap_padding
-          // if end_ts_diff > all_pane_range then
-          //   let normalized_end_ts_diff =
-          //     ((end_ts_diff / _pane_size) + 1).u64() * _pane_size
-          //   earliest_ts + normalized_end_ts_diff
-          // else
-          //   earliest_ts + all_pane_range
-          // end
-
-        var next_pane_idx = _earliest_window_idx
-        for _ in Range(0, _panes_per_slide) do
-          _panes(next_pane_idx)? = EmptyPane
-          _panes_start_ts(next_pane_idx)? = next_start_ts
-          next_pane_idx = (next_pane_idx + 1) % _panes.size()
-          next_start_ts = next_start_ts + _pane_size
-        end
-        _earliest_window_idx = next_pane_idx
-          // (_earliest_window_idx + _panes_per_slide) % _panes.size()
-
-        output_watermark_ts = window_end_ts
-        stopped = false
-        // @printf[I32]("!@ -- -- TRIGGERED!! window_end:%s, New _earliest_window_idx:%s\n".cstring(), (output_watermark_ts / 1_000_000_000).string().cstring(), _earliest_window_idx.string().cstring())
-      // else
-        // @printf[I32]("!@ -- -- NOT TRIGGERED\n".cstring())
+        @printf[I32]("!@ -- Trigger next window: earliest:%s, watermark:%s, _earliest_window_idx:%s\n".cstring(), earliest_ts.string().cstring(), watermark_ts.string().cstring(), _earliest_window_idx.string().cstring())
+        (let out, let output_watermark_ts) = _trigger_next(earliest_ts,
+          trigger_diff)?
+        (out, output_watermark_ts, false)
+      else
+        (None, 0, true)
       end
     else
       Fail()
+      (None, 0, true)
     end
-    (out, output_watermark_ts, stopped)
+
+  fun ref _trigger_next(earliest_ts: U64, trigger_diff: U64):
+    ((Out | None), U64) ?
+  =>
+    var running_acc = _identity_acc
+    var pane_idx = _earliest_window_idx
+    for i in Range(0, _panes_per_window) do
+      // If we find an EmptyPane, then we ignore it.
+      match _panes(pane_idx)?
+      | let next_acc: Acc =>
+        running_acc = _agg.combine(running_acc, next_acc)
+      end
+      pane_idx = (pane_idx + 1) % _panes.size()
+    end
+    let out = _agg.output(_key, running_acc)
+
+    var next_start_ts =
+      earliest_ts + (_panes.size().u64() * _pane_size) + trigger_diff
+
+    var next_pane_idx = _earliest_window_idx
+    for _ in Range(0, _panes_per_slide) do
+      _panes(next_pane_idx)? = EmptyPane
+      _panes_start_ts(next_pane_idx)? = next_start_ts
+      next_pane_idx = (next_pane_idx + 1) % _panes.size()
+      next_start_ts = next_start_ts + _pane_size
+    end
+    _earliest_window_idx = next_pane_idx
+    (out, next_start_ts)
 
   fun ref _expand_windows(event_ts: U64, end_ts: U64) ? =>
 
@@ -621,7 +656,6 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     end
     true
 
-
 ////////////////////////////
 // TUMBLING COUNT WINDOWS
 ////////////////////////////
@@ -681,6 +715,7 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
     ((Out | None), U64)
   =>
+    @printf[I32]("!@ TumblingCountWindows:apply()\n".cstring())
     var out: (Out | None) = None
     _agg.update(input, _acc)
     _current_count = _current_count + 1
@@ -691,12 +726,16 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
 
     (out, watermark_ts)
 
-  fun ref on_timeout(watermark_ts: U64): ((Out | None), U64) =>
+  fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64,
+    watermarks: StageWatermarks): ((Out | None), U64)
+  =>
     var out: (Out | None) = None
+    var new_output_watermark_ts = output_watermark_ts
     if _current_count > 0 then
       out = _trigger()
+      new_output_watermark_ts = input_watermark_ts
     end
-    (out, watermark_ts)
+    (out, new_output_watermark_ts)
 
   fun ref _trigger(): (Out | None) =>
     var out: (Out | None) = None
@@ -714,7 +753,6 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
       recover Array[U8] end
     end
 
-
 ////////////////
 // UTILITIES
 ///////////////
@@ -722,30 +760,7 @@ primitive _ExpandSlidingWindow
   fun new_pane_count(event_ts: U64, end_ts: U64, cur_pane_count: USize,
     pane_size: U64, panes_per_slide: USize): USize
   =>
-    // How many panes do we need to add to accommodate event_ts?
-    // let min_new_panes = ((event_ts - end_ts) / pane_size).usize() + 1
-
-
-
-    // How many panes do we need to add to that so we end on a slide boundary?
-    // Calculate how many extra panes we need to add to ensure we end on a
-    // slide boundary. Find the next nearest multiple of _panes_per_slide above
-    // // our pane_count and then find the difference.
-    // let multiplier = (min_new_panes / panes_per_slide) + 1
-    // // let next_nearest_multiple = multiplier * panes_per_slide
-    // // let extra_panes = next_nearest_multiple - min_new_panes
-
-    // let extra_panes = multiplier * panes_per_slide
-
-
-
-    // // New total
-    // cur_pane_count + (min_new_panes + extra_panes)
-
-    let min_new_panes = ((event_ts - end_ts).f64() / pane_size.f64()).usize() + 1
-
-    @printf[I32]("!@ _ExpandSlidingWindow: min_new_panes: %s, panes_per_slide: %s, cur_pane_count: %s\n".cstring(), min_new_panes.string().cstring(), panes_per_slide.string().cstring(), cur_pane_count.string().cstring())
-    let new_count =
-      Math.lcm(min_new_panes, panes_per_slide)
-    @printf[I32]("!@ -- extra_count: %s\n".cstring(), new_count.string().cstring())
+    let min_new_panes =
+      ((event_ts - end_ts).f64() / pane_size.f64()).usize() + 1
+    let new_count = Math.lcm(min_new_panes, panes_per_slide)
     new_count + cur_pane_count

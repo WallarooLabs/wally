@@ -32,10 +32,8 @@ primitive StepStateCheckpointer
       @printf[I32]("StepStateCheckpointer apply()\n".cstring())
     end
     let watermarks_bytes = StageWatermarksSerializer(watermarks, auth)
-    @printf[I32]("!@ 1\n".cstring())
     wb.u32_be(watermarks_bytes.size().u32())
     wb.write(watermarks_bytes)
-    @printf[I32]("!@ 2\n".cstring())
     let state_bytes =
       match runner
       | let r: SerializableStateRunner =>
@@ -53,14 +51,10 @@ primitive StepStateCheckpointer
         end
         recover val Array[U8] end
       end
-    @printf[I32]("!@ 3\n".cstring())
 
     wb.u32_be(state_bytes.size().u32())
     if state_bytes.size() > 0 then
       wb.write(state_bytes)
     end
-    @printf[I32]("!@ 4\n".cstring())
 
     event_log.checkpoint_state(id, checkpoint_id, wb.done())
-    @printf[I32]("!@ 5\n".cstring())
-
