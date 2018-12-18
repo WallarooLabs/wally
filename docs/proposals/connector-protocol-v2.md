@@ -164,6 +164,7 @@ ok(InitialCredits, PointsOfReference) ->
         u32(InitialCredits),
         % This encodes each point of reference in sequence using the
         % remaining bytes in the frame.
+        u32(length(PointsOfReference)),
         lists:map(fun ({StreamId, StreamName, Ref}) ->
             [u64(StreamId), short_bytes(StreamName), point_of_reference(Ref)]
         end, PointsOfReference)
