@@ -16,6 +16,7 @@ Copyright 2018 The Wallaroo Authors.
 
 */
 
+use "wallaroo/core/invariant"
 use "wallaroo/core/state"
 use "wallaroo_labs/mort"
 
@@ -24,7 +25,8 @@ trait WindowsPhase[In: Any val, Out: Any val, Acc: State ref]
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
     ((Out | Array[Out] val | None), U64)
 
-  fun ref attempt_to_trigger(watermark_ts: U64):
+  fun ref attempt_to_trigger(input_watermark_ts: U64,
+    output_watermark_ts: U64, watermarks: StageWatermarks):
     ((Out | Array[Out] val | None), U64)
 
   fun check_panes_increasing(): Bool =>
@@ -38,7 +40,8 @@ class EmptyWindowsPhase[In: Any val, Out: Any val, Acc: State ref] is
     Fail()
     (None, 0)
 
-  fun ref attempt_to_trigger(watermark_ts: U64):
+  fun ref attempt_to_trigger(input_watermark_ts: U64,
+    output_watermark_ts: U64, watermarks: StageWatermarks):
     ((Out | Array[Out] val | None), U64)
   =>
     Fail()
@@ -58,14 +61,18 @@ class InitialWindowsPhase[In: Any val, Out: Any val, Acc: State ref] is
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
     ((Out | Array[Out] val | None), U64)
   =>
+    @printf[I32]("!@ InitialWindowsPhase:apply(), watermark_ts: %s\n".cstring(), watermark_ts.string().cstring())
     let wrapper = _windows_wrapper_builder(watermark_ts)
     _windows._initial_apply(input, event_ts, watermark_ts, wrapper)
 
-  fun ref attempt_to_trigger(watermark_ts: U64):
+  fun ref attempt_to_trigger(input_watermark_ts: U64,
+    output_watermark_ts: U64, watermarks: StageWatermarks):
     ((Out | Array[Out] val | None), U64)
   =>
-    let wrapper = _windows_wrapper_builder(watermark_ts)
-    _windows._initial_attempt_to_trigger(watermark_ts, wrapper)
+    @printf[I32]("!@ InitialWindowsPhase:attempt_to_trigger()\n".cstring())
+    let wrapper = _windows_wrapper_builder(input_watermark_ts)
+    _windows._initial_attempt_to_trigger(input_watermark_ts,
+      output_watermark_ts, wrapper, watermarks)
 
 class ProcessingWindowsPhase[In: Any val, Out: Any val, Acc: State ref] is
   WindowsPhase[In, Out, Acc]
@@ -77,10 +84,27 @@ class ProcessingWindowsPhase[In: Any val, Out: Any val, Acc: State ref] is
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
     (Array[Out] val, U64)
   =>
+    @printf[I32]("!@ ProcessingWindowsPhase:apply(), watermark_ts: %s\n".cstring(), watermark_ts.string().cstring())
+    ifdef debug then
+      Invariant(watermark_ts < U64.max_value())
+    end
     _windows_wrapper.apply(input, event_ts, watermark_ts)
 
-  fun ref attempt_to_trigger(watermark_ts: U64): (Array[Out] val, U64) =>
-    _windows_wrapper.attempt_to_trigger(watermark_ts)
+  fun ref attempt_to_trigger(input_watermark_ts: U64,
+    output_watermark_ts: U64, watermarks: StageWatermarks):
+    (Array[Out] val, U64)
+  =>
+    @printf[I32]("!@ ProcessingWindowsPhase:attempt_to_trigger(), input_watermark_ts: %s, max_value: %s\n".cstring(), input_watermark_ts.string().cstring(), U64.max_value().string().cstring())
+    if input_watermark_ts == U64.max_value() then
+      try
+        _windows_wrapper.trigger_all(output_watermark_ts, watermarks)?
+      else
+        Fail()
+        (recover Array[Out] end, 0)
+      end
+    else
+      _windows_wrapper.attempt_to_trigger(input_watermark_ts)
+    end
 
   fun check_panes_increasing(): Bool =>
     _windows_wrapper.check_panes_increasing()

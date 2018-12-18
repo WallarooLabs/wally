@@ -20,6 +20,7 @@ use "buffered"
 use "serialise"
 use "wallaroo/core/common"
 use "wallaroo/core/topology"
+use "wallaroo/core/windows"
 use "wallaroo_labs/mort"
 
 trait ref State
@@ -64,8 +65,27 @@ trait ref StateWrapper[In: Any val, Out: Any val, S: State ref]
   // Return (output, output_watermark_ts)
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
     ((Out | Array[Out] val | None), U64)
-  fun ref on_timeout(wall_time: U64):
-    ((Out | Array[Out] val | None), U64)
+  fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64,
+    watermarks: StageWatermarks): ((Out | Array[Out] val | None), U64)
   fun ref encode(auth: AmbientAuth): ByteSeq
 
 class EmptyState is State
+
+class EmptyStateWrapper[In: Any val, Out: Any val, S: State ref]
+  // Return (output, output_watermark_ts)
+  fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
+    ((Out | Array[Out] val | None), U64)
+  =>
+    Fail()
+    (None, 0)
+
+  fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64,
+    watermarks: StageWatermarks): ((Out | Array[Out] val | None), U64)
+  =>
+    Fail()
+    (None, 0)
+
+  fun ref encode(auth: AmbientAuth): ByteSeq =>
+    Fail()
+    recover Array[U8] end
+

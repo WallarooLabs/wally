@@ -574,13 +574,11 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     event_log.ack_rollback(_id)
 
   fun ref rollback_watermarks(bs: ByteSeq val) =>
-    @printf[I32]("!@ Rolling back watermarks on %s\n".cstring(), _id.string().cstring())
     try
       _watermarks = StageWatermarksDeserializer(bs as Array[U8] val, _auth)?
     else
       Fail()
     end
-    @printf[I32]("!@ -- Successfully rolled back watermarks on %s\n".cstring(), _id.string().cstring())
 
   ///////////////
   // WATERMARKS
@@ -590,6 +588,12 @@ actor Step is (Producer & Consumer & BarrierProcessor)
 
   fun ref update_output_watermark(w: U64): (U64, U64) =>
     _watermarks.update_output_watermark(w)
+
+  fun input_watermark(): U64 =>
+    _watermarks.input_watermark()
+
+  fun output_watermark(): U64 =>
+    _watermarks.output_watermark()
 
   /////////////
   // TIMEOUTS
@@ -603,7 +607,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     else
       match _runner
       | let tr: TimeoutTriggeringRunner =>
-        tr.on_timeout(_id, this, _router, _metrics_reporter)
+        tr.on_timeout(_id, this, _router, _metrics_reporter, _watermarks)
       else
         Fail()
       end

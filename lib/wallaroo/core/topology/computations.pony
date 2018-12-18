@@ -24,6 +24,7 @@ use "wallaroo/core/common"
 use "wallaroo_labs/mort"
 use "wallaroo/core/routing"
 use "wallaroo/core/state"
+use "wallaroo/core/windows"
 
 
 interface val Computation[In: Any val, Out: Any val]
@@ -31,7 +32,7 @@ interface val Computation[In: Any val, Out: Any val]
   fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
     RunnerBuilder
 
-interface val StatelessComputation[In: Any val, Out: Any val] is
+trait val StatelessComputation[In: Any val, Out: Any val] is
   Computation[In, Out]
   fun apply(input: In): (Out | Array[Out] val | None)
 
@@ -41,7 +42,7 @@ interface val StatelessComputation[In: Any val, Out: Any val] is
     StatelessComputationRunnerBuilder[In, Out](this, step_group_id,
       parallelization)
 
-interface val StateComputation[In: Any val, Out: Any val, S: State ref] is
+trait val StateComputation[In: Any val, Out: Any val, S: State ref] is
   (Computation[In, Out] & StateInitializer[In, Out, S])
   // Return a tuple containing the result of the computation (which is None
   // if there is no value to forward) and a StateChange if there was one (or
@@ -91,8 +92,13 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref] is
     let res = _comp(input, _state)
     (res, watermark_ts)
 
-  fun ref on_timeout(watermark_ts: U64): (None, U64) =>
-    (None, watermark_ts)
+  fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64,
+    watermarks: StageWatermarks): ((Out | Array[Out] val | None), U64)
+  =>
+    (None, input_watermark_ts)
 
   fun ref encode(auth: AmbientAuth): ByteSeq =>
      _encoder_decoder.encode(_state, auth)
+
+  fun name(): String =>
+    _comp.name()

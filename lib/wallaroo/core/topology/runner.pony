@@ -323,17 +323,21 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     end
 
   fun ref on_timeout(producer_id: RoutingId, producer: Producer ref,
-    router: Router, metrics_reporter: MetricsReporter ref)
+    router: Router, metrics_reporter: MetricsReporter ref,
+    watermarks: StageWatermarks)
   =>
     @printf[I32]("!@ on_timeout called on StateRunner\n".cstring())
     let on_timeout_ts = Time.nanos()
     for (key, sw) in _state_map.pairs() do
-      let watermark_ts = producer.check_effective_input_watermark(
+      let input_watermark_ts = watermarks.check_effective_input_watermark(
         on_timeout_ts)
+      let initial_output_watermark_ts = watermarks.output_watermark()
 
-      (let out, let output_watermark_ts) = sw.on_timeout(watermark_ts)
+      (let out, let output_watermark_ts) =
+        sw.on_timeout(input_watermark_ts, initial_output_watermark_ts,
+          watermarks)
       (let new_watermark_ts, let old_watermark_ts) =
-        producer.update_output_watermark(output_watermark_ts)
+        watermarks.update_output_watermark(output_watermark_ts)
 
       // TODO: Is this sufficient for assigning msg ids to window outputs?
       let new_i_msg_uid = _msg_id_gen()
@@ -364,7 +368,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
           "", latest_ts - on_timeout_ts,
           //!@ real
           os, key, on_timeout_ts, new_watermark_ts, old_watermark_ts,
-          producer_id,  producer, router, new_i_msg_uid, None, latest_ts,
+          producer_id, producer, router, new_i_msg_uid, None, latest_ts,
           //!@ metrics_id, worker_ingress_ts
           0, on_timeout_ts,
           //!@ real
@@ -392,6 +396,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, U64)
   =>
+    @printf[I32]("!@ StateRunner:run()\n".cstring())
     match data
     | let input: In =>
       let state_wrapper =
@@ -401,12 +406,13 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
           match producer
           | let s: Step ref =>
             s.register_key(_step_group, key)
+            let new_state = _state_initializer.state_wrapper(key)
+            _state_map(key) = new_state
+            new_state
           else
             Fail()
+            EmptyStateWrapper[In, Out, State]
           end
-          let new_state = _state_initializer.state_wrapper(key)
-          _state_map(key) = new_state
-          new_state
         end
 
       let new_metrics_id = ifdef "detailed-metrics" then
@@ -418,8 +424,21 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
         end
 
       let computation_start = Time.nanos()
+
       (let result, let output_watermark_ts) =
-        state_wrapper(input, event_ts, watermark_ts)
+        // !TODO!: This match is a hack to avoid segfaulting on the
+        // state_wrapper.apply() call below when the state wrapper is a Python
+        // state computation. We need to determine the cause of this problem
+        // and remove this match.
+        match state_wrapper
+        | let sc: StateComputationWrapper[In, Out, S] =>
+          sc(input, event_ts, watermark_ts)
+        | let w: Windows[In, Out, S] =>
+          w(input, event_ts, watermark_ts)
+        else
+          state_wrapper(input, event_ts, watermark_ts)
+        end
+        // state_wrapper(input, event_ts, watermark_ts)
       let computation_end = Time.nanos()
 
       (let new_watermark_ts, let old_watermark_ts) =

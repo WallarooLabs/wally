@@ -221,6 +221,102 @@ class iso _TestSlidingWindows is UnitTest
     | let a: Array[USize] val => a
     else error end
 
+class iso _TestSlidingWindowsNoDelay is UnitTest
+  fun name(): String => "windows/_TestSlidingWindowsNoDelay"
+
+  fun apply(h: TestHelper) ? =>
+    let range: U64 = Seconds(10)
+    let slide: U64 = Seconds(2)
+    let delay: U64 = Seconds(0)
+    let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+      delay)
+
+    var res: ((USize | Array[USize] val | None), U64) =
+      (recover Array[USize] end, 0)
+
+    // First 2 windows values
+    res = sw(2, Seconds(92), Seconds(100))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    res = sw(3, Seconds(93), Seconds(102))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 5)
+
+    res = sw(4, Seconds(94), Seconds(103))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 9)
+
+    res = sw(5, Seconds(95), Seconds(104))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+
+    // Second 2 windows with values
+    res = sw(1, Seconds(102), Seconds(106))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 10)
+
+    res = sw(2, Seconds(103), Seconds(107))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 3)
+
+    res = sw(3, Seconds(104), Seconds(108))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    res = sw(4, Seconds(105), Seconds(109))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 10)
+
+    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+
+    // Third 2 windows with values.
+    res = sw(10, Seconds(108), Seconds(112))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 20)
+
+    res = sw(20, Seconds(109), Seconds(113))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 40)
+
+    res = sw(30, Seconds(110), Seconds(114))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    res = sw(40, Seconds(111), Seconds(115))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 107)
+
+    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+
+    // Fourth set of windows
+    // Use this message to trigger 10 windows.
+    res = sw(2, Seconds(192), Seconds(200))
+    h.assert_eq[USize](_array(res._1)?.size(), 5)
+    h.assert_eq[USize](_array(res._1)?(0)?, 100)
+    h.assert_eq[USize](_array(res._1)?(1)?, 100)
+    h.assert_eq[USize](_array(res._1)?(2)?, 70)
+    h.assert_eq[USize](_array(res._1)?(3)?, 0)
+    h.assert_eq[USize](_array(res._1)?(4)?, 0)
+
+    res = sw(3, Seconds(193), Seconds(202))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 5)
+
+    res = sw(4, Seconds(194), Seconds(203))
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 9)
+
+    res = sw(5, Seconds(195), Seconds(204))
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+
+    true
+
+  fun _array(res: (USize | Array[USize] val | None)): Array[USize] val ? =>
+    match res
+    | let a: Array[USize] val => a
+    else error end
+
 class iso _TestSlidingWindowsOutOfOrder is UnitTest
   fun name(): String => "windows/_TestSlidingWindowsOutOfOrder"
 
@@ -601,6 +697,161 @@ class iso _TestSlidingWindowsEarlyData is UnitTest
     | let a: Array[USize] val => a
     else error end
 
+class iso _TestSlidingWindowsStragglers is UnitTest
+  fun name(): String => "windows/_TestSlidingWindowsStragglers"
+
+  fun apply(h: TestHelper) ? =>
+    let range: U64 = Seconds(10)
+    let slide: U64 = Seconds(2)
+    let delay: U64 = Seconds(1_000)
+    let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+      delay)
+
+    // Last heard threshold of 100 seconds
+    let watermarks = StageWatermarks(Seconds(100_000))
+
+    var res: ((USize | Array[USize] val | None), U64) =
+      (recover Array[USize] end, 0)
+
+    var wm = Seconds(10_000)
+    var cur_ts = Seconds(50_000)
+    wm = watermarks.receive_watermark(1, wm, cur_ts)
+    res = sw(1, wm, wm)
+    watermarks.update_output_watermark(res._2)
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    wm = Seconds(10_001)
+    cur_ts = Seconds(50_001)
+    wm = watermarks.receive_watermark(1, wm, cur_ts)
+    res = sw(3, wm, wm)
+    watermarks.update_output_watermark(res._2)
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_array(res._1)?(0)?, 0)
+
+    wm = Seconds(10_002)
+    cur_ts = Seconds(50_002)
+    wm = watermarks.receive_watermark(1, wm, cur_ts)
+    res = sw(5, wm, wm)
+    watermarks.update_output_watermark(res._2)
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    // It's been awhile since we've heard from anyone
+    cur_ts = Seconds(10_000_000)
+    let input_w = watermarks.check_effective_input_watermark(cur_ts)
+    let output_w = watermarks.output_watermark()
+    res = sw.on_timeout(input_w, output_w, watermarks)
+    watermarks.update_output_watermark(res._2)
+    h.assert_eq[USize](_array(res._1)?.size(), 502)
+    for i in Range(0, 500) do
+      h.assert_eq[USize](_array(res._1)?(i)?, 0)
+    end
+    h.assert_eq[USize](_array(res._1)?(500)?, 1 + 3)
+    h.assert_eq[USize](_array(res._1)?(501)?, 1 + 3 + 5)
+    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+
+    true
+
+  fun _array(res: (USize | Array[USize] val | None)): Array[USize] val ? =>
+    match res
+    | let a: Array[USize] val => a
+    else error end
+
+class iso _TestSlidingWindowsStragglersSequence is UnitTest
+  fun name(): String => "windows/_TestSlidingWindowsStragglersSequence"
+
+  fun apply(h: TestHelper) ? =>
+    let range: U64 = Seconds(10)
+    let slide: U64 = Seconds(2)
+    let delay: U64 = Seconds(1_000)
+    let sw = RangeWindows[USize, Array[USize] val, Collected]("key",
+      _Collect, range, slide, delay)
+
+    // Last heard threshold of 100 seconds
+    let watermarks = StageWatermarks(Seconds(100_000))
+
+    var res: ((Array[USize] val | Array[Array[USize] val] val | None), U64) =
+      (recover Array[Array[USize] val] end, 0)
+
+    var wm = Seconds(10_000)
+    var cur_ts = Seconds(50_000)
+    wm = watermarks.receive_watermark(1, wm, cur_ts)
+    res = sw(1, wm, wm)
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    wm = Seconds(10_001)
+    cur_ts = Seconds(50_001)
+    wm = watermarks.receive_watermark(1, wm, cur_ts)
+    res = sw(2, wm, wm)
+    watermarks.update_output_watermark(res._2)
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_sum(_array(res._1)?(0)?), 0)
+
+    wm = Seconds(10_002)
+    cur_ts = Seconds(50_002)
+    wm = watermarks.receive_watermark(1, wm, cur_ts)
+    res = sw(3, wm, wm)
+    watermarks.update_output_watermark(res._2)
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    wm = Seconds(10_003)
+    cur_ts = Seconds(50_003)
+    wm = watermarks.receive_watermark(1, wm, cur_ts)
+    res = sw(4, wm, wm)
+    watermarks.update_output_watermark(res._2)
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_sum(_array(res._1)?(0)?), 0)
+
+    wm = Seconds(10_004)
+    cur_ts = Seconds(50_004)
+    wm = watermarks.receive_watermark(1, wm, cur_ts)
+    res = sw(5, wm, wm)
+    watermarks.update_output_watermark(res._2)
+    h.assert_eq[USize](_array(res._1)?.size(), 0)
+
+    wm = Seconds(10_005)
+    cur_ts = Seconds(50_005)
+    wm = watermarks.receive_watermark(1, wm, cur_ts)
+    res = sw(6, wm, wm)
+    watermarks.update_output_watermark(res._2)
+    h.assert_eq[USize](_array(res._1)?.size(), 1)
+    h.assert_eq[USize](_sum(_array(res._1)?(0)?), 0)
+
+    // It's been awhile since we've heard from anyone
+    cur_ts = Seconds(100_000_000)
+    let input_w = watermarks.check_effective_input_watermark(cur_ts)
+    let output_w = watermarks.output_watermark()
+    res = sw.on_timeout(input_w, output_w, watermarks)
+    watermarks.update_output_watermark(res._2)
+    h.assert_eq[USize](_array(res._1)?.size(), 502)
+    // Check empty windows before our stragglers
+    for i in Range(0, 498) do
+      h.assert_eq[USize](_sum(_array(res._1)?(i)?), 0)
+    end
+    h.assert_eq[USize](_sum(_array(res._1)?(498)?), 1 + 2)
+    h.assert_eq[USize](_sum(_array(res._1)?(499)?), 1 + 2 + 3 + 4)
+    h.assert_eq[USize](_sum(_array(res._1)?(500)?), 1 + 2 + 3 + 4 + 5 + 6)
+    h.assert_eq[USize](_sum(_array(res._1)?(501)?), 1 + 2 + 3 + 4 + 5 + 6)
+    for c in _array(res._1)?.values() do
+      h.assert_eq[Bool](CollectCheck(c), true)
+    end
+    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+
+    true
+
+  fun _array(res: (Array[USize] val | Array[Array[USize] val] val | None)):
+    Array[Array[USize] val] val ?
+  =>
+    match res
+    | let a: Array[Array[USize] val] val => a
+    else error end
+
+  fun _sum(arr: Array[USize] val): USize =>
+    var sum: USize = 0
+    for u in arr.values() do
+      sum = sum + u
+    end
+    sum
+
 class iso _TestSlidingWindowsSequence is UnitTest
   fun name(): String => "windows/_TestSlidingWindowsSequence"
 
@@ -825,7 +1076,6 @@ primitive CollectCheck
       for i in Range(1, arr.size()) do
         let v = arr(i)?
         if not ((v == (last + 1)) or (v <= last)) then
-          @printf[I32]("!@ Last: %s, v: %s\n".cstring(), last.string().cstring(), v.string().cstring())
           return false
         end
         last = v
@@ -834,7 +1084,3 @@ primitive CollectCheck
       false
     end
     true
-
-
-
-

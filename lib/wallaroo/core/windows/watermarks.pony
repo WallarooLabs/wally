@@ -135,47 +135,24 @@ class StageWatermarks
     end
     (_output_watermark, old)
 
+  fun input_watermark(): U64 =>
+    _input_watermark
+
+  fun output_watermark(): U64 =>
+    _output_watermark
+
   fun ref update_last_heard_threshold(t: U64) =>
     _last_heard_threshold = t
 
   fun _still_relevant(last_heard: U64, current_ts: U64): Bool =>
     (current_ts - last_heard) < _last_heard_threshold
 
-  //!@
-  fun print() =>
-    var o = ""
-    o = o + "!@############################################\n"
-    o = o + "!@ StageWatermarks\n"
-    o = o + "!@#################\n"
-    o = o + "!@ -- upstreams\n"
-    for (u, (a, b)) in _upstreams.pairs() do
-      o = o + "!@ -- -- u: " + u.string() + ", (" + a.string() + ", " + b.string() + ")\n"
-    end
-    o = o + "!@ -- input_watermark: " + _input_watermark.string() + "\n"
-    o = o + "!@ -- output_watermark: " + _output_watermark.string() + "\n"
-    o = o + "!@ -- last_heard_threshold " + _last_heard_threshold.string() + "\n"
-    o = o + "!@ -- _upstreams_marked_remove\n"
-    for id in _upstreams_marked_remove.values() do
-      o = o + "!@ -- -- id: " + id.string() + "\n"
-    end
-
-    o = o + "!@############################################\n"
-    @printf[I32]("%s\n".cstring(), o.cstring())
-
 primitive StageWatermarksSerializer
   fun apply(w: StageWatermarks, auth: AmbientAuth): ByteSeq val =>
-    @printf[I32]("!@ StageWatermarksSerializer: about to apply\n".cstring())
-    //!@
-    w.print()
-
     try
-      //!@
-      let s = Serialised(SerialiseAuth(auth), w)?.output(OutputSerialisedAuth(
+      Serialised(SerialiseAuth(auth), w)?.output(OutputSerialisedAuth(
         auth))
-      @printf[I32]("!@ Got s\n".cstring())
-      s
     else
-      @printf[I32]("!@ - FAILED TO SERIALIZE (segfault won't get here)!\n".cstring())
       Fail()
       recover Array[U8] end
     end
