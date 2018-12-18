@@ -441,7 +441,7 @@ In the notify-sent state, the following actions are valid:
     * NOTE: The point of reference in this ACK may differ from the point of reference sent by the connector in the NOTIFY message.  The connector must use the point of reference given in the NOTIFY_ACK message.
     * The connector must not send MESSAGE for any stream id before the connector receives a successful NOTIFY_ACK for the stream id.
 - RESTART: Worker -> Connector (next state is terminated)
-    * worker is requesting that the stream be reprocessed in some way
+    * worker is requesting that all streams be reprocessed
 
 In the open state, the following actions are valid:
 
@@ -450,14 +450,14 @@ In the open state, the following actions are valid:
 - ACK: Worker -> Connector
     * the are not 1-1 with MESSAGE frames
 - RESTART: Worker -> Connector (next state is terminated)
-    * worker is requesting that the stream be reprocessed in some way
+    * worker is requesting that all streams be reprocessed
 
 In the closed state, the following actions are valid:
 
 - NOTIFY: Connector -> Worker (next state is open)
     * reopens the stream
 - RESTART: Worker -> Connector (next state is terminated)
-    * worker is requesting that the stream be reprocessed in some way
+    * worker is requesting that all streams be reprocessed
 - ACK: Worker -> Connector
     * these can arrive asynchronously and should be processed accordingly
 
