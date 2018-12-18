@@ -35,7 +35,7 @@ while True:
     header = struct.unpack('>I', header_bytes)[0]
     payload = f.read(header)
     assert(len(payload) > 0)
-    obj = loads(payload)
+    obj = loads(payload.decode())  # Python3.5/json needs a string
     windows.setdefault(obj['key'], {}).setdefault(obj['ts'], []).append(obj['value'])
 
 # flatten windows to sequences
