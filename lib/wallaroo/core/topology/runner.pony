@@ -339,40 +339,27 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
       (let new_watermark_ts, let old_watermark_ts) =
         watermarks.update_output_watermark(output_watermark_ts)
 
-      // TODO: Is this sufficient for assigning msg ids to window outputs?
+      // New metrics info for the window outputs
       let new_i_msg_uid = _msg_id_gen()
+      let metrics_name = _state_initializer.name()
+      let pipeline_time_spent: U64 = 0
+      var metrics_id: U16 = 1
 
       let latest_ts = Time.nanos()
 
-      // !@ TODO: For metrics info, we need to pass along a worker_ingress_ts,
-      // metrics_name, metrics_id, and pipeline_time_spent value per window
-      // output. We could save this metadata per window.  It seems onerous
-      // but also the clearest option.
       match out
       | let o: Out =>
         OutputProcessor[Out](
-          _next_runner,
-          //!@ metric_name, pipeline_time_spent
-          "", latest_ts - on_timeout_ts,
-          //!@ real
+          _next_runner, metrics_name, pipeline_time_spent,
           o, key, on_timeout_ts, new_watermark_ts, old_watermark_ts,
           producer_id, producer, router, new_i_msg_uid, None, latest_ts,
-          //!@ metrics_id, worker_ingress_ts
-          0, on_timeout_ts,
-          //!@ real
-          metrics_reporter)
+          metrics_id, on_timeout_ts, metrics_reporter)
       | let os: Array[Out] val =>
         OutputProcessor[Out](
-          _next_runner,
-          //!@ metric_name, pipeline_time_spent
-          "", latest_ts - on_timeout_ts,
-          //!@ real
+          _next_runner, metrics_name, pipeline_time_spent,
           os, key, on_timeout_ts, new_watermark_ts, old_watermark_ts,
           producer_id, producer, router, new_i_msg_uid, None, latest_ts,
-          //!@ metrics_id, worker_ingress_ts
-          0, on_timeout_ts,
-          //!@ real
-          metrics_reporter)
+          metrics_id, on_timeout_ts, metrics_reporter)
       end
     end
     //!@ How do we configure this timeout and where does this go?
