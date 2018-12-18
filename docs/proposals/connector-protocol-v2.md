@@ -112,6 +112,10 @@ u16(N) ->
 u32(N) ->
     <<N:32/big-unsigned>>.
 
+-spec i64(non_neg_integer()) -> binary().
+i64(N) ->
+    <<N:64/big-signed>>.
+
 -spec u64(non_neg_integer()) -> binary().
 u64(N) ->
     <<N:64/big-unsigned>>.
@@ -255,7 +259,7 @@ message(Flags, StreamId, MessageId, EventTime, Key, Message) ->
             u64(MessageId)
         end,
         if Flags band ?EVENT_TIME /= 0 then
-            u64(EventTime)
+            i64(EventTime)
         else
             <<>>
         end,
