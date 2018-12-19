@@ -8,7 +8,7 @@ toc: true
 ---
 ## Wallaroo's resilience data directory
 
-As described in the [crash resilience chapter](/book/running-wallaroo/resilience-crash.html), Wallaroo requires a compile-time flag to enable crash resilience features.  In addition to the `--run-with-resilience` flag, the `--resilience-dir` flag specifies the path to Wallaroo's crash resilience data directory.  The resilience data directory contains worker-specific information for:
+As described in the [crash resilience chapter](../resilience-crash/), Wallaroo requires a compile-time flag to enable crash resilience features.  In addition to the `--run-with-resilience` flag, the `--resilience-dir` flag specifies the path to Wallaroo's crash resilience data directory.  The resilience data directory contains worker-specific information for:
 
 * Hostnames/IP addresses and TCP ports for other Wallaroo workers in the cluster
 
@@ -101,7 +101,7 @@ The following command line flags are recommended to enable data redundancy.
 
 ## Procedure for recovering for a worker crash
 
-See also: the [Crash Recovery in Practice section of the Crash Redundancy chapter](/book/running-wallaroo/resilience-crash.md)
+See also: the [Crash Recovery in Practice section of the Crash Redundancy chapter](../resilience-crash/#recovery-in-practice)
 
 This example assumes that each Wallaroo worker uses the argument `--resilience-dir /var/lib/wallaroo` to store its resilience data files.
 
@@ -123,4 +123,4 @@ This example assumes that each Wallaroo worker uses the argument `--resilience-d
 
 ## Scripted examples of Wallaroo worker start, stop, crash, and restart after catastrophic failure
 
-The [resilience demos directory](https://github.com/WallarooLabs/wallaroo/tree/master/demos/resilience-demo) contains a number of shell scripts to demonstrate Wallaroo worker starting, stopping, crashing, and restarting after a catastrophic failure.  Please see the [resilience demos directory README file](https://github.com/WallarooLabs/wallaroo/tree/master/demos/resilience-demo/README.me) file for details.
+The [resilience demos directory](https://github.com/WallarooLabs/wallaroo/tree/master/demos/resilience-demo) contains a number of shell scripts to demonstrate Wallaroo worker starting, stopping, crashing, and restarting after a catastrophic failure.  Please see the [resilience demos directory README file](https://github.com/WallarooLabs/wallaroo/tree/master/demos/resilience-demo/README.md) file for details.
