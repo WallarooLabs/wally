@@ -216,13 +216,14 @@ class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
     StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelization)
 
   fun timeout_interval(): U64 =>
+    // !@ !TODO!: Decide if we should set a minimum to this interval to
+    // avoid extremely frequent timer messages.
     let range_delay_based = (_range + _delay) * 2
     // if range_delay_based > Seconds(1) then
     //   range_delay_based
     // else
     //   Seconds(1)
     // end
-    //!@
     range_delay_based
 
   fun val decode(in_reader: Reader, auth: AmbientAuth):
@@ -383,31 +384,17 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
     (Array[Out] val, U64)
   =>
-    @printf[I32]("!@ _SlidingWindows:apply()\n".cstring())
     try
       let earliest_ts = _panes_start_ts(_earliest_window_idx)?
       let end_ts = earliest_ts + (_panes.size().u64() * _pane_size)
 
       //!@
-      let next_earliest_ts = _panes_start_ts((_earliest_window_idx + 1) % _panes.size())?
+      // let next_earliest_ts = _panes_start_ts((_earliest_window_idx + 1) % _panes.size())?
 
       var applied = false
 
-      //!@
-      if not check_panes_increasing() then
-        @printf[I32]("!@ !!!!!PANES!!!!!!\n".cstring())
-        for i in Range(0, _panes.size()) do
-          let idx = (_earliest_window_idx + i) % _panes.size()
-          let is_empty = match _panes(idx)?
-            | let e: EmptyPane => true
-            else false end
-          @printf[I32]("!@ -- idx: %s, is_empty: %s, ts: %s\n".cstring(), idx.string().cstring(), is_empty.string().cstring(), (_panes_start_ts(idx)? / 1_000_000).string().cstring())
-        end
-      end
-
-
       if event_ts < end_ts then
-        @printf[I32]("!@ Windows: preapply, watermark_ts: %s, earliest_ts: %s, next_earliest_ts: %s, end_ts: %s, next_ts - earliest_ts:%s\n".cstring(), watermark_ts.string().cstring(), earliest_ts.string().cstring(), next_earliest_ts.string().cstring(), end_ts.string().cstring(), (next_earliest_ts - earliest_ts).string().cstring())
+        // @printf[I32]("!@ Windows: preapply, watermark_ts: %s, earliest_ts: %s, next_earliest_ts: %s, end_ts: %s, next_ts - earliest_ts:%s\n".cstring(), watermark_ts.string().cstring(), earliest_ts.string().cstring(), next_earliest_ts.string().cstring(), end_ts.string().cstring(), (next_earliest_ts - earliest_ts).string().cstring())
         _apply_input(input, event_ts, earliest_ts)
         applied = true
       end
@@ -421,18 +408,18 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
         let new_end_ts = new_earliest_ts + (_panes.size().u64() * _pane_size)
 
         //!@
-        let new_next_earliest_ts = _panes_start_ts((_earliest_window_idx + 1) % _panes.size())?
+        // let new_next_earliest_ts = _panes_start_ts((_earliest_window_idx + 1) % _panes.size())?
 
-        @printf[I32]("!@ Windows: postapply, watermark_ts: %s, earliest_ts: %s, end_ts: %s, new_earliest_ts: %s, new_end_ts: %s, new_next_earliest_ts: %s, event_ts: %s\n".cstring(), watermark_ts.string().cstring(), earliest_ts.string().cstring(), end_ts.string().cstring(), new_earliest_ts.string().cstring(), new_end_ts.string().cstring(), new_next_earliest_ts.string().cstring(), event_ts.string().cstring())
+        // @printf[I32]("!@ Windows: postapply, watermark_ts: %s, earliest_ts: %s, end_ts: %s, new_earliest_ts: %s, new_end_ts: %s, new_next_earliest_ts: %s, event_ts: %s\n".cstring(), watermark_ts.string().cstring(), earliest_ts.string().cstring(), end_ts.string().cstring(), new_earliest_ts.string().cstring(), new_end_ts.string().cstring(), new_next_earliest_ts.string().cstring(), event_ts.string().cstring())
         if (event_ts >= new_end_ts) then
-          @printf[I32]("!@ Windows: Expanding windows\n".cstring())
+          // @printf[I32]("!@ Windows: Expanding windows\n".cstring())
           _expand_windows(event_ts, new_end_ts)?
           new_earliest_ts = _panes_start_ts(_earliest_window_idx)?
         end
         _apply_input(input, event_ts, new_earliest_ts)
       //!@
-      else
-        @printf[I32]("!@ Skipping postapply because applied already\n".cstring())
+      // else
+      //   @printf[I32]("!@ Skipping postapply because applied already\n".cstring())
       end
 
       (outs, output_watermark_ts)
@@ -451,10 +438,10 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       try
         match _panes(pane_idx)?
         | let acc: Acc =>
-          @printf[I32]("!@ Windows: _apply_update: event_ts: %s, window_ts: %s, _earliest_window_idx: %s, _panes.size(): %s, pane_idx: %s\n".cstring(), event_ts.string().cstring(), _panes_start_ts(pane_idx)?.string().cstring(), _earliest_window_idx.string().cstring(), _panes.size().string().cstring(), pane_idx.string().cstring())
+          // @printf[I32]("!@ Windows: _apply_update: event_ts: %s, window_ts: %s, _earliest_window_idx: %s, _panes.size(): %s, pane_idx: %s\n".cstring(), event_ts.string().cstring(), _panes_start_ts(pane_idx)?.string().cstring(), _earliest_window_idx.string().cstring(), _panes.size().string().cstring(), pane_idx.string().cstring())
           _agg.update(input, acc)
         else
-          @printf[I32]("!@ Windows: _apply_update: event_ts: %s, window_ts: %s, _earliest_window_idx: %s, _panes.size(): %s, pane_idx: %s\n".cstring(), event_ts.string().cstring(), _panes_start_ts(pane_idx)?.string().cstring(), _earliest_window_idx.string().cstring(), _panes.size().string().cstring(), pane_idx.string().cstring())
+          // @printf[I32]("!@ Windows: _apply_update: event_ts: %s, window_ts: %s, _earliest_window_idx: %s, _panes.size(): %s, pane_idx: %s\n".cstring(), event_ts.string().cstring(), _panes_start_ts(pane_idx)?.string().cstring(), _earliest_window_idx.string().cstring(), _panes.size().string().cstring(), pane_idx.string().cstring())
           let new_acc = _agg.initial_accumulator()
           _agg.update(input, new_acc)
           _panes(pane_idx)? = new_acc
@@ -557,7 +544,7 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       let window_end_ts = earliest_ts + _range
 
       if _should_trigger(earliest_ts, watermark_ts) then
-        @printf[I32]("!@ -- Trigger next window: earliest:%s, watermark:%s, _earliest_window_idx:%s\n".cstring(), earliest_ts.string().cstring(), watermark_ts.string().cstring(), _earliest_window_idx.string().cstring())
+        // @printf[I32]("!@ -- Trigger next window: earliest:%s, watermark:%s, _earliest_window_idx:%s\n".cstring(), earliest_ts.string().cstring(), watermark_ts.string().cstring(), _earliest_window_idx.string().cstring())
         (let out, let output_watermark_ts) = _trigger_next(earliest_ts,
           trigger_diff)?
         (out, output_watermark_ts, false)
@@ -715,7 +702,6 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
     ((Out | None), U64)
   =>
-    @printf[I32]("!@ TumblingCountWindows:apply()\n".cstring())
     var out: (Out | None) = None
     _agg.update(input, _acc)
     _current_count = _current_count + 1
