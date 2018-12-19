@@ -1,17 +1,27 @@
-# Data Redundancy for Wallaroo's Crash Recovery
-
+---
+title: "Data Redundancy"
+menu:
+  docs:
+    parent: "operators-manual"
+    weight: 30
+toc: true
+---
 ## Wallaroo's resilience data directory
 
 As described in the [crash resilience chapter](/book/running-wallaroo/resilience-crash.html), Wallaroo requires a compile-time flag to enable crash resilience features.  In addition to the `--run-with-resilience` flag, the `--resilience-dir` flag specifies the path to Wallaroo's crash resilience data directory.  The resilience data directory contains worker-specific information for:
 
 * Hostnames/IP addresses and TCP ports for other Wallaroo workers in the cluster
+
 * Source, sink, and pipeline topology information for the cluster's application
+
 * State information for state computations: dynamic keys processed by this worker and user-specified Python/Go/Pony data structures for state computations.
 
 If a Wallaroo worker process crashes and restarts, the files in the resilience data directory provide the necessary information to:
 
 * reconnect to the surviving cluster worker processes,
+
 * participate in the Chandy-Lamport snapshot algorithm's recovery procedure to, which rolls back the global cluster state to a well-defined state, and
+
 * reconfigure local state computation actors to restore the app's user-specified Python/Go/Pony data structures to match the global cluster state snapshot
 
 ## Loss of the resilience data directory -> crash recovery is impossible
