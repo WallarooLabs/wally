@@ -34,7 +34,7 @@ For example, if we were running the bundled Python example [word_count](https://
 
 ### Running the resilience example
 
-In order to run the example you will need Machida with resilience enabled, Giles Sender, Data Receiver, and the Cluster Shutdown tool. If you haven't yet set up wallaroo, please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to get started.
+In order to run the example you will need Machida with resilience enabled, Giles Sender, Data Receiver, and the Cluster Shutdown tool. If you haven't yet set up wallaroo, please visit our [setup](/python-installation/choosing-an-installation-option/) instructions to get started.
 
 #### Starting new shells
 

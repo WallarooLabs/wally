@@ -3,7 +3,7 @@ title: "Using Connectors as Sources & Sinks"
 menu:
   docs:
     parent: "pytutorial"
-    weight: 6
+    weight: 60
 toc: true
 ---
 This is a preview release of Wallaroo's connectors feature that allows full customization of sources and sinks. These sources and sinks can be integrated into Wallaroo using libraries you're already familiar with in Python. A number of built-in connectors offer a quick way to get started and hook up common stream types and they're all available for easy customization.
@@ -39,7 +39,7 @@ celsius_feed = wallaroo.experimental.SourceConnectorConfig(
     return wallaroo.build_application("Celsius to Fahrenheit", pipeline)
 ```
 
-You can follow along in this example by going to [github](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/python/celsius_connectors/).
+You can follow along in this example by going to [GitHub](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/python/celsius_connectors/).
 
 We have introduced two new application builder methods for declaring connectors: `source_connector` and `sink_connector`. These allow you to describe both ends of the connection so the connector script can encode or decode data in a way that's compatible with your application's worker code. Keeping these in one place helps ensure that it's easy to keep them in sync. The port specified here is what the connector script will automatically use when connecting to the initializing worker.
 
@@ -86,7 +86,7 @@ To run an application that makes use of these connectors we'll need to understan
 
 These included connectors are self-contained Python scripts. Some of them may expect a related Python library to be installed and available for import but our example uses the UDP facilities provided for by Python's standard library. Be sure that the Python path is set up to include the Wallaroo library.
 
-If we run one of these scripts we'll see there are some required arguments listed. The first one should be familiar. `--application-module` is the same as the one seen when running a Wallaroo worker (you can review these command line parameters in the [Running Wallaroo](/book/running-wallaroo/running-wallaroo.md) section). Providing this argument allows the script to autodetect most of the connector settings by reading the same application description that the Wallaroo application worker runs with.
+If we run one of these scripts we'll see there are some required arguments listed. The first one should be familiar. `--application-module` is the same as the one seen when running a Wallaroo worker (you can review these command line parameters in the [Running Wallaroo](/operators-manual/running-wallaroo/) section). Providing this argument allows the script to autodetect most of the connector settings by reading the same application description that the Wallaroo application worker runs with.
 
 The application module is not quite enough for the script to know what settings to use when connecting to Wallaroo. Since the application may have more than one connector, the `--connector` argument is required for disambiguating which connector in the application setup this script is running as. With this passed as an argument, we can autodetect the most common settings.
 
