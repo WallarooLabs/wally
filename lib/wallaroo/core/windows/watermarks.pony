@@ -63,7 +63,6 @@ class StageWatermarks
   // is nothing to remove. We should replace this approach.
   let _upstreams_marked_remove: Array[RoutingId] = Array[RoutingId]
 
-  //!@ Where do we determine the threshold?
   new create(last_heard_threshold: U64 = 10_000_000_000) =>
     _last_heard_threshold = last_heard_threshold
     // TODO: Remove this hack. We are keeping a 0 in this array to avoid
@@ -74,10 +73,6 @@ class StageWatermarks
   fun ref receive_watermark(u: RoutingId, w: U64, current_ts: U64): U64 =>
     _upstreams(u) = (w, current_ts)
     if w > _input_watermark then
-      // !@ Should we check every time?  Tradeoff: If we do, then we pay the
-      // cost of checking every upstream.  If we don't, then we can only notice
-      // that we should ignore certain upstreams in our calculations
-      // whenever a timeout is triggered.
       check_effective_input_watermark(current_ts)
     else
       _input_watermark

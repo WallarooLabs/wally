@@ -240,7 +240,8 @@ class StatelessComputationRunner[In: Any val, Out: Any val] is Runner
         end
 
       //!@ This is unnecessary work since we only ever pass along the
-      // input watermark
+      // input watermark for stateless computations (i.e. the output
+      // watermark always equals the input after each message).
       (let new_watermark_ts, let old_watermark_ts) =
         producer.update_output_watermark(watermark_ts)
 
@@ -326,7 +327,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     router: Router, metrics_reporter: MetricsReporter ref,
     watermarks: StageWatermarks)
   =>
-    @printf[I32]("!@ on_timeout called on StateRunner\n".cstring())
+    // @printf[I32]("!@ on_timeout called on StateRunner\n".cstring())
     let on_timeout_ts = Time.nanos()
     for (key, sw) in _state_map.pairs() do
       let input_watermark_ts = watermarks.check_effective_input_watermark(
@@ -362,7 +363,6 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
           metrics_id, on_timeout_ts, metrics_reporter)
       end
     end
-    //!@ How do we configure this timeout and where does this go?
     match _step_timeout_trigger
     | let stt: StepTimeoutTrigger =>
       let ti = _state_initializer.timeout_interval()
@@ -383,7 +383,6 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, U64)
   =>
-    @printf[I32]("!@ StateRunner:run()\n".cstring())
     match data
     | let input: In =>
       let state_wrapper =
