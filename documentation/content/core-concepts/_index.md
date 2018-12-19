@@ -5,6 +5,7 @@ menu:
     parent: "core-concepts"
     weight: 1
 toc: true
+layout: single
 ---
 A Wallaroo application consists of a pipeline with one or more sources. A pipeline takes in data from external systems, performs a series of computations based on that data, and optionally produces outputs which are sent to an external system.
 

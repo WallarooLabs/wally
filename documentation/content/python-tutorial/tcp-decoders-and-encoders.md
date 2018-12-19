@@ -6,7 +6,7 @@ menu:
     weight: 85
 toc: true
 ---
-Earlier, we spoke of [sources and sinks](/core-concepts/core-concepts/) and the role they play in Wallaroo. In this section, we are going to dive more into how you work with sources and sinks. We'll be covering two key concepts: `Decoder`s and `Encoder`s.
+Earlier, we spoke of [sources and sinks](/core-concepts/) and the role they play in Wallaroo. In this section, we are going to dive more into how you work with sources and sinks. We'll be covering two key concepts: `Decoder`s and `Encoder`s.
 
 ## Reviewing our terms
 

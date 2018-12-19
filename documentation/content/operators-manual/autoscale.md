@@ -3,7 +3,7 @@ title: "Autoscale"
 menu:
   docs:
     parent: "operators-manual"
-    weight: 2
+    weight: 20
 toc: true
 ---
 Wallaroo is designed to support scale-independent development. It can adapt to changing demands by growing or shrinking to fit the available resources. You don’t have to update any code or bother with stopping your cluster and redeploying. This set of features is called “autoscale”.

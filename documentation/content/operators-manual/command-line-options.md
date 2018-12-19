@@ -3,7 +3,7 @@ title: "Command-Line Options"
 menu:
   docs:
     parent: "operators-manual"
-    weight: 4
+    weight: 40
 toc: true
 ---
 Every Wallaroo option exposes a set of command-line options that are used to configure it. This document gives an overview of each of those options.
