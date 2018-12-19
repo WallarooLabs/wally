@@ -1,24 +1,24 @@
-/book/getting-started/choosing-an-installation-option.html /python-installation/ 301!
-/book/getting-started/setup.html /python-installation/ 301!
-/book/getting-started/docker-setup.html /python-installation/python-docker-installation-guide/ 301!
-/book/getting-started/vagrant-setup.html /python-installation/python-vagrant-installation-guide/ 301!
-/book/getting-started/run-a-wallaroo-application-wallaroo-up.html /python-installation/python-vagrant-installation-guide/#validate-your-installation 301!
-/getting-started/run-a-wallaroo-application-docker.html /python-installation/python-docker-installation-guide/#validate-your-installation 301!
+/book/getting-started/choosing-an-installation-option.html /python-installation/ 301
+/book/getting-started/setup.html /python-installation/ 301
+/book/getting-started/docker-setup.html /python-installation/python-docker-installation-guide/ 301
+/book/getting-started/vagrant-setup.html /python-installation/python-vagrant-installation-guide/ 301
+/book/getting-started/run-a-wallaroo-application-wallaroo-up.html /python-installation/python-vagrant-installation-guide/#validate-your-installation 301
+/getting-started/run-a-wallaroo-application-docker.html /python-installation/python-docker-installation-guide/#validate-your-installation 301
 
-/book/python/api.html /python-tutorial/api/ 301!
-/book/python/wallaroo-python-api.html /python-tutorial/ 301!
-/book/python/using-connectors.html /python-tutorial/using-connectors/ 301!
-/book/appendix/tcp-decoders-and-encoders.html /python-tutorial/tcp-decoders-and-encoders/ 301!
-/book/python/word-count.html /python-tutorial/word-count/ 301!
+/book/python/api.html /python-tutorial/api/ 301
+/book/python/wallaroo-python-api.html /python-tutorial/ 301
+/book/python/using-connectors.html /python-tutorial/using-connectors/ 301
+/book/appendix/tcp-decoders-and-encoders.html /python-tutorial/tcp-decoders-and-encoders/ 301
+/book/python/word-count.html /python-tutorial/word-count/ 301
 
-/book/core-concepts/core-concepts.html /core-concepts/ 301!
-/book/core-concepts/partitioning.html /core-concepts/partitioning/ 301!
-/book/core-concepts/working-with-state.html /core-concepts/working-with-state/ 301!
-/book/core-concepts/state.html /core-concepts/working-with-state/ 301!
+/book/core-concepts/core-concepts.html /core-concepts/ 301
+/book/core-concepts/partitioning.html /core-concepts/partitioning/ 301
+/book/core-concepts/working-with-state.html /core-concepts/working-with-state/ 301
+/book/core-concepts/state.html /core-concepts/working-with-state/ 301
 
-/book/running-wallaroo/running-wallaroo.html /operators-manual/running-wallaroo/ 301!
-/book/metrics/metrics-ui.html /operators-manual/metrics-ui/ 301!
-/book/go/getting-started/setup.html ??? 301!
-/book/go/api/start-a-project.html ??? 301!
-/book/go/api/interworker-serialization-and-resilience.html ??? 301!
-/book/core-concepts/clustering.html /operators-manual/running-wallaroo/ 301!
+/book/running-wallaroo/running-wallaroo.html /operators-manual/running-wallaroo/ 301
+/book/metrics/metrics-ui.html /operators-manual/metrics-ui/ 301
+/book/go/getting-started/setup.html ??? 301
+/book/go/api/start-a-project.html ??? 301
+/book/go/api/interworker-serialization-and-resilience.html ??? 301
+/book/core-concepts/clustering.html /operators-manual/running-wallaroo/ 301
