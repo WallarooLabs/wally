@@ -6,7 +6,7 @@ menu:
     weight: 80
 toc: true
 ---
-As you're developing Python Wallaroo applications, there will come a time where you will need to do some debugging during your development process. Debugging can be as simple as inserting a `print` statement in your code (we even do it in our examples) or a bit more involved by using a debugger to get backtraces and such. In this section we'll cover how to debug using `print`, an interactive debugger, and a remote debugger. It will help if you've gone through the [Python API Introduction](/python-tutorial/intro/), [Setting Up Your Environment for Wallaroo](/python-installation/choosing-an-installation-option/), and [Writing Your Own Wallaroo Python Application](/python-tutorial/writing-your-own-application/) sections prior to continuing so you're aware of the components that make up a Python Wallaroo application and how they interact with each other.
+As you're developing Python Wallaroo applications, there will come a time where you will need to do some debugging during your development process. Debugging can be as simple as inserting a `print` statement in your code (we even do it in our examples) or a bit more involved by using a debugger to get backtraces and such. In this section we'll cover how to debug using `print`, an interactive debugger, and a remote debugger. It will help if you've gone through the [Python API Introduction](/python-tutorial/), [Setting Up Your Environment for Wallaroo](/python-installation/), and [Writing Your Own Wallaroo Python Application](/python-tutorial/writing-your-own-application/) sections prior to continuing so you're aware of the components that make up a Python Wallaroo application and how they interact with each other.
 
 ## Debugging Using `print` and `repr`
 
