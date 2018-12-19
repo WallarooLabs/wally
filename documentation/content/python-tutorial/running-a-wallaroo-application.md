@@ -7,7 +7,7 @@ menu:
 toc: true
 ---
 {{% note %}}
-You should have already completed the [setup instructions]({{< ref "/python-installation" >}}) in the "Python Installation" guide.
+You should have already completed the [setup instructions]({{< relref "/python-installation" >}}) in the "Python Installation" guide.
 {{% /note %}}
 
 ## Running the Application

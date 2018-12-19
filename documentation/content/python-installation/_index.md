@@ -9,16 +9,16 @@ layout: single
 ---
 For 64-bit MacOS and Windows users, we provide two different ways for you to install Wallaroo:
 
-- [Wallaroo in Docker]({{< ref "python-docker-installation-guide.md" >}})
-- [Wallaroo in Vagrant]({{< ref "python-vagrant-installation-guide.md" >}})
+- [Wallaroo in Docker]({{< relref "python-docker-installation-guide.md" >}})
+- [Wallaroo in Vagrant]({{< relref "python-vagrant-installation-guide.md" >}})
 
 If you are unsure about which solution is right for you, a breakdown of each is provided below. (NOTE: Wallaroo does not support 32-bit platforms.)
 
 For 64-bit Linux users, we provide three different ways for you to install Wallaroo.
 
-- [Wallaroo Up]({{< ref "python-wallaroo-up-installation-guide.md" >}})
-- [Wallaroo in Docker]({{< ref "python-docker-installation-guide.md" >}})
-- [Wallaroo in Vagrant]({{< ref "python-vagrant-installation-guide.md" >}})
+- [Wallaroo Up]({{< relref "python-wallaroo-up-installation-guide.md" >}})
+- [Wallaroo in Docker]({{< relref "python-docker-installation-guide.md" >}})
+- [Wallaroo in Vagrant]({{< relref "python-vagrant-installation-guide.md" >}})
 
 If you are unsure about which solution is right for you, we wanted to provide a breakdown of each approach. We recommend using Wallaroo Up.
 
@@ -30,7 +30,7 @@ Installing with Docker provides the benefit of needing to install only one syste
 
 The Docker environment has limited customizability due to the nature of a container's lifecycle but we have provided options to persist both code changes and Python modules for you.
 
-[Get started installing with Docker]({{< ref "python-docker-installation-guide.md" >}}/).
+[Get started installing with Docker]({{< relref "python-docker-installation-guide.md" >}}/).
 
 ## Installing with Vagrant
 
@@ -38,7 +38,7 @@ We recommend this process if you're looking to get started quickly and want a mo
 
 Installing with Vagrant provides the benefit of needing to install only two system dependencies: Virtualbox and Vagrant. Once Vagrant is set up and you have a copy of the Wallaroo codebase, you will only need to run a `vagrant up` command from the `vagrant` directory and you will have Wallaroo and all of its support tools available within the Wallaroo Vagrant Box.
 
-[Get started installing with Vagrant]({{< ref "python-vagrant-installation-guide.md" >}}).
+[Get started installing with Vagrant]({{< relref "python-vagrant-installation-guide.md" >}}).
 
 ## Wallaroo Up
 
@@ -46,4 +46,4 @@ We recommend this process if you would prefer to use your development environmen
 
 This process requires installing several system libraries which may conflict with requirements of other tools in your development environment. We recommmend reviewing the process before proceeding.
 
-[Get started installing with Wallaroo Up]({{< ref "python-wallaroo-up-installation-guide.md" >}}).
+[Get started installing with Wallaroo Up]({{< relref "python-wallaroo-up-installation-guide.md" >}}).
