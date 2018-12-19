@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    
+    <title>Wallaroo  | Running Wallaroo</title>
+    <meta name="HandheldFriendly" content="True">
+    <meta name="MobileOptimized" content="320">
+
+    <meta name="viewport" content="width=device-width,minimum-scale=1">
+    <meta name="generator" content="Hugo 0.49.2" />
+    
+    
+      <META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
+    
+
+    
+    
+      <link href="/dist/css/app.955516233bcafa4d2a1c13cea63c7b50.css" rel="stylesheet">
+    
+
+    
+      <link rel="stylesheet" href="/css/jquery-ui.min.css">
+    
+      <link rel="stylesheet" href="/css/jquery-ui.theme.min.css">
+    
+      <link rel="stylesheet" href="/cshighlight.css">
+    
+      <link rel="stylesheet" href="/css/my.css">
+    
+
+    
+      
+    
+
+    
+
+    <meta property="og:title" content="Running Wallaroo" />
+<meta property="og:description" content="A Wallaroo application is distributed over one or more Wallaroo processes, which we call &ldquo;workers&rdquo;. Any Wallaroo cluster will have one worker designated as the &ldquo;cluster initializer&rdquo;, a temporary role played during cluster initialization.
+Workers communicate with each other over two channels: a control channel and a data channel. They send metrics data over TCP to an external metrics address. And they optionally listen for messages from external systems over an external channel." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://docs.wallaroolabs.com/operators-manual/running-wallaroo/" />
+
+<meta itemprop="name" content="Running Wallaroo">
+<meta itemprop="description" content="A Wallaroo application is distributed over one or more Wallaroo processes, which we call &ldquo;workers&rdquo;. Any Wallaroo cluster will have one worker designated as the &ldquo;cluster initializer&rdquo;, a temporary role played during cluster initialization.
+Workers communicate with each other over two channels: a control channel and a data channel. They send metrics data over TCP to an external metrics address. And they optionally listen for messages from external systems over an external channel.">
+
+
+
+<meta itemprop="wordCount" content="1133">
+
+
+
+<meta itemprop="keywords" content="" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Running Wallaroo"/>
+<meta name="twitter:description" content="A Wallaroo application is distributed over one or more Wallaroo processes, which we call &ldquo;workers&rdquo;. Any Wallaroo cluster will have one worker designated as the &ldquo;cluster initializer&rdquo;, a temporary role played during cluster initialization.
+Workers communicate with each other over two channels: a control channel and a data channel. They send metrics data over TCP to an external metrics address. And they optionally listen for messages from external systems over an external channel."/>
+
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+  </head>
+
+  <body class="ma0 avenir bg-near-white">
+
+    
+
+  <header>
+    <div class="bg-green">
+      <nav class="pv3 ph3 ph4-ns" role="navigation">
+  <div class="flex-l justify-between items-center center">
+    <a href="https://docs.wallaroolabs.com/" class="f3 fw2 hover-white no-underline white-90 dib">
+      Wallaroo
+    </a>
+    <div class="flex-l items-center">
+      
+        <ul class="pl0 mr3">
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/core-concepts/" title="Core Concepts page">
+              Core Concepts
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/python-installation/" title="Installation page">
+              Installation
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/python-tutorial/" title="Tutorial page">
+              Tutorial
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/operators-manual/" title="Operators Manual page">
+              Operators Manual
+            </a>
+          </li>
+          
+        </ul>
+      
+      
+<div hidden>
+  <span id="new-window-0">Opens in a new window</span>
+  <span id="new-window-1">Opens an external site</span>
+  <span id="new-window-2">Opens an external site in a new window</span>
+</div>
+
+
+
+
+
+
+
+
+
+    </div>
+  </div>
+</nav>
+
+    </div>
+  </header>
+
+
+    <main class="pb7" role="main">
+      
+  <article class="w-100 ph4 pb5 pb6-ns pt1 pt5-ns">
+    <div class="flex-l">
+
+      <div class="order-0 w-100 w-20-l ph5-m ph0-l mb4 sticky dn db-l">
+        
+<nav role="navigation" class="doc-menu bg-light-gray pl3 pr3">
+  <ul class="list pa0 nl2">
+    
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".core-concepts">Core Concepts</a>
+        <ul class="core-concepts desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/core-concepts/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo Core Concepts
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/core-concepts/state/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              State
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/core-concepts/working-with-state/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Working with State
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/core-concepts/partitioning/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Partitioning
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".pyinstallation">Python Installation Guide</a>
+        <ul class="pyinstallation desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/python-installation/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Choosing an Installation Option
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-installation/python-docker-installation-guide/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Installing with Docker
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-installation/python-vagrant-installation-guide/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Installing with Vagrant
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-installation/python-wallaroo-up-installation-guide/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Installing with Wallaroo Up
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".pytutorial">Python Tutorial</a>
+        <ul class="pytutorial desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/python-tutorial/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Python API Introduction
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/running-a-wallaroo-application/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Running A Wallaroo Application
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/writing-your-own-application/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Writing Your Own Application
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/writing-your-own-stateful-application/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Writing Your Own Stateful Application
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/word-count/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Word Count
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/interworker-serialization-and-resilience/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Inter-worker Serialization and Resilience
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/using-connectors/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Using Connectors as Sources &amp; Sinks
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/api/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo Python API Classes
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/debugging/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Debugging
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/tcp-decoders-and-encoders/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              TCP Decoders and Encoders
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/virtualenv/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo and Virtualenv
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/starting-a-new-shell/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Starting a new shell
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2  primary-color" data-target=".operators-manual">Operators Manual</a>
+        <ul class="operators-manual desktopmenu animated fadeIn list pl0 pb2 bg-light-gray db">
+          <li class="f6 fw4">
+            <a href="/operators-manual/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Operators Manual
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/running-wallaroo/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 primary-color ">
+              Running Wallaroo
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/autoscale/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Autoscale
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/resilience/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Resilience
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/command-line-options/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Command-Line Options
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/metrics-ui/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo Metrics UI
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".appendix">Appendix</a>
+        <ul class="appendix desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/appendix/giles-sender/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Giles sender
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/appendix/wallaroo-docker-tips/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Tips for using Wallaroo in Docker
+            </a>
+          </li>
+        </ul>
+      </li>
+  </ul>
+</nav>
+
+      </div>
+
+      <div class="order-2 w-100 w-20-l ph5-m ph0-l mb4 sticky dn db-l"><nav role="toc" class="toc bg-light-gray pl3 pr3 nested-list-reset nested-copy-line-height nested-links">
+    <p class="f5 b mb3">What's in this document</p>
+      <nav id="TableOfContents">
+<ul>
+<li>
+<ul>
+<li><a href="#single-worker-setup">Single Worker Setup</a></li>
+<li><a href="#multi-worker-setup">Multi-Worker Setup</a></li>
+<li><a href="#restarting-workers">Restarting workers</a></li>
+<li><a href="#shutting-down-a-cluster">Shutting Down a Cluster</a></li>
+</ul></li>
+</ul>
+</nav>
+  </nav>
+
+
+
+
+</div>
+
+      <div class="order-1 w-60-l mw7 ph0 ph5-ns mid-gray nested-copy-line-height no-underline nested-links nested-img nested-copy-seperator nested-blockquote mt0-ns" style="flex-grow:1;">
+        <div class="documentation-copy center measure-wide-l">
+          <header class="w-100">
+          <p class="f6 b helvetica tracked">
+            Operator's Manual
+          </p>
+          <h1 class="f1 athelas mb1">Running Wallaroo</h1>
+          </header>
+
+          <main class="nested-copy-line-height lh-copy serif f4 nested-links nested-img mid-gray pr4-l">
+
+<p>A Wallaroo application is distributed over one or more Wallaroo processes, which we call &ldquo;workers&rdquo;. Any Wallaroo cluster will have one worker designated as the &ldquo;cluster initializer&rdquo;, a temporary role played during cluster initialization.</p>
+
+<p>Workers communicate with each other over two channels: a control channel and a data channel. They send metrics data over TCP to an external metrics address. And they optionally listen for messages from external systems over an external channel.</p>
+
+<p>Depending on the type of sources and sinks used in your application, you might need to provide more configuration information.  For example, a TCP source requires a network address so that it can listen for incoming data.  And a TCP sink requires a target address where it can send output data.</p>
+
+<p>In this document, we&rsquo;ll discuss most of the command line arguments that can be passed to a Wallaroo binary.  For a complete list, see <a href="/operators-manual/command-line-options/">Wallaroo Command Line Options</a>.</p>
+
+<h2 id="single-worker-setup">Single Worker Setup</h2>
+
+<p>If you are starting up a Wallaroo cluster with only one worker, then that worker must be configured as the &ldquo;cluster initializer&rdquo; by passing the <code>--cluster-initializer</code> flag. You must also specify a target address for metrics data using the <code>--metrics</code> parameter. And you must specify its control and data addresses via the <code>--control</code> and <code>--data</code> command line parameters (these will be used if more workers are added to the cluster later).</p>
+
+<p>If your application uses a TCP source, then you must specify a TCP input address via <code>--in</code>. Likewise, if your application uses a TCP sink, then you must specify a TCP output address via <code>--out</code>. In what follows, we&rsquo;ll be using the <a href="https://github.com/WallarooLabs/wallaroo/tree/0.6.0/examples/python/alerts_stateful">Alerts</a> example app which uses a TCP sink.</p>
+
+<p>If you are using the Python API, then you will run <a href="/python-tutorial/#machida">Machida</a>, passing in the application name via <code>--application-module</code>. And since Machida is single-threaded, you must pass in <code>--ponythreads 1</code> (otherwise Machida will refuse to start).</p>
+
+<p>Putting this all together, to run the Alerts app, you would run the following command:</p>
+
+
+
+
+
+<div id="tabset-operators-manual-running-wallaroo-1">
+<ul>
+  
+    
+  <li><a href="#tabset-operators-manual-running-wallaroo-1-0">Python 2.7</a></li>
+
+    
+  <li><a href="#tabset-operators-manual-running-wallaroo-1-1">Python 3</a></li>
+
+</ul>
+
+
+<div id="tabset-operators-manual-running-wallaroo-1-0">
+  
+    <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">
+machida --application-module alerts --out <span style="color:#ae81ff">127</span>.0.0.1:7002 <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --metrics <span style="color:#ae81ff">127</span>.0.0.1:5001 --control <span style="color:#ae81ff">127</span>.0.0.1:6000 --data <span style="color:#ae81ff">127</span>.0.0.1:6001 <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --cluster-initializer --ponythreads <span style="color:#ae81ff">1</span>
+</code></pre></div>
+  
+</div>
+
+
+<div id="tabset-operators-manual-running-wallaroo-1-1">
+  
+    <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">
+machida3 --application-module alerts --out <span style="color:#ae81ff">127</span>.0.0.1:7002 <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --metrics <span style="color:#ae81ff">127</span>.0.0.1:5001 --control <span style="color:#ae81ff">127</span>.0.0.1:6000 --data <span style="color:#ae81ff">127</span>.0.0.1:6001 <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --cluster-initializer --ponythreads <span style="color:#ae81ff">1</span>
+</code></pre></div>
+  
+</div>
+
+</div>
+
+<script>$(function(){$("#tabset-operators-manual-running-wallaroo-1").tabs();});</script>
+
+
+<p>If you want to be able to send messages to your worker from external systems (for example, to trigger a cluster shutdown using the <a href="https://github.com/WallarooLabs/wallaroo/tree/0.6.0/utils/cluster_shutdown">Cluster Shutdown tool</a>), then you need to have the worker listen on an &ldquo;external channel&rdquo;. This is accomplished by providing an address via the <code>--external</code> argument.</p>
+
+<h2 id="multi-worker-setup">Multi-Worker Setup</h2>
+
+<p>A Wallaroo application can alo be distributed over multiple Wallaroo workers. This requires that the <code>clustering</code> feature flag has been set during build (it is set by default when building via provided Makefiles in the Wallaroo repo). From among our multiple workers, we will have one play the role of initializer via the <code>--cluster-initializer</code> flag. We specify the total number of workers at startup (including the initializer) via the <code>--worker-count</code> parameter, which we pass to whichever worker we have chosen to be the initializer. We do not pass the worker count to any other workers at startup. As with the single worker case, we also pass the initializer its control and data channel addresses via <code>--control</code> and <code>--data</code>.</p>
+
+<p>You must provide a name for any worker that&rsquo;s not the initializer via the <code>--name</code> argument. Currently, the initializer&rsquo;s name will always be set to <code>&quot;initializer&quot;</code>, even if you provide it with a different name. We plan to change this in the future so that you can name the initializer as well.</p>
+
+<p>You need to tell every non-initializer worker which addresses the initializer is listening on for its control channel. This is done via the <code>--control</code> argument. We must also specify the metrics target via <code>--metrics</code>, just as we did in the single worker case above. And if we are using a TCP source and sink (as in the Celsius Converter app we&rsquo;re using as an example), then we must also pass every worker an <code>--in</code> and <code>--out</code> argument to specify the source and sink addresses.</p>
+
+<p>For non-initializer workers, you also need to set the control and data addresses they will listen on by using the <code>--my-control</code> and <code>--my-data</code> arguments, respectively.</p>
+
+<p>Assuming we are running a two worker cluster on a single machine, we would run the following commands:</p>
+
+
+
+
+
+<div id="tabset-operators-manual-running-wallaroo-2">
+<ul>
+  
+    
+  <li><a href="#tabset-operators-manual-running-wallaroo-2-0">Python 2.7</a></li>
+
+    
+  <li><a href="#tabset-operators-manual-running-wallaroo-2-1">Python 3</a></li>
+
+</ul>
+
+
+<div id="tabset-operators-manual-running-wallaroo-2-0">
+  
+    <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">
+Worker <span style="color:#ae81ff">1</span>
+
+machida --application-module alerts <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --out <span style="color:#ae81ff">127</span>.0.0.1:5555 --metrics <span style="color:#ae81ff">127</span>.0.0.1:5001 <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --control <span style="color:#ae81ff">127</span>.0.0.1:6500 --data <span style="color:#ae81ff">127</span>.0.0.1:6501 --worker-count <span style="color:#ae81ff">2</span> <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --cluster-initializer --ponythreads <span style="color:#ae81ff">1</span>
+
+Worker <span style="color:#ae81ff">2</span>
+
+machida --application-module alerts <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --out <span style="color:#ae81ff">127</span>.0.0.1:5555 --metrics <span style="color:#ae81ff">127</span>.0.0.1:5001 <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --my-control <span style="color:#ae81ff">127</span>.0.0.1:6503 --my-data <span style="color:#ae81ff">127</span>.0.0.1:6504 <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --control <span style="color:#ae81ff">127</span>.0.0.1:6500 --name Worker2 --ponythreads <span style="color:#ae81ff">1</span>
+</code></pre></div>
+  
+</div>
+
+
+<div id="tabset-operators-manual-running-wallaroo-2-1">
+  
+    <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">
+Worker <span style="color:#ae81ff">1</span>
+
+machida3 --application-module alerts <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --out <span style="color:#ae81ff">127</span>.0.0.1:5555 --metrics <span style="color:#ae81ff">127</span>.0.0.1:5001 <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --control <span style="color:#ae81ff">127</span>.0.0.1:6500 --data <span style="color:#ae81ff">127</span>.0.0.1:6501 --worker-count <span style="color:#ae81ff">2</span> <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --cluster-initializer --ponythreads <span style="color:#ae81ff">1</span>
+
+Worker <span style="color:#ae81ff">2</span>
+
+machida3 --application-module alerts <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --out <span style="color:#ae81ff">127</span>.0.0.1:5555 --metrics <span style="color:#ae81ff">127</span>.0.0.1:5001 <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --my-control <span style="color:#ae81ff">127</span>.0.0.1:6503 --my-data <span style="color:#ae81ff">127</span>.0.0.1:6504 <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --control <span style="color:#ae81ff">127</span>.0.0.1:6500 --name Worker2 --ponythreads <span style="color:#ae81ff">1</span>
+</code></pre></div>
+  
+</div>
+
+</div>
+
+<script>$(function(){$("#tabset-operators-manual-running-wallaroo-2").tabs();});</script>
+
+
+<p>Remember that multi-worker runs require that you distribute the same binary to all machines that are involved. Attempting to connect different binaries into a multi-worker cluster will fail.</p>
+
+<h2 id="restarting-workers">Restarting workers</h2>
+
+<p>When a cluster is starting up, all members will save information about the cluster to local disk. If a member exits and is restarted, it uses the saved information to reconnect to the running cluster. By default, cluster information is stored in <code>/tmp</code>. You can change the directory using the <code>--resilience-dir</code> parameter.</p>
+
+<p>Resilience files are based on the name you supply the worker so starting different applications or clusters and reusing names can lead to odd results if you have leftover files in your resilience directory. To avoid any weirdness, you should use our clean shutdown tool (see the next section) or make sure to &ldquo;manually&rdquo; clean your resilience directory. For example, if you were using <code>/tmp/wallaroo</code> as a resilience directory, you can manually clean it by running <code>rm -rf /tmp/wallaroo/</code> to remove all cluster information files.</p>
+
+<h2 id="shutting-down-a-cluster">Shutting Down a Cluster</h2>
+
+<p>Wallaroo comes with a <a href="https://github.com/WallarooLabs/wallaroo/tree/0.6.0/utils/cluster_shutdown">cluster shutdown tool</a> that can be used to shut down a running cluster. In order to receive a cluster shutdown message, our workers must be listening on an &ldquo;external channel&rdquo;. We provide an address for this via the <code>--external</code> command line argument. For example, to have our cluster initializer create an external channel listening on <code>127.0.0.1:5050</code>, we&rsquo;d start it up with a command like the following:</p>
+
+
+
+
+
+<div id="tabset-operators-manual-running-wallaroo-3">
+<ul>
+  
+    
+  <li><a href="#tabset-operators-manual-running-wallaroo-3-0">Python 2.7</a></li>
+
+    
+  <li><a href="#tabset-operators-manual-running-wallaroo-3-1">Python 3</a></li>
+
+</ul>
+
+
+<div id="tabset-operators-manual-running-wallaroo-3-0">
+  
+    <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">
+machida --application-module alerts <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --out <span style="color:#ae81ff">127</span>.0.0.1:5555 --metrics <span style="color:#ae81ff">127</span>.0.0.1:5001 <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --control <span style="color:#ae81ff">127</span>.0.0.1:6500 --data <span style="color:#ae81ff">127</span>.0.0.1:6501 --worker-count <span style="color:#ae81ff">2</span> <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --cluster-initializer --ponythreads <span style="color:#ae81ff">1</span> <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --external <span style="color:#ae81ff">127</span>.0.0.1:5050
+</code></pre></div>
+  
+</div>
+
+
+<div id="tabset-operators-manual-running-wallaroo-3-1">
+  
+    <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">
+machida3 --application-module alerts <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --out <span style="color:#ae81ff">127</span>.0.0.1:5555 --metrics <span style="color:#ae81ff">127</span>.0.0.1:5001 <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --control <span style="color:#ae81ff">127</span>.0.0.1:6500 --data <span style="color:#ae81ff">127</span>.0.0.1:6501 --worker-count <span style="color:#ae81ff">2</span> <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --cluster-initializer --ponythreads <span style="color:#ae81ff">1</span> <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  --external <span style="color:#ae81ff">127</span>.0.0.1:5050
+</code></pre></div>
+  
+</div>
+
+</div>
+
+<script>$(function(){$("#tabset-operators-manual-running-wallaroo-3").tabs();});</script>
+
+
+<p>Once the cluster is running, we can use the cluster shutdown tool to contact any running worker that&rsquo;s listening on an external channel. If we wanted to contact the worker started with the command above, we&rsquo;d run:</p>
+
+<pre><code class="language-bash">./cluster_shutdown 127.0.0.1:5050
+</code></pre>
+</main>
+        </div>
+      </div>
+    </div>
+  </article>
+
+    </main>
+    <footer class="bg-green bottom-0 w-100 pa3" role="contentinfo">
+  <div class="flex justify-between">
+  <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://docs.wallaroolabs.com/" >
+    &copy; 2018 Wallaroo
+  </a>
+    <div>
+<div hidden>
+  <span id="new-window-0">Opens in a new window</span>
+  <span id="new-window-1">Opens an external site</span>
+  <span id="new-window-2">Opens an external site in a new window</span>
+</div>
+
+
+
+
+
+
+
+
+</div>
+  </div>
+</footer>
+
+    
+
+  <script src="/dist/js/app.3fc0f988d21662902933.js"></script>
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.8.0/highlight.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.10.0/languages/pony.min.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+<script>
+  var toggleBtns = document.getElementsByClassName('js-toggle')
+  for (var i = 0; i < toggleBtns.length; i++) {
+    toggleBtns[i].addEventListener('click', toggleClass, false)
+  }
+
+function toggleClass() {
+  
+  var content = this.dataset.target.split(' ')
+  
+  var mobileCurrentlyOpen = document.querySelector('.mobilemenu:not(.dn)')
+  var desktopCurrentlyOpen = document.querySelector('.desktopmenu:not(.dn)')
+  var desktopActive = document.querySelector('.desktopmenu:not(.dn)')
+
+  
+  for (var i = 0; i < content.length; i++) {
+    var matches = document.querySelectorAll(content[i]);
+    
+    [].forEach.call(matches, function(dom) {
+        dom.classList.contains('dn') ?
+        dom.classList.remove('dn') :
+        dom.classList.add('dn');
+         return false;
+       });
+        
+      if (mobileCurrentlyOpen) mobileCurrentlyOpen.classList.add('dn')
+      if (desktopCurrentlyOpen) desktopCurrentlyOpen.classList.add('dn')
+      if (desktopActive) desktopActive.classList.remove('db')
+
+    }
+  }
+
+
+
+
+  let codeBlocks = document.getElementsByTagName('code')
+    for (let [key, codeBlock] of Object.entries(codeBlocks)){
+    var widthDif = codeBlock.scrollWidth - codeBlock.clientWidth
+    if (widthDif > 0)
+      codeBlock.parentNode.classList.add('expand')
+  }
+
+</script>
+
+
+  </body>
+</html>

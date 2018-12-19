@@ -35,7 +35,7 @@ All of the Docker commands throughout the rest of this manual assume that you ha
 ### Get the official Wallaroo image
 
 ```bash
-docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
+docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/{{% docker-version-url %}}
 ```
 
 ### What's Included in the Wallaroo Docker image
@@ -119,21 +119,21 @@ docker run --rm -it --privileged -p 4000:4000 \
 -v /tmp/wallaroo-docker/wallaroo-{{% wallaroo-version %}}/wallaroo-src:/src/wallaroo \
 -v /tmp/wallaroo-docker/wallaroo-{{% wallaroo-version %}}/python-virtualenv-machida:/src/python-virtualenv \
 --name wally \
-wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
+wallaroo-labs-docker-wallaroolabs.bintray.io/{{% docker-version-url %}}
 {{< /tab >}}
 {{< tab name="Powershell" codelang="bash" >}}
 docker run --rm -it --privileged -p 4000:4000 `
 -v c:/wallaroo-docker/wallaroo--{{% wallaroo-version %}}/wallaroo-src:/src/wallaroo `
 -v c:/wallaroo-docker/wallaroo-{{% wallaroo-version %}}/python-virtualenv-machida:/src/python-virtualenv `
 --name wally `
-wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
+wallaroo-labs-docker-wallaroolabs.bintray.io/{{% docker-version-url %}}
 {{< /tab >}}
 {{< tab name="Windows Command Prompt" codelang="bash" >}}
 docker run --rm -it --privileged -p 4000:4000 ^
 -v c:/wallaroo-docker/wallaroo-{{% wallaroo-version %}}/wallaroo-src:/src/wallaroo ^
 -v c:/wallaroo-docker/wallaroo-{{% wallaroo-version %}}/python-virtualenv-machida:/src/python-virtualenv ^
 --name wally ^
-wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
+wallaroo-labs-docker-wallaroolabs.bintray.io/{{% docker-version-url %}}
 {{< /tab >}}
 {{< /tabs >}}
 
@@ -145,19 +145,19 @@ docker run --rm -it --privileged -p 4000:4000 \
 -v /tmp/wallaroo-docker/wallaroo-{{% wallaroo-version %}}/wallaroo-src:/src/wallaroo \
 -v /tmp/wallaroo-docker/wallaroo-{{% wallaroo-version %}}/python-virtualenv-machida3:/src/python-virtualenv \
 --name wally \
-wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }} -p python3
+wallaroo-labs-docker-wallaroolabs.bintray.io/{{% docker-version-url %}} -p python3
 {{< /tab >}}
 {{< tab name="Powershell" codelang="bash" >}}docker run --rm -it --privileged -p 4000:4000 `
 -v c:/wallaroo-docker/wallaroo--{{% wallaroo-version %}}/wallaroo-src:/src/wallaroo `
 -v c:/wallaroo-docker/wallaroo-{{% wallaroo-version %}}/python-virtualenv-machida3:/src/python-virtualenv `
 --name wally `
-wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }} -p python3
+wallaroo-labs-docker-wallaroolabs.bintray.io/{{% docker-version-url %}} -p python3
 {{< /tab >}}
 {{< tab name="Windows Command Prompt" codelang="bash" >}}docker run --rm -it --privileged -p 4000:4000 ^
 -v c:/wallaroo-docker/wallaroo-{{% wallaroo-version %}}/wallaroo-src:/src/wallaroo ^
 -v c:/wallaroo-docker/wallaroo-{{% wallaroo-version %}}/python-virtualenv-machida3:/src/python-virtualenv ^
 --name wally ^
-wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }} -p python3
+wallaroo-labs-docker-wallaroolabs.bintray.io/{{% docker-version-url %}} -p python3
 {{< /tab >}}
 {{< /tabs >}}
 
