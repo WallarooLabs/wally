@@ -9,15 +9,15 @@ toc: true
 For 64-bit MacOS and Windows users, we provide two different ways for you to install Wallaroo:
 
 - [Wallaroo in Docker]({{< ref "python-docker-installation-guide.md" >}})
-- [Wallaroo in Vagrant]({< ref "python-vagrant-installation-guide.md" >}})
+- [Wallaroo in Vagrant]({{< ref "python-vagrant-installation-guide.md" >}})
 
 If you are unsure about which solution is right for you, a breakdown of each is provided below. (NOTE: Wallaroo does not support 32-bit platforms.)
 
 For 64-bit Linux users, we provide three different ways for you to install Wallaroo.
 
-- [Wallaroo Up]({< ref "python-wallaroo-up-installation-guide.md" >}})
+- [Wallaroo Up]({{< ref "python-wallaroo-up-installation-guide.md" >}})
 - [Wallaroo in Docker]({{< ref "python-docker-installation-guide.md" >}})
-- [Wallaroo in Vagrant]({< ref "python-vagrant-installation-guide.md" >}})
+- [Wallaroo in Vagrant]({{< ref "python-vagrant-installation-guide.md" >}})
 
 If you are unsure about which solution is right for you, we wanted to provide a breakdown of each approach. We recommend using Wallaroo Up.
 
