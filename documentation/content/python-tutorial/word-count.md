@@ -3,7 +3,7 @@ title: "Word Count"
 menu:
   docs:
     parent: "pytutorial"
-    weight: 4
+    weight: 40
 toc: true
 ---
 Word count is the canonical streaming data application. It's canonical not because everyone needs to count words but because it's a good platform for demonstrating how to do many of the everyday tasks in a streaming application.
@@ -125,6 +125,6 @@ The complete example is available [here](https://github.com/WallarooLabs/wallaro
 
 ## Next Steps
 
-To learn how to make your application resilient and able to work across multiple workers, please continue to [Inter-worker Serialization and Resilience](interworker-serialization-and-resilience.md).
+To learn how to make your application resilient and able to work across multiple workers, please continue to [Inter-worker Serialization and Resilience](/python-tutorial/interworker-serialization-and-resilience/).
 
-For further reading, please refer to the [Wallaroo Python API Classes](api.md).
+For further reading, please refer to the [Wallaroo Python API Classes](/python-tutorial/api/).

@@ -3,7 +3,7 @@ title: "Wallaroo and Virtualenv"
 menu:
   docs:
     parent: "pytutorial"
-    weight: 9
+    weight: 90
 toc: true
 ---
 We recommend using [virtualenv](https://virtualenv.pypa.io/en/stable/) to handle your application's dependencies.
@@ -78,7 +78,7 @@ rm -fr ENV
 
 ## Using Virtualenv
 
-It is assumed that every shell you start for Wallaroo was set up by following [Starting a new shell for Wallaroo](/book/getting-started/starting-a-new-shell.md) for your environment.
+It is assumed that every shell you start for Wallaroo was set up by following [Starting a new shell for Wallaroo](/python-tutorial/starting-a-new-shell/) for your environment.
 
 To use the virtualenv, activate it in your shell. In the bash shell, this command is
 
