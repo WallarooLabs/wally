@@ -38,13 +38,13 @@ From within the Wallaroo Vagrant box run the following:
 
 ```bash
 cd /users/ubuntu/wallaroo
-bash .release/gitbook-release.sh VERSION COMMIT
+bash .release/documentation-release.sh VERSION COMMIT
 ```
 
 So, for example, if your version is release-0.4.0 and your commit is `0xa0ece`, you'd run:
 
 ```bash
-bash .release/gitbook-release.sh release-0.4.0 0xa0ece
+bash .release/documentation-release.sh release-0.4.0 0xa0ece
 ```
 
 This will then build and push the Wallaroo Documentation Gitbook to the `wallaroolabs/docs.wallaroolabs.com` Github repository.

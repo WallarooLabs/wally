@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    
+    <title>Wallaroo  | Giles sender</title>
+    <meta name="HandheldFriendly" content="True">
+    <meta name="MobileOptimized" content="320">
+
+    <meta name="viewport" content="width=device-width,minimum-scale=1">
+    <meta name="generator" content="Hugo 0.49.2" />
+    
+    
+      <META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
+    
+
+    
+    
+      <link href="/dist/css/app.955516233bcafa4d2a1c13cea63c7b50.css" rel="stylesheet">
+    
+
+    
+      <link rel="stylesheet" href="/css/jquery-ui.min.css">
+    
+      <link rel="stylesheet" href="/css/jquery-ui.theme.min.css">
+    
+      <link rel="stylesheet" href="/cshighlight.css">
+    
+      <link rel="stylesheet" href="/css/my.css">
+    
+
+    
+      
+    
+
+    
+
+    <meta property="og:title" content="Giles sender" />
+<meta property="og:description" content="Giles components act as external testers for Wallaroo. Giles Sender is used to mimic the behavior of an incoming data source. Giles Sender sends data to Wallaroo in one of four ways:
+ With no other commandline options given, it will send string representations of integers, starting with 1 and increasing by 1 with each new message. With a file name given as the --file/-f argument it will send each line of the given file as a message." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://docs.wallaroolabs.com/appendix/giles-sender/" />
+
+<meta itemprop="name" content="Giles sender">
+<meta itemprop="description" content="Giles components act as external testers for Wallaroo. Giles Sender is used to mimic the behavior of an incoming data source. Giles Sender sends data to Wallaroo in one of four ways:
+ With no other commandline options given, it will send string representations of integers, starting with 1 and increasing by 1 with each new message. With a file name given as the --file/-f argument it will send each line of the given file as a message.">
+
+
+
+<meta itemprop="wordCount" content="825">
+
+
+
+<meta itemprop="keywords" content="" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Giles sender"/>
+<meta name="twitter:description" content="Giles components act as external testers for Wallaroo. Giles Sender is used to mimic the behavior of an incoming data source. Giles Sender sends data to Wallaroo in one of four ways:
+ With no other commandline options given, it will send string representations of integers, starting with 1 and increasing by 1 with each new message. With a file name given as the --file/-f argument it will send each line of the given file as a message."/>
+
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+  </head>
+
+  <body class="ma0 avenir bg-near-white">
+
+    
+
+  <header>
+    <div class="bg-green">
+      <nav class="pv3 ph3 ph4-ns" role="navigation">
+  <div class="flex-l justify-between items-center center">
+    <a href="https://docs.wallaroolabs.com/" class="f3 fw2 hover-white no-underline white-90 dib">
+      Wallaroo
+    </a>
+    <div class="flex-l items-center">
+      
+        <ul class="pl0 mr3">
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/core-concepts/" title="Core Concepts page">
+              Core Concepts
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/python-installation/" title="Installation page">
+              Installation
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/python-tutorial/" title="Tutorial page">
+              Tutorial
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/operators-manual/" title="Operators Manual page">
+              Operators Manual
+            </a>
+          </li>
+          
+        </ul>
+      
+      
+<div hidden>
+  <span id="new-window-0">Opens in a new window</span>
+  <span id="new-window-1">Opens an external site</span>
+  <span id="new-window-2">Opens an external site in a new window</span>
+</div>
+
+
+
+
+
+
+
+
+
+    </div>
+  </div>
+</nav>
+
+    </div>
+  </header>
+
+
+    <main class="pb7" role="main">
+      
+  <article class="w-100 ph4 pb5 pb6-ns pt1 pt5-ns">
+    <div class="flex-l">
+
+      <div class="order-0 w-100 w-20-l ph5-m ph0-l mb4 sticky dn db-l">
+        
+<nav role="navigation" class="doc-menu bg-light-gray pl3 pr3">
+  <ul class="list pa0 nl2">
+    
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".core-concepts">Core Concepts</a>
+        <ul class="core-concepts desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/core-concepts/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo Core Concepts
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/core-concepts/state/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              State
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/core-concepts/working-with-state/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Working with State
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/core-concepts/partitioning/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Partitioning
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".pyinstallation">Python Installation Guide</a>
+        <ul class="pyinstallation desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/python-installation/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Choosing an Installation Option
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-installation/python-docker-installation-guide/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Installing with Docker
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-installation/python-vagrant-installation-guide/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Installing with Vagrant
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-installation/python-wallaroo-up-installation-guide/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Installing with Wallaroo Up
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".pytutorial">Python Tutorial</a>
+        <ul class="pytutorial desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/python-tutorial/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Python API Introduction
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/running-a-wallaroo-application/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Running A Wallaroo Application
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/writing-your-own-application/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Writing Your Own Application
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/writing-your-own-stateful-application/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Writing Your Own Stateful Application
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/word-count/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Word Count
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/interworker-serialization-and-resilience/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Inter-worker Serialization and Resilience
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/using-connectors/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Using Connectors as Sources &amp; Sinks
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/api/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo Python API Classes
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/debugging/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Debugging
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/tcp-decoders-and-encoders/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              TCP Decoders and Encoders
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/virtualenv/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo and Virtualenv
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/starting-a-new-shell/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Starting a new shell
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".operators-manual">Operators Manual</a>
+        <ul class="operators-manual desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/operators-manual/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Operators Manual
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/running-wallaroo/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Running Wallaroo
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/autoscale/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Autoscale
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/resilience/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Resilience
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/command-line-options/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Command-Line Options
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/metrics-ui/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo Metrics UI
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2  primary-color" data-target=".appendix">Appendix</a>
+        <ul class="appendix desktopmenu animated fadeIn list pl0 pb2 bg-light-gray db">
+          <li class="f6 fw4">
+            <a href="/appendix/giles-sender/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 primary-color ">
+              Giles sender
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/appendix/wallaroo-docker-tips/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Tips for using Wallaroo in Docker
+            </a>
+          </li>
+        </ul>
+      </li>
+  </ul>
+</nav>
+
+      </div>
+
+      <div class="order-2 w-100 w-20-l ph5-m ph0-l mb4 sticky dn db-l"><nav role="toc" class="toc bg-light-gray pl3 pr3 nested-list-reset nested-copy-line-height nested-links">
+    <p class="f5 b mb3">What's in this document</p>
+      <nav id="TableOfContents">
+<ul>
+<li>
+<ul>
+<li>
+<ul>
+<li><a href="#building-giles-sender">Building <code>giles/sender</code></a></li>
+</ul></li>
+<li><a href="#command-line-arguments">Command Line Arguments</a></li>
+<li><a href="#examples">Examples</a>
+<ul>
+<li><a href="#send-words-from-a-file">Send words from a file</a></li>
+<li><a href="#send-binary-data-from-a-file">Send binary data from a file</a>
+<ul>
+<li><a href="#fixed-length-data">Fixed Length Data</a></li>
+<li><a href="#variable-length-data">Variable Length Data</a></li>
+</ul></li>
+<li><a href="#multiple-input-files">Multiple Input Files</a></li>
+<li><a href="#send-a-sequence-of-numbers-encoded-as-strings">Send a sequence of numbers, encoded as strings</a></li>
+<li><a href="#send-a-sequence-of-numbers-encoded-as-big-endian-u64">Send a sequence of numbers, encoded as big-endian U64</a></li>
+</ul></li>
+<li><a href="#preparing-data-files-for-giles-sender">Preparing Data Files for Giles Sender</a></li>
+<li><a href="#pony-runtime-options">Pony Runtime Options</a></li>
+</ul></li>
+</ul>
+</nav>
+  </nav>
+
+
+
+
+</div>
+
+      <div class="order-1 w-60-l mw7 ph0 ph5-ns mid-gray nested-copy-line-height no-underline nested-links nested-img nested-copy-seperator nested-blockquote mt0-ns" style="flex-grow:1;">
+        <div class="documentation-copy center measure-wide-l">
+          <header class="w-100">
+          <p class="f6 b helvetica tracked">
+            Appendix
+          </p>
+          <h1 class="f1 athelas mb1">Giles sender</h1>
+          </header>
+
+          <main class="nested-copy-line-height lh-copy serif f4 nested-links nested-img mid-gray pr4-l">
+
+<p>Giles components act as external testers for Wallaroo. Giles Sender is used to mimic the behavior of an incoming data source. Giles Sender sends data to Wallaroo in one of four ways:</p>
+
+<ul>
+<li>With no other commandline options given, it will send string representations of integers, starting with <code>1</code> and increasing by <code>1</code> with each new message.</li>
+<li>With a file name given as the <code>--file/-f</code> argument it will send each line of the given file as a message.</li>
+<li>With a file name given as the <code>--file/-f</code> argument and binary format specified with <code>--binary/-y</code> and a fixed message size, specified with <code>--msg-size/-g</code>, it will send every <code>SIZE</code> bytes of the given file as a message.</li>
+<li>With a file name given as the <code>--file/-f</code> argument and binary format specified with <code>--binary/-y</code> and variable message size specified with <code>--variable-size/-z</code>, it will read the first 4 bytes to get the message size, send that message and repeat the process.</li>
+</ul>
+
+<h3 id="building-giles-sender">Building <code>giles/sender</code></h3>
+
+<p>If you do not already have the <code>wallaroo</code> repo, create a local copy:</p>
+
+<pre><code class="language-bash">git clone https://github.com/WallarooLabs/wallaroo
+</code></pre>
+
+<p>Compile the <code>giles-sender</code> binary:</p>
+
+<pre><code class="language-bash">cd wallaroo/giles/sender
+make
+</code></pre>
+
+<h2 id="command-line-arguments">Command Line Arguments</h2>
+
+<p><code>giles/sender</code> takes several command line arguments, below is a list with accompanying notes:</p>
+
+<ul>
+<li><code>--host/-h</code> address and port combination that Wallaroo is listening on for incoming source data. Must be provided in the <code>127.0.0.1:8082</code> format.</li>
+<li><code>--messages/-m</code> number of messages to send before terminating the sender.</li>
+<li><code>--file/-f</code> a file with newline-separated entries from which to read entries to send. If multiple files are provided, the first file is read to the end before the next file is open and read, and so on.</li>
+<li><code>--batch-size/-s</code> specifies the number of messages sent at every interval.</li>
+<li><code>--interval/-i</code> interval at which to send a batch of messages to Wallaroo. Defaults to <code>5_000_000</code>. The value is in nanoseconds.</li>
+<li><code>--repeat/-r</code> tells the sender to repeat reading the file/s as long as necessary to send the number of messages specified by <code>-m</code>.</li>
+<li><code>--binary/-y</code> a flag to pass if the data source file is in binary format.</li>
+<li><code>--u64/-u</code> send binary-encoded U64 values, starting from offset and incrementing by 1. The first value sent is offset+1.</li>
+<li><code>--start-from/-v</code> Set the offset for use with <code>--u64/-u</code> or when <code>--file/-f</code> is not used.</li>
+<li><code>--variable-size/-z</code> a flag to pass if using binary format and the binary messages have varying lengths. Cannot be used with <code>--msg-size/-g</code>.</li>
+<li><code>--msg-size/-g</code> the size of the binary message in bytes. Cannot be used with <code>--variable-size/-z</code>.</li>
+<li><code>--no-write/-w</code> flag to stop the <code>sender</code> from writing the messages sent to file.</li>
+</ul>
+
+<h2 id="examples">Examples</h2>
+
+<h3 id="send-words-from-a-file">Send words from a file</h3>
+
+<p>Each line contains a word</p>
+
+<pre><code class="language-bash"># words.txt
+hello
+world
+lorem
+ipsum
+sit
+amet
+</code></pre>
+
+<p>Use</p>
+
+<pre><code class="language-bash">sender --host 127.0.0.1:7000 --file words.txt --messages 100 --repeat
+</code></pre>
+
+<h3 id="send-binary-data-from-a-file">Send binary data from a file</h3>
+
+<h4 id="fixed-length-data">Fixed Length Data</h4>
+
+<p>In this case, the data in the file is already <a href="/python-tutorial/tcp-decoders-and-encoders#framed-message-protocols">framed</a>, and the <code>--msg-length</code> parameter is the number of bytes for the message <em>and</em> the length header.</p>
+
+<p>With a 4-byte header and 6-bytes of text, coming to a total of 10-bytes:</p>
+
+<pre><code class="language-bash"># my_binary_data_file
+\x00\x00\x00\x04123456
+\x00\x00\x00\x04abcdef
+</code></pre>
+
+<p>Use</p>
+
+<pre><code class="language-bash">sender --host 127.0.0.1:7000 --file=my_binary_data_file --messages=10 \
+  --repeat --batch-size=1 --interval=10_000_000 --binary --msg-size 10 \
+  --no-write
+</code></pre>
+
+<h4 id="variable-length-data">Variable Length Data</h4>
+
+<p>In this case, the data in the file is frame encoded, but the message length is not constant.</p>
+
+<pre><code class="language-bash"># my_variable_binary_data_file
+\x00\x00\x00\x041234
+\x00\x00\x00\x011
+\x00\x00\x00\x0bhello world
+</code></pre>
+
+<p>Use</p>
+
+<pre><code class="language-bash">sender --host 127.0.0.1:7000 --file=my_variable_binary_data_file --messages=10 \
+  --repeat --batch-size=1 --interval=10_000_000 --binary --variable-size \
+  --no-write
+</code></pre>
+
+<h3 id="multiple-input-files">Multiple Input Files</h3>
+
+<p>When using multiple input files, <code>sender</code> effectively concatenates the files by reading the first file to the end, then reading the next file, and so on.
+You can use this to concatenate multiple files, or to repeat the same file (although in this case, the <code>--repeat</code> option is better suited).</p>
+
+<p>With the files</p>
+
+<pre><code class="language-bash"># file1
+12
+34
+56
+
+# file2
+78
+90
+ab
+bc
+</code></pre>
+
+<p>To concatenate the files, in order, use</p>
+
+<pre><code class="language-bash">sender --host 127.0.0.1:7000 --file=file1,file2 --messages=100 --batch-size=1 \
+  --interval=10_000_000 --no-write --ponythreads=1 --ponynoblock
+</code></pre>
+
+<p>To send the contents of the first file twice, then the contents of the second file once, use</p>
+
+<pre><code class="language-bash">sender --host 127.0.0.1:7000 --file=file1,file1,file2 --messages=100 \
+  --batch-size=1 --interval=10_000_000 --no-write \
+  --ponythreads=1 --ponynoblock
+</code></pre>
+
+<p>Multiple input files are also supported for binary input, but they must all be either fixed length or variable length.</p>
+
+<h3 id="send-a-sequence-of-numbers-encoded-as-strings">Send a sequence of numbers, encoded as strings</h3>
+
+<p>To send the sequence <code>'1', '2', '3', ..., '100'</code></p>
+
+<p>Use</p>
+
+<pre><code class="language-bash">sender --host 127.0.0.1:7000 --messages 100 --ponythreads=1 --ponynoblock
+</code></pre>
+
+<h3 id="send-a-sequence-of-numbers-encoded-as-big-endian-u64">Send a sequence of numbers, encoded as big-endian U64</h3>
+
+<p>To send the sequence <code>1,2,3,...,100</code></p>
+
+<p>Use</p>
+
+<pre><code class="language-bash">sender --host 127.0.0.1:7000 --messages 100 --u64 \
+  --ponythreads=1 --ponynoblock
+</code></pre>
+
+<p>To send the sequence <code>101,102,...,200</code></p>
+
+<p>Use</p>
+
+<pre><code class="language-bash">sender --host 127.0.0.1:7000 --messages 100 --u64 --start-from 100 \
+  --ponythreads=1 --ponynoblock
+</code></pre>
+
+<h2 id="preparing-data-files-for-giles-sender">Preparing Data Files for Giles Sender</h2>
+
+<p><code>sender</code> has three modes for file input:</p>
+
+<ol>
+<li>newline delimited text</li>
+<li>fixed-length binary</li>
+<li>variable-length binary</li>
+</ol>
+
+<p>To create a data file for the first case, store your records separated by newlines in a file.
+To create data for the binary cases, follow the <a href="/python-tutorial/tcp-decoders-and-encoders#framed-message-protocols">framing protocol</a>.</p>
+
+<h2 id="pony-runtime-options">Pony Runtime Options</h2>
+
+<p>The following pony runtime parameters may also be useful in some situations</p>
+
+<ul>
+<li><code>--ponythreads</code> limits the number of threads the pony runtime will use.</li>
+<li><code>--ponynoblock</code></li>
+<li><code>--ponypinasio</code></li>
+</ul>
+</main>
+        </div>
+      </div>
+    </div>
+  </article>
+
+    </main>
+    <footer class="bg-green bottom-0 w-100 pa3" role="contentinfo">
+  <div class="flex justify-between">
+  <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://docs.wallaroolabs.com/" >
+    &copy; 2018 Wallaroo
+  </a>
+    <div>
+<div hidden>
+  <span id="new-window-0">Opens in a new window</span>
+  <span id="new-window-1">Opens an external site</span>
+  <span id="new-window-2">Opens an external site in a new window</span>
+</div>
+
+
+
+
+
+
+
+
+</div>
+  </div>
+</footer>
+
+    
+
+  <script src="/dist/js/app.3fc0f988d21662902933.js"></script>
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.8.0/highlight.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.10.0/languages/pony.min.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+<script>
+  var toggleBtns = document.getElementsByClassName('js-toggle')
+  for (var i = 0; i < toggleBtns.length; i++) {
+    toggleBtns[i].addEventListener('click', toggleClass, false)
+  }
+
+function toggleClass() {
+  
+  var content = this.dataset.target.split(' ')
+  
+  var mobileCurrentlyOpen = document.querySelector('.mobilemenu:not(.dn)')
+  var desktopCurrentlyOpen = document.querySelector('.desktopmenu:not(.dn)')
+  var desktopActive = document.querySelector('.desktopmenu:not(.dn)')
+
+  
+  for (var i = 0; i < content.length; i++) {
+    var matches = document.querySelectorAll(content[i]);
+    
+    [].forEach.call(matches, function(dom) {
+        dom.classList.contains('dn') ?
+        dom.classList.remove('dn') :
+        dom.classList.add('dn');
+         return false;
+       });
+        
+      if (mobileCurrentlyOpen) mobileCurrentlyOpen.classList.add('dn')
+      if (desktopCurrentlyOpen) desktopCurrentlyOpen.classList.add('dn')
+      if (desktopActive) desktopActive.classList.remove('db')
+
+    }
+  }
+
+
+
+
+  let codeBlocks = document.getElementsByTagName('code')
+    for (let [key, codeBlock] of Object.entries(codeBlocks)){
+    var widthDif = codeBlock.scrollWidth - codeBlock.clientWidth
+    if (widthDif > 0)
+      codeBlock.parentNode.classList.add('expand')
+  }
+
+</script>
+
+
+  </body>
+</html>

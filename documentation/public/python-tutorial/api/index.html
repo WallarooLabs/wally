@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    
+    <title>Wallaroo  | Wallaroo Python API Classes</title>
+    <meta name="HandheldFriendly" content="True">
+    <meta name="MobileOptimized" content="320">
+
+    <meta name="viewport" content="width=device-width,minimum-scale=1">
+    <meta name="generator" content="Hugo 0.49.2" />
+    
+    
+      <META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
+    
+
+    
+    
+      <link href="/dist/css/app.955516233bcafa4d2a1c13cea63c7b50.css" rel="stylesheet">
+    
+
+    
+      <link rel="stylesheet" href="/css/jquery-ui.min.css">
+    
+      <link rel="stylesheet" href="/css/jquery-ui.theme.min.css">
+    
+      <link rel="stylesheet" href="/cshighlight.css">
+    
+      <link rel="stylesheet" href="/css/my.css">
+    
+
+    
+      
+    
+
+    
+
+    <meta property="og:title" content="Wallaroo Python API Classes" />
+<meta property="og:description" content="The Wallaroo Python API allows developers to create Wallaroo applications in Python, which can then be run by Machida.
+Overview In order to create a Wallaroo application in Python, you need to create the functions and classes that provide the required interfaces for each stage in your pipeline, and then connect them together in a topology structure that is returned by the entry-point function application_setup. This function should always return the result of calling wallaroo." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://docs.wallaroolabs.com/python-tutorial/api/" />
+
+<meta itemprop="name" content="Wallaroo Python API Classes">
+<meta itemprop="description" content="The Wallaroo Python API allows developers to create Wallaroo applications in Python, which can then be run by Machida.
+Overview In order to create a Wallaroo application in Python, you need to create the functions and classes that provide the required interfaces for each stage in your pipeline, and then connect them together in a topology structure that is returned by the entry-point function application_setup. This function should always return the result of calling wallaroo.">
+
+
+
+<meta itemprop="wordCount" content="2855">
+
+
+
+<meta itemprop="keywords" content="" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Wallaroo Python API Classes"/>
+<meta name="twitter:description" content="The Wallaroo Python API allows developers to create Wallaroo applications in Python, which can then be run by Machida.
+Overview In order to create a Wallaroo application in Python, you need to create the functions and classes that provide the required interfaces for each stage in your pipeline, and then connect them together in a topology structure that is returned by the entry-point function application_setup. This function should always return the result of calling wallaroo."/>
+
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+  </head>
+
+  <body class="ma0 avenir bg-near-white">
+
+    
+
+  <header>
+    <div class="bg-green">
+      <nav class="pv3 ph3 ph4-ns" role="navigation">
+  <div class="flex-l justify-between items-center center">
+    <a href="https://docs.wallaroolabs.com/" class="f3 fw2 hover-white no-underline white-90 dib">
+      Wallaroo
+    </a>
+    <div class="flex-l items-center">
+      
+        <ul class="pl0 mr3">
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/core-concepts/" title="Core Concepts page">
+              Core Concepts
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/python-installation/" title="Installation page">
+              Installation
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/python-tutorial/" title="Tutorial page">
+              Tutorial
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/operators-manual/" title="Operators Manual page">
+              Operators Manual
+            </a>
+          </li>
+          
+        </ul>
+      
+      
+<div hidden>
+  <span id="new-window-0">Opens in a new window</span>
+  <span id="new-window-1">Opens an external site</span>
+  <span id="new-window-2">Opens an external site in a new window</span>
+</div>
+
+
+
+
+
+
+
+
+
+    </div>
+  </div>
+</nav>
+
+    </div>
+  </header>
+
+
+    <main class="pb7" role="main">
+      
+  <article class="w-100 ph4 pb5 pb6-ns pt1 pt5-ns">
+    <div class="flex-l">
+
+      <div class="order-0 w-100 w-20-l ph5-m ph0-l mb4 sticky dn db-l">
+        
+<nav role="navigation" class="doc-menu bg-light-gray pl3 pr3">
+  <ul class="list pa0 nl2">
+    
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".core-concepts">Core Concepts</a>
+        <ul class="core-concepts desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/core-concepts/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo Core Concepts
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/core-concepts/state/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              State
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/core-concepts/working-with-state/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Working with State
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/core-concepts/partitioning/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Partitioning
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".pyinstallation">Python Installation Guide</a>
+        <ul class="pyinstallation desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/python-installation/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Choosing an Installation Option
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-installation/python-docker-installation-guide/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Installing with Docker
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-installation/python-vagrant-installation-guide/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Installing with Vagrant
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-installation/python-wallaroo-up-installation-guide/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Installing with Wallaroo Up
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2  primary-color" data-target=".pytutorial">Python Tutorial</a>
+        <ul class="pytutorial desktopmenu animated fadeIn list pl0 pb2 bg-light-gray db">
+          <li class="f6 fw4">
+            <a href="/python-tutorial/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Python API Introduction
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/running-a-wallaroo-application/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Running A Wallaroo Application
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/writing-your-own-application/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Writing Your Own Application
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/writing-your-own-stateful-application/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Writing Your Own Stateful Application
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/word-count/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Word Count
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/interworker-serialization-and-resilience/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Inter-worker Serialization and Resilience
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/using-connectors/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Using Connectors as Sources &amp; Sinks
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/api/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 primary-color ">
+              Wallaroo Python API Classes
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/debugging/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Debugging
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/tcp-decoders-and-encoders/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              TCP Decoders and Encoders
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/virtualenv/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo and Virtualenv
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/starting-a-new-shell/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Starting a new shell
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".operators-manual">Operators Manual</a>
+        <ul class="operators-manual desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/operators-manual/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Operators Manual
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/running-wallaroo/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Running Wallaroo
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/autoscale/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Autoscale
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/resilience/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Resilience
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/command-line-options/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Command-Line Options
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/metrics-ui/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo Metrics UI
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".appendix">Appendix</a>
+        <ul class="appendix desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/appendix/giles-sender/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Giles sender
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/appendix/wallaroo-docker-tips/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Tips for using Wallaroo in Docker
+            </a>
+          </li>
+        </ul>
+      </li>
+  </ul>
+</nav>
+
+      </div>
+
+      <div class="order-2 w-100 w-20-l ph5-m ph0-l mb4 sticky dn db-l"><nav role="toc" class="toc bg-light-gray pl3 pr3 nested-list-reset nested-copy-line-height nested-links">
+    <p class="f5 b mb3">What's in this document</p>
+      <nav id="TableOfContents">
+<ul>
+<li>
+<ul>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#table-of-contents">Table of Contents</a>
+<ul>
+<li><a href="#application-setup">Application Setup</a>
+<ul>
+<li><a href="#partial-pipelines">Partial Pipelines</a></li>
+<li><a href="#merging-partial-pipelines">Merging Partial Pipelines</a></li>
+<li><a href="#building-an-application">Building an Application</a></li>
+<li><a href="#args"><code>args</code></a></li>
+</ul></li>
+<li><a href="#wallaroo"><code>wallaroo</code></a>
+<ul>
+<li><a href="#wallaroo-source-name-source-config"><code>wallaroo.source(name, source_config)</code></a>
+<ul>
+<li><a href="#to-computation"><code>to(computation)</code></a></li>
+<li><a href="#key-by-key-extractor"><code>key_by(key_extractor)</code></a></li>
+<li><a href="#to-sink-sink-config"><code>to_sink(sink_config)</code></a></li>
+<li><a href="#to-sinks-sink-configs"><code>to_sinks(sink_configs)</code></a></li>
+</ul></li>
+<li><a href="#wallaroo-build-application-application-name-pipeline"><code>wallaroo.build_application(application_name, pipeline)</code></a></li>
+</ul></li>
+<li><a href="#computation">Computation</a>
+<ul>
+<li>
+<ul>
+<li><a href="#wallaroo-computation-name"><code>@wallaroo.computation(name)</code></a>
+<ul>
+<li><a href="#example">Example</a></li>
+</ul></li>
+<li><a href="#wallaroo-computation-multi-name"><code>@wallaroo.computation_multi(name)</code></a>
+<ul>
+<li><a href="#example-1">Example</a></li>
+</ul></li>
+</ul></li>
+</ul></li>
+<li><a href="#state">State</a>
+<ul>
+<li><a href="#example-state">Example State</a></li>
+</ul></li>
+<li><a href="#statecomputation">StateComputation</a>
+<ul>
+<li><a href="#wallaroo-state-computation-name-state"><code>@wallaroo.state_computation(name, state)</code></a>
+<ul>
+<li><a href="#example-2">Example</a></li>
+</ul></li>
+<li><a href="#wallaroo-state-computation-multi-name-state"><code>@wallaroo.state_computation_multi(name, state)</code></a>
+<ul>
+<li><a href="#example-3">Example</a></li>
+</ul></li>
+</ul></li>
+<li><a href="#data">Data</a></li>
+<li><a href="#key">Key</a></li>
+<li><a href="#keyextractor">KeyExtractor</a>
+<ul>
+<li><a href="#example-key-extractor">Example Key Extractor</a></li>
+</ul></li>
+<li><a href="#sink">Sink</a>
+<ul>
+<li><a href="#tcpsink">TCPSink</a>
+<ul>
+<li><a href="#wallaroo-tcpsinkconfig-host-port-encoder"><code>wallaroo.TCPSinkConfig(host, port, encoder)</code></a></li>
+</ul></li>
+<li><a href="#kafkasink">KafkaSink</a>
+<ul>
+<li><a href="#wallaroo-kafkasinkconfig-topic-brokers-log-level-max-produce-buffer-ms-max-message-size-encoder"><code>wallaroo.KafkaSinkConfig(topic, brokers, log_level, max_produce_buffer_ms, max_message_size, encoder)</code></a></li>
+</ul></li>
+<li><a href="#sink-encoder">Sink Encoder</a></li>
+<li><a href="#wallaroo-encoder"><code>@wallaroo.encoder</code></a>
+<ul>
+<li><a href="#example-encoder-for-a-tcpsink">Example encoder for a TCPSink</a></li>
+<li><a href="#example-encoder-for-a-kafka-sink">Example encoder for a Kafka Sink</a></li>
+</ul></li>
+</ul></li>
+<li><a href="#source">Source</a>
+<ul>
+<li><a href="#tcpsource">TCPSource</a>
+<ul>
+<li><a href="#wallaroo-tcpsourceconfig-host-port-decoder"><code>wallaroo.TCPSourceConfig(host, port, decoder)</code></a></li>
+</ul></li>
+<li><a href="#kafkasource">KafkaSource</a>
+<ul>
+<li><a href="#wallaroo-kafkasourceconfig-topic-brokers-log-level-decoder"><code>wallaroo.KafkaSourceConfig(topic, brokers, log_level, decoder)</code></a></li>
+</ul></li>
+<li><a href="#source-decoder">Source Decoder</a></li>
+<li><a href="#wallaroo-decoder-header-length-length-fmt"><code>@wallaroo.decoder(header_length, length_fmt)</code></a>
+<ul>
+<li><a href="#example-decoder-for-a-tcpsource">Example decoder for a TCPSource</a></li>
+</ul></li>
+<li><a href="#example-decoder-for-a-kafkasource">Example decoder for a KafkaSource</a></li>
+</ul></li>
+<li><a href="#inter-worker-serialization">Inter-worker serialization</a></li>
+</ul></li>
+</ul></li>
+</ul>
+</nav>
+  </nav>
+
+
+
+
+</div>
+
+      <div class="order-1 w-60-l mw7 ph0 ph5-ns mid-gray nested-copy-line-height no-underline nested-links nested-img nested-copy-seperator nested-blockquote mt0-ns" style="flex-grow:1;">
+        <div class="documentation-copy center measure-wide-l">
+          <header class="w-100">
+          <p class="f6 b helvetica tracked">
+            Python Tutorial
+          </p>
+          <h1 class="f1 athelas mb1">Wallaroo Python API Classes</h1>
+          </header>
+
+          <main class="nested-copy-line-height lh-copy serif f4 nested-links nested-img mid-gray pr4-l">
+
+<p>The Wallaroo Python API allows developers to create Wallaroo applications in Python, which can then be run by Machida.</p>
+
+<h2 id="overview">Overview</h2>
+
+<p>In order to create a Wallaroo application in Python, you need to create the functions and classes that provide the required interfaces for each stage in your pipeline, and then connect them together in a topology structure that is returned by the entry-point function <code>application_setup</code>. This function should always return the result of calling <code>wallaroo.build_application(app_name, pipeline)</code>.</p>
+
+<h2 id="table-of-contents">Table of Contents</h2>
+
+<ul>
+<li><a href="#application-setup">Application Setup</a></li>
+<li><a href="#computation">Computation</a></li>
+<li><a href="#state">State</a></li>
+<li><a href="#statecomputation">StateComputation</a></li>
+<li><a href="#data">Data</a></li>
+<li><a href="#key">Key</a></li>
+<li><a href="#keyextractor">KeyExtractor</a></li>
+<li><a href="#sink">Sink</a></li>
+<li><a href="#tcpsink">TCPSink</a></li>
+<li><a href="#kafkasink">KafkaSink</a></li>
+<li><a href="#sink-encoder">Sink Encoder</a></li>
+<li><a href="#source">Source</a></li>
+<li><a href="#tcpsource">TCPSource</a></li>
+<li><a href="#kafkasource">KafkaSource</a></li>
+<li><a href="#source-decoder">Source Decoder</a></li>
+<li><a href="#inter-worker-serialization">Inter-worker serialization</a></li>
+</ul>
+
+<h3 id="application-setup">Application Setup</h3>
+
+<p>After Machida loads a Wallaroo Python application module, it executes its entry point function, <code>application_setup(args)</code>, which returns an application topology structure that tells Wallaroo how to connect the classes, functions, and objects behind the scenes. A Wallaroo Python application must provide this function.</p>
+
+<h4 id="partial-pipelines">Partial Pipelines</h4>
+
+<p>A pipeline includes one or more sources. You use <code>wallaroo.source(...)</code> to define a stream originating from a source. Each source stream can be followed by one or more computation stages. A linear sequence from a source through zero or more computations constitutes a partial pipeline. For example:</p>
+
+<pre><code class="language-python">inputs = wallaroo.source(&quot;Source Name&quot;, source_config)
+partial_pipeline = inputs.to(my_computation)
+</code></pre>
+
+<p>This defines a partial pipeline that could be diagrammed as followed:</p>
+
+<pre><code>Source -&gt; my_computation -&gt;
+</code></pre>
+
+<p>The hanging arrow at the end indicates that the pipeline is partial. We can still add more stages, and to complete the pipeline we need one or more sinks.
+You create complete pipeline by terminating a partial pipeline with a call to <code>to_sink</code> or <code>to_sinks</code>. For example:</p>
+
+<pre><code class="language-python">inputs = wallaroo.source(&quot;Source Name&quot;, source_config)
+complete_pipeline = (inputs
+    .to(my_computation)
+    .to_sink(sink_config))
+</code></pre>
+
+<p>Our pipeline is now complete:</p>
+
+<pre><code>Source -&gt; my_computation -&gt; Sink
+</code></pre>
+
+<p>Unless a call to <code>to</code> using a stateless computation is preceded by a call to <code>key_by</code> (which partitions messages by key), there are no guarantees around the order in which messages will be processed. That&rsquo;s because Wallaroo might parallelize a stateless computation if that is beneficial for scaling. That means the execution graph for the above pipeline could look like this:</p>
+
+<pre><code>         /-&gt; my_stateless_computation -\
+        /                               \
+Source ----&gt; my_stateless_computation ----&gt; Sink
+        \                               /
+         \-&gt; my_stateless_computation -/
+</code></pre>
+
+<p>Some messages will be routed to each of the parallel computation instances. When they merge again at the sink, these messages will be interleaved in a non-deterministic fashion.</p>
+
+<h4 id="merging-partial-pipelines">Merging Partial Pipelines</h4>
+
+<p>You can merge two partial pipelines to form a new partial pipline. For example:</p>
+
+<pre><code class="language-python">inputs1 = wallaroo.source(&quot;Source 1&quot;, source_config)
+partial_pipeline1 = inputs1.to(computation1)
+
+inputs2 = wallaroo.source(&quot;Source 2&quot;, source_config)
+partial_pipeline2 = inputs2.to(computation2)
+
+partial_pipeline = inputs1.merge(inputs2)
+</code></pre>
+
+<p>The resulting partial pipeline could be</p>
+
+<pre><code>Source1 -&gt; computation1 -&gt;\
+                           \
+                            -&gt;
+                           /
+Source2 -&gt; computation2 -&gt;/
+</code></pre>
+
+<p>Again, the hanging arrow indicates we can still add more stages, and that to complete the pipeline we still need one or more sinks. You could also merge this partial pipeline with additional partial pipelines. When you merge partial pipelines in this way, you are not creating a join in the sense familiar from SQL joins. Instead, you are combining two streams into one, with messages from the first stream interwoven with messages from the second. That combined stream is then passed to the next stage following the hanging arrow.</p>
+
+<p>The following is an example of a complete pipeline including a merge where we first add one more computation before the sink:</p>
+
+<pre><code class="language-python">pipeline = (inputs1.merge(inputs2)
+    .to(computation3)
+    .to_sink(sink_config))
+</code></pre>
+
+<p>The corresponding diagram for this definition would look like this:</p>
+
+<pre><code>Source1 -&gt; computation1 -&gt;\
+                           \
+                            -&gt; computation3 -&gt; Sink
+                           /
+Source2 -&gt; computation2 -&gt;/
+</code></pre>
+
+<h4 id="building-an-application">Building an Application</h4>
+
+<p>Once you have defined a complete pipeline, you must pass it into <code>wallaroo.build_application(app_name, pipeline)</code> in order to build the application object you must return from the <code>application_setup</code> function.</p>
+
+<p>For a simple application with a decoder, computation, and encoder, the <code>application_setup</code> function might look like</p>
+
+<pre><code class="language-python">def application_setup(args):
+    inputs = wallaroo.source(&quot;Source Name&quot;, source_config)
+
+    pipeline = (inputs
+        .to(computation)
+        .to_sink(sink_config))
+
+    return wallaroo.build_application(&quot;Application Name&quot;, pipeline)
+</code></pre>
+
+<h4 id="args"><code>args</code></h4>
+
+<p>Since the application is run in an embedded Python runtime, it does not have standard access to <code>sys.argv</code> from which various options parsers could be used. Instead, Wallaroo provides <code>application_setup</code> with <code>args</code>: a list of the string command-line arguments it has received.</p>
+
+<h3 id="wallaroo"><code>wallaroo</code></h3>
+
+<p>The <code>wallaroo</code> library provides two functions that are needed to define a Wallaroo application, <code>source</code> and <code>build_application</code>.</p>
+
+<h4 id="wallaroo-source-name-source-config"><code>wallaroo.source(name, source_config)</code></h4>
+
+<p>Create a partial pipeline originating at a source.</p>
+
+<p><code>name</code> must be a string.</p>
+
+<p><code>source_config</code> must be one of the <a href="#source">SourceConfig</a> classes.</p>
+
+<p>There are number of methods you can call on a partial pipeline object (such as the one returned by <code>source</code>).</p>
+
+<h5 id="to-computation"><code>to(computation)</code></h5>
+
+<p>Add a computation <em>function</em> to the partial pipeline. This will either be a <a href="#computation">stateless</a> or a <a href="#statecomputation">state</a> computation. A call to <code>to</code> returns a new partial pipeline object.</p>
+
+<h5 id="key-by-key-extractor"><code>key_by(key_extractor)</code></h5>
+
+<p>Partition messages at this point based on the key extracted using the key_extractor function. A call to <code>key_by</code> returns a new partial pipeline object.</p>
+
+<p><code>key_extractor</code> must be a <a href="#keyextractor">KeyExtractor</a>.</p>
+
+<h5 id="to-sink-sink-config"><code>to_sink(sink_config)</code></h5>
+
+<p>Add a sink to the end of a pipeline. This returns a complete pipeline object that is ready to be passed to <code>wallaroo.build_application</code>.</p>
+
+<p><code>sink_config</code> must be one of the <a href="#sink">SinkConfig</a> classes.</p>
+
+<h5 id="to-sinks-sink-configs"><code>to_sinks(sink_configs)</code></h5>
+
+<p>Add multiple sinks to the end of a pipeline. This returns a complete pipeline object that is ready to be passed to <code>wallaroo.build_application</code>.</p>
+
+<p><code>sink_config</code> must be a list of <a href="#sink">SinkConfig</a> classes.</p>
+
+<p>At the moment, the same pipeline output is sent via all sinks. The ability to determine what output should be sent to which sinks will be added in a future version of Wallaroo.</p>
+
+<h4 id="wallaroo-build-application-application-name-pipeline"><code>wallaroo.build_application(application_name, pipeline)</code></h4>
+
+<p>Returns the topology structure Wallaroo requires in order to construct the topology connecting all of the application components.</p>
+
+<p><code>application_name</code> must be a string.</p>
+
+<p><code>pipeline</code> must be a complete pipeline object returned from either <code>to_sink</code> or <code>to_sinks</code>.</p>
+
+<h3 id="computation">Computation</h3>
+
+<p>A stateless computation is a simple function that takes input, returns an output, and does not modify any variables outside of its scope. A stateless computation should have <em>no side effects</em>.</p>
+
+<p>A <code>computation</code> function must be decorated with one of the <code>@wallaroo.computation</code> or <code>@wallaroo.computation_multi</code> decorators, which take the name of the computation as their only argument.</p>
+
+<h5 id="wallaroo-computation-name"><code>@wallaroo.computation(name)</code></h5>
+
+<p>Create a Wallaroo Computation from a function that takes <code>data</code> as its only argument and returns a single output.</p>
+
+<p><code>name</code> is the name of the computation in the pipeline, and must be unique.</p>
+
+<p><code>data</code> will be the output of the previous function in the pipeline.</p>
+
+<h6 id="example">Example</h6>
+
+<p>A Computation that doubles an integer, or returns 0 if its input was not an int:</p>
+
+<pre><code class="language-python">@wallaroo.computation(name=&quot;Double or Zero&quot;)
+def double_or_zero(data):
+    if isinstance(data, int):
+        return data*2
+    else
+        return 0
+</code></pre>
+
+<h5 id="wallaroo-computation-multi-name"><code>@wallaroo.computation_multi(name)</code></h5>
+
+<p>Create a Wallaroo Computation from a function that takes <code>data</code> as its only argument and returns a multiple outputs (as a list).</p>
+
+<p><code>name</code> is the name of the computation in the pipeline, and must be unique.</p>
+
+<p><code>data</code> will be the output of the previous function in the pipeline.</p>
+
+<p>The output must be a list of items or <code>None</code>. Each item in the list will arrive individually at the next stage, i.e. not as a list.</p>
+
+<h6 id="example-1">Example</h6>
+
+<p>A Computation that returns both its input integer and double that value. If the incoming data isn&rsquo;t an integer, it filters (drops) the message by returning <code>None</code>.</p>
+
+<pre><code class="language-python">@wallaroo.computation_multi(name=&quot;Identity and Double&quot;):
+def identity_and_double(data):
+    if isinstance(data, int):
+        return [data, data*2]
+    else
+        return None
+</code></pre>
+
+<h3 id="state">State</h3>
+
+<p>State is an object that is passed to the <a href="#statecomputation">StateComputation</a> function. It is a plain Python object and can be as simple or as complex as you would like.</p>
+
+<p>A common issue that arises with asynchronous execution is that when references to mutable objects are passed to the next stage, if another update to the state precedes the execution of the next stage, it will then execute with the latest state (that is, it will execute with the &ldquo;wrong&rdquo; state). Therefore, anything returned by a <a href="#computation">Computation</a> or <a href="#statecomputation">StateComputation</a> ought to be either unique, or immutable.</p>
+
+<p>In either case, it is up to the Python developer to provide a side-effect safe value for the computations to return!</p>
+
+<h4 id="example-state">Example State</h4>
+
+<p>An <code>AlphabetCounts</code> keeps a count for how many times each letter in the English alphabet has been seen:</p>
+
+<pre><code class="language-python">import copy
+
+AlphabetCounts(objects):
+    def __init__(self, initial_counts):
+        self.data = dict(initial_counts)
+
+    def update(self, c, value):
+        self.data[c] += value
+        return self.data[c]
+
+    def get_counts(self):
+        # Return a deep copy of the data dict
+        return copy.deepcopy(self.data)
+
+    def get_count(self, c):
+        # int is safe to return as is!
+        return self.data[c]
+</code></pre>
+
+<h3 id="statecomputation">StateComputation</h3>
+
+<p>A state computation is similar to a <a href="#computation">Computation</a>, except that it takes an additional argument: <code>state</code>.</p>
+
+<p>Similarly to a Computation, a StateComputation function must be decorated with the <code>@wallaroo.state_computation</code> decorator.</p>
+
+<p>A <code>state_computation</code> function must be decorated with one of the <code>@wallaroo.state_computation</code> or <code>@wallaroo.state_computation_multi</code> decorators, which take the name of the computation and the state class as their two arguments.</p>
+
+<h4 id="wallaroo-state-computation-name-state"><code>@wallaroo.state_computation(name, state)</code></h4>
+
+<p>Create a Wallaroo StateComputation from a function that takes <code>data</code> and <code>state</code> as its arguments and optionally returns an <code>output</code>.</p>
+
+<p><code>name</code> is the name of the computation in the pipeline, and must be unique.</p>
+
+<p><code>state</code> is the class used to represent state for this computation.</p>
+
+<p><code>data</code> is the output of the previous stage in the pipeline and input to our state computation.</p>
+
+<p><code>output</code> is the output data of the function (and will become the next stage&rsquo;s input data). If <code>output</code> is <code>None</code>, no message will be delivered to the next stage in the pipeline as a result of this iteration of the StateComputation.</p>
+
+<h5 id="example-2">Example</h5>
+
+<p>An example StateComputation that keeps track of the maximum integer value it has seen so far, and only persists the state if a new max has been set.</p>
+
+<pre><code class="language-python">class MaxState(object):
+    max = 0
+
+    def update(v):
+        if v &gt; max:
+            max = v
+
+@wallaroo.state_computation(name='Compute Max', state=MaxState):
+def compute_max(data, state):
+    before = state.max)
+    state.update(data)
+    output = state.max
+    return output
+</code></pre>
+
+<h4 id="wallaroo-state-computation-multi-name-state"><code>@wallaroo.state_computation_multi(name, state)</code></h4>
+
+<p>Create a Wallaroo StateComputation from a function that takes <code>data</code> and <code>state</code> as its arguments and returns a tuple of <code>(outputs, save_state</code>).</p>
+
+<p><code>name</code> is the name of the computation in the pipeline, and must be unique.</p>
+
+<p><code>state</code> is the class used to represent state for this computation.</p>
+
+<p><code>data</code> is the output of the previous stage in the pipeline and input to our state computation.</p>
+
+<p><code>outputs</code> is a list of output data of the function or <code>None</code>. Each item in the list will arrive at the next stage in the pipeline as an individual message. If <code>outputs</code> is <code>None</code>, no messages will be delivered to the next stage in the pipeline as a result of this iteration of the StateComputation.</p>
+
+<h5 id="example-3">Example</h5>
+
+<p>An example StateComputation that keeps track of the longest sentence it has seen so far, and outputs the words in a new sentence if it&rsquo;s the longest yet.</p>
+
+<pre><code class="language-python">class MaxLength
+    max = 0
+
+    def update(v):
+        if v &gt; max:
+            max = v
+
+@wallaroo.state_computation(name='Longest Sentence and Split Words',
+    state=MaxLength):
+def longest_sentence_and_split_words(data, state):
+    before = state.max
+    outputs = []
+    for sentence in data.strip().split('.'):
+        words = sentence.split(' ')
+        longest = max(longest, len(words))
+        if longest &gt; before:
+            outputs.extend(words)
+        before = longest
+    return outputs
+</code></pre>
+
+<h3 id="data">Data</h3>
+
+<p>Data is the object that is passed to <a href="#computation">Computations</a> and <a href="#statecomputation">StateComputations</a>. It is a plain Python object and can be as simple or as complex as you would like it to be.</p>
+
+<p>It is important to ensure that data returned is always immutable or unique to avoid any unexpected behavior due to the asynchronous execution nature of Wallaroo.</p>
+
+<h3 id="key">Key</h3>
+
+<p>Partition keys are <code>string</code> values.</p>
+
+<h3 id="keyextractor">KeyExtractor</h3>
+
+<p>A key extractor function must be decorated with the <code>@wallaroo.key_extractor</code> decorator and return the appropriate <a href="#key">Key</a> for <code>data</code>.</p>
+
+<h4 id="example-key-extractor">Example Key Extractor</h4>
+
+<p>An example that partitions transactions based on the user assocatied with them:</p>
+
+<pre><code class="language-python">@wallaroo.key_extractor
+def extract_user(transaction):
+    return transaction.user
+</code></pre>
+
+<h3 id="sink">Sink</h3>
+
+<p>Wallaroo currently supports two types of sinks: <a href="#tcpsink">TCPSink</a>, <a href="#kafkasink">KafkaSink</a>.</p>
+
+<h4 id="tcpsink">TCPSink</h4>
+
+<p>A <code>TCPSink</code> is used to send output to an external system using TCP.</p>
+
+<p>The <code>wallaroo.TCPSinkConfig</code> class is used to define the properties of the <code>TCPSink</code>, which will be created by Wallaroo as part of the pipeline initialization process.</p>
+
+<p>A <code>wallaroo.TCPSinkConfig</code> may be passed on its own to <a href="#to-sink-sink-config">to_sink</a> or as part of a list to <a href="#to-sinks-sink-configs">to_sinks</a>.</p>
+
+<h5 id="wallaroo-tcpsinkconfig-host-port-encoder"><code>wallaroo.TCPSinkConfig(host, port, encoder)</code></h5>
+
+<p>The class used to define the properties of a Wallaroo TCPSink.</p>
+
+<p><code>host</code> is a string representing the host address.</p>
+
+<p><code>port</code> is a string representing the port number.</p>
+
+<p><code>encoder</code> is a <a href="#sink-encoder">Sink Encoder</a> that returns <code>bytes</code>.</p>
+
+<h4 id="kafkasink">KafkaSink</h4>
+
+<p>A <code>KafkaSink</code> is used to send output to an external Kafka cluster.</p>
+
+<p>The <code>wallaroo.KafkaSinkConfig</code> class is used to define the properties of the <code>KafkaSink</code>, which will be created by Wallaroo as part of the pipeline initialization process.</p>
+
+<h5 id="wallaroo-kafkasinkconfig-topic-brokers-log-level-max-produce-buffer-ms-max-message-size-encoder"><code>wallaroo.KafkaSinkConfig(topic, brokers, log_level, max_produce_buffer_ms, max_message_size, encoder)</code></h5>
+
+<p>The class used to define the properties of a Wallaroo KafkaSink.</p>
+
+<p><code>topic</code> is a string.</p>
+
+<p><code>brokers</code> is a list of <code>(host, port)</code> pairs of strings.</p>
+
+<p><code>log_level</code> is one of the strings <code>Fine</code>, <code>Info</code>, <code>Warn</code>, <code>Error</code>.</p>
+
+<p><code>max_produce_buffer_ms</code> is an integer representing the <code>max_produce_buffer</code> value in milliseconds. The default value is <code>0</code>.</p>
+
+<p><code>max_message_size</code> is the maximum kafka message buffer size in bytes. The default vlaue is <code>100000</code>.</p>
+
+<p><code>encoder</code> is a <a href="#sink-encoder">Sink Encoder</a> that returns <code>(bytes, key)</code>, where <code>key</code> may be a string or <code>None</code>.</p>
+
+<h4 id="sink-encoder">Sink Encoder</h4>
+
+<p>The Sink Encoder is responsible for taking the output of the last computation in a pipeline and converting it into the data type that is accepted by the Sink.</p>
+
+<p>To define a sink encoder, use the <code>@wallaroo.encoder</code> decorator to decorate a function that takes <code>data</code> and returns the correct data type for the sink.</p>
+
+<p>It is up to the developer to determine how to translate <code>data</code> into the output data, and what information to keep or discard.</p>
+
+<h4 id="wallaroo-encoder"><code>@wallaroo.encoder</code></h4>
+
+<p>The decorator used to define <a href="#sink-encoder">sink encoders</a>.</p>
+
+<h5 id="example-encoder-for-a-tcpsink">Example encoder for a TCPSink</h5>
+
+<p>A complete <a href="#tcpsink">TCPSink</a> encoder example that takes a list of integers and encodes it to a sequence of big-endian longs preceded by a big-endian short representing the number of integers in the list:</p>
+
+<pre><code class="language-python">@wallaroo.encoder
+def tcp_encode(data):
+    fmt = '&gt;H{}'.format('L'*len(data))
+    return struct.pack(fmt, len(data), *data)
+</code></pre>
+
+<h5 id="example-encoder-for-a-kafka-sink">Example encoder for a Kafka Sink</h5>
+
+<p>A complete <code>KafkaSink</code> encoder example that takes a word and sends it to the partition corresponding to the first letter of the word:</p>
+
+<pre><code class="language-python">@wallaroo.encoder
+def kafka_encode(data):
+    word = data[:]
+    # explicitly get a substring because `[0]` in Python 3 returns an int
+    letter_key = data[0:1]
+    return (word, letter_key)
+</code></pre>
+
+<h3 id="source">Source</h3>
+
+<p>Wallaroo currently supports two types of soruces: <a href="#tcpsource">TCPSource</a>, <a href="#kafkasource">KafkaSource</a>.</p>
+
+<h4 id="tcpsource">TCPSource</h4>
+
+<p>The TCP Source receives data from an external TCP connection and decodes it into the data type that the first computation in its pipeline expects.</p>
+
+<p>The <code>wallaroo.TCPSourceConfig</code> class is used to define the properties of the TCP Source, which will be created by Wallaroo as part of the pipeline initialization process.</p>
+
+<p>An instance of <code>TCPSourceConfig</code> is a required argument of <a href="#wallaroo-source-name-source-config">wallaroo.source</a>.</p>
+
+<h5 id="wallaroo-tcpsourceconfig-host-port-decoder"><code>wallaroo.TCPSourceConfig(host, port, decoder)</code></h5>
+
+<p>The class used to define the properties of a Wallaroo TCPSource.</p>
+
+<p><code>host</code> is a string representing the host address.</p>
+
+<p><code>port</code> is a string representing the port number.</p>
+
+<p><code>decoder</code> is a <a href="#source-decoder">Source decoder</a>.</p>
+
+<h4 id="kafkasource">KafkaSource</h4>
+
+<p>A <code>KafkaSource</code> is used to get input from an external Kafka cluster.</p>
+
+<p>The <code>wallaroo.KafkaSourceConfig</code> class is used to define the properties of the <code>KafkaSource</code>, which will be created by Wallaroo as part of the pipeline initialization process.</p>
+
+<p>An instance of <code>KafkaSourceConfig</code> is a required argument of <a href="#wallaroo-source-name-source-config">wallaroo.source</a>.</p>
+
+<h5 id="wallaroo-kafkasourceconfig-topic-brokers-log-level-decoder"><code>wallaroo.KafkaSourceConfig(topic, brokers, log_level, decoder)</code></h5>
+
+<p>The class used to define the properties of a Wallaroo KafkaSink.</p>
+
+<p><code>topic</code> is a string.</p>
+
+<p><code>brokers</code> is a list of <code>(host, port)</code> pairs of strings.</p>
+
+<p><code>log_level</code> is one of the strings <code>Fine</code>, <code>Info</code>, <code>Warn</code>, <code>Error</code>.</p>
+
+<p><code>decoder</code> is a <a href="#source-decoder">Source Decoder</a>.</p>
+
+<h4 id="source-decoder">Source Decoder</h4>
+
+<p>The Source Decoder is responsible for two tasks:</p>
+
+<ol>
+<li>Telling Wallaroo <em>how many bytes to read</em> from its input source.</li>
+<li>Converting those bytes into an object that the rest of the application can process. <code>None</code> can be returned to completely discard a message.</li>
+</ol>
+
+<p>To define a source decoder, use the <a href="#wallaroo-decoder-header-length-length-fmt">@wallaroo.decoder</a> decorator to decorate a function that takes <code>bytes</code> and returns the correct data type for the next stage in the pipeline.</p>
+
+<p>It is up to the developer to determine how to translate <code>bytes</code> into the next stage&rsquo;s input data type, and what information to keep or discard.</p>
+
+<h4 id="wallaroo-decoder-header-length-length-fmt"><code>@wallaroo.decoder(header_length, length_fmt)</code></h4>
+
+<p>The decorator used to define <a href="#source-decoder">source decoders</a>.</p>
+
+<p><code>header_length</code> is the integer number of bytes to read for the header. The default value is 4.</p>
+
+<p><code>length_fmt</code> is the <a href="https://docs.python.org/2/library/struct.html#format-strings">struct.unpack format string</a> to use when unpacking the header into an integer. This value is then used to determine how many bytes should be read for the <code>bytes</code> argument that will be passed to the decorated function. The default value is <code>&quot;&gt;I&quot;</code>.</p>
+
+<h5 id="example-decoder-for-a-tcpsource">Example decoder for a TCPSource</h5>
+
+<p>A complete <code>TCPSource</code> decoder example that decodes messages with a 32-bit unsigned integer _payload<em>length</em> and a character followed by a 32-bit unsigned int in its <em>payload</em>. Filters out any input that raises a <code>struct.error</code> by returning <code>None</code>:</p>
+
+<pre><code class="language-python">@wallaroo.decoder(header_length=4, length_fmt=&quot;&gt;I&quot;)
+def decode(bs):
+    try:
+        return struct.unpack('&gt;1sL', bs)
+    except struct.error:
+        return None
+</code></pre>
+
+<h4 id="example-decoder-for-a-kafkasource">Example decoder for a KafkaSource</h4>
+
+<p>A complete <code>KafkaSource</code> decoder example that decodes messages with a 32-bit unsigned int in its <em>payload</em>. Filters out any input that raises a <code>struct.error</code> by returning <code>None</code>:</p>
+
+<pre><code class="language-python">@wallaroo.decoder(header_length=4, length_fmt=&quot;&gt;I&quot;)
+def decode(bs):
+    try:
+        return struct.unpack('&gt;1sL', bs)
+    except struct.error:
+        return None
+</code></pre>
+
+<h3 id="inter-worker-serialization">Inter-worker serialization</h3>
+
+<p>When Wallaroo runs with multiple workers, a built-in serializations and deserialization functions based on pickle take care of the encoding and decoding objects on the wire. The worker processes send each other these encoded objects. In some cases, you may wish to override this built-in serialization. If you wish to know more, please refer to the <a href="/python-tutorial/interworker-serialization-and-resilience/">Inter-worker serialization and resilience</a> section of the manual.</p>
+</main>
+        </div>
+      </div>
+    </div>
+  </article>
+
+    </main>
+    <footer class="bg-green bottom-0 w-100 pa3" role="contentinfo">
+  <div class="flex justify-between">
+  <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://docs.wallaroolabs.com/" >
+    &copy; 2018 Wallaroo
+  </a>
+    <div>
+<div hidden>
+  <span id="new-window-0">Opens in a new window</span>
+  <span id="new-window-1">Opens an external site</span>
+  <span id="new-window-2">Opens an external site in a new window</span>
+</div>
+
+
+
+
+
+
+
+
+</div>
+  </div>
+</footer>
+
+    
+
+  <script src="/dist/js/app.3fc0f988d21662902933.js"></script>
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.8.0/highlight.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.10.0/languages/pony.min.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+<script>
+  var toggleBtns = document.getElementsByClassName('js-toggle')
+  for (var i = 0; i < toggleBtns.length; i++) {
+    toggleBtns[i].addEventListener('click', toggleClass, false)
+  }
+
+function toggleClass() {
+  
+  var content = this.dataset.target.split(' ')
+  
+  var mobileCurrentlyOpen = document.querySelector('.mobilemenu:not(.dn)')
+  var desktopCurrentlyOpen = document.querySelector('.desktopmenu:not(.dn)')
+  var desktopActive = document.querySelector('.desktopmenu:not(.dn)')
+
+  
+  for (var i = 0; i < content.length; i++) {
+    var matches = document.querySelectorAll(content[i]);
+    
+    [].forEach.call(matches, function(dom) {
+        dom.classList.contains('dn') ?
+        dom.classList.remove('dn') :
+        dom.classList.add('dn');
+         return false;
+       });
+        
+      if (mobileCurrentlyOpen) mobileCurrentlyOpen.classList.add('dn')
+      if (desktopCurrentlyOpen) desktopCurrentlyOpen.classList.add('dn')
+      if (desktopActive) desktopActive.classList.remove('db')
+
+    }
+  }
+
+
+
+
+  let codeBlocks = document.getElementsByTagName('code')
+    for (let [key, codeBlock] of Object.entries(codeBlocks)){
+    var widthDif = codeBlock.scrollWidth - codeBlock.clientWidth
+    if (widthDif > 0)
+      codeBlock.parentNode.classList.add('expand')
+  }
+
+</script>
+
+
+  </body>
+</html>

@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    
+    <title>Wallaroo  | Using Connectors as Sources &amp; Sinks</title>
+    <meta name="HandheldFriendly" content="True">
+    <meta name="MobileOptimized" content="320">
+
+    <meta name="viewport" content="width=device-width,minimum-scale=1">
+    <meta name="generator" content="Hugo 0.49.2" />
+    
+    
+      <META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
+    
+
+    
+    
+      <link href="/dist/css/app.955516233bcafa4d2a1c13cea63c7b50.css" rel="stylesheet">
+    
+
+    
+      <link rel="stylesheet" href="/css/jquery-ui.min.css">
+    
+      <link rel="stylesheet" href="/css/jquery-ui.theme.min.css">
+    
+      <link rel="stylesheet" href="/cshighlight.css">
+    
+      <link rel="stylesheet" href="/css/my.css">
+    
+
+    
+      
+    
+
+    
+
+    <meta property="og:title" content="Using Connectors as Sources &amp; Sinks" />
+<meta property="og:description" content="This is a preview release of Wallaroo&rsquo;s connectors feature that allows full customization of sources and sinks. These sources and sinks can be integrated into Wallaroo using libraries you&rsquo;re already familiar with in Python. A number of built-in connectors offer a quick way to get started and hook up common stream types and they&rsquo;re all available for easy customization.
+Care has been taken to keep the API simple and the runtime assumptions unobtrusive so it&rsquo;s easy to hook up the library to existing code." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://docs.wallaroolabs.com/python-tutorial/using-connectors/" />
+
+<meta itemprop="name" content="Using Connectors as Sources &amp; Sinks">
+<meta itemprop="description" content="This is a preview release of Wallaroo&rsquo;s connectors feature that allows full customization of sources and sinks. These sources and sinks can be integrated into Wallaroo using libraries you&rsquo;re already familiar with in Python. A number of built-in connectors offer a quick way to get started and hook up common stream types and they&rsquo;re all available for easy customization.
+Care has been taken to keep the API simple and the runtime assumptions unobtrusive so it&rsquo;s easy to hook up the library to existing code.">
+
+
+
+<meta itemprop="wordCount" content="1896">
+
+
+
+<meta itemprop="keywords" content="" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Using Connectors as Sources &amp; Sinks"/>
+<meta name="twitter:description" content="This is a preview release of Wallaroo&rsquo;s connectors feature that allows full customization of sources and sinks. These sources and sinks can be integrated into Wallaroo using libraries you&rsquo;re already familiar with in Python. A number of built-in connectors offer a quick way to get started and hook up common stream types and they&rsquo;re all available for easy customization.
+Care has been taken to keep the API simple and the runtime assumptions unobtrusive so it&rsquo;s easy to hook up the library to existing code."/>
+
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+  </head>
+
+  <body class="ma0 avenir bg-near-white">
+
+    
+
+  <header>
+    <div class="bg-green">
+      <nav class="pv3 ph3 ph4-ns" role="navigation">
+  <div class="flex-l justify-between items-center center">
+    <a href="https://docs.wallaroolabs.com/" class="f3 fw2 hover-white no-underline white-90 dib">
+      Wallaroo
+    </a>
+    <div class="flex-l items-center">
+      
+        <ul class="pl0 mr3">
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/core-concepts/" title="Core Concepts page">
+              Core Concepts
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/python-installation/" title="Installation page">
+              Installation
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/python-tutorial/" title="Tutorial page">
+              Tutorial
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/operators-manual/" title="Operators Manual page">
+              Operators Manual
+            </a>
+          </li>
+          
+        </ul>
+      
+      
+<div hidden>
+  <span id="new-window-0">Opens in a new window</span>
+  <span id="new-window-1">Opens an external site</span>
+  <span id="new-window-2">Opens an external site in a new window</span>
+</div>
+
+
+
+
+
+
+
+
+
+    </div>
+  </div>
+</nav>
+
+    </div>
+  </header>
+
+
+    <main class="pb7" role="main">
+      
+  <article class="w-100 ph4 pb5 pb6-ns pt1 pt5-ns">
+    <div class="flex-l">
+
+      <div class="order-0 w-100 w-20-l ph5-m ph0-l mb4 sticky dn db-l">
+        
+<nav role="navigation" class="doc-menu bg-light-gray pl3 pr3">
+  <ul class="list pa0 nl2">
+    
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".core-concepts">Core Concepts</a>
+        <ul class="core-concepts desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/core-concepts/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo Core Concepts
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/core-concepts/state/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              State
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/core-concepts/working-with-state/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Working with State
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/core-concepts/partitioning/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Partitioning
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".pyinstallation">Python Installation Guide</a>
+        <ul class="pyinstallation desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/python-installation/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Choosing an Installation Option
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-installation/python-docker-installation-guide/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Installing with Docker
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-installation/python-vagrant-installation-guide/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Installing with Vagrant
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-installation/python-wallaroo-up-installation-guide/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Installing with Wallaroo Up
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2  primary-color" data-target=".pytutorial">Python Tutorial</a>
+        <ul class="pytutorial desktopmenu animated fadeIn list pl0 pb2 bg-light-gray db">
+          <li class="f6 fw4">
+            <a href="/python-tutorial/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Python API Introduction
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/running-a-wallaroo-application/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Running A Wallaroo Application
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/writing-your-own-application/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Writing Your Own Application
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/writing-your-own-stateful-application/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Writing Your Own Stateful Application
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/word-count/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Word Count
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/interworker-serialization-and-resilience/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Inter-worker Serialization and Resilience
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/using-connectors/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 primary-color ">
+              Using Connectors as Sources &amp; Sinks
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/api/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo Python API Classes
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/debugging/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Debugging
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/tcp-decoders-and-encoders/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              TCP Decoders and Encoders
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/virtualenv/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo and Virtualenv
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/starting-a-new-shell/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Starting a new shell
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".operators-manual">Operators Manual</a>
+        <ul class="operators-manual desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/operators-manual/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Operators Manual
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/running-wallaroo/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Running Wallaroo
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/autoscale/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Autoscale
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/resilience/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Resilience
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/command-line-options/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Command-Line Options
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/metrics-ui/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo Metrics UI
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".appendix">Appendix</a>
+        <ul class="appendix desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/appendix/giles-sender/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Giles sender
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/appendix/wallaroo-docker-tips/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Tips for using Wallaroo in Docker
+            </a>
+          </li>
+        </ul>
+      </li>
+  </ul>
+</nav>
+
+      </div>
+
+      <div class="order-2 w-100 w-20-l ph5-m ph0-l mb4 sticky dn db-l"><nav role="toc" class="toc bg-light-gray pl3 pr3 nested-list-reset nested-copy-line-height nested-links">
+    <p class="f5 b mb3">What's in this document</p>
+      <nav id="TableOfContents">
+<ul>
+<li>
+<ul>
+<li><a href="#using-a-connector-in-your-application">Using a Connector in Your Application</a></li>
+<li><a href="#running-connector-scripts">Running Connector Scripts</a></li>
+<li><a href="#starting-with-prebuilt-connectors">Starting with Prebuilt Connectors</a>
+<ul>
+<li><a href="#kafka">Kafka</a></li>
+<li><a href="#aws-kinesis">AWS Kinesis</a></li>
+<li><a href="#redis">Redis</a></li>
+<li><a href="#rabbitmq">RabbitMQ</a></li>
+<li><a href="#udp">UDP</a></li>
+<li><a href="#aws-s3">AWS S3</a></li>
+<li><a href="#postgres">Postgres</a></li>
+</ul></li>
+<li><a href="#building-your-own-connectors">Building Your Own Connectors</a>
+<ul>
+<li><a href="#custom-source-connector">Custom Source Connector</a></li>
+<li><a href="#custom-sink-connector">Custom Sink Connector</a></li>
+</ul></li>
+</ul></li>
+</ul>
+</nav>
+  </nav>
+
+
+
+
+</div>
+
+      <div class="order-1 w-60-l mw7 ph0 ph5-ns mid-gray nested-copy-line-height no-underline nested-links nested-img nested-copy-seperator nested-blockquote mt0-ns" style="flex-grow:1;">
+        <div class="documentation-copy center measure-wide-l">
+          <header class="w-100">
+          <p class="f6 b helvetica tracked">
+            Python Tutorial
+          </p>
+          <h1 class="f1 athelas mb1">Using Connectors as Sources &amp; Sinks</h1>
+          </header>
+
+          <main class="nested-copy-line-height lh-copy serif f4 nested-links nested-img mid-gray pr4-l">
+
+<p>This is a preview release of Wallaroo&rsquo;s connectors feature that allows full customization of sources and sinks. These sources and sinks can be integrated into Wallaroo using libraries you&rsquo;re already familiar with in Python. A number of built-in connectors offer a quick way to get started and hook up common stream types and they&rsquo;re all available for easy customization.</p>
+
+<p>Care has been taken to keep the API simple and the runtime assumptions unobtrusive so it&rsquo;s easy to hook up the library to existing code. Read down below for more information on how this works. As this is still a preview release, we are looking for early feedback and would love to hear from you. You can connect with us by emailing <a href="mailto:hello@wallaroolabs.com">hello@wallaroolabs.com</a>.</p>
+
+<p>Connectors are comprised of two parts. First is the entry in your application builder which explains how encoding and decoding of the content works as well as giving each connector instance a name and direction of flow (source or sink). Second is the script which is a local process which runs side-by-side with Wallaroo. We&rsquo;ll look at each part in turn in the sections below.</p>
+
+<h2 id="using-a-connector-in-your-application">Using a Connector in Your Application</h2>
+
+<p>In your application module&rsquo;s <code>application_setup</code> function, the application builder returns a description of your application in terms of pipelines. Connectors tap into this by allowing the declaration of source and sink connectors and wiring these up by name in your pipeline definitions.</p>
+
+<p>Here is an example of what this looks like:</p>
+
+<pre><code class="language-python">def application_setup(args):
+celsius_feed = wallaroo.experimental.SourceConnectorConfig(
+        &quot;celsius_feed&quot;,
+        encoder=encode_feed,
+        decoder=decode_feed,
+        port=7100)
+    fahrenheit_conversion = wallaroo.experimental.SinkConnectorConfig(
+        &quot;fahrenheit_conversion&quot;,
+        encoder=encode_conversion,
+        decoder=decode_conversion,
+        port=7200)
+    pipeline = (
+        wallaroo.source(&quot;convert temperature readings&quot;, celsius_feed)
+        .to(multiply)
+        .to(add)
+        .to_sink(fahrenheit_conversion)
+    )
+    return wallaroo.build_application(&quot;Celsius to Fahrenheit&quot;, pipeline)
+</code></pre>
+
+<p>You can follow along in this example by going to <a href="https://github.com/WallarooLabs/wallaroo/tree/0.6.0/examples/python/celsius_connectors/">GitHub</a>.</p>
+
+<p>We have introduced two new application builder methods for declaring connectors: <code>source_connector</code> and <code>sink_connector</code>. These allow you to describe both ends of the connection so the connector script can encode or decode data in a way that&rsquo;s compatible with your application&rsquo;s worker code. Keeping these in one place helps ensure that it&rsquo;s easy to keep them in sync. The port specified here is what the connector script will automatically use when connecting to the initializing worker.</p>
+
+<p>In this example we can look at the celsius feed&rsquo;s encoder and decoder functions:</p>
+
+<pre><code class="language-python">@wallaroo.experimental.stream_message_encoder
+def encode_feed(data):
+    return data
+
+@wallaroo.experimental.stream_message_decoder
+def decode_feed(data):
+    return struct.unpack(&quot;&gt;f&quot;, data)[0]
+</code></pre>
+
+<p>Here we&rsquo;ve defined two functions and use <code>wallaroo.experimental.stream_message_encoder</code> and <code>wallaroo.experimental.stream_message_decoder</code> as decorators. These decorators will handle framing and delivery of your data, so all you need to ensure is that the bytes represent the single message you want to deliver.</p>
+
+<p>You might ask why the example&rsquo;s encoder function definition is only returning the data. In this case, the example is receiving data that&rsquo;s already a packed floating point number so there is no need to reencode it. This allows the encoder to pass along data as-is when it&rsquo;s already in the correct format.</p>
+
+<p>Returning to the application setup code, we should look at the pipeline definition to understand how all of this comes together. First is the pipeline construction:</p>
+
+<pre><code class="language-python">pipeline = (
+        wallaroo.source(&quot;convert temperature readings&quot;, celsius_feed)
+        # ...
+</code></pre>
+
+<p>The code sample constructs a source using the celsius_feed connector configuration object defined above. This must match the type of connector; in this case, new_pipeline expects a source, so we should declare <code>&quot;celsius_feed&quot;</code> using <code>SourceConnectorConfig</code>.</p>
+
+<p>Likewise, our sink has adopted a named connector:</p>
+
+<pre><code class="language-python">    # ...
+    .to_sink(fahrenheit_conversion)
+</code></pre>
+
+<p>This matches up with our call to <code>SinkConnectorConfig</code> and it has its own encoder and decoder functions as well.</p>
+
+<p>Notice how we don&rsquo;t couple the specifics of the medium used by the connector and instead focus on how we interpret incoming messages in terms of their serialization. This allows applications to evolve and mix their infrastructure over time.</p>
+
+<h2 id="running-connector-scripts">Running Connector Scripts</h2>
+
+<p>To run an application that makes use of these connectors we&rsquo;ll need to understand how the connector scripts work. Wallaroo includes a <a href="https://github.com/WallarooLabs/wallaroo/tree/0.6.0/connectors/">library of connectors</a> to help get you started. We&rsquo;ll look at <code>udp_source</code> and <code>udp_sink</code> as used in the example introduced above.</p>
+
+<p>These included connectors are self-contained Python scripts. Some of them may expect a related Python library to be installed and available for import but our example uses the UDP facilities provided for by Python&rsquo;s standard library. Be sure that the Python path is set up to include the Wallaroo library.</p>
+
+<p>If we run one of these scripts we&rsquo;ll see there are some required arguments listed. The first one should be familiar. <code>--application-module</code> is the same as the one seen when running a Wallaroo worker (you can review these command line parameters in the <a href="/operators-manual/running-wallaroo/">Running Wallaroo</a> section). Providing this argument allows the script to autodetect most of the connector settings by reading the same application description that the Wallaroo application worker runs with.</p>
+
+<p>The application module is not quite enough for the script to know what settings to use when connecting to Wallaroo. Since the application may have more than one connector, the <code>--connector</code> argument is required for disambiguating which connector in the application setup this script is running as. With this passed as an argument, we can autodetect the most common settings.</p>
+
+<p>Many connector scripts will have their own additional arguments, some may be required and others may be optional. In this case we have two, the host and port (not to be confused with the port that the connector script uses to communicate with the Wallaroo initializer). These argument names prefix the connector name to ensure that conflicting argument names do not cause problems. For example, you should be able to pass all your Wallaroo arguments in without conflict.</p>
+
+<p>To illustrate this, let&rsquo;s look at what the <code>udp_source</code> command line parameters might look like:</p>
+
+<pre><code class="language-bash">./wallaroo/connectors/udp_source --application-module celsius \
+    --connector celsius_feed \
+    --celsius_feed-host 127.0.0.1 \
+    --celsius_feed-port 6789
+</code></pre>
+
+<p>In this example, we are running a UDP source for our application which listens to a UDP socket on 127.0.0.1 port 6789 and forwards the data in each packet to Wallaroo as a message.</p>
+
+<p>Since the included connector scripts are self-contained, feel free to copy it over to your application tree to use them directly and make path management a little easier.</p>
+
+<h2 id="starting-with-prebuilt-connectors">Starting with Prebuilt Connectors</h2>
+
+<p>We have a number of <a href="https://github.com/WallarooLabs/wallaroo/tree/0.6.0/connectors/">prebuilt connectors</a>. Here is a short description of each one. These are all written so they can be copied and customized in your application source tree. You&rsquo;re still welcome to run them in place as well.</p>
+
+<h3 id="kafka">Kafka</h3>
+
+<p>This connector provides Kafka source and sink support. This uses the <a href="https://pypi.org/project/kafka/">kafka library</a>. Consumer group based sources are supported to allow easier management of your source&rsquo;s progress through a topic.</p>
+
+<p>While Wallaroo already has built-in Kafka support, using the connector allows you to support the use of consumer groups and reuse any logic you might already have around offset management and consumer lifecycles. We&rsquo;re looking for feedback, so if your Kafka use case doesn&rsquo;t seem to fit either option, please let us know at <a href="mailto:hello@wallaroolabs.com">hello@wallaroolabs.com</a>.</p>
+
+<h3 id="aws-kinesis">AWS Kinesis</h3>
+
+<p>AWS Kinesis is supported via the <a href="https://pypi.org/project/boto3/">boto3 library</a>. This script will expect AWS credentials to be setup as described in their documentation.</p>
+
+<h3 id="redis">Redis</h3>
+
+<p>Redis has many ways to be used as a source and a sink. We&rsquo;ve provided two starting points to show how a source and sink can work. The script is very easy to modify and uses the well maintained <a href="https://pypi.org/project/redis/">redis library</a>.</p>
+
+<p>For the source, we show an example using the subscription support offered by Redis pubsub and it&rsquo;s a natural fit for many stream processing applications. Check out <code>redis_subscriber_source</code> for <a href="https://github.com/WallarooLabs/wallaroo/tree/0.6.0/connectors/redis_subscriber_source">details</a>.</p>
+
+<p>For the sink, we show that not everything needs to look exactly like a stream to be used with Wallaroo. We use the given hash key in redis and set key-value pairs on that target hash for each key-value pair passed to the sink. This is very handy for those cases that want to keep track of the latest value. See <code>redis_hash_sink</code> for <a href="https://github.com/WallarooLabs/wallaroo/tree/0.6.0/connectors/redis_hash_sink">details</a>.</p>
+
+<h3 id="rabbitmq">RabbitMQ</h3>
+
+<p>Our RabbitMQ source uses the <a href="https://pypi.org/project/pika/">pika library</a>. We support automatic provisioning of missing queues in our setup code but it&rsquo;s advised that users ensure they provision their broker&rsquo;s exchange with the appropriate type beforehand.</p>
+
+<h3 id="udp">UDP</h3>
+
+<p>Our UDP support uses the Python standard library. To see an example of it in action, check out the <a href="https://github.com/WallarooLabs/wallaroo/tree/0.6.0/examples/python/celsius_connectors/">celsius_connectors example</a>.</p>
+
+<h3 id="aws-s3">AWS S3</h3>
+
+<p>This sink is powered by the <a href="https://pypi.org/project/boto3/">boto3 library</a> and allows key value pairs to be uploaded as named blobs to an S3 bucket.</p>
+
+<h3 id="postgres">Postgres</h3>
+
+<p>We offer some starting templates for Postgres integration. These depend on your database schema and so we&rsquo;ve left them in the <a href="https://github.com/WallarooLabs/wallaroo/tree/0.6.0/connectors/templates">connectors/templates directory</a>.</p>
+
+<p>As a source we have a very interesting example of how notifiers can turn a regular table into a stream. If you&rsquo;re struggling with finding an efficient way to stream relational data, this might be a good place to start.</p>
+
+<p>On the sink side, we support inserting new records for each sink output. This should be easy to modify to allow more complex database interactions.</p>
+
+<p>If you have a use-case with Postgres and don&rsquo;t feel like our template addresses it. Please let us know at <a href="mailto:hello@wallaroolabs.com">hello@wallaroolabs.com</a>.</p>
+
+<h2 id="building-your-own-connectors">Building Your Own Connectors</h2>
+
+<p>While we offer prebuilt connectors and they can be modified, sometimes you might find yourself needing to build a connector from scratch. We&rsquo;ll walk through a source and sink example.</p>
+
+<h3 id="custom-source-connector">Custom Source Connector</h3>
+
+<p>To build a new source, you need to import <code>wallaroo.experimental</code> along with any other runtime requirements you have. Because this is a vanilla Python runtime, you&rsquo;re welcome to organize your code however you like.</p>
+
+<p>When your script starts running, you need to create the proper
+connector instance type. In this case we&rsquo;d like to build a source connector so we&rsquo;ll use this:</p>
+
+<pre><code class="language-python">connector = wallaroo.experimental.SourceConnector(required_params=[], optional_params=[])
+</code></pre>
+
+<p>For this connector we&rsquo;re not requesting any additional parameters but if we did, it&rsquo;d be available on the <code>connector.params</code> property.</p>
+
+<p>Once we&rsquo;ve constructed this and we&rsquo;re ready to connect to Wallaroo to allow data to flow we call <code>connect</code>:</p>
+
+<pre><code class="language-python">connector.connect()
+</code></pre>
+
+<p>The connectors library will automatically resolve the port to use for connecting to the Wallaroo initializer. By default the connector runtime assumes you&rsquo;re co-locating the connector and the worker on the same host so the loopback address is used (127.0.0.1). The script can pass custom <code>host</code> and <code>port</code> parameters here if the automatically resolved information needs to change. Since we recommend that you run your connector scripts next to the Wallaroo process, the defaults work just fine.</p>
+
+<p>Your script can do any other initialization but once it&rsquo;s running, all you need is a call to <code>write</code>:</p>
+
+<pre><code class="language-python">connector.write(&quot;hello world&quot;)
+</code></pre>
+
+<p>In this case, the string hello world will be passed to the encoder function specified in the application module. The resulting bytes will then be sent to the local Wallaroo worker and then decoded with the specified decoder function.</p>
+
+<h3 id="custom-sink-connector">Custom Sink Connector</h3>
+
+<p>Building a sink is very similar to a source except that we listen for connections from Wallaroo rather than connect to Wallaroo.</p>
+
+<p>To get started we build an instance of the sink connector:</p>
+
+<pre><code class="language-python">connector = wallaroo.experimental.SinkConnector(required_params=[], optional_params=[])
+</code></pre>
+
+<p>Once you&rsquo;re ready to accept incoming data you can call <code>listen</code>:</p>
+
+<pre><code class="language-python">connector.listen()
+</code></pre>
+
+<p>When you&rsquo;re ready to read a value, call the <code>read</code> method. Usually this can be done in a loop like so:</p>
+
+<pre><code class="language-python">while True:
+    author, message = connector.read()
+    print(&quot;{} said {}&quot;.format(author, message))
+</code></pre>
+
+<p>In this loop we do one read at a time and expect a tuple to be returned by the decoder function that is automatically called for us (as specified in the application_setup for the application).</p>
+</main>
+        </div>
+      </div>
+    </div>
+  </article>
+
+    </main>
+    <footer class="bg-green bottom-0 w-100 pa3" role="contentinfo">
+  <div class="flex justify-between">
+  <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://docs.wallaroolabs.com/" >
+    &copy; 2018 Wallaroo
+  </a>
+    <div>
+<div hidden>
+  <span id="new-window-0">Opens in a new window</span>
+  <span id="new-window-1">Opens an external site</span>
+  <span id="new-window-2">Opens an external site in a new window</span>
+</div>
+
+
+
+
+
+
+
+
+</div>
+  </div>
+</footer>
+
+    
+
+  <script src="/dist/js/app.3fc0f988d21662902933.js"></script>
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.8.0/highlight.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.10.0/languages/pony.min.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+<script>
+  var toggleBtns = document.getElementsByClassName('js-toggle')
+  for (var i = 0; i < toggleBtns.length; i++) {
+    toggleBtns[i].addEventListener('click', toggleClass, false)
+  }
+
+function toggleClass() {
+  
+  var content = this.dataset.target.split(' ')
+  
+  var mobileCurrentlyOpen = document.querySelector('.mobilemenu:not(.dn)')
+  var desktopCurrentlyOpen = document.querySelector('.desktopmenu:not(.dn)')
+  var desktopActive = document.querySelector('.desktopmenu:not(.dn)')
+
+  
+  for (var i = 0; i < content.length; i++) {
+    var matches = document.querySelectorAll(content[i]);
+    
+    [].forEach.call(matches, function(dom) {
+        dom.classList.contains('dn') ?
+        dom.classList.remove('dn') :
+        dom.classList.add('dn');
+         return false;
+       });
+        
+      if (mobileCurrentlyOpen) mobileCurrentlyOpen.classList.add('dn')
+      if (desktopCurrentlyOpen) desktopCurrentlyOpen.classList.add('dn')
+      if (desktopActive) desktopActive.classList.remove('db')
+
+    }
+  }
+
+
+
+
+  let codeBlocks = document.getElementsByTagName('code')
+    for (let [key, codeBlock] of Object.entries(codeBlocks)){
+    var widthDif = codeBlock.scrollWidth - codeBlock.clientWidth
+    if (widthDif > 0)
+      codeBlock.parentNode.classList.add('expand')
+  }
+
+</script>
+
+
+  </body>
+</html>
