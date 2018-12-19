@@ -18,7 +18,7 @@ Since recovery involves a rollback to the last successful checkpoint, any data t
 
 When a crashed worker is restarted, if it can find its resilience files in the path specified by `--resilience-dir`, it will automatically start the recovery process. The simplest way to do this is to rerun the worker using the same command it was originally run with.
 
-For example, if we were running the bundled Python example [word_count](https://github.com/WallarooLabs/wallaroo/tree/master/examples/python/word_count/), this might look something like:
+For example, if we were running the bundled Python example [word_count](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/python/word_count/), this might look something like:
 
     ```bash
     machida-resilience --application-module word_count \

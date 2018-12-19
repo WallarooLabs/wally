@@ -123,4 +123,4 @@ This example assumes that each Wallaroo worker uses the argument `--resilience-d
 
 ## Scripted examples of Wallaroo worker start, stop, crash, and restart after catastrophic failure
 
-The [resilience demos directory](https://github.com/WallarooLabs/wallaroo/tree/master/demos/resilience-demo) contains a number of shell scripts to demonstrate Wallaroo worker starting, stopping, crashing, and restarting after a catastrophic failure.  Please see the [resilience demos directory README file](https://github.com/WallarooLabs/wallaroo/tree/master/demos/resilience-demo/README.md) file for details.
+The [resilience demos directory](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/demos/resilience-demo) contains a number of shell scripts to demonstrate Wallaroo worker starting, stopping, crashing, and restarting after a catastrophic failure.  Please see the [resilience demos directory README file](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/demos/resilience-demo/README.md) file for details.
