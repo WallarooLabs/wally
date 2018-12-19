@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>What is Wallaroo? on Wallaroo</title>
+    <link>https://docs.wallaroolabs.com/</link>
+    <description>Recent content in What is Wallaroo? on Wallaroo</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    
+	<atom:link href="https://docs.wallaroolabs.com/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Autoscale</title>
+      <link>https://docs.wallaroolabs.com/operators-manual/autoscale/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/operators-manual/autoscale/</guid>
+      <description>Wallaroo is designed to support scale-independent development. It can adapt to changing demands by growing or shrinking to fit the available resources. You don’t have to update any code or bother with stopping your cluster and redeploying. This set of features is called “autoscale”.
+With autoscale enabled, you can add or remove workers from a running cluster. We call these “grow to fit” and “shrink to fit”, respectively (referring to the fact that the cluster grows or shrinks to fit your current resource requirements).</description>
+    </item>
+    
+    <item>
+      <title>Command-Line Options</title>
+      <link>https://docs.wallaroolabs.com/operators-manual/command-line-options/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/operators-manual/command-line-options/</guid>
+      <description>Every Wallaroo option exposes a set of command-line options that are used to configure it. This document gives an overview of each of those options.
+Command-Line Parameters When running a Wallaroo application, we use some of the following command line parameters (a star indicates it is required, a plus that it is required for multi-worker runs):
+--control/-c *[Sets address for initializer control channel; sets control address to connect to for non-initializers] --data/-d *[Sets address for initializer data channel] --my-control [Optionally sets address for my data channel] --my-data [Optionally sets address for my data channel] --external/-e [Sets address for external message channel] --worker-count/-w +[Sets cluster initializers total number of workers, including cluster initializer itself] --name/-n +[Sets name for this worker.</description>
+    </item>
+    
+    <item>
+      <title>Debugging</title>
+      <link>https://docs.wallaroolabs.com/python-tutorial/debugging/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/python-tutorial/debugging/</guid>
+      <description>As you&amp;rsquo;re developing Python Wallaroo applications, there will come a time where you will need to do some debugging during your development process. Debugging can be as simple as inserting a print statement in your code (we even do it in our examples) or a bit more involved by using a debugger to get backtraces and such. In this section we&amp;rsquo;ll cover how to debug using print, an interactive debugger, and a remote debugger.</description>
+    </item>
+    
+    <item>
+      <title>Giles sender</title>
+      <link>https://docs.wallaroolabs.com/appendix/giles-sender/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/appendix/giles-sender/</guid>
+      <description>Giles components act as external testers for Wallaroo. Giles Sender is used to mimic the behavior of an incoming data source. Giles Sender sends data to Wallaroo in one of four ways:
+ With no other commandline options given, it will send string representations of integers, starting with 1 and increasing by 1 with each new message. With a file name given as the --file/-f argument it will send each line of the given file as a message.</description>
+    </item>
+    
+    <item>
+      <title>Installing with Docker</title>
+      <link>https://docs.wallaroolabs.com/python-installation/python-docker-installation-guide/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/python-installation/python-docker-installation-guide/</guid>
+      <description>To get you up and running quickly with Wallaroo, we have provided a Docker image which includes Wallaroo and related tools needed to run and modify a few example applications. We should warn that this Docker image was created with the intent of getting users started quickly with Wallaroo and is not intended to be a fully customizable development environment or suitable for production.
+Installing Docker MacOS There are instructions for getting Docker up and running on MacOS on the Docker website.</description>
+    </item>
+    
+    <item>
+      <title>Installing with Vagrant</title>
+      <link>https://docs.wallaroolabs.com/python-installation/python-vagrant-installation-guide/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/python-installation/python-vagrant-installation-guide/</guid>
+      <description>To get you up and running quickly with Wallaroo, we have provided a Vagrantfile which includes Wallaroo and related tools needed to run and modify a few example applications. We should warn that this Vagrantfile was created with the intent of getting users started quickly with Wallaroo and is not intended to be suitable for production. Wallaroo in Vagrant runs on Ubuntu Linux Xenial.
+Set up Environment for the Wallaroo Tutorial Linux and MacOS If you haven&amp;rsquo;t already done so, create a directory called ~/wallaroo-tutorial and navigate there by running:</description>
+    </item>
+    
+    <item>
+      <title>Installing with Wallaroo Up</title>
+      <link>https://docs.wallaroolabs.com/python-installation/python-wallaroo-up-installation-guide/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/python-installation/python-wallaroo-up-installation-guide/</guid>
+      <description>Supported Systems Wallaroo Up has been tested on:
+ Amazon Linux 2 CentOS 7 Debian  Buster (Testing) Jessie Stretch  Fedora  27 28  Oracle Linux 7 Ubuntu  Artful Bionic Trusty Xenial   It should also work on Red Hat Enterprise Linux 7.
+Memory requirements In order to compile the Wallaroo example applications, your system will need to have approximately 3 GB working memory (this can be RAM or swap).</description>
+    </item>
+    
+    <item>
+      <title>Inter-worker Serialization and Resilience</title>
+      <link>https://docs.wallaroolabs.com/python-tutorial/interworker-serialization-and-resilience/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/python-tutorial/interworker-serialization-and-resilience/</guid>
+      <description>Wallaroo applications can scale horizontally by running multiple worker processes (ideally on different machines connected by a fast network). Worker processes send each other encoded objects, some of which may contain Python objects. Wallaroo provides serialization and deserialization based on the pickle module; if this is sufficient for your needs then you don&amp;rsquo;t need to write any serialization or deserialization code. If pickle is insufficient for your application (for example, if pickle is too slow or if you are using classes that cannot be serialized or deserialized with pickle) then you must provide your own serialize and deserialize functions that convert between objects and strings that represent those objects.</description>
+    </item>
+    
+    <item>
+      <title>Partitioning</title>
+      <link>https://docs.wallaroolabs.com/core-concepts/partitioning/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/core-concepts/partitioning/</guid>
+      <description>If all of the application state exists in one state object then only one state computation at a time can access that state object. In order to leverage concurrency, that state needs to be divided into multiple distinct state objects. Wallaroo can then automatically distribute these objects in a way that allows them to be accessed by state computations in parallel.
+For example, in an application that keeps track of stock prices, the naïve application state might be a dictionary where the stock symbol is used to look up the price of the stock.</description>
+    </item>
+    
+    <item>
+      <title>Resilience</title>
+      <link>https://docs.wallaroolabs.com/operators-manual/resilience/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/operators-manual/resilience/</guid>
+      <description>Wallaroo is designed with built-in resilience. However, since the operations involved with maintaining resilience can impact performance, this mode is off by default. For python users, we provide a separate binary with resilience enabled: machida-resilience (and machida3-resilience for Python 3) as part of the default installation. For Go and Ponyc users, to enable resilience in a Wallaroo application, the binary needs to be built with -D resilience if using the ponyc compiler directly, or with resilience=on if using our Makefile build system (as is the case with Machida).</description>
+    </item>
+    
+    <item>
+      <title>Running A Wallaroo Application</title>
+      <link>https://docs.wallaroolabs.com/python-tutorial/running-a-wallaroo-application/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/python-tutorial/running-a-wallaroo-application/</guid>
+      <description>You should have already completed the setup instructions in the &amp;ldquo;Python Installation&amp;rdquo; guide.
+  Running the Application Wallaroo uses an embedded Python runtime wrapped with a C API around it that lets Wallaroo execute Python code and read Python variables. So when machida --application-module my_application is run, machida (the binary we previously compiled), loads up the my_application.py module inside of its embedded Python runtime and executes its application_setup() function to retrieve the application topology it needs to construct in order to run the application.</description>
+    </item>
+    
+    <item>
+      <title>Running Wallaroo</title>
+      <link>https://docs.wallaroolabs.com/operators-manual/running-wallaroo/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/operators-manual/running-wallaroo/</guid>
+      <description>A Wallaroo application is distributed over one or more Wallaroo processes, which we call &amp;ldquo;workers&amp;rdquo;. Any Wallaroo cluster will have one worker designated as the &amp;ldquo;cluster initializer&amp;rdquo;, a temporary role played during cluster initialization.
+Workers communicate with each other over two channels: a control channel and a data channel. They send metrics data over TCP to an external metrics address. And they optionally listen for messages from external systems over an external channel.</description>
+    </item>
+    
+    <item>
+      <title>Starting a new shell</title>
+      <link>https://docs.wallaroolabs.com/python-tutorial/starting-a-new-shell/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/python-tutorial/starting-a-new-shell/</guid>
+      <description>In this section, we&amp;rsquo;re going to review how you can start a new shell for Wallaroo regardless of how you installed it.
+Wallaroo in Docker For each Shell you&amp;rsquo;re expected to setup, you&amp;rsquo;d have to run the following to enter the Wallaroo Docker container:
+Enter the Wallaroo Docker container:
+ Python 2.7 Python 3  docker exec -it wally env-setup   docker exec -it wally env-setup -p python3    $(function(){$(&#34;</description>
+    </item>
+    
+    <item>
+      <title>State</title>
+      <link>https://docs.wallaroolabs.com/core-concepts/state/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/core-concepts/state/</guid>
+      <description>The expectation with Wallaroo is that most applications will be stateful. Understanding how Wallaroo handles state is key to being able to design effective Wallaroo applications. In this section, we&amp;rsquo;re going to take you through how state works in Wallaroo and what advantages this brings.
+Transactions in Wallaroo Transactions are awesome. Using a data management system that features transactions makes our lives as programmers much easier. Transactions provide certain guarantees about how data will be updated that make it easier to reason about our code, easier to understand what our code will do.</description>
+    </item>
+    
+    <item>
+      <title>TCP Decoders and Encoders</title>
+      <link>https://docs.wallaroolabs.com/python-tutorial/tcp-decoders-and-encoders/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/python-tutorial/tcp-decoders-and-encoders/</guid>
+      <description>Earlier, we spoke of sources and sinks and the role they play in Wallaroo. In this section, we are going to dive more into how you work with sources and sinks. We&amp;rsquo;ll be covering two key concepts: Decoders and Encoders.
+Reviewing our terms Source Ingress point for inputs from external systems into a Wallaroo application.
+Sink Egress point for outputs from a Wallaroo application to external systems.
+Decoder Code that transforms a stream of bytes from an external system into a series of application input types.</description>
+    </item>
+    
+    <item>
+      <title>Tips for using Wallaroo in Docker</title>
+      <link>https://docs.wallaroolabs.com/appendix/wallaroo-docker-tips/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/appendix/wallaroo-docker-tips/</guid>
+      <description>In this section, we will cover some tips that can help facilitate the development process for users of the Wallaroo Docker image.
+Editing Wallaroo files within the Wallaroo Docker container When we start the Wallaroo Docker image with the -v /tmp/wallaroo-docker/wallaroo-0.6.0/wallaroo-src:/src/wallaroo option, as described in the Python Docker Installation Guide section, we will be creating a new directory locally at /tmp/wallaroo-docker/wallaroo-0.6.0/wallaroo-src if it does not exist. This directory will be populated with the Wallaroo source code when we start the container for the first time.</description>
+    </item>
+    
+    <item>
+      <title>Using Connectors as Sources &amp; Sinks</title>
+      <link>https://docs.wallaroolabs.com/python-tutorial/using-connectors/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/python-tutorial/using-connectors/</guid>
+      <description>This is a preview release of Wallaroo&amp;rsquo;s connectors feature that allows full customization of sources and sinks. These sources and sinks can be integrated into Wallaroo using libraries you&amp;rsquo;re already familiar with in Python. A number of built-in connectors offer a quick way to get started and hook up common stream types and they&amp;rsquo;re all available for easy customization.
+Care has been taken to keep the API simple and the runtime assumptions unobtrusive so it&amp;rsquo;s easy to hook up the library to existing code.</description>
+    </item>
+    
+    <item>
+      <title>Wallaroo Metrics UI</title>
+      <link>https://docs.wallaroolabs.com/operators-manual/metrics-ui/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/operators-manual/metrics-ui/</guid>
+      <description>In this section, we&amp;rsquo;ll introduce you to the Wallaroo Metrics UI. The Metrics UI is a tool to allow you to get soft real-time metric updates for any connected Wallaroo applications. The Metrics UI will provide you with a general and detailed performance overview of each running application.
+Metrics are reported for 3 top level categories in a Wallaroo application: Pipelines, Workers, and Computations. Each top level category is an aggregation of elements in its own subcategory.</description>
+    </item>
+    
+    <item>
+      <title>Wallaroo Python API Classes</title>
+      <link>https://docs.wallaroolabs.com/python-tutorial/api/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/python-tutorial/api/</guid>
+      <description>The Wallaroo Python API allows developers to create Wallaroo applications in Python, which can then be run by Machida.
+Overview In order to create a Wallaroo application in Python, you need to create the functions and classes that provide the required interfaces for each stage in your pipeline, and then connect them together in a topology structure that is returned by the entry-point function application_setup. This function should always return the result of calling wallaroo.</description>
+    </item>
+    
+    <item>
+      <title>Wallaroo and Virtualenv</title>
+      <link>https://docs.wallaroolabs.com/python-tutorial/virtualenv/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/python-tutorial/virtualenv/</guid>
+      <description>We recommend using virtualenv to handle your application&amp;rsquo;s dependencies.
+While not required to run Wallaroo applications, virtualenv will ensure that your application and development environment are isolated from the rest of your Python installation(s) on your computer. In addition, virtualenv will ensure that Machida uses the correct version of Python if you have multiple versions installed on your computer.
+Installing Virtualenv Follow the instructions on the virtualenv website.
+Setting up Virtualenv for your Application To create a virtualenv for your application, run the following command</description>
+    </item>
+    
+    <item>
+      <title>Word Count</title>
+      <link>https://docs.wallaroolabs.com/python-tutorial/word-count/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/python-tutorial/word-count/</guid>
+      <description>Word count is the canonical streaming data application. It&amp;rsquo;s canonical not because everyone needs to count words but because it&amp;rsquo;s a good platform for demonstrating how to do many of the everyday tasks in a streaming application.
+This section will take you through our Wallaroo word count example. Along the way, we will introduce you to two new concepts: receiving and decoding data on a TCPSource, and splitting one incoming message into several outgoing ones.</description>
+    </item>
+    
+    <item>
+      <title>Working with State</title>
+      <link>https://docs.wallaroolabs.com/core-concepts/working-with-state/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/core-concepts/working-with-state/</guid>
+      <description>Wallaroo&amp;rsquo;s state objects allow developers to define their own domain-specific data structures that Wallaroo manages. These state objects are used to store state in running application. They provide safe, serialized access to data in a highly parallelized environment. In &amp;ldquo;Working in State&amp;rdquo;, we are going to take you through how you can operate on your state objects.
+State computations Imagine a word counting application. We&amp;rsquo;ll have a state object for each different word.</description>
+    </item>
+    
+    <item>
+      <title>Writing Your Own Application</title>
+      <link>https://docs.wallaroolabs.com/python-tutorial/writing-your-own-application/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/python-tutorial/writing-your-own-application/</guid>
+      <description>In this section, we will go over the components that are required in order to write a Wallaroo Python application. We will start with the stateless alerts.py application from the examples section, then move on to an application that maintains and modifies state and uses partitioning to divide its work.
+A Stateless Application - Alerts The alerts.py application is going to receive transactions as its input stream, check for certain conditions that should trigger alerts, and then send out any triggered alerts to its sink.</description>
+    </item>
+    
+    <item>
+      <title>Writing Your Own Stateful Application</title>
+      <link>https://docs.wallaroolabs.com/python-tutorial/writing-your-own-stateful-application/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://docs.wallaroolabs.com/python-tutorial/writing-your-own-stateful-application/</guid>
+      <description>In this section, we will go over how to write a stateful application with the Wallaroo Python API. If you haven&amp;rsquo;t reviewed the simple stateless Alerts application example yet, you can find it here.
+A Stateful Application - Alphabet Our stateful application is going to add state to the Alerts example. Again, it receives as its inputs messages representing transactions. But now instead of statelessly checking individual transactions to see if they pass certain thresholds, it will add each transaction amount to a running total.</description>
+    </item>
+    
+  </channel>
+</rss>

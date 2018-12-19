@@ -36,9 +36,9 @@ If you have more than one Python version installed, virtualenv may set up the im
 
 ```python
 Traceback (most recent call last):
-  File "wallaroo-{{ book.wallaroo_version }}/examples/python/alerts_stateful/alerts.py", line 18, in <module>
+  File "wallaroo-{{ {{% wallaroo-version %}} }}/examples/python/alerts_stateful/alerts.py", line 18, in <module>
     import wallaroo
-  File "wallaroo-{{ book.wallaroo_version }}/machida/wallaroo.py", line 16, in <module>
+  File "wallaroo-{{ {{% wallaroo-version %}} }}/machida/wallaroo.py", line 16, in <module>
     import argparse
   File "/usr/local/Cellar/python/2.7.14/Frameworks/Python.framework/Versions/2.7/lib/python2.7/argparse.py", line 86, in <module>
     import copy as _copy
@@ -107,7 +107,7 @@ To run a Wallaroo application with virtualenv, run it within an activated shell:
 {{< tabs >}}
 {{< tab name="Python 2.7" codelang="bash" >}}
 source ENV/bin/activate
-export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/lib:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/alerts_stateful"
+export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ {{% wallaroo-version %}} }}/machida/lib:$HOME/wallaroo-tutorial/wallaroo-{{ {{% wallaroo-version %}} }}/examples/python/alerts_stateful"
 machida --application-module alerts \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6000 --data 127.0.0.1:6001 --name worker-name \
@@ -116,7 +116,7 @@ machida --application-module alerts \
 {{< /tab >}}
 {{< tab name="Python 3" codelang="bash" >}}
 source ENV/bin/activate
-export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/lib:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/alerts_stateful"
+export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ {{% wallaroo-version %}} }}/machida/lib:$HOME/wallaroo-tutorial/wallaroo-{{ {{% wallaroo-version %}} }}/examples/python/alerts_stateful"
 machida3 --application-module alerts \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6000 --data 127.0.0.1:6001 --name worker-name \
