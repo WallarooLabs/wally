@@ -347,8 +347,6 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   new create(key: Key, agg: Aggregation[In, Out, Acc], range: U64, slide: U64,
     delay: U64, watermark_ts: U64)
   =>
-    // Invariant that range divides evenly by slide
-
     _key = key
     _agg = agg
     _range = range

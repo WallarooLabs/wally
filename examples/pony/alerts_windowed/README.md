@@ -12,8 +12,7 @@ objects.
 
 ### Processing
 
-We examine each transaction at a stateless computation. If the amount is higher
-than a certain positive threshold, we create a deposit alert. If it's lower than a certain negative threshold, we create a withdrawal alert.
+We sum transaction totals in sliding windows, and when they're triggered, check if the sum is either above or below a thershold, at which point we send an alert.
 
 ### Output
 

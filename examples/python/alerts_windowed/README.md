@@ -2,7 +2,7 @@
 
 ## About The Application
 
-This is an example of a windowed application that !@....
+This is an example of a windowed application that takes transactions, sums their totals in sliding windows, and sends an alert if a windowed total is above or below a threshold.
 
 ### Input
 
@@ -11,7 +11,7 @@ objects.
 
 ### Processing
 
-!@... 
+We sum transaction totals in sliding windows, and when they're triggered, check if the sum is either above or below a thershold, at which point we send an alert. 
 
 ### Output
 
