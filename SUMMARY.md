@@ -9,6 +9,8 @@
 * [State](book/core-concepts/state.md)
 * [Working with State](book/core-concepts/working-with-state.md)
 * [Partitioning](book/core-concepts/partitioning.md)
+* [Aggregations](book/core-concepts/aggregations.md)
+* [Windows](book/core-concepts/windows.md)
 
 ## Wallaroo Language Support
 * [Wallaroo Languages Supported](book/language_support.md)
