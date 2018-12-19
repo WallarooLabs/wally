@@ -56,18 +56,17 @@ This document uses Erlang code to describe the frame format and content. You don
 
 #### Constants
 
-Frame tags (`$H` = ASCII value of H):
-
 ```erlang
--define(HELLO, $H).
--define(OK, $O).
--define(ERROR, $E).
+-define(HELLO, 0).
+-define(OK, 1).
+-define(ERROR, 2).
 
--define(NOTIFY, $N).
--define(MESSAGE, $M).
+-define(NOTIFY, 3).
+-define(NOTIFY_ACK, 4).
+-define(MESSAGE, 5).
 
--define(ACK, $A).
--define(RESTART, $!).
+-define(ACK, 6).
+-define(RESTART, 7).
 ```
 
 Message bit-flags:
@@ -112,6 +111,10 @@ u16(N) ->
 -spec u32(non_neg_integer()) -> binary().
 u32(N) ->
     <<N:32/big-unsigned>>.
+
+-spec i64(non_neg_integer()) -> binary().
+i64(N) ->
+    <<N:64/big-signed>>.
 
 -spec u64(non_neg_integer()) -> binary().
 u64(N) ->
@@ -165,6 +168,7 @@ ok(InitialCredits, PointsOfReference) ->
         u32(InitialCredits),
         % This encodes each point of reference in sequence using the
         % remaining bytes in the frame.
+        u32(length(PointsOfReference)),
         lists:map(fun ({StreamId, StreamName, Ref}) ->
             [u64(StreamId), short_bytes(StreamName), point_of_reference(Ref)]
         end, PointsOfReference)
@@ -226,6 +230,17 @@ notify(StreamId, StreamName, PointOfRef) ->
         point_of_reference(PointOfRef)
     ]).
 
+-spec notify_ack(non_neg_integer(), bool(), point_of_reference()) -> frame().
+notify_ack(StreamId, NotifySuccess, PointOfRef) ->
+    frame([
+        ?NOTIFY_ACK,
+        if NotifySuccess -> <<1>>;
+           true          -> <<0>>
+        end,
+        u64(StreamId),
+        u64(PointOfRef)
+    ]).
+
 -spec message(Flags, StreamId, MessageId, EventTime, Key, Message) -> frame()
   when
     Flags :: non_neg_integer(),      % See message bit flag definitions above
@@ -244,7 +259,7 @@ message(Flags, StreamId, MessageId, EventTime, Key, Message) ->
             u64(MessageId)
         end,
         if Flags band ?EVENT_TIME /= 0 then
-            u64(EventTime)
+            i64(EventTime)
         else
             <<>>
         end,
@@ -261,7 +276,7 @@ message(Flags, StreamId, MessageId, EventTime, Key, Message) ->
     ]).
 
 ack(Credits, MessageAcks) ->
-    framed([
+    frame([
         ?ACK,
         u32(Credits),
         u32(length(MessageAcks)),
@@ -379,6 +394,7 @@ In the handshake state the following frame types are valid:
 In the streaming state the following frame types are valid:
 
    - NOFITY: Connector -> Worker
+   - NOTIFY_ACK: Worker -> Connector
    - MESSAGE: Connector -> Worker
    - ACK: Worker -> Connector
    - RESTART: Worker -> Connector
@@ -394,22 +410,38 @@ The disconnected state has no communication but it is recommended that the conne
 Each stream during a session must be in one of the following states:
 
 ```
-                  +-------------+--------------+
-                  |             |              |
-                  |             |              V
- +-------+     +------+     +--------+     +------------+
- | Start +---->| Open +---->| Closed +---->| Terminated |
- +-------+     +------+     +--------+     +------------+
-                  ^             |
-                  |             |
-                  +-------------+
+                  +------------+-------------+--------------+
+                  |            | +--------+  |              |
+                  |            | |        |  |              |
+                  |            | |        V  |              V
+ +-------+     +------+     +------+     +--------+     +------------+
+ | Start +---->|Notify|---->| Open +---->| Closed +---->| Terminated |
+ +-------+     | Sent |     |      |     |        |     |            |
+               +------+     +------+     +--------+     +------------+
+                  ^  |                     ^ |
+                  |  |                     | |
+                  |  +---------------------+ |
+                  +--------------------------+
 ```
 
 New streams must be introduced and reset streams must be reintroduced. The connector may not know if a notification is the first use of a stream or not. If the StreamId has been used before, the handshake will include information on where to resume from. The state machine will always end up in the open state after a notification.
 
-In the intro state, the following actions are valid:
+In the start state, the following actions are valid:
 
-    - NOTIFY: Connector -> Worker (provide a stream id and a fully qualified name)
+- NOTIFY: Connector -> Worker (provide a stream id and a fully qualified name)
+
+In the notify-sent state, the following actions are valid:
+
+- NOTIFY_ACK: Worker -> Connector
+    * The `NotifySuccess` byte indicates whether the connector has successfully processed the NOTIFY message.  Value values are:
+        - 1: The connector may send MESSAGE actions for this stream id.
+            * Next state is open
+        - 0: The connector may not send MESSAGE actions for this stream id.  The worker (or, in a future Wallaroo release, another worker) has this stream id in use by another connection and therefore prohibits use by this connection.
+            * Next state is closed
+    * NOTE: The point of reference in this ACK may differ from the point of reference sent by the connector in the NOTIFY message.  The connector must use the point of reference given in the NOTIFY_ACK message.
+    * The connector must not send MESSAGE for any stream id before the connector receives a successful NOTIFY_ACK for the stream id.
+- RESTART: Worker -> Connector (next state is terminated)
+    * worker is requesting that all streams be reprocessed
 
 In the open state, the following actions are valid:
 
@@ -418,14 +450,14 @@ In the open state, the following actions are valid:
 - ACK: Worker -> Connector
     * the are not 1-1 with MESSAGE frames
 - RESTART: Worker -> Connector (next state is terminated)
-    * worker is requesting that the stream be reprocessed in some way
+    * worker is requesting that all streams be reprocessed
 
 In the closed state, the following actions are valid:
 
 - NOTIFY: Connector -> Worker (next state is open)
     * reopens the stream
 - RESTART: Worker -> Connector (next state is terminated)
-    * worker is requesting that the stream be reprocessed in some way
+    * worker is requesting that all streams be reprocessed
 - ACK: Worker -> Connector
     * these can arrive asynchronously and should be processed accordingly
 
