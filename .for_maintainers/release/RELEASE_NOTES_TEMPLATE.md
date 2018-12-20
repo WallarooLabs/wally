@@ -32,7 +32,7 @@ Overview of release and what is included.
 In all cases below, if you run into issues, please reach out to us! We’re available on [twitter](https://twitter.com/wallaroolabs), [IRC](https://webchat.freenode.net/?channels=#wallaroo), [Github](https://github.com/WallarooLabs/wallaroo), [by email](mailto:hello@wallaroolabs.com), or [our mailing list](https://groups.io/g/wallaroo).
 We love questions!
 
-**If you have made no changes to Wallaroo or Pony since installation, your best bet will be to start from scratch, following the [instructions](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) of your choice.**
+**If you have made no changes to Wallaroo or Pony since installation, your best bet will be to start from scratch, following the [instructions](https://docs.wallaroolabs.com/python-installation/) of your choice.**
 
 Below are instructions for [Upgrading Wallaroo when compiled from source](#upgrading-wallaroo-when-compiled-from-source), [Upgrading Wallaroo in Docker](#upgrading-wallaroo-in-docker), [Upgrading Wallaroo in Vagrant](#upgrading-wallaroo-in-vagrant), and [Upgrading Wallaroo via Wallaroo Up](#upgrading-wallaroo-up).
 
@@ -125,7 +125,7 @@ mkdir c:\wallaroo-docker\wallaroo-src
 <a name="upgrading-wallaroo-in-vagrant"></a>
 ### Upgrading Wallaroo in Vagrant
 
-To upgrade your Wallaroo installation in Vagrant, you’ll want to follow the latest installation instructions for [Wallaroo in Vagrant](https://docs.wallaroolabs.com/book/getting-started/vagrant-setup.html).
+To upgrade your Wallaroo installation in Vagrant, you’ll want to follow the latest installation instructions for [Wallaroo in Vagrant](https://docs.wallaroolabs.com/python-installation/python-vagrant-installation-guide/).
 
 Finally, to provision your new Vagrant box, run the following commands:
 

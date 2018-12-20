@@ -2,7 +2,7 @@
 
 This is an example application that receives strings of text, splits it into individual words and counts the occurrences of each word. Contains commands to allow you to autoscale up to 3 worker cluster, starting from 1.
 
-You will need a working [Wallaroo Python API](/book/python/intro.md).
+You will need a working [Wallaroo Python API](https://docs.wallaroolabs.com/python-tutorial/).
 
 ## Running Word Count
 
