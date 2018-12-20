@@ -5,7 +5,7 @@ Machida is a Wallaroo-Python Runtime that enables a Wallaroo application to be w
 ## Requirements
 
 You will need your environment to be [set up with a working
-Wallaroo](/book/getting-started/setup.md).
+Wallaroo](https://docs.wallaroolabs.com/python-installation/).
 
 ## Build
 

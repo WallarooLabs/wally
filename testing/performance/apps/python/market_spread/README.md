@@ -4,12 +4,12 @@
 
 This is a version of the Python Market Spread example application using struct serialization for better performance when testing multi-worker and resilience.
 
-You can read more about Market Spread in [What is Wallaroo](/book/what-is-wallaroo.md)
+You can read more about Market Spread in [What is Wallaroo](https://docs.wallaroolabs.com/)
 
 
 ## Running Market Spread
 
-In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [MacOS](/book/getting-started/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool.
 
 You will need five separate shells to run this application. Open each shell and go to the `testing/performance/apps/python/market_spread` directory.
 

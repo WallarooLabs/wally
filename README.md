@@ -143,13 +143,13 @@ Wallaroo is licensed under the [Apache version 2][apache-2-license] license.
 [cla]: https://gist.github.com/WallarooLabsTeam/e06d4fed709e0e7035fdaa7249bf88fb
 [commercial-support-email]: mailto:sales@wallaroolabs.com
 [contribution-guide]: CONTRIBUTING.md
-[docker-link]: https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html
+[docker-link]: https://docs.wallaroolabs.com/python-installation/
 [documentation]: https://docs.wallaroolabs.com/
 [group-badge]: https://img.shields.io/badge/mailing%20list-join%20%E2%86%92-%23551A8B.svg
 [group-link]: https://groups.io/g/wallaroo
 [hello-wallaroo-post]: https://blog.wallaroolabs.com/2017/03/hello-wallaroo/
 [home-page]: https://www.wallaroolabs.com/
-[installation-options]: https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html
+[installation-options]: https://docs.wallaroolabs.com/python-installation/
 [irc-badge]: https://img.shields.io/badge/IRC-join%20chat%20%E2%86%92-blue.svg
 [irc-link]: https://webchat.freenode.net/?channels=#wallaroo
 [kafka-link]: https://kafka.apache.org/
@@ -158,8 +158,7 @@ Wallaroo is licensed under the [Apache version 2][apache-2-license] license.
 [overview-video]: https://vimeo.com/234753585
 [python-examples]: examples/python/
 [reverse]: examples/python/reverse/
-[source-install-instructions]: https://docs.wallaroolabs.com/book/getting-started/linux-setup.html
 [survey-link]: https://wallaroolabs.typeform.com/to/HS6azY?source=wallaroo_readme
 [wallaroo-license-readme]: #license
-[wally-up]: https://docs.wallaroolabs.com/book/getting-started/wallaroo-up.html
+[wally-up]: https://docs.wallaroolabs.com/python-installation/python-wallaroo-up-installation-guide/
 [faq]: https://www.wallaroolabs.com/faq
