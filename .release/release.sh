@@ -90,7 +90,12 @@ update_version() {
 
 commit_version_update() {
   echo "Committing version change..."
-  git add .
+  # commit VERSION update
+  git add VERSION
+  git add vagrant/Vagrantfile
+  git add misc/wallaroo-up.sh
+  git add misc/activate
+  git add Dockerfile
   git commit -m "Update version for $for_version release"
 }
 

@@ -74,7 +74,12 @@ update_version() {
 }
 
 commit_version_update() {
-  git add .
+  # commit VERSION update
+  git add VERSION
+  git add vagrant/Vagrantfile
+  git add misc/wallaroo-up.sh
+  git add misc/activate
+  git add Dockerfile
   git commit -m "Create candidate for $version release"
 }
 
