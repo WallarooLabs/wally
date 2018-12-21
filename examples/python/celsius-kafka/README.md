@@ -22,14 +22,14 @@ The `decoder` function creates a float from the value represented by the payload
 
 ## Running Celsius Kafka
 
-In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/python-installation/) instructions to choose one of these options if you have not already done so.
+In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
 If you are using Python 3, replace all instances of `machida` with `machida3` in your commands.
 
 You will also need access to a Kafka cluster.
 
 **NOTE:** If running in Docker, the Kafka cluster and kafkacat should be run from your host and not within the Docker container.
 
-You will need five separate shells to run this application (please see [starting a new shell](https://docs.wallaroolabs.com/python-tutorial/starting-a-new-shell/) for details depending on your installation choice). Open each shell and go to the `examples/python/celsius-kafka` directory.
+You will need five separate shells to run this application (please see [starting a new shell](https://docs.wallaroolabs.com/book/getting-started/starting-a-new-shell.html) for details depending on your installation choice). Open each shell and go to the `examples/python/celsius-kafka` directory.
 
 ### Shell 1: Metrics
 

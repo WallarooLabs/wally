@@ -3,7 +3,7 @@
 /book/getting-started/docker-setup.html /python-installation/python-docker-installation-guide/ 301
 /book/getting-started/vagrant-setup.html /python-installation/python-vagrant-installation-guide/ 301
 /book/getting-started/run-a-wallaroo-application-wallaroo-up.html /python-installation/python-vagrant-installation-guide/#validate-your-installation 301
-/book/getting-started/run-a-wallaroo-application-docker.html /python-installation/python-docker-installation-guide/#validate-your-installation 301
+/getting-started/run-a-wallaroo-application-docker.html /python-installation/python-docker-installation-guide/#validate-your-installation 301
 
 /book/python/api.html /python-tutorial/api/ 301
 /book/python/wallaroo-python-api.html /python-tutorial/ 301

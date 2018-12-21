@@ -34,7 +34,7 @@ Any issues that arise during testing should be created using the following forma
 
 ##### Docker Installation Instructions
 
-Follow the instructions for [setting up and installing Wallaroo](https://wallaroo-docs-rc.netlify.com/python-installation/python-docker-installation-guide/).
+Follow the instructions for [setting up and installing Wallaroo](https://wallaroo-docs-rc.netlify.com/book/getting-started/docker-setup.html).
 
 - [ ] MacOS -
 - [ ] Windows -
@@ -42,7 +42,7 @@ Follow the instructions for [setting up and installing Wallaroo](https://wallaro
 
 ##### Docker "Run a Wallaroo Application" Instructions
 
-Follow the instructions for [Run a Wallaroo Application in Docker](https://wallaroo-docs-rc.netlify.com/python-installation/python-docker-installation-guide/#validate-your-installation).
+Follow the instructions for [Run a Wallaroo Application in Docker](https://wallaroo-docs-rc.netlify.com/book/getting-started/run-a-wallaroo-application-docker.html).
 
 - [ ] MacOS -
 - [ ] Windows -
@@ -60,7 +60,7 @@ Run through all the Python examples and make sure they work. This means everythi
 
 ##### Installing From Wallaroo Up for Python Instructions
 
-Follow the instructions for [setting up and installing Wallaroo](https://wallaroo-docs-rc.netlify.com/python-installation/python-wallaroo-up-installation-guide/).
+Follow the instructions for [setting up and installing Wallaroo](https://wallaroo-docs-rc.netlify.com/book/getting-started/wallaroo-up.html).
 
 - [ ] Ubuntu Xenial -
 - [ ] Ubuntu Trusty -
@@ -71,7 +71,7 @@ Follow the instructions for [setting up and installing Wallaroo](https://wallaro
 
 ##### Python From Wallaroo Up "Run a Wallaoo Application" Instructions
 
-Follow the instructions for the Python From Wallaroo Up [Run a Wallaroo Application](https://wallaroo-docs-rc.netlify.com/python-installation/python-wallaroo-up-installation-guide/#validate-your-installation).
+Follow the instructions for the Python From Wallaroo Up [Run a Wallaroo Application](https://wallaroo-docs-rc.netlify.com/book/getting-started/run-a-wallaroo-application-wallaroo-up.html).
 
 - [ ] Ubuntu Xenial -
 - [ ] Ubuntu Trusty -
@@ -95,11 +95,41 @@ Making Sure it Works:
 - [ ] Debian Stretch -
 - [ ] CentOS 7 -
 
+#### Python From Source
+
+##### Installing From Source for Python Instructions
+
+Follow the instructions for [setting up and installing Wallaroo](https://wallaroo-docs-rc.netlify.com/book/getting-started/linux-setup.html).
+
+- [ ] Xenial -
+- [ ] Trusty -
+- [ ] Bionic -
+
+##### Python From Source "Run a Wallaoo Application" Instructions
+
+Follow the instructions for the Python From Source [Run a Wallaroo Application](https://wallaroo-docs-rc.netlify.com/book/getting-started/run-a-wallaroo-application.html).
+
+- [ ] Xenial -
+- [ ] Trusty -
+- [ ] Bionic -
+
+##### From Source Python Examples
+
+Run through all the Python examples and make sure they work. This means everything in `examples/python`. You can run the automated version using `<wallaroo-install-path>/misc/example-tester.sh python`. This will run all examples except the kafka ones.
+
+Making Sure it Works:
+    - Building and running all  `examples/python` applications
+    - verifying all applications build and run as expected
+
+- [ ] Xenial -
+- [ ] Trusty -
+- [ ] Bionic -
+
 #### Vagrant for Python
 
 ##### Vagrant Installation Instructions
 
-Follow the instructions for [setting up and installing Wallaroo](https://wallaroo-docs-rc.netlify.com/python-installation/python-vagrant-installation-guide/).
+Follow the instructions for [setting up and installing Wallaroo](https://wallaroo-docs-rc.netlify.com/book/getting-started/vagrant-setup.html).
 
 - [ ] MacOS -
 - [ ] Windows -
@@ -107,7 +137,7 @@ Follow the instructions for [setting up and installing Wallaroo](https://wallaro
 
 ##### Vagrant "Run a Wallaroo Application" Instructions
 
-Follow the instructions for [Run a Wallaroo Application in Vagrant](https://wallaroo-docs-rc.netlify.com/python-installation/python-vagrant-installation-guide/#validate-your-installation).
+Follow the instructions for [Run a Wallaroo Application in Vagrant](https://wallaroo-docs-rc.netlify.com/book/getting-started/run-a-wallaroo-application-vagrant.html).
 
 - [ ] MacOS -
 - [ ] Windows -
@@ -120,6 +150,128 @@ Run through all the Python examples and make sure they work. This means everythi
 - [ ] MacOS -
 - [ ] Windows -
 - [ ] Linux -
+
+#### Docker for Go
+
+##### Docker Installation Instructions
+
+Follow the instructions for [setting up and installing Wallaroo](https://wallaroo-docs-rc.netlify.com/book/go/getting-started/docker-setup.html).
+
+- [ ] MacOS -
+- [ ] Windows -
+- [ ] Linux -
+
+##### Docker "Run a Wallaroo Application" Instructions
+
+Follow the instructions for [Run a Wallaroo Go Application in Docker](https://wallaroo-docs-rc.netlify.com/book/go/getting-started/run-a-wallaroo-go-application-docker.html).
+
+- [ ] MacOS -
+- [ ] Windows -
+- [ ] Linux -
+
+##### Docker Go Examples
+
+Run through all the Go examples and make sure they work. This means everything in `examples/go`. You can run the automated version using `<wallaroo-install-path>/misc/example-tester.sh go`. This will run all examples except the kafka ones.
+
+- [ ] MacOS -
+- [ ] Windows -
+- [ ] Linux -
+
+#### Go From Wallaroo Up
+
+##### Installing From Wallaroo Up for Go Instructions
+
+Follow the instructions for [setting up and installing Wallaroo](https://wallaroo-docs-rc.netlify.com/book/go/getting-started/wallaroo-up.html).
+
+- [ ] Ubuntu Xenial -
+- [ ] Ubuntu Trusty -
+- [ ] Ubuntu Bionic -
+- [ ] Fedora 28 -
+- [ ] Debian Stretch -
+- [ ] CentOS 7 -
+
+##### Go From Wallaroo Up "Run a Wallaoo Application" Instructions
+
+Follow the instructions for the Go From Wallaroo Up [Run a Wallaroo Application](https://wallaroo-docs-rc.netlify.com/book/go/getting-started/run-a-wallaroo-go-application-wallaroo-up.html).
+
+- [ ] Ubuntu Xenial -
+- [ ] Ubuntu Trusty -
+- [ ] Ubuntu Bionic -
+- [ ] Fedora 28 -
+- [ ] Debian Stretch -
+- [ ] CentOS 7 -
+
+##### From Wallaroo Up Go Examples
+
+Run through all the Go examples and make sure they work. This means everything in `examples/go`. You can run the automated version using `<wallaroo-install-path>/misc/example-tester.sh go`. This will run all examples except the kafka ones.
+
+Making Sure it Works:
+    - Building and running all  `examples/go` applications
+    - verifying all applications build and run as expected
+
+- [ ] Ubuntu Xenial -
+- [ ] Ubuntu Trusty -
+- [ ] Ubuntu Bionic -
+- [ ] Fedora 28 -
+- [ ] Debian Stretch -
+- [ ] CentOS 7 -
+
+#### Go From Source
+
+##### Installing From Source for Go Instructions
+
+Follow the instructions for [setting up and installing Wallaroo](https://wallaroo-docs-rc.netlify.com/book/go/getting-started/linux-setup.html).
+
+- [ ] Xenial -
+- [ ] Trusty -
+- [ ] Bionic -
+
+##### Go "Run a Wallaoo Application" Instructions
+
+Follow the instructions for [Run a Wallaroo Go Application](https://wallaroo-docs-rc.netlify.com/book/go/getting-started/run-a-wallaroo-go-application.html).
+
+- [ ] Xenial -
+- [ ] Trusty -
+- [ ] Bionic -
+
+##### From Source Go Examples
+
+Run through all the Go examples and make sure they work. This means everything in `examples/go`. You can run the automated version using `<wallaroo-install-path>/misc/example-tester.sh go`. This will run all examples except the kafka ones.
+
+Making Sure it Works:
+    - Building and running all  `examples/go` applications
+    - verifying all applications build and run as expected
+
+- [ ] Xenial -
+- [ ] Trusty -
+- [ ] Bionic -
+
+#### Vagrant for Go
+
+##### Vagrant Installation Instructions
+
+Follow the instructions for [setting up and installing Wallaroo](https://wallaroo-docs-rc.netlify.com/book/go/getting-started/vagrant-setup.html).
+
+- [ ] MacOS -
+- [ ] Windows -
+- [ ] Linux -
+
+##### Vagrant "Run a Wallaroo Application" Instructions
+
+Follow the instructions for [Run a Wallaroo Go Application in Vagrant](https://wallaroo-docs-rc.netlify.com/book/go/getting-started/run-a-wallaroo-go-application-vagrant.html).
+
+- [ ] MacOS -
+- [ ] Windows -
+- [ ] Linux -
+
+##### Vagrant Go Examples
+
+Run through all the Go examples and make sure they work. This means everything in `examples/go`. You can run the automated version using `<wallaroo-install-path>/misc/example-tester.sh go`. This will run all examples except the kafka ones.
+
+- [ ] MacOS -
+- [ ] Windows -
+- [ ] Linux -
+
 
 ## Phase 2
 

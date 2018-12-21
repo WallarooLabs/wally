@@ -94,7 +94,7 @@ case "$OS" in
     *)
     echo "This script has only been tested on Linux. Wallaroo can be "
     echo "installed on non-Linux environments using Docker or Vagrant. Please visit: "
-    echo "https://docs.wallaroolabs.com/python-installation/"
+    echo "https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html"
     echo "for instructions for a Python Wallaroo environment or please visit: "
     echo "https://docs.wallaroolabs.com/book/go/getting-started/choosing-an-installation-option.html"
     echo "for instructions for a Go Wallaroo environment."

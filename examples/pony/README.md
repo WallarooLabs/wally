@@ -2,7 +2,7 @@
 
 In this section you will find Wallaroo examples in [Ponylang](https://www.ponylang.org).
 
-To get set up for running examples, you should complete the [setup instructions](https://docs.wallaroolabs.com/python-installation/).
+To get set up for running examples, you should complete the [setup instructions](/book/getting-started/setup.md).
 
 ## Examples by Category
 
