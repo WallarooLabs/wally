@@ -18,6 +18,7 @@
 
 /book/running-wallaroo/running-wallaroo.html /operators-manual/running-wallaroo/ 301
 /book/metrics/metrics-ui.html /operators-manual/metrics-ui/ 301
+/book/go/getting-started/setup.html ??? 301
+/book/go/api/start-a-project.html ??? 301
+/book/go/api/interworker-serialization-and-resilience.html ??? 301
 /book/core-concepts/clustering.html /operators-manual/running-wallaroo/ 301
-
-/book/go/* /go 301
