@@ -76,3 +76,16 @@ Once that is completed, you can run the following to run the `wallaroo-up-tester
 ```bash
 ./wallaroo-up-tester.bash 1 custom
 ```
+
+## Updating Wallaroo Up Script Checksum
+
+If you made a change to the `misc/wallaroo-up.sh` file, you will need to update the checksum to match the current file structure. In order to do so you will need to run the following script from the top level directory in the Wallaroo repository:
+
+```bash
+bash misc/update-wallaroo-up-checksum.sh
+```
+
+### Dependencies
+
+The `misc/update-wallaroo-up-checksum.sh` requires the system it is running on to have `grep` and `sed`.
+  
