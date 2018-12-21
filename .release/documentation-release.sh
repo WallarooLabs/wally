@@ -6,7 +6,7 @@ set -o nounset
 verify_args() {
   ## Verifies that the documentation release is being run for the provided args for
   ## version and commit
-  echo "Creating documentation for version $for_version with commit $commit"
+  echo "Creating gitbook for version $for_version with commit $commit"
   while true; do
     read -rp "Is this correct (y/n)?" yn
     case $yn in

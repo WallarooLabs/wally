@@ -18,14 +18,14 @@ Our release process features a few primary steps
 * Building and releasing RC artifacts including:
   * Building and releasing the Wallaroo RC source archive and Metrics UI RC AppImage to Bintray
   * Building and releasing the Wallaroo and Metrics UI RC Docker images on Bintray
-  * Building and pushing RC Documentation
+  * Building and pushing RC Documentation Gitbook
 * Testing of the release candidate
 * Promoting of a release candidate to a release
 * Building and releasing artifacts including:
   * Building and releasing the Wallaroo source archive and Metrics UI AppImage to Bintray
   * Building and releasing the Wallaroo and Metrics UI Docker images on Bintray
   * Building and publishing a publicly accesible AMI
-  * Building and pushing Documentation
+  * Building and pushing Documentation Gitbook
 
 * Post release process
 
