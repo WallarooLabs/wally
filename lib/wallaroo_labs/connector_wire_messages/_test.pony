@@ -1,6 +1,6 @@
 /*
 
-Copyright 2017 The Wallaroo Authors.
+Copyright 2018 The Wallaroo Authors.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -151,7 +151,7 @@ class iso _TestErrorMsg is UnitTest
     let encoded = Frame.encode(a)
     let m = Frame.decode(encoded)?
     let b = m as ErrorMsg
-    h.assert_eq[String](b.message, msg)
+    h.assert_eq[String](a.message, msg)
     h.assert_eq[String](b.message, msg)
 
 class iso _TestNotifyMsg is UnitTest
