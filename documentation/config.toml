@@ -1,34 +1,3 @@
-baseURL = "https://docs.wallaroolabs.com/"
+baseURL = "http://example.org/"
 languageCode = "en-us"
-title = "Wallaroo"
-theme = "ananke"
-canonifyurls = false
-preserveTaxonomyNames = true
-
-[params]
-  wallaroo_version = "0.5.3"
-  custom_css = ["css/jquery-ui.min.css", "css/jquery-ui.theme.min.css", "css/highlight.css", "css/my.css"]
-  background_color_class = "bg-green"
-
-[related]
-  threshold = 80
-  includeNewer = true
-  toLower = false
-
-[[related.indices]]
-  name = "tags"
-  weight = 100
-
-[menu]
-
-[[menu.docs]]
-  name = "Core Concepts"
-  weight = 1
-  identifier = "core-concepts"
-  url = "/core-concepts"
-
-[[menu.docs]]
-  name = "Python Tutorial"
-  weight = 1
-  identifier = "pytutorial"
-  url = "/python-tutorial"
+title = "My New Hugo Site"
