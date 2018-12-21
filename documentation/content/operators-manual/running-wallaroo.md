@@ -25,12 +25,12 @@ If you are using the Python API, then you will run [Machida](/book/python/intro.
 Putting this all together, to run the Alerts app, you would run the following command:
 
 {{< tabs >}}
-{{< tab name="Python 2.7" codelang="bash" >}}
+{{< tab name="Python 2.7" codelang="python" >}}
 machida --application-module alerts --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --cluster-initializer --ponythreads 1
 {{< /tab >}}
-{{< tab name="Python 3" codelang="bash" >}}
+{{< tab name="Python 3" codelang="python" >}}
 machida3 --application-module alerts --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --cluster-initializer --ponythreads 1
@@ -52,7 +52,7 @@ For non-initializer workers, you also need to set the control and data addresses
 Assuming we are running a two worker cluster on a single machine, we would run the following commands:
 
 {{< tabs >}}
-{{< tab name="Python 2.7" codelang="bash" >}}
+{{< tab name="Python 2.7" codelang="python" >}}
 Worker 1
 
 machida --application-module alerts \
@@ -67,7 +67,7 @@ machida --application-module alerts \
   --my-control 127.0.0.1:6503 --my-data 127.0.0.1:6504 \
   --control 127.0.0.1:6500 --name Worker2 --ponythreads 1
 {{< /tab >}}
-{{< tab name="Python 3" codelang="bash" >}}
+{{< tab name="Python 3" codelang="python" >}}
 Worker 1
 
 machida3 --application-module alerts \
@@ -97,14 +97,14 @@ Resilience files are based on the name you supply the worker so starting differe
 Wallaroo comes with a [cluster shutdown tool](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/utils/cluster_shutdown) that can be used to shut down a running cluster. In order to receive a cluster shutdown message, our workers must be listening on an "external channel". We provide an address for this via the `--external` command line argument. For example, to have our cluster initializer create an external channel listening on `127.0.0.1:5050`, we'd start it up with a command like the following:
 
 {{< tabs >}}
-{{< tab name="Python 2.7" codelang="bash" >}}
+{{< tab name="Python 2.7" codelang="python" >}}
 machida --application-module alerts \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6500 --data 127.0.0.1:6501 --worker-count 2 \
   --cluster-initializer --ponythreads 1 \
   --external 127.0.0.1:5050
 {{< /tab >}}
-{{< tab name="Python 3" codelang="bash" >}}
+{{< tab name="Python 3" codelang="python" >}}
 machida3 --application-module alerts \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6500 --data 127.0.0.1:6501 --worker-count 2 \
