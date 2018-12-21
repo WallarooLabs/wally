@@ -3,7 +3,7 @@ title: "Running Wallaroo"
 menu:
   docs:
     parent: "operators-manual"
-    weight: 10
+    weight: 1
 toc: true
 ---
 A Wallaroo application is distributed over one or more Wallaroo processes, which we call "workers". Any Wallaroo cluster will have one worker designated as the "cluster initializer", a temporary role played during cluster initialization.
@@ -20,7 +20,7 @@ If you are starting up a Wallaroo cluster with only one worker, then that worker
 
 If your application uses a TCP source, then you must specify a TCP input address via `--in`. Likewise, if your application uses a TCP sink, then you must specify a TCP output address via `--out`. In what follows, we'll be using the [Alerts](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/python/alerts_stateful) example app which uses a TCP sink.
 
-If you are using the Python API, then you will run [Machida](/python-tutorial/#machida), passing in the application name via `--application-module`. And since Machida is single-threaded, you must pass in `--ponythreads 1` (otherwise Machida will refuse to start).
+If you are using the Python API, then you will run [Machida](/python-tutorial/intro/#machida), passing in the application name via `--application-module`. And since Machida is single-threaded, you must pass in `--ponythreads 1` (otherwise Machida will refuse to start).
 
 Putting this all together, to run the Alerts app, you would run the following command:
 

@@ -5,7 +5,6 @@ menu:
     parent: "pyinstallation"
     weight: 1
 toc: true
-layout: single
 ---
 For 64-bit MacOS and Windows users, we provide two different ways for you to install Wallaroo:
 

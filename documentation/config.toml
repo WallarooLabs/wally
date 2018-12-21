@@ -50,23 +50,3 @@ preserveTaxonomyNames = true
   weight = 5
   identifier = "appendix"
   url = "/appendix"
-
-  [[menu.main]]
-    name = "Core Concepts"
-    url = "/core-concepts/"
-    weight = 1
-
-  [[menu.main]]
-    name = "Installation"
-    url = "/python-installation/"
-    weight = 10
-
-  [[menu.main]]
-    name = "Tutorial"
-    url = "/python-tutorial/"
-    weight = 20
-
-  [[menu.main]]
-    name = "Operators Manual"
-    url = "/operators-manual/"
-    weight = 30

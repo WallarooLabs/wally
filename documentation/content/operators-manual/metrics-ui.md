@@ -3,14 +3,14 @@ title: "Wallaroo Metrics UI"
 menu:
   docs:
     parent: "operators-manual"
-    weight: 50
+    weight: 5
 toc: true
 ---
 In this section, we'll introduce you to the Wallaroo Metrics UI. The Metrics UI is a tool to allow you to get soft real-time metric updates for any connected Wallaroo applications. The Metrics UI will provide you with a general and detailed performance overview of each running application.
 
 Metrics are reported for 3 top level categories in a Wallaroo application: `Pipelines`, `Workers`, and `Computations`. Each top level category is an aggregation of elements in its own subcategory. The Metrics UI also provides metrics for each subcategory. All metrics are provided using a time window of the last 5 minutes of processing.
 
-At this point we assume you've made your way through the [Setting Up Your Environment for Wallaroo](/python-installation/) and [Core Concepts](/core-concepts/) sections of the documentation. If you haven't, please do so and return here once you have.
+At this point we assume you've made your way through the [Setting Up Your Environment for Wallaroo](/python-installation/choosing-an-installation-option/) and [Core Concepts](/core-concepts/core-concepts/) sections of the documentation. If you haven't, please do so and return here once you have.
 
 ## Getting Started with the Metrics UI
 
@@ -98,7 +98,7 @@ Now that we have an understanding of what metrics we'll be showing you and the c
 
 ## Page by Page Overview
 
-In this section, we'll give a page by page overview of the information presented to you via the Wallaroo Metrics UI. This information is presented via static images and does not fully convey the experience of using the Metrics UI live with a running Wallaroo application. To follow along on your own, follow the instructions in the [Validate Your Installation](/python-installation/python-docker-installation-guide/#validate-your-installation) section of one of the [installation guides](/python-installation/). Once you've completed the **Check Out Some Metrics** section of that page and have visited the URL for the Metrics UI, you'll be ready to follow along as we take a deep dive into the Metrics UI.
+In this section, we'll give a page by page overview of the information presented to you via the Wallaroo Metrics UI. This information is presented via static images and does not fully convey the experience of using the Metrics UI live with a running Wallaroo application. To follow along on your own, follow the instructions in the [Validate Your Installation](/python-installation/python-docker-installation-guide/#validate-your-installation) section of one of the [installation guides](/python-installation/choosing-an-installation-option/). Once you've completed the **Check Out Some Metrics** section of that page and have visited the URL for the Metrics UI, you'll be ready to follow along as we take a deep dive into the Metrics UI.
 
 ### Landing
 

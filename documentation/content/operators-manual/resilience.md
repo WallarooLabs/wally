@@ -3,7 +3,7 @@ title: "Resilience"
 menu:
   docs:
     parent: "operators-manual"
-    weight: 30
+    weight: 3
 toc: true
 ---
 Wallaroo is designed with built-in resilience. However, since the operations involved with maintaining resilience can impact performance, this mode is off by default. For python users, we provide a separate binary with resilience enabled: `machida-resilience` (and `machida3-resilience` for Python 3) as part of the default installation. For Go and Ponyc users, to enable resilience in a Wallaroo application, the binary needs to be built with `-D resilience` if using the `ponyc` compiler directly, or with `resilience=on` if using our Makefile build system (as is the case with `Machida`).
@@ -34,7 +34,7 @@ For example, if we were running the bundled Python example [word_count](https://
 
 ### Running the resilience example
 
-In order to run the example you will need Machida with resilience enabled, Giles Sender, Data Receiver, and the Cluster Shutdown tool. If you haven't yet set up wallaroo, please visit our [setup](/python-installation/) instructions to get started.
+In order to run the example you will need Machida with resilience enabled, Giles Sender, Data Receiver, and the Cluster Shutdown tool. If you haven't yet set up wallaroo, please visit our [setup](/python-installation/choosing-an-installation-option/) instructions to get started.
 
 #### Starting new shells
 
