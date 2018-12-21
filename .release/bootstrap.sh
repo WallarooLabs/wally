@@ -94,13 +94,11 @@ install_python_dependencies() {
   echo "** Python dependencies installed"
 }
 
-install_documentation_dependencies() {
-  pushd /tmp
-  # install hugo
-  wget https://github.com/gohugoio/hugo/releases/download/v0.52/hugo_0.52_Linux-64bit.deb
-  sudo dpkg -i hugo_0.52_Linux-64bit.deb
-
-  popd
+install_gitbook_dependencies() {
+  # install gitbook
+  npm install gitbook-cli -g
+  # install any required plugins - this checks book.json for plugin list
+  gitbook install
   # for uploading generated docs to repo
   sudo -H python -m pip install ghp-import
 }
@@ -191,7 +189,7 @@ install_kafka_compression_libraries
 install_required_libraries
 install_monitoring_hub_dependencies
 install_python_dependencies
-install_documentation_dependencies
+install_gitbook_dependencies
 install_docker
 install_go
 install_other

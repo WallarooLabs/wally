@@ -80,12 +80,6 @@ update_version() {
   # update checksum in wallaroo-up.sh
   WALLAROO_UP_CHECKSUM_COMMAND=$(grep -Po '(?<=^CALCULATED_MD5="\$\().*(?=\)")' misc/wallaroo-up.sh | sed 's@\$0@misc/wallaroo-up.sh@')
   sed -i "s@^MD5=.*@MD5=\"$(eval $WALLAROO_UP_CHECKSUM_COMMAND)\"@" misc/wallaroo-up.sh
-  # Update version in config.toml
-  sed -i "s/^wallaroo_version=.*/wallaroo_version=\"${version}\"/" documentation/config.toml
-  # Update docker version in config.toml
-  DOCKER_VERSION=$(< VERSION)-$(git log -n 1 --oneline | cut -d' ' -f1)
-  DOCKER_URL="release\/wallaroo:$DOCKER_VERSION"
-  sed -i "s/^docker_version_url=.*/docker_version_url=\"${DOCKER_URL}\"/" documentation/config.toml
 }
 
 commit_version_update() {
