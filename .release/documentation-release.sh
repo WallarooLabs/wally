@@ -63,14 +63,11 @@ build_book() {
 upload_book() {
   echo "Uploading book..."
   # git magic. without all this, our ghp-import command won't work
-  pushd documentation
   git remote add doc-site "git@github.com:wallaroolabs/docs.wallaroolabs.com.git"
   git fetch doc-site
   git reset doc-site/$remote_branch
 
   ghp-import -p -r doc-site -b $remote_branch -f public
-
-  popd
 }
 
 git_clean() {
