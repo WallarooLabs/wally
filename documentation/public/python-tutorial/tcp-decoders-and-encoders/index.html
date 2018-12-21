@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    
+    <title>Wallaroo  | TCP Decoders and Encoders</title>
+    <meta name="HandheldFriendly" content="True">
+    <meta name="MobileOptimized" content="320">
+
+    <meta name="viewport" content="width=device-width,minimum-scale=1">
+    <meta name="generator" content="Hugo 0.49.2" />
+    
+    
+      <META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
+    
+
+    
+    
+      <link href="/dist/css/app.955516233bcafa4d2a1c13cea63c7b50.css" rel="stylesheet">
+    
+
+    
+      <link rel="stylesheet" href="/css/jquery-ui.min.css">
+    
+      <link rel="stylesheet" href="/css/jquery-ui.theme.min.css">
+    
+      <link rel="stylesheet" href="/cshighlight.css">
+    
+      <link rel="stylesheet" href="/css/my.css">
+    
+
+    
+      
+    
+
+    
+
+    <meta property="og:title" content="TCP Decoders and Encoders" />
+<meta property="og:description" content="Earlier, we spoke of sources and sinks and the role they play in Wallaroo. In this section, we are going to dive more into how you work with sources and sinks. We&rsquo;ll be covering two key concepts: Decoders and Encoders.
+Reviewing our terms Source Ingress point for inputs from external systems into a Wallaroo application.
+Sink Egress point for outputs from a Wallaroo application to external systems.
+Decoder Code that transforms a stream of bytes from an external system into a series of application input types." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://docs.wallaroolabs.com/python-tutorial/tcp-decoders-and-encoders/" />
+
+<meta itemprop="name" content="TCP Decoders and Encoders">
+<meta itemprop="description" content="Earlier, we spoke of sources and sinks and the role they play in Wallaroo. In this section, we are going to dive more into how you work with sources and sinks. We&rsquo;ll be covering two key concepts: Decoders and Encoders.
+Reviewing our terms Source Ingress point for inputs from external systems into a Wallaroo application.
+Sink Egress point for outputs from a Wallaroo application to external systems.
+Decoder Code that transforms a stream of bytes from an external system into a series of application input types.">
+
+
+
+<meta itemprop="wordCount" content="920">
+
+
+
+<meta itemprop="keywords" content="" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="TCP Decoders and Encoders"/>
+<meta name="twitter:description" content="Earlier, we spoke of sources and sinks and the role they play in Wallaroo. In this section, we are going to dive more into how you work with sources and sinks. We&rsquo;ll be covering two key concepts: Decoders and Encoders.
+Reviewing our terms Source Ingress point for inputs from external systems into a Wallaroo application.
+Sink Egress point for outputs from a Wallaroo application to external systems.
+Decoder Code that transforms a stream of bytes from an external system into a series of application input types."/>
+
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+  </head>
+
+  <body class="ma0 avenir bg-near-white">
+
+    
+
+  <header>
+    <div class="bg-green">
+      <nav class="pv3 ph3 ph4-ns" role="navigation">
+  <div class="flex-l justify-between items-center center">
+    <a href="https://docs.wallaroolabs.com/" class="f3 fw2 hover-white no-underline white-90 dib">
+      Wallaroo
+    </a>
+    <div class="flex-l items-center">
+      
+        <ul class="pl0 mr3">
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/core-concepts/" title="Core Concepts page">
+              Core Concepts
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/python-installation/" title="Installation page">
+              Installation
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/python-tutorial/" title="Tutorial page">
+              Tutorial
+            </a>
+          </li>
+          
+          <li class="list f5 f4-ns fw4 dib pr3">
+            <a class="hover-white no-underline white-90" href="/operators-manual/" title="Operators Manual page">
+              Operators Manual
+            </a>
+          </li>
+          
+        </ul>
+      
+      
+<div hidden>
+  <span id="new-window-0">Opens in a new window</span>
+  <span id="new-window-1">Opens an external site</span>
+  <span id="new-window-2">Opens an external site in a new window</span>
+</div>
+
+
+
+
+
+
+
+
+
+    </div>
+  </div>
+</nav>
+
+    </div>
+  </header>
+
+
+    <main class="pb7" role="main">
+      
+  <article class="w-100 ph4 pb5 pb6-ns pt1 pt5-ns">
+    <div class="flex-l">
+
+      <div class="order-0 w-100 w-20-l ph5-m ph0-l mb4 sticky dn db-l">
+        
+<nav role="navigation" class="doc-menu bg-light-gray pl3 pr3">
+  <ul class="list pa0 nl2">
+    
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".core-concepts">Core Concepts</a>
+        <ul class="core-concepts desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/core-concepts/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo Core Concepts
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/core-concepts/state/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              State
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/core-concepts/working-with-state/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Working with State
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/core-concepts/partitioning/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Partitioning
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".pyinstallation">Python Installation Guide</a>
+        <ul class="pyinstallation desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/python-installation/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Choosing an Installation Option
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-installation/python-docker-installation-guide/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Installing with Docker
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-installation/python-vagrant-installation-guide/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Installing with Vagrant
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-installation/python-wallaroo-up-installation-guide/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Installing with Wallaroo Up
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2  primary-color" data-target=".pytutorial">Python Tutorial</a>
+        <ul class="pytutorial desktopmenu animated fadeIn list pl0 pb2 bg-light-gray db">
+          <li class="f6 fw4">
+            <a href="/python-tutorial/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Python API Introduction
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/running-a-wallaroo-application/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Running A Wallaroo Application
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/writing-your-own-application/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Writing Your Own Application
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/writing-your-own-stateful-application/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Writing Your Own Stateful Application
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/word-count/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Word Count
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/interworker-serialization-and-resilience/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Inter-worker Serialization and Resilience
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/using-connectors/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Using Connectors as Sources &amp; Sinks
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/api/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo Python API Classes
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/debugging/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Debugging
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/tcp-decoders-and-encoders/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 primary-color ">
+              TCP Decoders and Encoders
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/virtualenv/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo and Virtualenv
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/python-tutorial/starting-a-new-shell/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Starting a new shell
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".operators-manual">Operators Manual</a>
+        <ul class="operators-manual desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/operators-manual/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Operators Manual
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/running-wallaroo/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Running Wallaroo
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/autoscale/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Autoscale
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/resilience/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Resilience
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/command-line-options/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Command-Line Options
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/operators-manual/metrics-ui/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Wallaroo Metrics UI
+            </a>
+          </li>
+        </ul>
+      </li>
+      
+      <li class="f5 w-100 hover-bg-light-gray hover-accent-color-light fw8">
+        <a href="javascript:void(0)" class="js-toggle dib w-100 link mid-gray hover-accent-color-light pl2 pr2 pb2 " data-target=".appendix">Appendix</a>
+        <ul class="appendix desktopmenu animated fadeIn list pl0 pb2 bg-light-gray dn">
+          <li class="f6 fw4">
+            <a href="/appendix/giles-sender/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Giles sender
+            </a>
+          </li>
+          <li class="f6 fw4">
+            <a href="/appendix/wallaroo-docker-tips/" class="db link hover-bg-gray hover-white pl3 pr2 pv2 black ">
+              Tips for using Wallaroo in Docker
+            </a>
+          </li>
+        </ul>
+      </li>
+  </ul>
+</nav>
+
+      </div>
+
+      <div class="order-2 w-100 w-20-l ph5-m ph0-l mb4 sticky dn db-l"><nav role="toc" class="toc bg-light-gray pl3 pr3 nested-list-reset nested-copy-line-height nested-links">
+    <p class="f5 b mb3">What's in this document</p>
+      <nav id="TableOfContents">
+<ul>
+<li>
+<ul>
+<li><a href="#reviewing-our-terms">Reviewing our terms</a>
+<ul>
+<li><a href="#source">Source</a></li>
+<li><a href="#sink">Sink</a></li>
+<li><a href="#decoder">Decoder</a></li>
+<li><a href="#encoder">Encoder</a></li>
+</ul></li>
+<li><a href="#framed-message-protocols">Framed Message Protocols</a></li>
+<li><a href="#creating-a-decoder">Creating a Decoder</a></li>
+<li><a href="#creating-an-encoder">Creating an Encoder</a></li>
+</ul></li>
+</ul>
+</nav>
+  </nav>
+
+
+
+
+</div>
+
+      <div class="order-1 w-60-l mw7 ph0 ph5-ns mid-gray nested-copy-line-height no-underline nested-links nested-img nested-copy-seperator nested-blockquote mt0-ns" style="flex-grow:1;">
+        <div class="documentation-copy center measure-wide-l">
+          <header class="w-100">
+          <p class="f6 b helvetica tracked">
+            Python Tutorial
+          </p>
+          <h1 class="f1 athelas mb1">TCP Decoders and Encoders</h1>
+          </header>
+
+          <main class="nested-copy-line-height lh-copy serif f4 nested-links nested-img mid-gray pr4-l">
+
+<p>Earlier, we spoke of <a href="/core-concepts/">sources and sinks</a> and the role they play in Wallaroo. In this section, we are going to dive more into how you work with sources and sinks. We&rsquo;ll be covering two key concepts: <code>Decoder</code>s and <code>Encoder</code>s.</p>
+
+<h2 id="reviewing-our-terms">Reviewing our terms</h2>
+
+<h3 id="source">Source</h3>
+
+<p>Ingress point for inputs from external systems into a Wallaroo application.</p>
+
+<h3 id="sink">Sink</h3>
+
+<p>Egress point for outputs from a Wallaroo application to external systems.</p>
+
+<h3 id="decoder">Decoder</h3>
+
+<p>Code that transforms a stream of bytes from an external system
+into a series of application input types.</p>
+
+<h3 id="encoder">Encoder</h3>
+
+<p>Code that transforms an application output type into bytes for
+sending to an external system.</p>
+
+<h2 id="framed-message-protocols">Framed Message Protocols</h2>
+
+<p>A Wallaroo TCP Source accepts a stream of bytes from an external source and turns that stream of bytes into a stream of application specific messages. As an application programmer, you provide a <code>Decoder</code> to tell Wallaroo how to turn that stream of bytes into messages.</p>
+
+<p>An incoming stream of bytes can represent many things: each byte could be an 8-bit unsigned integer, or every 4-byte block may be a 32-bit integer. Or the stream may be an ASCII sequence (each byte is a char), or a Unicode sequence (in which case characters aren&rsquo;t equally-wide!).</p>
+
+<p>Decoders are unique to the type of source. <code>TCPSource</code>s use a <a href="https://www.codeproject.com/Articles/37496/TCP-IP-Protocol-Design-Message-Framing">framed message protocol</a>. A framed message protocol boils down to:</p>
+
+<ul>
+<li>We have a fixed size header that tells us how long a message is</li>
+<li>We have a variable length message payload</li>
+</ul>
+
+<p>The message payload is what our application cares about. The fixed length header allows us to easily get the size of our payload. With these two pieces of information, we can quickly chop up a stream of incoming bytes into a series of messages.</p>
+
+<p>The size of the header is up to you the designer of the particular message type. You can make it 4 bytes, 8 bytes, 16, et cetera. The important part is that you need enough bytes to represent the length of your payload. For most data, a 4-byte header is plenty. In the abstract, this looks like</p>
+
+<pre><code>PayloadSize [x bytes] : Payload [bytes specified in PayloadSize]
+</code></pre>
+
+<p>So if our header is 4 bytes long, an incoming message would look something like:</p>
+
+<p>| header | payload |
+| - | - |
+| xxxx | some data here |</p>
+
+<p>Let&rsquo;s make that a bit more concrete. Let&rsquo;s say we are sending in two messages; each contains a string. The first has &ldquo;first&rdquo; as a payload and the second payload is &ldquo;not first&rdquo;. Our stream of bytes would be:</p>
+
+<ul>
+<li>4-byte header whose value is <code>5</code></li>
+<li>5-byte payload containing the binary representation of the ASCII string &ldquo;first&rdquo;</li>
+<li>4-byte header whose value is <code>9</code></li>
+<li>9 byte payload containing the binary representation of the ASCII string &ldquo;not first&rdquo;</li>
+</ul>
+
+<h2 id="creating-a-decoder">Creating a Decoder</h2>
+
+<p>Wallaroo&rsquo;s <code>TCPSource</code> takes a decoder <em>function</em> that can process a framed message protocol. You&rsquo;ll need to implement three methods. Below is a decoder that we can use to process a stream of strings for a word count application.</p>
+
+<pre><code class="language-python">@wallaroo.decoder(header_length=4, length_fmt=&quot;&gt;I&quot;)
+def decode_lines(bs):
+    return bs.decode(&quot;utf-8&quot;)
+</code></pre>
+
+<p><code>header_length</code> is the fixed size of our payload field.</p>
+
+<p><code>length_fmt</code> is used internally to decode our message header to determine how long the payload is going to be. We rely on the Python <code>struct</code> package to decode the bytes. If you aren&rsquo;t familiar with <code>struct</code>, you can check out <a href="https://docs.python.org/2/library/struct.html">the documentation</a> to learn more. Remember, when using <code>struct</code>, don&rsquo;t forget to import it!</p>
+
+<p><code>decode_lines</code> takes a series of bytes that represent your payload and turns it into an application message. In this case, our application message is a string, so we take the incoming byte stream <code>bs</code> and convert it to UTF-8 Python string.</p>
+
+<p>Here&rsquo;s a slightly more complicated example taken from our <a href="https://github.com/WallarooLabs/wallaroo/tree/0.6.0/examples/python/alphabet">Alphabet Popularity Contest example</a>.</p>
+
+<pre><code class="language-python">@wallaroo.decoder(header_length=4, length_fmt=&quot;&gt;I&quot;)
+def decode_votes(bs):
+    (letter, vote_count) = struct.unpack(&quot;&gt;sI&quot;, bs)
+    letter = letter.decode(&quot;utf-8&quot;)  # for Python 3 comptibility
+    return Votes(letter, vote_count)
+</code></pre>
+
+<p>Like we did in our previous example, we&rsquo;re using a 4-byte integer payload length header:</p>
+
+<pre><code class="language-python">@wallaroo.decoder(header_length=4, length_fmt=&quot;&gt;I&quot;)
+</code></pre>
+
+<p>But this time, we are doing something slightly more complicated in our payload. Our payload is two items, a string representing a letter and some votes for that letter. We unpack those using <code>struct</code> and create a domain specific object <code>Votes</code> to return.</p>
+
+<h2 id="creating-an-encoder">Creating an Encoder</h2>
+
+<p>Wallaroo encoders do the opposite of decoders. A decoder takes a stream of bytes and turns in into messages for Wallaroo to process. An encoder receives a stream of messages and converts them into a stream of bytes for sending to another system.</p>
+
+<p>Here&rsquo;s a quick example encoder:</p>
+
+<pre><code class="language-python">@wallaroo.encoder
+def encode_data(data):
+    # data is a string
+    return data + &quot;\n&quot;
+</code></pre>
+
+<p>It takes a string that we want to send to an external system as an input, adds a newline at the end and returns it for sending.</p>
+
+<p>Here&rsquo;s a more complicated example taken from our <a href="https://github.com/WallarooLabs/wallaroo/tree/0.6.0/examples/python/alphabet">Alphabet Popularity Contest example</a>:</p>
+
+<pre><code class="language-python">class Votes(object):
+    def __init__(self, letter, votes):
+        self.letter = letter
+        self.votes = votes
+
+@wallaroo.encoder
+def encode_votes(votes):
+    return struct.pack(&quot;&gt;IsQ&quot;, 9, votes.letter, votes.votes)
+</code></pre>
+
+<p>Let&rsquo;s take a look at what is happening here. First of all, we are once again using the Python <code>struct</code> package. In this case, though, we are creating our own packed binary message. It&rsquo;s a framed message with a 4-byte header for the payload length, plus the payload:</p>
+
+<pre><code>| header | payload |
+| 9 | letter &amp; votes |
+</code></pre>
+
+<p>If we were encoding the letter &ldquo;A&rdquo; and a vote value of &ldquo;1&rdquo; our payload would be <code>'A\x00\x00\x00\x00\x00\x00\x00\x01'</code>. This along with our framing data can be sent along to another system that expects framed data.</p>
+</main>
+        </div>
+      </div>
+    </div>
+  </article>
+
+    </main>
+    <footer class="bg-green bottom-0 w-100 pa3" role="contentinfo">
+  <div class="flex justify-between">
+  <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="https://docs.wallaroolabs.com/" >
+    &copy; 2018 Wallaroo
+  </a>
+    <div>
+<div hidden>
+  <span id="new-window-0">Opens in a new window</span>
+  <span id="new-window-1">Opens an external site</span>
+  <span id="new-window-2">Opens an external site in a new window</span>
+</div>
+
+
+
+
+
+
+
+
+</div>
+  </div>
+</footer>
+
+    
+
+  <script src="/dist/js/app.3fc0f988d21662902933.js"></script>
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.8.0/highlight.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.10.0/languages/pony.min.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+<script>
+  var toggleBtns = document.getElementsByClassName('js-toggle')
+  for (var i = 0; i < toggleBtns.length; i++) {
+    toggleBtns[i].addEventListener('click', toggleClass, false)
+  }
+
+function toggleClass() {
+  
+  var content = this.dataset.target.split(' ')
+  
+  var mobileCurrentlyOpen = document.querySelector('.mobilemenu:not(.dn)')
+  var desktopCurrentlyOpen = document.querySelector('.desktopmenu:not(.dn)')
+  var desktopActive = document.querySelector('.desktopmenu:not(.dn)')
+
+  
+  for (var i = 0; i < content.length; i++) {
+    var matches = document.querySelectorAll(content[i]);
+    
+    [].forEach.call(matches, function(dom) {
+        dom.classList.contains('dn') ?
+        dom.classList.remove('dn') :
+        dom.classList.add('dn');
+         return false;
+       });
+        
+      if (mobileCurrentlyOpen) mobileCurrentlyOpen.classList.add('dn')
+      if (desktopCurrentlyOpen) desktopCurrentlyOpen.classList.add('dn')
+      if (desktopActive) desktopActive.classList.remove('db')
+
+    }
+  }
+
+
+
+
+  let codeBlocks = document.getElementsByTagName('code')
+    for (let [key, codeBlock] of Object.entries(codeBlocks)){
+    var widthDif = codeBlock.scrollWidth - codeBlock.clientWidth
+    if (widthDif > 0)
+      codeBlock.parentNode.classList.add('expand')
+  }
+
+</script>
+
+
+  </body>
+</html>
