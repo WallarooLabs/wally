@@ -8,8 +8,8 @@ preserveTaxonomyNames = true
 # Do not reformat `wallaroo_version` and `docker_version_url` params
 # They are substituted programatically
 [params]
-wallaroo_version="0.6.0"
-docker_version_url="dev/wallaroo:0.6.0"
+wallaroo_version="release-0.6.1"
+docker_version_url="dev/wallaroo:release-0.6.1-272f49a"
 custom_css = ["css/jquery-ui.min.css", "css/jquery-ui.theme.min.css", "cshighlight.css", "css/my.css"]
 background_color_class = "bg-green"
 
