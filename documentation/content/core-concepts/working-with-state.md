@@ -10,20 +10,31 @@ Wallaroo's state objects allow developers to define their own domain-specific da
 
 ## State computations
 
-Imagine a word counting application. We'll have a state object for each different word. We might represent the state for each word's total like this:
+Imagine a word counting application. We'll have a state object for each different word. Each word and count object would look something like:
 
-```python
-class WordTotal(object):
-    count = 0
-```
+{{< tabs >}}
+{{< tab name="Python" codelang="python" >}}
+class WordAndCount(object):
+    def __init__(self, word="", count=0):
+        self.word = word
+        self.count = count
+{{< /tab >}}
+{{< tab name="Go" codelang="go" >}}
+type WordAndCount struct {
+  Word string
+  Count uint64
+}
+{{< /tab >}}
+{{< /tabs >}}
 
-State computations allow you to read and write data to state objects. State computations have 2 inputs and 1 output. 
+State computations allow you to read and write data to state objects. State computations have 2 inputs and 2 outputs. 
 
 * State computation input:
   - The message to be processed
   - The state object we are operating on
 * State computation output:
   - An optional output message
+  - A boolean to indicate if we made any updates to the state object we operated on
 
 ## Thread Safety
 
