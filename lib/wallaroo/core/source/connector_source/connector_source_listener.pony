@@ -173,7 +173,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     _notify_listening()
     ifdef debug then
       @printf[I32]("Socket for %s now listening on %s:%s\n".cstring(),
-        _pipeline_name.cstring(), _host, _service)
+        _pipeline_name.cstring(), _host.cstring(), _service.cstring())
     end
 
   be recovery_protocol_complete() =>
