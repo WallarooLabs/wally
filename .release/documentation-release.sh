@@ -51,13 +51,7 @@ checkout_to_commit() {
 
 build_book() {
   echo "Building book..."
-  pushd documentation/themes/anake
-  git submodule init
-  git submodule update
-  popd
-  pushd documentation
   hugo
-  popd
 }
 
 upload_book() {
