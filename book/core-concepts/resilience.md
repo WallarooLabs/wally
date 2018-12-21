@@ -1,3 +1,0 @@
-# Resilience
-
-coming soon

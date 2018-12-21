@@ -1,1 +1,0 @@
-# Wallaroo Architecture

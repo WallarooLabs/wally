@@ -64,4 +64,4 @@ This will then ensure the following are built and released:
 
 * the Wallaroo RC/release source archive and Metrics UI RC AppImage to Bintray (documented in [DOCKER_RELEASE.md](DOCKER_RELEASE.md)).
 * the Wallaroo and Metrics UI RC/release Docker images on Bintray ([BINTRAY_ARTIFACTS_RELEASE.md](BINTRAY_ARTIFACTS_RELEASE.md)).
-* the RC/release Documentation Gitbook ([GITBOOK_RELEASE.md](GITBOOK_RELEASE.md)).
+* the RC/release Documentation ([DOCUMENTATION_RELEASE.md](DOCUMENTATION_RELEASE.md)).

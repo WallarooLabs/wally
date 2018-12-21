@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # md5 for validatiing script checksum
-MD5="d858f70ac039cb96c6f34b0f9f17c220  -"
+MD5="1a38eba173e5606a2cfe4d0841dbb355  -"
 
 set -eEuo pipefail
 
@@ -94,7 +94,7 @@ case "$OS" in
     *)
     echo "This script has only been tested on Linux. Wallaroo can be "
     echo "installed on non-Linux environments using Docker or Vagrant. Please visit: "
-    echo "https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html"
+    echo "https://docs.wallaroolabs.com/python-installation/"
     echo "for instructions for a Python Wallaroo environment or please visit: "
     echo "https://docs.wallaroolabs.com/book/go/getting-started/choosing-an-installation-option.html"
     echo "for instructions for a Go Wallaroo environment."
