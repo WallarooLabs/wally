@@ -308,7 +308,6 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     end
     true
 
-//!@ Test this
 primitive _InitializePaneParameters
   fun apply(range: U64, slide: U64, delay: U64):
     (USize, U64, USize, USize, U64)

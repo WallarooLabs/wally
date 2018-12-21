@@ -37,8 +37,8 @@ class iso _TestExpandSlidingWindow is UnitTest
     var event_ts: U64 = Seconds(0)
     var end_ts: U64 = Seconds(0)
 
-    (let init_pane_count, let pane_size, let panes_per_slide) =
-      _initialize_from(range, slide, delay)
+    (let init_pane_count, let pane_size, let panes_per_slide, _, _) =
+      _InitializePaneParameters(range, slide, delay)
 
     h.assert_eq[USize](init_pane_count, 6)
     h.assert_eq[U64](pane_size, Seconds(2))
@@ -93,22 +93,3 @@ class iso _TestExpandSlidingWindow is UnitTest
     h.assert_eq[USize](v - init_pane_count, 456)
 
     true
-
-  fun _initialize_from(range: U64, slide: U64, delay: U64):
-    (USize, U64, USize)
-  =>
-    // !@ This code is duplicated from SlidingWindow and needs to be
-    // broken out and tested
-    // Return (pane_count, pane_size, panes_per_slide, end_ts)
-    let pane_size = Math.gcd(range.usize(), slide.usize()).u64()
-    let panes_per_slide = (slide / pane_size).usize()
-    let panes_per_window = (range / pane_size).usize()
-    // Normalize delay to units of slide.
-    let delay_slide_units = (delay.f64() / slide.f64()).ceil()
-    // Calculate how many panes we need. The delay tells us how long we
-    // wait after the close of a window to trigger and clear it. We need
-    // enough extra panes to account for this delay.
-    let extra_panes = delay_slide_units.usize() * panes_per_slide
-    let pane_count = panes_per_window + extra_panes
-
-    (pane_count, pane_size, panes_per_slide)
