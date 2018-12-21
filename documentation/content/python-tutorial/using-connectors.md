@@ -133,7 +133,7 @@ Our RabbitMQ source uses the [pika library](https://pypi.org/project/pika/). We 
 
 ### UDP
 
-Our UDP support uses the Python standard library. To see an example of it in action, check out the [celsius_connectors example](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/python/celsius_connectors/).
+Our UDP support uses the Python standard library. To see an example of it in action, check out the [celsius_connectors example](https://github.com/Wallaroo/wallaroo/tree/{{% wallaroo-version %}}/examples/python/celsius_connectors/).
 
 ### AWS S3
 
