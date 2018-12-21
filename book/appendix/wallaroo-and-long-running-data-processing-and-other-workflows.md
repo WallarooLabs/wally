@@ -1,0 +1,3 @@
+# Wallaroo and Long-Running Data Processing and Other Workflows
+
+Wallaroo was designed to be a highly efficient and general purpose data processing engine, including event-by-event (stream) processing with microsecond response as well as other longer running tasks such as distributed logfile analysis or model training, and even real-time workflows that do not fit into standard real-time streaming topologies. In order to facilitate and simplify the deployment of such applications, we are building out additional APIs and libraries that will be released over the next few releases of Wallaroo. If you have specific needs or use-cases we encourage you to contact us.

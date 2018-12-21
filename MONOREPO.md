@@ -2,7 +2,7 @@
 
 Wallaroo currently exists as a mono-repo. All the source that makes Wallaroo go is in this repo. Let's take a quick walk through what you'll find in each top-level directory:
 
-#### documentation/
+#### book/
 Markdown source used to build http://docs.wallaroolabs.com. http://docs.wallaroolabs.com gets built from the latest commit to the release branch.
 
 #### examples/

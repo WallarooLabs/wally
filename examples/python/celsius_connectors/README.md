@@ -14,7 +14,7 @@ The output from this application is presented as text that we can print directly
 
 ## Running Celsius
 
-In order to run the application you will need Machida. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/python-installation/) instructions to choose one of these options if you have not already done so.
+In order to run the application you will need Machida. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
 
 The script expects machida to be in a specific path so you may need to edit `run_sample` to use the correct path for your machida executable. Also be sure to have the correct PYTHONPATH environment variable (it should include the wallaroo package which is part of machida).
 
@@ -24,4 +24,4 @@ Once that is done, you can run the application within this directory using:
 ./run_sample
 ```
 
-See the documentation on [using connectors](https://docs.wallaroolabs.com/python-tutorial/using-connectors/) for more information on how this example works.
+See the documentation on [using connectors](https://docs.wallaroolabs.com/book/python/using-connectors.html) for more information on how this example works.
