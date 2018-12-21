@@ -19,7 +19,7 @@ When running a Wallaroo application, we use some of the following command line p
   --my-control [Optionally sets address for my data channel]
   --my-data [Optionally sets address for my data channel]
   --external/-e [Sets address for external message channel]
-  --worker-count/-w +[Sets cluster initializers total number of workers,
+  --worker-count/-w +[Sets cluster initializer\'s total number of workers,
     including cluster initializer itself]
   --name/-n +[Sets name for this worker. Initializer will overwrite this 
     name with "initializer"]
