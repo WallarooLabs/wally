@@ -115,170 +115,92 @@ class ConnectorSourceNotify[In: Any val]
       end
       true
     else
-      _metrics_reporter.pipeline_ingest(_pipeline_name, _source_name)
-      let ingest_ts = Time.nanos()
-      let pipeline_time_spent: U64 = 0
-      var latest_metrics_id: U16 = 1
-
       ifdef "trace" then
         @printf[I32](("Rcvd msg at " + _pipeline_name + " source\n").cstring())
       end
 
-      (let is_finished, let last_ts) =
-        try
-          let data': Array[U8] val = consume data
-          (let event_timestamp, let key_string, let decoder_data) =
-            try
-              // SLF TODO: If we get an old-school connector message,
-              // it'll probably parse as a HelloMsg, then we'll return an
-              // empty array for decoder_data, then the Python decoder
-              // will almost certainly crash.
-              error
+      if true then
+        received_old_school(source, consume data)
+      else
+        received_connector_msg(source, consume data)
+      end
+    end
 
-              /***** In real life:
-              let connector_msg = cwm.Frame.decode(data')?
-              match connector_msg
-              | let q: cwm.HelloMsg =>
-                @printf[I32]("^*^* got HelloMsg, SLF TODO\n".cstring())
-              | let q: cwm.OkMsg =>
-                @printf[I32]("^*^* got OkMsg, WTF, SLF TODO\n".cstring())
-              | let q: cwm.ErrorMsg =>
-                @printf[I32]("^*^* got ErrorMsg, SLF TODO\n".cstring())
-              | let q: cwm.NotifyMsg =>
-                @printf[I32]("^*^* got NotifyMsg, SLF TODO\n".cstring())
-              | let q: cwm.NotifyAckMsg =>
-                @printf[I32]("^*^* got NotifyAckMsg, WTF, SLF TODO\n".cstring())
-              | let q: cwm.MessageMsg =>
-                @printf[I32]("^*^* got MessageMsg message of the message family of messages, SLF TODO do stuff below\n".cstring())
-              | let q: cwm.AckMsg =>
-                @printf[I32]("^*^* got AckMsg, WTF, SLF TODO\n".cstring())
-              | let q: cwm.RestartMsg =>
-                @printf[I32]("^*^* got RestartMsg, WTF, SLF TODO\n".cstring())
-              end
-              // SLF TODO in real life, nobody should fall through here?
-              // But we aren't IRL yet.
-              (666, "", recover Array[U8] end)
-              *****/
+  fun ref received_old_school(source: ConnectorSource[In] ref,
+    data: Array[U8] iso)
+    : Bool
+  =>
+    _metrics_reporter.pipeline_ingest(_pipeline_name, _source_name)
+    let ingest_ts = Time.nanos()
+    let pipeline_time_spent: U64 = 0
+    var latest_metrics_id: U16 = 1
 
-            else
-              @printf[I32]("^*^* SLF TODO silly client didn't send a parseable message".cstring())
-              // SLF TODO: assume for the moment that the client sent us
-              // and old-school connector message.
-              // In real life, we would craft and error message and
-              // then close the connection.
-              let event_timestamp': U64 = try
-                  Bytes.to_u64(data'(0)?, data'(1)?, data'(2)?, data'(3)?, data'(4)?,
-                      data'(5)?, data'(6)?, data'(7)?)
-                else
-                  0
-                end
-              let key_length: U32 = try
-                  Bytes.to_u32(data'(8)?, data'(9)?, data'(10)?, data'(11)?)
-                else
-                  0
-                end
-              let key_bytes = recover val data'.slice(12, 12+key_length.usize()) end
-              let key_string' = String.from_array(key_bytes)
-              let decoder_data' = recover val data'.slice(12+key_length.usize()) end
-              (event_timestamp', key_string', decoder_data')
-            end
-          // SLF TODO: deal with error msg from client
-          // SLF NOTE: _handler = decoder from machida/machida3 yo
-          //      let decoder = recover val
-          //        let d = @PyTuple_GetItem(source_config_tuple, 5)
-          //        Machida.inc_ref(d)
-          //        PyFramedSourceHandler(d)?
-          //      end
-          // SLF TODO: decode connector-protocol-v2.md protocol first
-          // SLF TODO: _body_count & _last_message_id is a hack for scaffolding, remove it
-          let decoded =
-            if true then
-              if (_body_count == 0) then
-                try
-                  // SLF TODO: We may get data from the connector before we
-                  // have been told about the first checkpoint.  How do we
-                  // know 100% of the time what the last CheckpointId is?
-                  (_active_stream_registry as ConnectorSourceListener[In]).
-                    stream_notify(_session_tag, _MyStream(), 0,
-                      _connector_source as ConnectorSource[In])
-                  _stream_map(_MyStream()) = _StreamState(true, 0, 0, 0, 0, 0)
-                  // SLF TODO: return _continue_perhaps()
-                else
-                  Fail()
-                end
-              end
+    let data': Array[U8] val = consume data
+    @printf[I32]("^*^* SLF TODO silly client didn't send a parseable message".cstring())
+    // SLF TODO: assume for the moment that the client sent us
+    // and old-school connector message.
+    // In real life, we would craft and error message and
+    // then close the connection.
+    let event_timestamp': U64 = try
+        Bytes.to_u64(data'(0)?, data'(1)?, data'(2)?, data'(3)?, data'(4)?,
+            data'(5)?, data'(6)?, data'(7)?)
+      else
+        0
+      end
+    let key_length: U32 = try
+        Bytes.to_u32(data'(8)?, data'(9)?, data'(10)?, data'(11)?)
+      else
+        0
+      end
+    let key_bytes = recover val data'.slice(12, 12+key_length.usize()) end
+    let key_string = String.from_array(key_bytes)
+    let decoder_data = recover val data'.slice(12+key_length.usize()) end
 
-              _body_count = _body_count + 1
-              try
-                let s = _stream_map(_MyStream())?
-                s.last_message_id = s.base_point_of_reference + _body_count
-                @printf[I32]("^*^* %s.%s got pseudo-msg-id %lu\n".cstring(),
-                  __loc.type_name().cstring(), __loc.method_name().cstring(),
-                  s.last_message_id)
-                if s.pending_query then
-                  // SLF TODO: No reply yet from active stream registry.
-                  // This is an error: tell the client, etc etc.
-                  @printf[I32]("^*^* %s.%s synchronous protocol error: client didn't wait for NOTIFY_ACK for stream id %lu\n".cstring(),
-                    __loc.type_name().cstring(), __loc.method_name().cstring(),
-                    _MyStream())
-                end
-                if s.last_message_id < s.filter_message_id then
-                  @printf[I32]("^*^* %s.%s DEDUPLICATE %lu < %lu\n".cstring(),
-                    __loc.type_name().cstring(), __loc.method_name().cstring(),
-                    s.last_message_id, s.filter_message_id)
-                  return _continue_perhaps()
-                else
-                  _handler.decode(decoder_data)?
-                end
-              else
-                @printf[I32]("^*^* %s.%s StreamId %lu map lookup failure\n".cstring(), _MyStream())
-                // SLF TODO send error
-                return _continue_perhaps()
-              end
-            else // if true
-              ifdef debug then
-                @printf[I32]("Error decoding message at source\n".cstring())
-              end
-              error
-            end // if true
-
-          let decode_end_ts = Time.nanos()
-          _metrics_reporter.step_metric(_pipeline_name,
-            "Decode Time in Connector Source", latest_metrics_id, ingest_ts,
-            decode_end_ts)
-          latest_metrics_id = latest_metrics_id + 1
-
-          ifdef "trace" then
-            @printf[I32](("Msg decoded at " + _pipeline_name +
-              " source\n").cstring())
-          end
-
-          let msg_uid = _msg_id_gen()
-
-          // TODO: We need a way to determine the key based on the policy
-          // for any particular connector. For example, the Kafka connector
-          // needs a way to provide the Kafka key here.
-
-          // TOOD: We need a way to assign watermarks based on the policy
-          // for any particular connector.
-          if ingest_ts > _watermark_ts then
-            _watermark_ts = ingest_ts
-          end
-
-          let initial_key =
-            if key_string isnt None then
-              key_string
-            else
-              msg_uid.string()
-            end
-
-          if decoder_data isnt None then
-            _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-              consume initial_key, ingest_ts, _watermark_ts, _source_id,
-              source, _router, msg_uid, None, decode_end_ts,
-              latest_metrics_id, ingest_ts, _metrics_reporter)
+    // This is a big temporary hack to simulate receiving MESSAGE
+    // messages with stream-id numbers & stuff.
+    // It pretends that we received a NOTIFY message and sends a
+    // query to the active stream registry and then processes the
+    // message without waiting for a response.  A real impl will
+    // wait for the response from the active registry before allowing
+    // MESSAGE messages.
+    let decoded =
+      if true then
+        if (_body_count == 0) then
+          try
+            // SLF TODO: We may get data from the connector before we
+            // have been told about the first checkpoint.  How do we
+            // know 100% of the time what the last CheckpointId is?
+            (_active_stream_registry as ConnectorSourceListener[In]).
+              stream_notify(_session_tag, _MyStream(), 0,
+                _connector_source as ConnectorSource[In])
+            _stream_map(_MyStream()) = _StreamState(true, 0, 0, 0, 0, 0)
+            // SLF TODO: return _continue_perhaps()
           else
-            (true, ingest_ts)
+            Fail()
+          end
+        end
+
+        _body_count = _body_count + 1
+        try
+          let s = _stream_map(_MyStream())?
+          s.last_message_id = s.base_point_of_reference + _body_count
+          @printf[I32]("^*^* %s.%s got pseudo-msg-id %lu\n".cstring(),
+            __loc.type_name().cstring(), __loc.method_name().cstring(),
+            s.last_message_id)
+          if s.pending_query then
+            // SLF TODO: No reply yet from active stream registry.
+            // This is an error: tell the client, etc etc.
+            @printf[I32]("^*^* %s.%s synchronous protocol error: client didn't wait for NOTIFY_ACK for stream id %lu\n".cstring(),
+              __loc.type_name().cstring(), __loc.method_name().cstring(),
+              _MyStream())
+          end
+          if s.last_message_id < s.filter_message_id then
+            @printf[I32]("^*^* %s.%s DEDUPLICATE %lu < %lu\n".cstring(),
+              __loc.type_name().cstring(), __loc.method_name().cstring(),
+              s.last_message_id, s.filter_message_id)
+            return _continue_perhaps()
+          else
+            _handler.decode(decoder_data)?
           end
         else
           @printf[I32](("Unable to decode message at " + _pipeline_name +
@@ -286,29 +208,113 @@ class ConnectorSourceNotify[In: Any val]
           ifdef debug then
             Fail()
           end
-          (true, ingest_ts)
+          return _continue_perhaps()
         end
+      end // if true
 
-      if is_finished then
-        let end_ts = Time.nanos()
-        let time_spent = end_ts - ingest_ts
+    ifdef "trace" then
+      @printf[I32](("Msg decoded at " + _pipeline_name +
+        " source\n").cstring())
+    end
+    _run_and_subsequent_activity(latest_metrics_id, ingest_ts,
+      key_string, pipeline_time_spent, source, decoded)
 
-        ifdef "detailed-metrics" then
-          _metrics_reporter.step_metric(_pipeline_name,
-            "Before end at Connector Source", 9999,
-            last_ts, end_ts)
-        end
+  fun ref received_connector_msg(source: ConnectorSource[In] ref,
+    data: Array[U8] iso): Bool
+  =>
+    // SLF TODO
+    try
+      // SLF TODO: If we get an old-school connector message,
+      // it'll probably parse as a HelloMsg, then we'll return an
+      // empty array for decoder_data, then the Python decoder
+      // will almost certainly crash.
+      error
 
-        _metrics_reporter.pipeline_metric(_pipeline_name, time_spent +
-          pipeline_time_spent)
-        _metrics_reporter.worker_metric(_pipeline_name, time_spent)
+      /***** In real life:
+      let connector_msg = cwm.Frame.decode(data')?
+      match connector_msg
+      | let q: cwm.HelloMsg =>
+        @printf[I32]("^*^* got HelloMsg, SLF TODO\n".cstring())
+      | let q: cwm.OkMsg =>
+        @printf[I32]("^*^* got OkMsg, WTF, SLF TODO\n".cstring())
+      | let q: cwm.ErrorMsg =>
+        @printf[I32]("^*^* got ErrorMsg, SLF TODO\n".cstring())
+      | let q: cwm.NotifyMsg =>
+        @printf[I32]("^*^* got NotifyMsg, SLF TODO\n".cstring())
+      | let q: cwm.NotifyAckMsg =>
+        @printf[I32]("^*^* got NotifyAckMsg, WTF, SLF TODO\n".cstring())
+      | let q: cwm.MessageMsg =>
+        @printf[I32]("^*^* got MessageMsg message of the message family of messages, SLF TODO do stuff below\n".cstring())
+      | let q: cwm.AckMsg =>
+        @printf[I32]("^*^* got AckMsg, WTF, SLF TODO\n".cstring())
+      | let q: cwm.RestartMsg =>
+        @printf[I32]("^*^* got RestartMsg, WTF, SLF TODO\n".cstring())
+      end
+      // SLF TODO in real life, nobody should fall through here?
+      // But we aren't IRL yet.
+      (666, "", recover Array[U8] end)
+      *****/
+
+    else
+      None
+    end
+    _continue_perhaps()
+
+  fun ref _run_and_subsequent_activity(latest_metrics_id: U16,
+    ingest_ts: U64,
+    key_string: String val,
+    pipeline_time_spent: U64,
+    source: ConnectorSource[In] ref,
+    decoded: (In val| None val)): Bool
+   =>
+    let decode_end_ts = Time.nanos()
+    _metrics_reporter.step_metric(_pipeline_name,
+      "Decode Time in Connector Source", latest_metrics_id, ingest_ts,
+      decode_end_ts)
+    let latest_metrics_id' = latest_metrics_id + 1
+
+    let msg_uid = _msg_id_gen()
+
+    // TODO: We need a way to determine the key based on the policy
+    // for any particular connector. For example, the Kafka connector
+    // needs a way to provide the Kafka key here.
+
+    let initial_key =
+      if key_string isnt None then
+        key_string
+      else
+        msg_uid.string()
       end
 
-      source.expect(_header_size)
-      _header = true
+    (let is_finished, let last_ts) =
+      try
+        _runner.run[In](_pipeline_name, pipeline_time_spent, decoded as In,
+          consume initial_key, _source_id, source, _router,
+          msg_uid, None, decode_end_ts,
+          latest_metrics_id', ingest_ts, _metrics_reporter)
+      else
+        (true, ingest_ts)
+      end
 
-      _continue_perhaps()
+    if is_finished then
+      let end_ts = Time.nanos()
+      let time_spent = end_ts - ingest_ts
+
+      ifdef "detailed-metrics" then
+        _metrics_reporter.step_metric(_pipeline_name,
+          "Before end at Connector Source", 9999,
+          last_ts, end_ts)
+      end
+
+      _metrics_reporter.pipeline_metric(_pipeline_name, time_spent +
+        pipeline_time_spent)
+      _metrics_reporter.worker_metric(_pipeline_name, time_spent)
     end
+
+    source.expect(_header_size)
+    _header = true
+
+    _continue_perhaps()
 
   fun _continue_perhaps(): Bool =>
     ifdef linux then
