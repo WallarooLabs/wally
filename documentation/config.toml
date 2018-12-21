@@ -44,9 +44,3 @@ preserveTaxonomyNames = true
   weight = 4
   identifier = "operators-manual"
   url = "/operators-manual"
-
-[[menu.docs]]
-  name = "Appendix"
-  weight = 5
-  identifier = "appendix"
-  url = "/appendix"
