@@ -12,7 +12,7 @@ Workers communicate with each other over two channels: a control channel and a d
 
 Depending on the type of sources and sinks used in your application, you might need to provide more configuration information.  For example, a TCP source requires a network address so that it can listen for incoming data.  And a TCP sink requires a target address where it can send output data.
 
-In this document, we'll discuss most of the command line arguments that can be passed to a Wallaroo binary.  For a complete list, see [Wallaroo Command Line Options](/operators-manual/command-line-options/).
+In this document, we'll discuss most of the command line arguments that can be passed to a Wallaroo binary.  For a complete list, see [Wallaroo Command Line Options](/book/running-wallaroo/wallaroo-command-line-options.md).
 
 ## Single Worker Setup
 
@@ -20,7 +20,7 @@ If you are starting up a Wallaroo cluster with only one worker, then that worker
 
 If your application uses a TCP source, then you must specify a TCP input address via `--in`. Likewise, if your application uses a TCP sink, then you must specify a TCP output address via `--out`. In what follows, we'll be using the [Alerts](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/python/alerts_stateful) example app which uses a TCP sink.
 
-If you are using the Python API, then you will run [Machida](/python-tutorial/intro/#machida), passing in the application name via `--application-module`. And since Machida is single-threaded, you must pass in `--ponythreads 1` (otherwise Machida will refuse to start).
+If you are using the Python API, then you will run [Machida](/book/python/intro.md), passing in the application name via `--application-module`. And since Machida is single-threaded, you must pass in `--ponythreads 1` (otherwise Machida will refuse to start).
 
 Putting this all together, to run the Alerts app, you would run the following command:
 

@@ -12,19 +12,19 @@ To get you up and running quickly with Wallaroo, we have provided a Docker image
 
 ### MacOS
 
-There are [instructions](https://docs.docker.com/docker-for-mac/) for getting Docker up and running on MacOS on the Docker website.  We recommend the 'Standard' version of the 'Docker for Mac' package.
+There are [instructions](https://docs.docker.com/docker-for-mac/) for getting Docker up and running on MacOS on the [Docker website](https://docs.docker.com/docker-for-mac/).  We recommend the 'Standard' version of the 'Docker for Mac' package.
 
 Installing Docker will result in it running on your machine. After you reboot your machine, that will no longer be the case. In the future, you'll need to have Docker running in order to use a variety of commands in this book. We suggest that you [set up Docker to boot automatically](https://docs.docker.com/docker-for-mac/#general).
 
 ### Windows
 
-There are [instructions](https://docs.docker.com/docker-for-windows/) for getting Docker up and running on Windows on the Docker website. We recommend installing the latest stable release, as there are breaking changes to our commands on edge releases. Installing Docker will result in it running on your machine. After you reboot your machine, that will no longer be the case. In the future, you'll need to have Docker running in order to use a variety of commands in this book. We suggest that you [set up Docker to boot automatically](https://docs.docker.com/docker-for-windows/#general).
+There are [instructions](https://www.docker.com/docker-windows/) for getting Docker up and running on Windows on the [Docker website](https://docs.docker.com/docker-for-windows/). We recommend installing the latest stable release, as there are breaking changes to our commands on edge releases. Installing Docker will result in it running on your machine. After you reboot your machine, that will no longer be the case. In the future, you'll need to have Docker running in order to use a variety of commands in this book. We suggest that you [set up Docker to boot automatically](https://docs.docker.com/docker-for-windows/#general).
 
 Currently, development is only supported for Linux containers within Docker.
 
 ### Linux Ubuntu
 
-There are [instructions](https://docs.docker.com/engine/installation/linux/ubuntu/) for getting Docker up and running on Ubuntu on the Docker website.
+There are [instructions](https://docs.docker.com/engine/installation/linux/ubuntu/) for getting Docker up and running on Ubuntu on the [Docker website](https://docs.docker.com/engine/installation/linux/ubuntu/).
 
 Installing Docker will result in it running on your machine. After you reboot your machine, that will no longer be the case. In the future, you'll need to have Docker running in order to use a variety of commands in this book. We suggest that you [set up Docker to boot automatically](https://docs.docker.com/engine/installation/linux/linux-postinstall/#configure-docker-to-start-on-boot).
 
@@ -54,7 +54,7 @@ docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }
 
 * **Wallaroo Source Code**: full Wallaroo source code is provided, including Python example applications.
 
-* **Machida with Resilience**: runs Wallaroo Python 2.7 applications and writes state to disk for recovery. This version of Machida can be used via the `machida-resilience` and `machida3-resilience` binaries. See the [Interworker Serialization and Resilience](/python-tutorial/interworker-serialization-and-resilience/) documentation for general information and the [Resilience](/operators-manual/command-line-options/#resilience) section of our [Command Line Options](/operators-manual/command-line-options/) documentation for information on its usage.
+* **Machida with Resilience**: runs Wallaroo Python 2.7 applications and writes state to disk for recovery. This version of Machida can be used via the `machida-resilience` and `machida3-resilience` binaries. See the [Interworker Serialization and Resilience](/book/python/interworker-serialization-and-resilience.md) documentation for general information and the [Resilience](/book/running-wallaroo/wallaroo-command-line-options.md#resilience) section of our [Command Line Options](/book/running-wallaroo/wallaroo-command-line-options.md) documentation for information on its usage.
 
 * **Machida3 with Resilience**: similar to Machida with Resilience, but for Python 3.5+.
 
@@ -277,7 +277,7 @@ You can then click into one of the elements within a category to get to a detail
 
 ![Computation Detailed Metrics page](/images/metrics/computation-detailed-metrics-page.png)
 
-Feel free to click around and get a feel for how the Metrics UI is set up and how it is used to monitor a running Wallaroo application. If you'd like a deeper dive into the Metrics UI, have a look at our [Monitoring Metrics with the Monitoring Hub](/operators-manual/metrics-ui/) section.
+Feel free to click around and get a feel for how the Metrics UI is set up and how it is used to monitor a running Wallaroo application. If you'd like a deeper dive into the Metrics UI, have a look at our [Monitoring Metrics with the Monitoring Hub](/book/metrics/metrics-ui.md) section.
 
 ### Shell 5: Cluster Shutdown
 
@@ -305,4 +305,4 @@ docker stop wally
 
 This command will also terminate any active sessions you may have left open to the docker container.
 
-For tips on editing existing Wallaroo example code or installing Python modules within Docker, have a look at our [Tips for using Wallaroo in Docker](/appendix/wallaroo-docker-tips/) section.
+For tips on editing existing Wallaroo example code or installing Python modules within Docker, have a look at our [Tips for using Wallaroo in Docker](/book/appendix/wallaroo-in-docker-tips.md) section.

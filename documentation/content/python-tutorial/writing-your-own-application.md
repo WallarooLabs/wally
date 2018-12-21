@@ -3,10 +3,10 @@ title: "Writing Your Own Application"
 menu:
   docs:
     parent: "pytutorial"
-    weight: 20
+    weight: 2
 toc: true
 ---
-In this section, we will go over the components that are required in order to write a Wallaroo Python application. We will start with the [stateless `alerts.py` application](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/python/alerts_stateless/) from the [examples](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/) section, then move on to an application that maintains and modifies state and uses partitioning to divide its work.
+In this section, we will go over the components that are required in order to write a Wallaroo Python application. We will start with the stateless `alerts.py` application from the [examples](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/python/alerts_stateless/) section, then move on to an application that maintains and modifies state and uses partitioning to divide its work.
 
 ## A Stateless Application - Alerts
 
@@ -45,7 +45,7 @@ def encode_alert(alert):
 
 ### Source Decoder
 
-For simplicity's sake, we are using an internal test generator source to simulate a stream of inputs into the application. In a real application, you will probably be receiving inputs in a binary format. If so, you need to define a decoder for converting those bytes to your input types. For more on this, please refer to the [Creating A Decoder](/python-tutorial/tcp-decoders-and-encoders/#creating-a-decoder) section.
+For simplicity's sake, we are using an internal test generator source to simulate a stream of inputs into the application. In a real application, you will probably be receiving inputs in a binary format. If so, you need to define a decoder for converting those bytes to your input types. For more on this, please refer to the [Creating A Decoder](/book/appendix/tcp-decoders-and-encoders.md#creating-a-decoder) section.
 
 ### Application Setup
 
@@ -80,7 +80,7 @@ def constant_key(input):
     return "constant"
 ```
 
-We explain `key_by` in more detail and with examples in [Writing Your Own Stateful Application](/python-tutorial/writing-your-own-stateful-application/). 
+We explain `key_by` in more detail and with examples in the next [section](writing-your-own-stateful-application.md). 
 
 Finally, after adding our computation stage, we add the sink, using a `TCPSinkConfig`:
 
@@ -124,8 +124,8 @@ import wallaroo
 
 ## Running `alerts.py`
 
-The complete example is available [here](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/python/alerts_stateless/). To run it, follow the [instructions](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/python/alerts_stateless/README.md)
+The complete example is available [here](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/python/alerts_stateless/). To run it, follow the [Reverse application instructions](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/python/alerts_stateless/README.md)
 
 ## Next Steps
 
-To learn how to write a stateful application, continue to [Writing Your Own Stateful Application](/python-tutorial/writing-your-own-stateful-application/).
+To learn how to write a stateful application, continue to [Writing Your Own Stateful Application](writing-your-own-stateful-application.md).

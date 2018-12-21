@@ -71,7 +71,7 @@ sender --host 127.0.0.1:7000 --file words.txt --messages 100 --repeat
 
 #### Fixed Length Data
 
-In this case, the data in the file is already [framed](/python-tutorial/tcp-decoders-and-encoders#framed-message-protocols), and the `--msg-length` parameter is the number of bytes for the message _and_ the length header.
+In this case, the data in the file is already [framed](/book/appendix/tcp-decoders-and-encoders.md#framed-message-protocols), and the `--msg-length` parameter is the number of bytes for the message _and_ the length header.
 
 With a 4-byte header and 6-bytes of text, coming to a total of 10-bytes:
 
@@ -185,7 +185,7 @@ sender --host 127.0.0.1:7000 --messages 100 --u64 --start-from 100 \
 3. variable-length binary
 
 To create a data file for the first case, store your records separated by newlines in a file.
-To create data for the binary cases, follow the [framing protocol](/python-tutorial/tcp-decoders-and-encoders#framed-message-protocols).
+To create data for the binary cases, follow the [framing protocol](/book/appendix/tcp-decoders-and-encoders.md#framed-message-protocols).
 
 
 ## Pony Runtime Options

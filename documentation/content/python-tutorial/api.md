@@ -3,7 +3,7 @@ title: "Wallaroo Python API Classes"
 menu:
   docs:
     parent: "pytutorial"
-    weight: 70
+    weight: 7
 toc: true
 ---
 The Wallaroo Python API allows developers to create Wallaroo applications in Python, which can then be run by Machida.
@@ -15,12 +15,13 @@ In order to create a Wallaroo application in Python, you need to create the func
 ## Table of Contents
 
 * [Application Setup](#application-setup)
+* [ApplicationBuilder](#applicationbuilder)
 * [Computation](#computation)
 * [State](#state)
 * [StateComputation](#statecomputation)
 * [Data](#data)
 * [Key](#key)
-* [KeyExtractor](#keyextractor)
+* [KeyExtractor](#key-extractor)
 * [Sink](#sink)
 * [TCPSink](#tcpsink)
 * [KafkaSink](#kafkasink)
@@ -147,7 +148,7 @@ Since the application is run in an embedded Python runtime, it does not have sta
 
 The `wallaroo` library provides two functions that are needed to define a Wallaroo application, `source` and `build_application`.
 
-#### `wallaroo.source(name, source_config)`
+####`wallaroo.source(name, source_config)`
 
 Create a partial pipeline originating at a source.
 
@@ -165,7 +166,7 @@ Add a computation _function_ to the partial pipeline. This will either be a [sta
 
 Partition messages at this point based on the key extracted using the key_extractor function. A call to `key_by` returns a new partial pipeline object.
 
-`key_extractor` must be a [KeyExtractor](#keyextractor).
+`key_extractor` must be a [KeyExtractor](#key_extractor).
 
 ##### `to_sink(sink_config)`
 
@@ -325,6 +326,7 @@ Create a Wallaroo StateComputation from a function that takes `data` and `state`
 
 ##### Example
 
+!@
 An example StateComputation that keeps track of the longest sentence it has seen so far, and outputs the words in a new sentence if it's the longest yet.
 
 ```python
@@ -351,7 +353,7 @@ def longest_sentence_and_split_words(data, state):
 
 ### Data
 
-Data is the object that is passed to [Computations](#computation) and [StateComputations](#statecomputation). It is a plain Python object and can be as simple or as complex as you would like it to be.
+Data is the object that is passed to [Computation](#computation)s and [StateComputation](#statecomputation)s. It is a plain Python object and can be as simple or as complex as you would like it to be.
 
 It is important to ensure that data returned is always immutable or unique to avoid any unexpected behavior due to the asynchronous execution nature of Wallaroo.
 
@@ -383,7 +385,7 @@ A `TCPSink` is used to send output to an external system using TCP.
 
 The `wallaroo.TCPSinkConfig` class is used to define the properties of the `TCPSink`, which will be created by Wallaroo as part of the pipeline initialization process.
 
-A `wallaroo.TCPSinkConfig` may be passed on its own to [to_sink](#to-sink-sink-config) or as part of a list to [to_sinks](#to-sinks-sink-configs).
+A `wallaroo.TCPSinkConfig` may be passed on its own to [to_sink](#to_sinksink_config) or as part of a list to [to_sinks](#to_sinkssink_configs).
 
 ##### `wallaroo.TCPSinkConfig(host, port, encoder)`
 
@@ -463,7 +465,7 @@ The TCP Source receives data from an external TCP connection and decodes it into
 
 The `wallaroo.TCPSourceConfig` class is used to define the properties of the TCP Source, which will be created by Wallaroo as part of the pipeline initialization process.
 
-An instance of `TCPSourceConfig` is a required argument of [wallaroo.source](#wallaroo-source-name-source-config).
+An instance of `TCPSourceConfig` is a required argument of [new_pipeline](#new_pipelinename-source_config).
 
 ##### `wallaroo.TCPSourceConfig(host, port, decoder)`
 
@@ -481,7 +483,7 @@ A `KafkaSource` is used to get input from an external Kafka cluster.
 
 The `wallaroo.KafkaSourceConfig` class is used to define the properties of the `KafkaSource`, which will be created by Wallaroo as part of the pipeline initialization process.
 
-An instance of `KafkaSourceConfig` is a required argument of [wallaroo.source](#wallaroo-source-name-source-config).
+An instance of `KafkaSourceConfig` is a required argument of [new_pipeline](#new_pipelinename-source_config).
 
 ##### `wallaroo.KafkaSourceConfig(topic, brokers, log_level, decoder)`
 
@@ -502,7 +504,7 @@ The Source Decoder is responsible for two tasks:
 1. Telling Wallaroo _how many bytes to read_ from its input source.
 2. Converting those bytes into an object that the rest of the application can process. `None` can be returned to completely discard a message.
 
-To define a source decoder, use the [@wallaroo.decoder](#wallaroo-decoder-header-length-length-fmt) decorator to decorate a function that takes `bytes` and returns the correct data type for the next stage in the pipeline.
+To define a source decoder, use the [@wallaroo.decoder](#@wallaroo.decoder) decorator to decorate a function that takes `bytes` and returns the correct data type for the next stage in the pipeline.
 
 It is up to the developer to determine how to translate `bytes` into the next stage's input data type, and what information to keep or discard.
 
@@ -542,4 +544,4 @@ def decode(bs):
 
 ### Inter-worker serialization
 
-When Wallaroo runs with multiple workers, a built-in serializations and deserialization functions based on pickle take care of the encoding and decoding objects on the wire. The worker processes send each other these encoded objects. In some cases, you may wish to override this built-in serialization. If you wish to know more, please refer to the [Inter-worker serialization and resilience](/python-tutorial/interworker-serialization-and-resilience/) section of the manual.
+When Wallaroo runs with multiple workers, a built-in serializations and deserialization functions based on pickle take care of the encoding and decoding objects on the wire. The worker processes send each other these encoded objects. In some cases, you may wish to override this built-in serialization. If you wish to know more, please refer to the [Inter-worker serialization and resilience](interworker-serialization-and-resilience.md) section of the manual.

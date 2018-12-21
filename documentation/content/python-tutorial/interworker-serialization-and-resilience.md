@@ -3,7 +3,7 @@ title: "Inter-worker Serialization and Resilience"
 menu:
   docs:
     parent: "pytutorial"
-    weight: 50
+    weight: 5
 toc: true
 ---
 Wallaroo applications can scale horizontally by running multiple worker processes (ideally on different machines connected by a fast network). Worker processes send each other encoded objects, some of which may contain Python objects. Wallaroo provides serialization and deserialization based on the `pickle` module; if this is sufficient for your needs then you don't need to write any serialization or deserialization code. If `pickle` is insufficient for your application (for example, if `pickle` is too slow or if you are using classes that cannot be serialized or deserialized with `pickle`) then you must provide your own `serialize` and `deserialize` functions that convert between objects and strings that represent those objects. If you provide your own `serialize` and `deserialize` functions then they must be in the top level module of your application.

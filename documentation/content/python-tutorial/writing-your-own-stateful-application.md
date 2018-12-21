@@ -3,10 +3,10 @@ title: "Writing Your Own Stateful Application"
 menu:
   docs:
     parent: "pytutorial"
-    weight: 30
+    weight: 3
 toc: true
 ---
-In this section, we will go over how to write a stateful application with the Wallaroo Python API. If you haven't reviewed the simple stateless Alerts application example yet, you can find it [here](/python-tutorial/writing-your-own-application/).
+In this section, we will go over how to write a stateful application with the Wallaroo Python API. If you haven't reviewed the simple stateless Alerts application example yet, you can find it [here](writing-your-own-application.md).
 
 ## A Stateful Application - Alphabet
 
@@ -115,4 +115,4 @@ import wallaroo
 
 The complete stateful alerts example is available [here](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/python/alerts_stateful/). To run it, follow the [Alerts application instructions](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/python/alerts_stateful/README.md)
 
-To learn how to make your application resilient and able to work across multiple workers, skip ahead to [Inter-worker Serialization and Resilience](/python-tutorial/interworker-serialization-and-resilience/). Otherwise, continue on to the next section of the tutorial, [Word Count](/python-tutorial/word-count/).
+To learn how to make your application resilient and able to work across multiple workers, skip ahead to [Inter-worker Serialization and Resilience](interworker-serialization-and-resilience.md).
