@@ -50,26 +50,3 @@
   background-color: var(--black-05);
 }
 
-table {
-  display: table;
-  width: 100%;
-  border: solid;
-  border-collapse: collapse;
-  border-width: .5px;
-}
-
-thead {
-  color: black;
-}
-
-th {
-  border-style: solid;
-  border-color: gray;
-  border-width: .5px;
-}
-
-td {
-  border-style: solid;
-  border-color: gray;
-  border-width: .5px;
-}
