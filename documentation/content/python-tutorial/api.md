@@ -19,8 +19,10 @@ In order to create a Wallaroo application in Python, you need to create the func
 * [State](#state)
 * [StateComputation](#statecomputation)
 * [Data](#data)
+* [Aggregation](#aggregation)
 * [Key](#key)
 * [KeyExtractor](#keyextractor)
+* [Windows](#windows)
 * [Sink](#sink)
 * [TCPSink](#tcpsink)
 * [KafkaSink](#kafkasink)
@@ -410,6 +412,48 @@ def longest_sentence_and_split_words(data, state):
     return outputs
 ```
 
+### Aggregation
+
+For an overview of what aggregations are and how they must be implemented, see [here](/core-concepts/aggregations). 
+
+In order to implement an aggregation, you must create a class that extends `wallaroo.Aggregation`, and you must implement four methods:
+
+`initial_accumulator(self)`: returns the initial accumulator that is used by the aggregation. This must act as an identity element for `combine`.
+
+`update(self, input, acc)`: uses `input` to update the accumulator `acc`.
+
+`combine(self, acc1, acc2)`: returns an accumulator created by combining `acc1` and `acc2`. This operation must be associative, and it must not mutate `acc1` or `acc2`. 
+
+`output(self, key, acc)`: produces an output based on the accumulator `acc`. The `key` is passed in from the context in case it is needed when creating the output. This operation must not mutate `acc`.
+
+You can optionally implement:
+
+`name(self)`: returns the name of the aggregation. If this method is not implemented, the class name is used instead.
+
+##### Example
+
+```python
+class _MySum():
+    def __init__(self, initial_total):
+        self.total = initial_total
+
+    def add(self, value):
+        self.total = self.total + value
+
+class MySumAgg(wallaroo.Aggregation):
+    def initial_accumulator(self):
+        return _MySum(0)
+
+    def update(self, input, sum):
+        sum.add(sum.total + input.value)
+
+    def combine(self, sum1, sum2):
+        return Sum(sum1.total + sum2.total)
+
+    def output(self, key, sum):
+        return MyOutputType(key, sum.total)
+```
+
 ### Data
 
 Data is the object that is passed to [Computations](#computation) and [StateComputations](#statecomputation). It is a plain Python object and can be as simple or as complex as you would like it to be.
@@ -433,6 +477,52 @@ An example that partitions transactions based on the user assocatied with them:
 def extract_user(transaction):
     return transaction.user
 ```
+
+### Windows
+
+For an in-depth overview of windows, see [here](/core-concepts/windows). Windows are either count-based or range-based.
+
+#### Count-based
+
+`wallaroo.count_windows(count)`: defines count-based windows that trigger an output every `count` messages.
+
+`over(aggregation)`: specifies the aggregation used for these windows.
+
+##### Example
+
+This defines count windows with a count of 5 over a user-defined [aggregation](#aggregation) class `MySumAgg`:
+
+```python
+    (inputs
+        .to(wallaroo.count_windows(5)
+            .over(MySumAgg))
+        .to_sink(sink_config))
+```
+
+#### Range-based
+
+`wallaroo.range_windows(range)`: defines range-based windows with the specified `range`.
+
+`with_slide(slide)`: optionally specifies a slide for these windows, resulting in sliding (overlapping) windows. For example, if the slide is 3 seconds, then a new window of length `range` (specified via `wallaroo.range_windows(range)`) will be started every 3 seconds. The default slide is equal to the range (resulting in tumbling windows).
+
+`with_delay(delay)`: optionally specifies a delay on triggering a window. This is either (1) an estimation of the maximum lateness expected for messages or (2) the lateness threshold beyond which you no longer care about messages. The default delay is 0.
+
+`over(aggregation)`: specifies the aggregation used for these windows.
+
+##### Example
+
+This defines range-based sliding windows with a range of 6 seconds, a slide of 3 seconds, and a delay of 10 seconds:
+
+```python
+    (inputs
+        .to(wallaroo.range_windows(wallaroo.seconds(6))
+            .with_slide(wallaroo.seconds(3))
+            .with_delay(wallaroo.seconds(10))
+            .over(MySumAgg))
+        .to_sink(sink_config))
+```
+
+This means windows of length 6 seconds will be started every 3 seconds. Each of these windows will be triggered 10 seconds after we have past the end of its range in event time.
 
 ### Sink
 
