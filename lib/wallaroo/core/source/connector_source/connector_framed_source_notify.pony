@@ -21,6 +21,7 @@ use "collections"
 use "time"
 use "wallaroo_labs/time"
 use "wallaroo_labs/bytes"
+use cwm = "wallaroo_labs/connector_wire_messages"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/partitioning"
@@ -126,22 +127,61 @@ class ConnectorSourceNotify[In: Any val]
       (let is_finished, let last_ts) =
         try
           let data': Array[U8] val = consume data
-          // TODO: John use this variable
-          let event_timestamp: U64 = try
-              Bytes.to_u64(data'(0)?, data'(1)?, data'(2)?, data'(3)?, data'(4)?,
-                  data'(5)?, data'(6)?, data'(7)?)
-            else
-              0
-            end
-          let key_length: U32 = try
-              Bytes.to_u32(data'(8)?, data'(9)?, data'(10)?, data'(11)?)
-            else
-              0
-            end
-          let key_bytes = recover val data'.slice(12, 12+key_length.usize()) end
-          let key_string = String.from_array(key_bytes)
-          let decoder_data = recover val data'.slice(12+key_length.usize()) end
+          (let event_timestamp, let key_string, let decoder_data) =
+            try
+              // SLF TODO: If we get an old-school connector message,
+              // it'll probably parse as a HelloMsg, then we'll return an
+              // empty array for decoder_data, then the Python decoder
+              // will almost certainly crash.
+              error
 
+              /***** In real life:
+              let connector_msg = cwm.Frame.decode(data')?
+              match connector_msg
+              | let q: cwm.HelloMsg =>
+                @printf[I32]("^*^* got HelloMsg, SLF TODO\n".cstring())
+              | let q: cwm.OkMsg =>
+                @printf[I32]("^*^* got OkMsg, WTF, SLF TODO\n".cstring())
+              | let q: cwm.ErrorMsg =>
+                @printf[I32]("^*^* got ErrorMsg, SLF TODO\n".cstring())
+              | let q: cwm.NotifyMsg =>
+                @printf[I32]("^*^* got NotifyMsg, SLF TODO\n".cstring())
+              | let q: cwm.NotifyAckMsg =>
+                @printf[I32]("^*^* got NotifyAckMsg, WTF, SLF TODO\n".cstring())
+              | let q: cwm.MessageMsg =>
+                @printf[I32]("^*^* got MessageMsg message of the message family of messages, SLF TODO do stuff below\n".cstring())
+              | let q: cwm.AckMsg =>
+                @printf[I32]("^*^* got AckMsg, WTF, SLF TODO\n".cstring())
+              | let q: cwm.RestartMsg =>
+                @printf[I32]("^*^* got RestartMsg, WTF, SLF TODO\n".cstring())
+              end
+              // SLF TODO in real life, nobody should fall through here?
+              // But we aren't IRL yet.
+              (666, "", recover Array[U8] end)
+              *****/
+
+            else
+              @printf[I32]("^*^* SLF TODO silly client didn't send a parseable message".cstring())
+              // SLF TODO: assume for the moment that the client sent us
+              // and old-school connector message.
+              // In real life, we would craft and error message and
+              // then close the connection.
+              let event_timestamp': U64 = try
+                  Bytes.to_u64(data'(0)?, data'(1)?, data'(2)?, data'(3)?, data'(4)?,
+                      data'(5)?, data'(6)?, data'(7)?)
+                else
+                  0
+                end
+              let key_length: U32 = try
+                  Bytes.to_u32(data'(8)?, data'(9)?, data'(10)?, data'(11)?)
+                else
+                  0
+                end
+              let key_bytes = recover val data'.slice(12, 12+key_length.usize()) end
+              let key_string' = String.from_array(key_bytes)
+              let decoder_data' = recover val data'.slice(12+key_length.usize()) end
+              (event_timestamp', key_string', decoder_data')
+            end
           // SLF TODO: deal with error msg from client
           // SLF NOTE: _handler = decoder from machida/machida3 yo
           //      let decoder = recover val
