@@ -302,7 +302,8 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
                     encoded_key = key.encode() if key else ''.encode()
                     return struct.pack(
                         '>IqI{}s{}s'.format(len(encoded_key), len(encoded)),
-                        len(encoded) + 8 + len(encoded_key) + 8, # total frame size
+                        # 1st I = message length hdr, not included in total frame size
+                        8 + 4 + len(encoded_key) + len(encoded), # total frame size
                         event_time, # 64bit event_time
                         len(encoded_key),
                         encoded_key,
