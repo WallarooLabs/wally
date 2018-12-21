@@ -97,7 +97,7 @@ The following command line flags are recommended to enable data redundancy.
 
 4. `--resilience-no-local-file-io`, which disables the creation of non-I/O journal files.
 
-5. `--resilience-dos-server host:9999` to specify where the DOS server can be contacted.  The `host` string may be a DNS hostname or IPv4 address.
+5. `--dos-server host:9999` to specify where the DOS server can be contacted.  The `host` string may be a DNS hostname or IPv4 address.
 
 ## Procedure for recovering for a worker crash
 
