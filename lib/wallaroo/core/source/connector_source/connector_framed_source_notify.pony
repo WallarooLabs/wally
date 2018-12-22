@@ -117,29 +117,28 @@ class ConnectorSourceNotify[In: Any val]
       ifdef "trace" then
         @printf[I32](("Rcvd msg at " + _pipeline_name + " source\n").cstring())
       end
+      _metrics_reporter.pipeline_ingest(_pipeline_name, _source_name)
+      let ingest_ts = WallClock.nanoseconds()
+      let pipeline_time_spent: U64 = 0
+      let latest_metrics_id: U16 = 1 // SLF TODO is this right?
 
-      if true then
-        received_old_school(source, consume data)
+      if true then // SLF TODO remove compat for old school
+        received_old_school(source, consume data, latest_metrics_id,
+          ingest_ts, pipeline_time_spent)
       else
-        received_connector_msg(source, consume data)
+        received_connector_msg(source, consume data, latest_metrics_id,
+          ingest_ts, pipeline_time_spent)
       end
     end
 
   fun ref received_old_school(source: ConnectorSource[In] ref,
-    data: Array[U8] iso)
+    data: Array[U8] iso,
+    latest_metrics_id: U16,
+    ingest_ts: U64,
+    pipeline_time_spent: U64)
     : Bool
   =>
-    _metrics_reporter.pipeline_ingest(_pipeline_name, _source_name)
-    let ingest_ts = WallClock.nanoseconds()
-    let pipeline_time_spent: U64 = 0
-    var latest_metrics_id: U16 = 1
-
     let data': Array[U8] val = consume data
-    @printf[I32]("^*^* SLF TODO silly client didn't send a parseable message".cstring())
-    // SLF TODO: assume for the moment that the client sent us
-    // and old-school connector message.
-    // In real life, we would craft and error message and
-    // then close the connection.
     let event_timestamp': U64 = try
         Bytes.to_u64(data'(0)?, data'(1)?, data'(2)?, data'(3)?, data'(4)?,
             data'(5)?, data'(6)?, data'(7)?)
@@ -166,14 +165,10 @@ class ConnectorSourceNotify[In: Any val]
       if true then
         if (_body_count == 0) then
           try
-            // SLF TODO: We may get data from the connector before we
-            // have been told about the first checkpoint.  How do we
-            // know 100% of the time what the last CheckpointId is?
             (_active_stream_registry as ConnectorSourceListener[In]).
               stream_notify(_session_tag, _MyStream(), 0,
                 _connector_source as ConnectorSource[In])
             _stream_map(_MyStream()) = _StreamState(true, 0, 0, 0, 0, 0)
-            // SLF TODO: return _continue_perhaps()
           else
             Fail()
           end
@@ -197,7 +192,7 @@ class ConnectorSourceNotify[In: Any val]
             @printf[I32]("^*^* %s.%s DEDUPLICATE %lu < %lu\n".cstring(),
               __loc.type_name().cstring(), __loc.method_name().cstring(),
               s.last_message_id, s.filter_message_id)
-            return _continue_perhaps()
+            return _continue_perhaps(source)
           else
             _handler.decode(decoder_data)?
           end
@@ -207,7 +202,7 @@ class ConnectorSourceNotify[In: Any val]
           ifdef debug then
             Fail()
           end
-          return _continue_perhaps()
+          return _continue_perhaps(source)
         end
       end // if true
 
@@ -216,53 +211,90 @@ class ConnectorSourceNotify[In: Any val]
         " source\n").cstring())
     end
     _run_and_subsequent_activity(latest_metrics_id, ingest_ts,
-      key_string, pipeline_time_spent, source, decoded)
+      pipeline_time_spent, key_string, source, decoded)
 
   fun ref received_connector_msg(source: ConnectorSource[In] ref,
-    data: Array[U8] iso): Bool
+    data: Array[U8] iso,
+    latest_metrics_id: U16,
+    ingest_ts: U64,
+    pipeline_time_spent: U64): Bool
   =>
     // SLF TODO
     try
-      // SLF TODO: If we get an old-school connector message,
-      // it'll probably parse as a HelloMsg, then we'll return an
-      // empty array for decoder_data, then the Python decoder
-      // will almost certainly crash.
-      error
-
-      /***** In real life:
-      let connector_msg = cwm.Frame.decode(data')?
+      let connector_msg = cwm.Frame.decode(consume data)?
       match connector_msg
-      | let q: cwm.HelloMsg =>
-        @printf[I32]("^*^* got HelloMsg, SLF TODO\n".cstring())
-      | let q: cwm.OkMsg =>
-        @printf[I32]("^*^* got OkMsg, WTF, SLF TODO\n".cstring())
-      | let q: cwm.ErrorMsg =>
-        @printf[I32]("^*^* got ErrorMsg, SLF TODO\n".cstring())
-      | let q: cwm.NotifyMsg =>
-        @printf[I32]("^*^* got NotifyMsg, SLF TODO\n".cstring())
-      | let q: cwm.NotifyAckMsg =>
+      | let m: cwm.HelloMsg =>
+        ifdef "trace" then
+          @printf[I32]("^*^* got HelloMsg\n".cstring())
+        end
+        // SLF TODO:
+        // 1. Send new message to active stream registry: gimme everything
+        //    you've got.
+        // 2. Add behavior to connector_source receive reply from registry
+        // 3. Add callback to this notify class to get reply args from #2 msg.
+        // 4. That callback sends reply to socket.
+      | let m: cwm.OkMsg =>
+        ifdef "trace" then
+          @printf[I32]("^*^* got OkMsg, WTF\n".cstring())
+        end
+        // SLF TODO:
+        // Send ERROR("I SEND OK TO YOU, SILLY") to client,
+        // close connection via our closed(), then return.
+      | let m: cwm.ErrorMsg =>
+        ifdef "trade" then
+          @printf[I32]("^*^* got ErrorMsg\n".cstring())
+        end
+        @printf[I32]("Client sent us ERROR msg: %s\n".cstring(),
+          m.message.cstring())
+        source.close()
+        return _continue_perhaps(source)
+      | let m: cwm.NotifyMsg =>
+        ifdef "trace" then
+          @printf[I32]("^*^* got NotifyMsg: %lu %s %lu\n".cstring(),
+            m.stream_id, m.stream_name.cstring(), m.point_of_ref)
+        end
+        // SLF TODO:
+        // 1. Send query to active stream registry
+        // 2. Update _stream_map for pending query
+        // 3. Edit stream_notify_result(): Create reply msg & send to socket.
+
+        try
+          (_active_stream_registry as ConnectorSourceListener[In])
+            .stream_notify(_session_tag, m.stream_id, m.point_of_ref,
+              _connector_source as ConnectorSource[In])
+          _stream_map(m.stream_id) = _StreamState(true, 0, 0, 0, 0, 0)
+        else
+          Fail()
+        end
+
+      | let m: cwm.NotifyAckMsg =>
         @printf[I32]("^*^* got NotifyAckMsg, WTF, SLF TODO\n".cstring())
-      | let q: cwm.MessageMsg =>
+      | let m: cwm.MessageMsg =>
         @printf[I32]("^*^* got MessageMsg message of the message family of messages, SLF TODO do stuff below\n".cstring())
-      | let q: cwm.AckMsg =>
+
+            // SLF TODO: We may get data from the connector before we
+            // have been told about the first checkpoint.  How do we
+            // know 100% of the time what the last CheckpointId is?
+
+      | let m: cwm.AckMsg =>
         @printf[I32]("^*^* got AckMsg, WTF, SLF TODO\n".cstring())
-      | let q: cwm.RestartMsg =>
+      | let m: cwm.RestartMsg =>
         @printf[I32]("^*^* got RestartMsg, WTF, SLF TODO\n".cstring())
       end
-      // SLF TODO in real life, nobody should fall through here?
-      // But we aren't IRL yet.
-      (666, "", recover Array[U8] end)
-      *****/
-
     else
-      None
+      @printf[I32](("Unable to decode message at " + _pipeline_name +
+        " source\n").cstring())
+      ifdef debug then
+        Fail()
+      end
+      return _continue_perhaps(source)
     end
-    _continue_perhaps()
+    _continue_perhaps(source)
 
   fun ref _run_and_subsequent_activity(latest_metrics_id: U16,
     ingest_ts: U64,
-    key_string: String val,
     pipeline_time_spent: U64,
+    key_string: String val,
     source: ConnectorSource[In] ref,
     decoded: (In val| None val)): Bool
    =>
@@ -310,12 +342,11 @@ class ConnectorSourceNotify[In: Any val]
       _metrics_reporter.worker_metric(_pipeline_name, time_spent)
     end
 
+    _continue_perhaps(source)
+
+  fun ref _continue_perhaps(source: ConnectorSource[In] ref): Bool =>
     source.expect(_header_size)
     _header = true
-
-    _continue_perhaps()
-
-  fun _continue_perhaps(): Bool =>
     ifdef linux then
       true
     else
