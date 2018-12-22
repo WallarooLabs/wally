@@ -219,7 +219,6 @@ class ConnectorSourceNotify[In: Any val]
     ingest_ts: U64,
     pipeline_time_spent: U64): Bool
   =>
-    // SLF TODO
     try
       let connector_msg = cwm.Frame.decode(consume data)?
       match connector_msg
@@ -227,59 +226,111 @@ class ConnectorSourceNotify[In: Any val]
         ifdef "trace" then
           @printf[I32]("^*^* got HelloMsg\n".cstring())
         end
+
         // SLF TODO:
+        // 0. Add new state var(s) for managing protocol state machine:
+        //    Connected/Handshake/Streaming
         // 1. Send new message to active stream registry: gimme everything
         //    you've got.
+        //    - Include the session_tag arg like stream_notify() uses.
         // 2. Add behavior to connector_source receive reply from registry
         // 3. Add callback to this notify class to get reply args from #2 msg.
-        // 4. That callback sends reply to socket.
+        //    - Check session_tag arg like stream_notify_result() does,
+        //      to ignore late-arriving replies.
+        // 4. That callback sends reply to socket, manages state vars for FSM,
+        //    etc.
+
       | let m: cwm.OkMsg =>
         ifdef "trace" then
-          @printf[I32]("^*^* got OkMsg, WTF\n".cstring())
+          @printf[I32]("^*^* got OkMsg\n".cstring())
         end
+
         // SLF TODO:
         // Send ERROR("I SEND OK TO YOU, SILLY") to client,
-        // close connection via our closed(), then return.
+        // close connection.
+
       | let m: cwm.ErrorMsg =>
-        ifdef "trade" then
-          @printf[I32]("^*^* got ErrorMsg\n".cstring())
-        end
         @printf[I32]("Client sent us ERROR msg: %s\n".cstring(),
           m.message.cstring())
         source.close()
         return _continue_perhaps(source)
+
       | let m: cwm.NotifyMsg =>
         ifdef "trace" then
           @printf[I32]("^*^* got NotifyMsg: %lu %s %lu\n".cstring(),
             m.stream_id, m.stream_name.cstring(), m.point_of_ref)
         end
+
         // SLF TODO:
-        // 1. Send query to active stream registry
+        // 0. Send ERROR & close if not in Streaming state.
+        // 1. Send query to active stream registry if no key and if query
+        //    isn't already in flight.
         // 2. Update _stream_map for pending query
         // 3. Edit stream_notify_result(): Create reply msg & send to socket.
 
         try
-          (_active_stream_registry as ConnectorSourceListener[In])
-            .stream_notify(_session_tag, m.stream_id, m.point_of_ref,
-              _connector_source as ConnectorSource[In])
-          _stream_map(m.stream_id) = _StreamState(true, 0, 0, 0, 0, 0)
+          if not _stream_map.contains(m.stream_id) then
+            (_active_stream_registry as ConnectorSourceListener[In])
+              .stream_notify(_session_tag, m.stream_id, m.point_of_ref,
+                _connector_source as ConnectorSource[In])
+            _stream_map(m.stream_id) = _StreamState(true, 0, 0, 0, 0, 0)
+          else
+            // SLF TODO: create NOTIFY_ACK with success=false & send to socket.
+            None
+          end
         else
           Fail()
         end
 
       | let m: cwm.NotifyAckMsg =>
-        @printf[I32]("^*^* got NotifyAckMsg, WTF, SLF TODO\n".cstring())
+        ifdef "trace" then
+          @printf[I32]("^*^* got NotifyAckMsg\n".cstring())
+        end
+
+        // SLF TODO:
+        // Send ERROR("I SEND NOTIFY_ACK TO YOU, SILLY") to client,
+        // close connection.
+
       | let m: cwm.MessageMsg =>
         @printf[I32]("^*^* got MessageMsg message of the message family of messages, SLF TODO do stuff below\n".cstring())
 
-            // SLF TODO: We may get data from the connector before we
-            // have been told about the first checkpoint.  How do we
-            // know 100% of the time what the last CheckpointId is?
+        // SLF TODO:
+        // 0. Send ERROR & close if not in Streaming state.
+        // 1. Check m.flags for sanity, send ErrorMsg if bad.
+        // 2. Check m.stream_id for active & not-pending status in
+        //    _stream_map, send ErrorMsg if bad.
+        // 3. If message_id is lower than last-received-id, then
+        //    drop message (i.e. we dedupe).
+        //    - If ephemeral flag, then don't check & don't dedupe?
+        // 3. If UnstableReference flag, then ... don't dedupe?
+        // 4. If Boundary flag, then ... anything extra?
+        // 5. If Eos flag, then close this session:
+        //    - remove from _stream_map
+        //    - send stream_update() to active stream registry
+        //      see this.closed() for example usage
+        // 6. What did I forget?  See received_old_school() for hints:
+        //    it isn't perfect but it "works" at demo quality.
+        // 7. Finish with: return _run_and_subsequent_activity(...)
+        //    - Do not fall through to end of match statement.
 
       | let m: cwm.AckMsg =>
-        @printf[I32]("^*^* got AckMsg, WTF, SLF TODO\n".cstring())
+        ifdef "trace" then
+          @printf[I32]("^*^* got AckMsg\n".cstring())
+        end
+
+        // SLF TODO:
+        // Send ERROR("I SEND ACK TO YOU, SILLY") to client,
+        // close connection.
+
       | let m: cwm.RestartMsg =>
-        @printf[I32]("^*^* got RestartMsg, WTF, SLF TODO\n".cstring())
+        ifdef "trace" then
+          @printf[I32]("^*^* got RestartMsg\n".cstring())
+        end
+
+        // SLF TODO:
+        // Send ERROR("I SEND RESTART TO YOU, SILLY") to client,
+        // close connection.
+
       end
     else
       @printf[I32](("Unable to decode message at " + _pipeline_name +
@@ -287,7 +338,6 @@ class ConnectorSourceNotify[In: Any val]
       ifdef debug then
         Fail()
       end
-      return _continue_perhaps(source)
     end
     _continue_perhaps(source)
 
@@ -506,20 +556,34 @@ class ConnectorSourceNotify[In: Any val]
   fun ref stream_notify_result(session_tag: USize, success: Bool,
     stream_id: U64, point_of_reference: U64, last_message_id: U64) =>
     if (session_tag != _session_tag) or (not _session_active) then
+      // This is a reply from a query that we'd sent in a prior TCP
+      // connection, or else the TCP connection is closed now,
+      // so ignore it.
       return
     end
 
-    // SLF TODO
     @printf[I32]("^*^* %s.%s(%s, %lu, p-o-r %lu, l-msgid %lu)\n".cstring(),
       __loc.type_name().cstring(), __loc.method_name().cstring(),
       success.string().cstring(),
       stream_id, point_of_reference, last_message_id)
     try
-      let s = _stream_map(stream_id)?
-      s.pending_query = false
-      s.base_point_of_reference = point_of_reference
-      s.base_point_of_reference = last_message_id // TODO simulation HACK, deleteme!
-      s.filter_message_id = last_message_id
+      let success_reply =
+        if success and (not _stream_map.contains(stream_id)) then
+          true
+        else
+          let s = _stream_map(stream_id)?
+          if success and s.pending_query then
+            s.pending_query = false
+            s.base_point_of_reference = point_of_reference
+            s.base_point_of_reference = last_message_id // SLF TODO simulation HACK, deleteme!
+            s.filter_message_id = last_message_id
+            true
+          else
+            false
+          end
+        end
+      let m = cwm.NotifyAckMsg(success_reply, stream_id, point_of_reference)
+
       // SLF TODO: SEND REPLY TO CONNECTOR CLIENT
     else
       Fail()
