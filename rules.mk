@@ -556,6 +556,7 @@ endef
 
 define APPRUN_HEREDOC
 #!/bin/sh
+export RELEASE_MUTABLE_DIR="/tmp/.local/share/wallaroo"
 HERE=$$(dirname "$$(readlink -f "$${0}")")
 "$${HERE}"/usr/bin/metrics_reporter_ui $$@
 if [ "$$1" = "start" ]; then
