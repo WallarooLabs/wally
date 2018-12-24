@@ -15,7 +15,7 @@
 
 import argparse
 from collections import Counter
-import datetime as dt
+import datetime
 import pickle
 import struct
 import inspect
@@ -235,29 +235,12 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
     elif issubclass(base_cls, Encoder):
         # ConnectorEncoder
         if issubclass(base_cls, ConnectorEncoder):
+            # Assign `func` to `_encode` attribute. The rest is done in
+            # the ConnectorEncoder class definition
             class C(base_cls):
                 def encode(self, data, event_time=0, key=None):
-                    encoded = func(data)
-                    if isinstance(event_time, dt.datetime):
-                        # We'll assume naive datetime values should be treated as
-                        # UTC. Python's brain-dead datetime package is mostly
-                        # useless for fixing this without a mountain of caveats
-                        # like improper DST handling. We'll assume the user can
-                        # import a library that handles this better than Python
-                        # does itself.
-                        #
-                        # Convert to an integer number of ms from the floating
-                        # point seconds that Python uses.
-                        event_time = int(event_time.timestamp() * 1000)
-                    encoded_key = key.encode() if key else ''.encode()
-                    return struct.pack(
-                        '>IqI{}s{}s'.format(len(encoded_key), len(encoded)),
-                        # 1st I = message length hdr, not included in total frame size
-                        8 + 4 + len(encoded_key) + len(encoded), # total frame size
-                        event_time, # 64bit event_time
-                        len(encoded_key),
-                        encoded_key,
-                        encoded) # final payload, variable size as formatted above
+                    encoded_data = func(data)
+                    return self._encode(encoded_data, event_time, key)
 
         # OctetEncoder
         elif issubclass(base_cls, OctetEncoder):
@@ -346,8 +329,43 @@ class ConnectorDecoder(Decoder):
     pass
 
 
+# datetime.datetime.timestamp() is only available in python 3.3+
+if sys.version_info.major >= 3 and sys.version_info.minor >= 3:
+    def dt_to_timestmap(dt):
+        return dt.timestamp()
+else:
+    def dt_to_timestamp(dt):
+        # Use the native timezone provided in the event_time object
+        # If none is provided, it defaults to system timezone
+        return ((dt.astimezone() -
+                 datetime.datetime(1970,1,1, tzinfo=datetime.timezone.utc)) /
+                datetime.timedelta(seconds=1), time.time())
+
+
 class ConnectorEncoder(Encoder):
-    pass
+    def _encode(self, encoded_data, event_time=0, key=None):
+        if isinstance(event_time, datetime.datetime):
+            # We'll assume naive datetime values should be treated as
+            # UTC. Python's brain-dead datetime package is mostly
+            # useless for fixing this without a mountain of caveats
+            # like improper DST handling. We'll assume the user can
+            # import a library that handles this better than Python
+            # does itself.
+            #
+            # Convert to an integer number of ms from the floating
+            # point seconds that Python uses.
+            # timestamp() is only available in python3.3+
+
+            event_time = int(dt_to_timestamp(event_time) * 1000)
+        encoded_key = key.encode() if key else ''.encode()
+        return struct.pack(
+            '>IqI{}s{}s'.format(len(encoded_key), len(encoded_data)),
+            # 1st I = message length hdr, not included in total frame size
+            8 + 4 + len(encoded_key) + len(encoded_data), # total frame size
+            event_time, # 64bit event_time
+            len(encoded_key),
+            encoded_key,
+            encoded_data) # final payload, variable size as formatted above
 
 
 def computation(name):
