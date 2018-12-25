@@ -9,6 +9,10 @@ except ImportError:
 
 
 class Hello(object):
+    """
+    Hello(version: String, cookie: String, program_name: String,
+          instance_name: String)
+    """
     def __init__(self, version, cookie, program_name, instance_name):
         self.version = version
         self.cookie = cookie
@@ -16,8 +20,8 @@ class Hello(object):
         self.instance_name = instance_name
 
     def __str__(self):
-        return ("Hello(version={}, cookie={}, program_name={}, "
-                "instance_name={})"
+        return ("Hello(version={!r}, cookie={!r}, program_name={!r}, "
+                "instance_name={!r})"
                 .format(self.version, self.cookie, self.program_name,
                         self.instance_name))
 
@@ -73,12 +77,18 @@ def test_hello():
 
 
 class Ok(object):
+    """
+    Ok(initial_credits: U32,
+       credit_list: Array[(stream_id: U64,
+                           stream_name: bytes,
+                           point_of_ref: U64)])
+   """
     def __init__(self, initial_credits, credit_list):
         self.initial_credits = initial_credits
         self.credit_list = credit_list
 
     def __str__(self):
-        return ("Ok(initial_credits={}, credit_list={})"
+        return ("Ok(initial_credits={!r}, credit_list={!r})"
                 .format(self.initial_credits, self.credit_list))
 
     def __eq__(self, other):
@@ -88,12 +98,11 @@ class Ok(object):
     def encode(self):
         packed_credits = []
         for (sid, sn, por) in self.credit_list:
-            encoded_sn = sn.encode()
             packed_credits.append(
-                struct.pack('>QH{}sQ'.format(len(encoded_sn)),
+                struct.pack('>QH{}sQ'.format(len(sn)),
                             sid,
-                            len(encoded_sn),
-                            encoded_sn,
+                            len(sn),
+                            sn,
                             por))
         return (struct.pack('>II', self.initial_credits,
                             len(self.credit_list)) +
@@ -108,7 +117,7 @@ class Ok(object):
         for _ in range(credit_list_length):
             stream_id = struct.unpack(">Q", reader.read(8))[0]
             stream_name_length = struct.unpack(">H", reader.read(2))[0]
-            stream_name = reader.read(stream_name_length).decode()
+            stream_name = reader.read(stream_name_length)
             point_of_ref = struct.unpack(">Q", reader.read(8))[0]
             credit_list.append((stream_id,
                                 stream_name,
@@ -117,7 +126,7 @@ class Ok(object):
 
 
 def test_ok():
-    ic, cl = 100, [(1, "1", 0), (2, "2", 1)]
+    ic, cl = 100, [(1, b"1", 0), (2, b"2", 1)]
     ok = Ok(ic, cl)
     assert(ok.initial_credits == ic)
     assert(ok.credit_list == cl)
@@ -132,17 +141,20 @@ def test_ok():
 
 
 class Error(object):
+    """
+    Error(msg: String)
+    """
     def __init__(self, msg):
-        self.msg = msg
+        self.message = msg
 
     def __str__(self):
-        return "Error(msg={})".format(self.msg)
+        return "Error(message={!r})".format(self.message)
 
     def __eq__(self, other):
-        return self.msg == other.msg
+        return self.message == other.message
 
     def encode(self):
-        encoded = self.msg.encode()
+        encoded = self.message.encode()
         return struct.pack(">H{}s".format(len(encoded)),
                            len(encoded),
                            encoded)
@@ -158,24 +170,27 @@ class Error(object):
 def test_error():
     msg = "hello world"
     error = Error(msg)
-    assert(error.msg == msg)
+    assert(error.message == msg)
     encoded = error.encode()
     assert(len(encoded) == len(msg.encode()) + 2)
     decoded = Error.decode(encoded)
     assert(isinstance(decoded, Error))
-    assert(decoded.msg == msg)
+    assert(decoded.message == msg)
     assert(decoded == error)
     assert(str(decoded) == str(error))
 
 
 class Notify(object):
+    """
+    Notify(stream_id: U64, stream_name: bytes, point_of_ref: U64)
+    """
     def __init__(self, stream_id, stream_name, point_of_ref=0):
         self.stream_id = stream_id
         self.stream_name = stream_name
         self.point_of_ref = point_of_ref
 
     def __str__(self):
-        return ("Notify(stream_id={}, stream_name={}, point_of_ref={})"
+        return ("Notify(stream_id={!r}, stream_name={!r}, point_of_ref={!r})"
                 .format(self.stream_id, self.stream_name, self.point_of_ref))
 
     def __eq__(self, other):
@@ -184,11 +199,10 @@ class Notify(object):
                 self.point_of_ref == other.point_of_ref)
 
     def encode(self):
-        encoded_sn = self.stream_name.encode()
-        return struct.pack(">QH{}sQ".format(len(encoded_sn)),
+        return struct.pack(">QH{}sQ".format(len(self.stream_name)),
                            self.stream_id,
-                           len(encoded_sn),
-                           encoded_sn,
+                           len(self.stream_name),
+                           self.stream_name,
                            self.point_of_ref)
 
     @staticmethod
@@ -196,13 +210,13 @@ class Notify(object):
         reader = StringIO(bs)
         stream_id = struct.unpack(">Q", reader.read(8))[0]
         stream_name_length = struct.unpack(">H", reader.read(2))[0]
-        stream_name = reader.read(stream_name_length).decode()
+        stream_name = reader.read(stream_name_length)
         point_of_ref = struct.unpack(">Q", reader.read(8))[0]
         return Notify(stream_id, stream_name, point_of_ref)
 
 
 def test_notify():
-    sid, sn, por = 0, "0", 1
+    sid, sn, por = 0, b"0", 1
     notify = Notify(sid, sn, por)
     assert(notify.stream_id == sid)
     assert(notify.stream_name == sn)
@@ -219,13 +233,16 @@ def test_notify():
 
 
 class NotifyAck(object):
+    """
+    NotifyAck(notify_success: Bool, stream_id: U64, point_of_ref: U64)
+    """
     def __init__(self, notify_success, stream_id, point_of_ref):
         self.notify_success = notify_success
         self.stream_id = stream_id
         self.point_of_ref = point_of_ref
 
     def __str__(self):
-        return ("NotifyAck(notify_success={}, stream_id={}, point_of_ref={})"
+        return ("NotifyAck(notify_success={!r}, stream_id={!r}, point_of_ref={!r})"
                 .format(self.notify_success, self.stream_id,
                         self.point_of_ref))
 
@@ -267,6 +284,11 @@ def test_notify_ack():
 
 
 class Message(object):
+    """
+    Message(stream_id: int, flags: byte, message_id: (int | None),
+            event_time: int, key: (bytes | None),
+            message: (bytes | None))
+    """
     Ephemeral = 1
     Boundary = 2
     Eos = 4
@@ -281,12 +303,18 @@ class Message(object):
         self.flags = flags
         self.message_id = message_id
         self.event_time = event_time
-        self.key = key
-        self.message = message
+        if key is None or isinstance(key, bytes):
+            self.key = key
+        else:
+            raise TypeError("Parameter key must be either None or bytes")
+        if message is None or isinstance(message, bytes):
+            self.message = message
+        else:
+            raise TypeError("Parameter message must be either None or bytes")
 
     def __str__(self):
-        return ("Message(stream_id={}, flags={}, message_id={}, event_time"
-                "={}, key={}, message={})".format(
+        return ("Message(stream_id={!r}, flags={!r}, message_id={!r}, event_time"
+                "={!r}, key={!r}, message={!r})".format(
                     self.stream_id,
                     self.flags,
                     self.message_id,
@@ -311,10 +339,10 @@ class Message(object):
                      if self.message_id else b'')
         event_time = (struct.pack('>q', self.event_time)
                       if self.event_time else b'')
-        en_key = self.key.encode() if self.key else b''
-        key = (struct.pack('>H{}s'.format(len(en_key)), len(en_key), en_key)
+        key = (struct.pack('>H{}s'.format(len(self.key)), len(self.key),
+                           self.key)
                if self.key else b'')
-        msg = self.message.encode() if self.message else b''
+        msg = self.message if self.message else b''
         return b''.join((sid, flags, messageid, event_time, key, msg))
 
     @classmethod
@@ -331,11 +359,11 @@ class Message(object):
             event_time = None
         if flags & cls.Key == cls.Key:
             key_length = struct.unpack('>H', reader.read(2))[0]
-            key = reader.read(key_length).decode()
+            key = reader.read(key_length)
         else:
             key = None
         if not (flags & cls.Boundary == cls.Boundary):
-            message = reader.read().decode()
+            message = reader.read()
         else:
             message = None
         return cls(stream_id, flags, message_id, event_time, key, message)
@@ -367,8 +395,6 @@ class Message(object):
 
         if flags & cls.Boundary == cls.Boundary:
             assert(message is None)
-        else:
-            assert(message is not None)
 
         if flags & cls.Key == cls.Key:
             assert(key is not None)
@@ -390,8 +416,8 @@ def test_message():
     stream_id = 123
     message_id = 456
     event_time = 1001
-    key = 'key'
-    message = 'hello world'
+    key = 'key'.encode()
+    message = 'hello world'.encode()
     """
     Allowed flag combinations
         E B Eo  Un  Et  K
@@ -615,8 +641,8 @@ def test_message():
             8 + 1 +
             (8 if msg.message_id else 0) +
             (8 if msg.event_time else 0) +
-            ((2 + len(key.encode())) if msg.key else 0) +
-            (len(message.encode()) if msg.message else 0)))
+            ((2 + len(key)) if msg.key else 0) +
+            (len(message) if msg.message else 0)))
 
         decoded = Message.decode(encoded)
         assert(isinstance(decoded, Message))
@@ -633,12 +659,15 @@ def test_message():
 
 
 class Ack(object):
+    """
+    Ack(credits: U32, acks: Array[(stream_id: U64, point_of_ref: U64)]
+    """
     def __init__(self, credits, acks):
         self.credits = credits
         self.acks = acks
 
     def __str__(self):
-        return "Ack(credits={}, acks={})".format(self.credits, self.acks)
+        return "Ack(credits={!r}, acks={!r})".format(self.credits, self.acks)
 
     def __eq__(self, other):
         return (self.credits == other.credits and
@@ -726,6 +755,10 @@ class Frame(object):
         frame_tag = struct.unpack('>B', bs[0:1])[0]
         return cls._FRAME_TYPE_MAP[frame_tag].decode(bs[1:])
 
+    @staticmethod
+    def read_header(bs):
+        return struct.unpack('>I', bs[:4])[0]
+
 
 def _test_frame_encode_decode(msg):
     framed = Frame.encode(msg)
@@ -733,12 +766,12 @@ def _test_frame_encode_decode(msg):
     assert(decoded == msg)
 
 def test_frame():
-
+    assert(Frame.read_header(struct.pack('>I', 50)) == 50)
     msgs = []
     msgs.append(Hello("version", "cookie", "program_name", "instance_name"))
-    msgs.append(Ok(100, [(1,"1",1), (2, "2", 2)]))
+    msgs.append(Ok(100, [(1,b"",1), (2, b"2", 2)]))
     msgs.append(Error("this is an error message"))
-    msgs.append(Notify(123, "stream123", 1001))
+    msgs.append(Notify(123, b"stream123", 1001))
     msgs.append(NotifyAck(False, 123, 1001))
     # Message framing is tested in the test_message test
     msgs.append(Ack(1000, [(123, 999), (300, 200)]))
@@ -746,4 +779,3 @@ def test_frame():
 
     for msg in msgs:
         _test_frame_encode_decode(msg)
-
