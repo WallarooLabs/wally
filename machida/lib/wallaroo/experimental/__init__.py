@@ -13,6 +13,7 @@
 #  permissions and limitations under the License.
 
 import argparse
+import asyncore
 import inspect
 import socket
 import struct
@@ -23,6 +24,14 @@ from functools import wraps
 from select import select
 
 import wallaroo
+
+
+class ConnectorError(Exception):
+    pass
+
+
+class ConnectorUnknownMessageError(ConnectorError):
+  pass
 
 
 def stream_message_decoder(func):
@@ -62,6 +71,10 @@ class SinkConnectorConfig(object):
 
 
 class SourceConnector(object):
+  # Nisan TODO: replace synchronous socket with asyncore.dispatch
+  # https://docs.python.org/2.7/library/asyncore.html#asyncore.dispatcher
+  # https://docs.python.org/3/library/asyncore.html#module-asyncore
+  # Newer asyncio: https://docs.python.org/3/library/asyncio-protocol.html
     def __init__(self, args=None, required_params=[], optional_params=[]):
         params = parse_connector_args(args or sys.argv, required_params, optional_params)
         wallaroo_mod = __import__(params.application)
@@ -98,6 +111,60 @@ class SourceConnector(object):
             raise RuntimeError("Please call connect before writing")
         payload = self._encoder.encode(message, event_time, key)
         self._conn.sendall(payload)
+
+
+class AtLeastOnceSourceConnector(SourceConnector):
+    # Nisan TODO: Update for Asyncore.dispatcher based SourceConnector
+    """
+    An at-least-once source connector implemented over the base SourceConnector
+    """
+    def __init__(self, args=None, required_params=[], optional_params=[],
+        handler):
+        self._handler = handler
+        super(AtLeastOnceSourceConnector, self).__init__(args,
+                                                         required_params,
+                                                         optional_params)
+
+    def send(self, msg, event_time=0, key=None):
+        self.write(self._frame(msg.encode()), event_time, key)
+
+    def _frame(self, bs, event_time=0, key=None):
+        return struct.pack('>I{}s'.format(len(bs)), len(bs), bs)
+
+    def recv(self, msg):
+        if isinstance(msg, cwm.Ok):
+            self.recv_ok(msg)
+        elif isinstance(msg, cwm.Error):
+            self.recv_error(msg)
+        elif isinstance(msg, cwm.NotifyAck):
+            self.recv_notify_ack(msg)
+        elif isinstance(msg, cwm.Ack):
+            self.recv_ack(msg)
+        elif isinstance(msg, cwm.Restart):
+            self.recv_restart(msg)
+        else:
+            raise ConnectorUnknownMessageError("Got unknown message type {}"
+                    " with contents {}".format(type(msg), msg))
+
+    def recv(ok, msg):
+        if hello(world):
+            if isinstance(blablablaa):
+
+    def recv_ok(self, msg):
+        self._handler.ok(msg)
+        raise NotImplementedError
+
+    def recv_error(self, msg):
+        raise ConnectorError(msg)
+
+    def recv_notify_ack(self, msg):
+        raise NotImplementedError
+
+    def recv_ack(self, msg):
+        raise NotImplementedError
+
+    def recv_restart(self, msg):
+        raise NotImplementedError
 
 
 class SinkConnector(object):
