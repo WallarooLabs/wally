@@ -17,10 +17,12 @@ machida = pargs.command
 # This is imported to test that wallaroo's python library is reachable.
 try:
     import wallaroo
-except:
+except ImportError:
     raise ImportError("Unable to find wallaroo python library. Has the wallaroo "
           "environment been activated? "
           "See https://docs.wallaroolabs.com/book/getting-started/wallaroo-up.html")
+except:
+    raise
 
 
 class UDPHandler(SocketServer.BaseRequestHandler):

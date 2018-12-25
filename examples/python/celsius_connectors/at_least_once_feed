@@ -1,0 +1,276 @@
+#!/usr/bin/env python
+
+"""
+An example at-least-once feed with resettable sources that exercises the new
+AtLeastOnceSourceConnector and at-least-once protocol.
+
+To run it:
+
+1. start the mock server (TODO: replace with wallaroo app once pony connector is ready)
+    ```sh
+    python3 server.py
+    ```
+
+    The mock server will choose a random offset betwee 0 and 800 for each stream to in its notify_ack. (Since each stream has 1000 total messagrs, each of size 8 bytes, it does so by choosing `random.randint(0,800)*8` as the point_of_ref.)
+
+2. Start the feed:
+
+    ```sh
+    ./at_least_once_feed \
+        --application-module celsius \
+        --connector celsius_feed \
+        --celsius_feed-host 127.0.0.1 \
+        --celsius_feed-port 7100 \
+        --celsius_feed-timeout 0.05 \
+        --celsius_feed-filenames celsius.msg,celsius.msg.2,celsius.msg.3
+    ```
+"""
+import ctypes
+from struct import unpack
+import time
+
+from wallaroo.experimental import (
+                                   connector_wire_messages as cwm,
+                                   AtLeastOnceSourceConnector,
+                                   ProtocolError,
+                                   ConnectorError)
+
+
+class BaseIter(object):
+    """
+    A base class for creating iterator classes -- e.g. stateful iterators
+    To use it, create your own subclass and implement the `__next__(self)`
+    method.
+    """
+    def throw(self, type=None, value=None, traceback=None):
+        raise StopIteration
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        return self.__next__()
+
+    def __next__(self):
+        raise NotImplementedError
+
+
+class FramedFileReader(BaseIter):
+    """
+    A framed file reader iterator with a resettable position.
+
+    Usage: `FramedFileReader(filename)`.
+    Data should have U32 length headers followed by data bytes, followed by
+    the next datum's length header and bytes, and so on until the end of the
+    file.
+    """
+    def __init__(self, filename):
+        self.file = open(filename, mode='rb')
+        self.name = filename
+        self.key = filename.encode()
+
+    def __str__(self):
+        return ("FramedFileReader(filename: {}, closed: {})"
+                .format(self.name, self.file.closed))
+
+    def point_of_ref(self):
+        try:
+            return self.file.tell()
+        except:
+            return -1
+
+    def reset(self, pos=0):
+        print("reseting {} to position {}".format(self.__str__(), pos))
+        self.file.seek(pos)
+
+    def __next__(self):
+        # read header
+        h = self.file.read(4)
+        if not h:
+            raise StopIteration
+        h_bytes = unpack('>I', h)[0]
+        b = self.file.read(h_bytes)
+        if not b:
+            raise StopIteration
+        return (b, self.file.tell())
+
+    def close(self):
+        self.file.close()
+
+    def __del__(self):
+        try:
+            self.close()
+        except:
+            pass
+
+
+class MultiFileReaderConnector(AtLeastOnceSourceConnector, BaseIter):
+    """
+    MultiFileReaderConnector
+
+    Send data from mutliple files in a round-robin fashion using the
+    AtLeastOnceSourceConnector protocol and superclass.
+    New files may be added at any point.
+
+    An iterator interface is used to read and send the next datum to the
+    Wallaroo source, for use with an external loop, such as
+    ```
+    # Create client instance
+    client = MultiFileReaderConnector(...)
+    client.initiate_handshake(hello_msg)
+
+    # ... wait for notify acks
+    time.sleep(2)
+
+    # start the read-send loop
+    while True:
+        try:
+            next(client)
+        except StopIteration:
+            break
+    ```
+    """
+    def __init__(self, args=None, required_params=[], optional_params=[]):
+        AtLeastOnceSourceConnector.__init__(self, args, required_params,
+                                            optional_params)
+        self.sources = {} # stream_id: source instance
+        self.keys = []
+        self._idx = -1
+        self.joining = set()
+
+    def stream_updated(self, stream):
+        super(MultiFileReaderConnector, self).stream_updated(stream)
+        source = self.sources.pop(stream.id, None)
+        # stream already in sources
+        if source:
+            # if stream is closed, close the file, then remove the source
+            if not stream.is_open:
+                source.close()
+                # don't put it back in sources...
+            # otherwise... check if you need to reset its position
+            else:
+                # if stream just joined, remove it from joining
+                if stream.id in self.joining:
+                    self.joining.remove(stream.id)
+                    if stream.point_of_ref != source.point_of_ref:
+                        source.reset(stream.point_of_ref)
+                # put it back
+                self.sources[stream.id] = source
+        # stream is new to us
+        else:
+            if stream.is_open:
+                # This is an error for MultiFileReaderConnector
+                raise ConnectorError("Can't open a new source from a stream. "
+                                     "Please use the add_source interface.")
+            # nothing to do with a closed stream for which there is no source
+
+    def add_source(self, source):
+        # add to self.sources
+        _id = self.get_id(source.name)
+        self.sources[_id] = source
+        self.keys.append(_id)
+        # add to joining set so we can control the starting sequence
+        self.joining.add(_id)
+
+        # send a notify
+        self.notify(_id, source.name, source.point_of_ref())
+
+    @staticmethod
+    def get_id(text):
+        """
+        Get a positive U64 from the I64 of the hash of text
+        """
+        return ctypes.c_size_t(hash(text)).value
+
+    # Make this class an iterable:
+    def __next__(self):
+        if len(self.keys) > 0:
+            try:
+                # get next position
+                self._idx = (self._idx + 1) % len(self.keys)
+                # get key of that position
+                key = self.keys[self._idx]
+                # get source at key
+                source = self.sources[key]
+                # get value from source
+                value, point_of_ref = next(source)
+                # send it as a message
+                msg = cwm.Message(
+                    stream_id = key,
+                    flags = cwm.Message.Key,
+                    message_id = point_of_ref,
+                    key = source.key,
+                    message = value)
+                self.write(msg)
+                return msg
+            except StopIteration:
+                # if the source threw a StopIteration, send an EOS message
+                # for it, then close it and remove it from sources
+                self.end_of_stream(stream_id = key)
+                source.close()
+                del self.sources[key]
+                self.keys.pop(self._idx)
+                self._idx -= 1 # to avoid skipping in the round-robin sender
+                return source
+        else:
+            raise StopIteration
+
+
+client = MultiFileReaderConnector(
+        args=None,
+        required_params=['host', 'port', 'filenames'],
+        optional_params=['timeout', 'delay'])
+
+# Open a connection with a hello message
+hello = cwm.Hello("0.0.1", "1234", "celsius at least once", "instance")
+client.initiate_handshake(hello)
+client.start()
+
+params = client.params
+filenames = params.filenames.split(',')
+if params.delay:
+    delay = float(params.delay)
+else:
+    delay = 0.001
+
+
+# Open FramedFileReader
+for fn in filenames:
+    client.add_source(FramedFileReader(filename = fn))
+
+# Wait for notifies to trickle in via `stream_updated`
+# continue to sending once self.joining is empty
+timeout = 5
+t0 = time.time()
+while client.joining:
+    if time.time() - t0 >= timeout:
+        raise Exception("Didn't receive NotifyAcks within {} seconds"
+                        .format(timeout))
+    time.sleep(0.05)
+
+# Rely on the iterator method of our connector subclass
+while True:
+    try:
+        msg = next(client)
+        if isinstance(msg, FramedFileReader):
+            print("Closed and removed {}".format(msg))
+        else:
+            print("Sent the message: {}".format(msg))
+        time.sleep(delay)
+    except ProtocolError as err:
+        if "notify" in err.message:
+            time.sleep(0.5)
+        raise
+    except StopIteration:
+        print("Reached the end of all files. Shutting down.")
+        break
+
+print("Waiting for all pending send to clear")
+timeout = 15
+t0 = time.time()
+while not client.pending_sends():
+    if time.time() - t0 >= timeout:
+        raise Exception("Pending sends failed to clear within {} seconds"
+                        .format(timeout))
+    time.sleep(0.1)
+print("All pending sends have cleared. Shutting down.")
