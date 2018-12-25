@@ -1,0 +1,76 @@
+#!/usr/bin/env python
+
+from struct import unpack
+from time import sleep
+from datetime import datetime
+
+from wallaroo.experimental import (
+                                   #conector_wire_messages as cwm,
+                                   SourceConnector)
+
+
+class FramedFileReader(object):
+    def __init__(self, filename):
+        self.file = open(filename, mode='rb')
+
+    def reset(self, pos=0):
+        self.file.seek(pos)
+
+    def throw(self, type=None, value=None, traceback=None):
+        raise StopIteration
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        return self.__next__()
+
+    def __next__(self):
+        # read header
+        h = self.file.read(4)
+        if not h:
+            raise StopIteration
+        h_bytes = unpack('>I', h)[0]
+        b = self.file.read(h_bytes)
+        if not b:
+            raise StopIteration
+        return (b, self.file.tell())
+
+    def close(self):
+        self.file.close()
+
+    def __del__(self):
+        try:
+            self.close()
+        except:
+            pass
+
+
+#        data = self.request[0].strip()
+#        connector.write(data)
+
+connector = SourceConnector(required_params=['filename'],
+                            optional_params=['delay'])
+params = connector.params
+print('params', params)
+filename = params.filename
+if params.delay:
+    delay = float(params.delay)
+else:
+    delay = 0
+
+#connector.connect()
+
+# Open FramedFileReader
+ffr = FramedFileReader(filename = filename)
+for i, (x, pos)  in enumerate(ffr):
+    print(i, pos, repr(x), unpack('>f', x)[0])
+
+print('\n')
+print("resetting to 5104")
+print('\n')
+ffr.reset(5104)
+for i, (x, pos)  in enumerate(ffr):
+    print(i, pos, repr(x), unpack('>f', x)[0])
+
+
