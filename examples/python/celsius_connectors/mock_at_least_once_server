@@ -2,6 +2,7 @@
 
 import asyncore
 import asynchat
+import random
 import socket
 import struct
 import sys
@@ -62,7 +63,8 @@ class AsyncServer(asynchat.async_chat, object):
             notify_ack = cwm.NotifyAck(
                 True,
                 msg.stream_id,
-                800)
+                random.randint(0,800)*8 # Skip to one of the first 800 messages!
+                )
             self._streams[msg.stream_id] = [msg.stream_id,
                                             msg.stream_name,
                                             msg.point_of_ref]
@@ -82,7 +84,8 @@ class AsyncServer(asynchat.async_chat, object):
 
     def handle_message(self, msg):
         # send an ack every 100 messages
-        self._streams[msg.stream_id][2] = msg.message_id
+        if msg.message_id:
+            self._streams[msg.stream_id][2] = msg.message_id
         if self.received_count % 100 == 0:
             # but reset point_of_ref back to 0 every 500
             # ... yes this will cause the sender to run forever.
