@@ -84,13 +84,6 @@ def terminate(_signal=None, _frame=None):
     exit(-1)
 
 
-source = subprocess.Popen([
-    "../../../connectors/udp_source",
-    "--application-module", "celsius",
-    "--connector", "celsius_feed",
-    "--celsius_feed-host", "127.0.0.1",
-    "--celsius_feed-port", "8801"])
-
 sink = subprocess.Popen([
     "../../../connectors/udp_sink",
     "--application-module", "celsius",
@@ -100,10 +93,7 @@ sink = subprocess.Popen([
 
 print("Ensuring connectors are initialized")
 time.sleep(1)
-source.poll()
 sink.poll()
-if source.returncode or sink.returncode:
-    terminate()
 
 thread = threading.Thread(target = recv_conv)
 thread.daemon = True
@@ -126,8 +116,21 @@ except:
           "See https://docs.wallaroolabs.com/python-installation/python-wallaroo-up-installation-guide/"
           % machida)
 
+source = subprocess.Popen([
+        "./at_least_once_feed",
+        "--application-module", "celsius",
+        "--connector", "celsius_feed",
+        "--celsius_feed-host", "127.0.0.1",
+        "--celsius_feed-port", "7100",
+        "--celsius_feed-timeout" "0.05",
+        "--celsius_feed-filenames", "celsius.msg,celsius.msg.2,celsius.msg.3"])
+source.poll()
+if source.returncode or sink.returncode:
+    terminate()
+time.sleep(1)
+
 signal.signal(signal.SIGINT, terminate)
 signal.signal(signal.SIGTERM, terminate)
 
-send_feed()
+send_feed() ## hack
 terminate()
