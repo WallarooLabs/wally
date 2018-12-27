@@ -11,15 +11,15 @@ toc: true
 
 Wallaroo Up has been tested on:
 
-- Amazon Linux 2 
-- CentOS 7 
-- Debian 
+- Amazon Linux 2
+- CentOS 7
+- Debian
   - Buster (Testing)
   - Jessie
   - Stretch
-- Fedora 
+- Fedora
   - 27
-  - 28 
+  - 28
 - Oracle Linux 7
 - Ubuntu
   - Artful
@@ -36,7 +36,7 @@ In order to compile the Wallaroo example applications, your system will need to 
 ## Download Wallaroo Up script
 
 ```bash
-curl https://raw.githubusercontent.com/WallarooLabs/wallaroo//misc/wallaroo-up.sh -o /tmp/wallaroo-up.sh -J -L
+curl https://raw.githubusercontent.com/WallarooLabs/wallaroo/{{% wallaroo-version %}}/misc/wallaroo-up.sh -o /tmp/wallaroo-up.sh -J -L
 ```
 
 ## Run the Wallaroo Up script
