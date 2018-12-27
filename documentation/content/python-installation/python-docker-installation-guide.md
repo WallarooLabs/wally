@@ -123,7 +123,7 @@ wallaroo-labs-docker-wallaroolabs.bintray.io/{{% docker-version-url %}}
 {{< /tab >}}
 {{< tab name="Powershell" codelang="bash" >}}
 docker run --rm -it --privileged -p 4000:4000 `
--v c:/wallaroo-docker/wallaroo--{{% wallaroo-version %}}/wallaroo-src:/src/wallaroo `
+-v c:/wallaroo-docker/wallaroo-{{% wallaroo-version %}}/wallaroo-src:/src/wallaroo `
 -v c:/wallaroo-docker/wallaroo-{{% wallaroo-version %}}/python-virtualenv-machida:/src/python-virtualenv `
 --name wally `
 wallaroo-labs-docker-wallaroolabs.bintray.io/{{% docker-version-url %}}
@@ -148,7 +148,7 @@ docker run --rm -it --privileged -p 4000:4000 \
 wallaroo-labs-docker-wallaroolabs.bintray.io/{{% docker-version-url %}} -p python3
 {{< /tab >}}
 {{< tab name="Powershell" codelang="bash" >}}docker run --rm -it --privileged -p 4000:4000 `
--v c:/wallaroo-docker/wallaroo--{{% wallaroo-version %}}/wallaroo-src:/src/wallaroo `
+-v c:/wallaroo-docker/wallaroo-{{% wallaroo-version %}}/wallaroo-src:/src/wallaroo `
 -v c:/wallaroo-docker/wallaroo-{{% wallaroo-version %}}/python-virtualenv-machida3:/src/python-virtualenv `
 --name wally `
 wallaroo-labs-docker-wallaroolabs.bintray.io/{{% docker-version-url %}} -p python3
