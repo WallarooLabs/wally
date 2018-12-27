@@ -13,4 +13,4 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 print("recieving on host: " + params.host + " port: " + str(params.port))
 while True:
     value = connector.read()
-    sock.sendto(value, (params.host, int(params.port)))
+    sock.sendto(value.encode(), (params.host, int(params.port)))
