@@ -3,11 +3,14 @@ import argparse
 import signal
 import struct
 import socket
-import SocketServer
 import subprocess
 import threading
 import time
 
+if sys.version_info.major == 2:
+    import SocketServer
+else:
+    import socketserver as SocketServer
 
 parser = argparse.ArgumentParser("Celsius Connectors Example")
 parser.add_argument('--command', default='machida')
