@@ -133,16 +133,16 @@ def test_ok():
 
 class Error(object):
     def __init__(self, msg):
-        self.msg = msg
+        self.message = msg
 
     def __str__(self):
-        return "Error(msg={})".format(self.msg)
+        return "Error(message={})".format(self.message)
 
     def __eq__(self, other):
-        return self.msg == other.msg
+        return self.message == other.message
 
     def encode(self):
-        encoded = self.msg.encode()
+        encoded = self.message.encode()
         return struct.pack(">H{}s".format(len(encoded)),
                            len(encoded),
                            encoded)
@@ -158,12 +158,12 @@ class Error(object):
 def test_error():
     msg = "hello world"
     error = Error(msg)
-    assert(error.msg == msg)
+    assert(error.message == msg)
     encoded = error.encode()
     assert(len(encoded) == len(msg.encode()) + 2)
     decoded = Error.decode(encoded)
     assert(isinstance(decoded, Error))
-    assert(decoded.msg == msg)
+    assert(decoded.message == msg)
     assert(decoded == error)
     assert(str(decoded) == str(error))
 
@@ -726,6 +726,10 @@ class Frame(object):
         frame_tag = struct.unpack('>B', bs[0:1])[0]
         return cls._FRAME_TYPE_MAP[frame_tag].decode(bs[1:])
 
+    @staticmethod
+    def read_header(bs):
+        return struct.unpack('>I', bs[:4])[0]
+
 
 def _test_frame_encode_decode(msg):
     framed = Frame.encode(msg)
@@ -733,7 +737,7 @@ def _test_frame_encode_decode(msg):
     assert(decoded == msg)
 
 def test_frame():
-
+    assert(Frame.read_header(struct.pack('>I', 50)) == 50)
     msgs = []
     msgs.append(Hello("version", "cookie", "program_name", "instance_name"))
     msgs.append(Ok(100, [(1,"1",1), (2, "2", 2)]))
@@ -746,4 +750,3 @@ def test_frame():
 
     for msg in msgs:
         _test_frame_encode_decode(msg)
-
