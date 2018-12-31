@@ -9,6 +9,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Added
 
+- Add support for windowing ([PR #2735](https://github.com/WallarooLabs/wallaroo/pull/2735))
 
 ### Changed
 
