@@ -16,6 +16,7 @@ Copyright 2017-2019 The Wallaroo Authors.
 
 */
 
+use "backpressure"
 use "buffered"
 use "collections"
 use "time"
@@ -467,6 +468,16 @@ class ConnectorSourceNotify[In: Any val]
     _fsm_state = _ProtoFsmDisconnected
     _clear_stream_map()
 
+  fun ref throttled(source: ConnectorSource[In] ref) =>
+    @printf[I32]("%s.throttled: %s Experiencing backpressure!\n".cstring(),
+      __loc.type_name().cstring(), _pipeline_name.cstring())
+    Backpressure.apply(_auth) // SLF TODO: appropriate?
+
+  fun ref unthrottled(source: ConnectorSource[In] ref) =>
+    @printf[I32]("%s.unthrottled: %s Releasing backpressure!\n".cstring(),
+      __loc.type_name().cstring(), _pipeline_name.cstring())
+    Backpressure.release(_auth) // SLF TODO: appropriate?
+
   fun ref connecting(conn: ConnectorSource[In] ref, count: U32) =>
     """
     Called if name resolution succeeded for a ConnectorSource and we are now
@@ -643,7 +654,6 @@ class ConnectorSourceNotify[In: Any val]
 
   fun ref _to_error_state(msg: String, source: ConnectorSource[In] ref): Bool
   =>
-    // SLF TODO: create reply message & send to client
     _send_reply(source, cwm.ErrorMsg(msg))
 
     _fsm_state = _ProtoFsmError
@@ -654,11 +664,13 @@ class ConnectorSourceNotify[In: Any val]
     let w1: Writer = w1.create()
     let w2: Writer = w2.create()
 
-    msg.encode(w1)
-    w2.u64_be(w1.size().u64())
-    let b1 = w1.done()
-    w2.writev(consume b1)
-    let b2 = w2.done()
-    source.writev(consume b2) // SLF TODO: oops, lots to do here in connector_source.pony !!
-
-
+    try
+      msg.encode(w1)?
+      w2.u64_be(w1.size().u64())
+      let b1 = w1.done()
+      w2.writev(consume b1)
+      let b2 = w2.done()
+      source.writev_final(consume b2)
+    else
+      Fail()
+    end
