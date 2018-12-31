@@ -257,10 +257,7 @@ class ConnectorSourceNotify[In: Any val]
         ifdef "trace" then
           @printf[I32]("^*^* got OkMsg\n".cstring())
         end
-        return _to_error_state(source)
-        // SLF TODO:
-        // Send ERROR("I SEND OK TO YOU, SILLY") to client,
-        // close connection.
+        return _to_error_state("Invalid message: ok", source)
 
       | let m: cwm.ErrorMsg =>
         @printf[I32]("Client sent us ERROR msg: %s\n".cstring(),
@@ -299,10 +296,7 @@ class ConnectorSourceNotify[In: Any val]
         ifdef "trace" then
           @printf[I32]("^*^* got NotifyAckMsg\n".cstring())
         end
-
-        // SLF TODO:
-        // Send ERROR("I SEND NOTIFY_ACK TO YOU, SILLY") to client,
-        // close connection.
+        return _to_error_state("Invalid message: notify_ack", source)
 
       | let m: cwm.MessageMsg =>
         @printf[I32]("^*^* got MessageMsg message of the message family of messages, SLF TODO do stuff below\n".cstring())
@@ -330,19 +324,13 @@ class ConnectorSourceNotify[In: Any val]
         ifdef "trace" then
           @printf[I32]("^*^* got AckMsg\n".cstring())
         end
-
-        // SLF TODO:
-        // Send ERROR("I SEND ACK TO YOU, SILLY") to client,
-        // close connection.
+        return _to_error_state("Invalid message: ack", source)
 
       | let m: cwm.RestartMsg =>
         ifdef "trace" then
           @printf[I32]("^*^* got RestartMsg\n".cstring())
         end
-
-        // SLF TODO:
-        // Send ERROR("I SEND RESTART TO YOU, SILLY") to client,
-        // close connection.
+        return _to_error_state("Invalid message: restart", source)
 
       end
     else
@@ -612,7 +600,8 @@ class ConnectorSourceNotify[In: Any val]
       Fail()
     end
 
-  fun ref _to_error_state(source: ConnectorSource[In] ref): Bool =>
+  fun ref _to_error_state(msg: String, source: ConnectorSource[In] ref): Bool
+  =>
     _fsm_state = _ProtoFsmError
     source.close()
     _continue_perhaps2()
