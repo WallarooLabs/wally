@@ -2,17 +2,11 @@
 
 All notable changes to Wallaroo will be documented in this file.
 
-## [unreleased] - unreleased
-
-### Fixed
-
+## [0.6.1] - 2018-12-31
 
 ### Added
 
 - Add support for windowing ([PR #2735](https://github.com/WallarooLabs/wallaroo/pull/2735))
-
-### Changed
-
 
 ## [0.6.0] - 2018-11-30
 
