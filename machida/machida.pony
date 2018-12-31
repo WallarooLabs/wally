@@ -22,6 +22,8 @@ use "pony-kafka"
 use "net"
 
 use "wallaroo"
+use "wallaroo/core/common"
+use "wallaroo/core/aggregations"
 use "wallaroo/core/partitioning"
 use "wallaroo/core/sink"
 use "wallaroo/core/sink/connector_sink"
@@ -34,6 +36,7 @@ use "wallaroo/core/source/gen_source"
 use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
 use "wallaroo/core/state"
+use "wallaroo/core/windows"
 
 // these are included because of wallaroo issue #814
 use "serialise"
@@ -69,6 +72,14 @@ use @stateful_computation_compute[Pointer[U8] val](c: Pointer[U8] val,
   d: Pointer[U8] val, s: Pointer[U8] val, m: Pointer[U8] tag)
 
 use @initial_state[Pointer[U8] val](computation: Pointer[U8] val)
+
+use @initial_accumulator[Pointer[U8] val](aggregation: Pointer[U8] val)
+use @aggregation_update[None](aggregation: Pointer[U8] val,
+  data: Pointer[U8] val, acc: Pointer[U8] val)
+use @aggregation_combine[Pointer[U8] val](aggregation: Pointer[U8] val,
+  acc1: Pointer[U8] val, acc2: Pointer[U8] val)
+use @aggregation_output[Pointer[U8] val](aggregation: Pointer[U8] val,
+  key: Pointer[U8] tag, acc: Pointer[U8] val)
 
 use @source_decoder_header_length[USize](source_decoder: Pointer[U8] val)
 use @source_decoder_payload_length[USize](source_decoder: Pointer[U8] val,
@@ -270,6 +281,15 @@ class PyFramedSourceHandler is FramedSourceHandler[(PyData val | None)]
   fun _final() =>
     Machida.dec_ref(_source_decoder)
 
+class val PyGenSourceHandlerBuilder
+  var _source_generator: Pointer[U8] val
+
+  new create(source_generator: Pointer[U8] val) =>
+    _source_generator = source_generator
+
+  fun apply(): PyGenSourceHandler =>
+    PyGenSourceHandler(_source_generator)
+
 class PyGenSourceHandler is GenSourceGenerator[PyData val]
   var _source_generator: Pointer[U8] val
 
@@ -381,6 +401,51 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
 
   fun _final() =>
     Machida.dec_ref(_computation)
+
+class val PyAggregation is
+  Aggregation[PyData val, (PyData val | None), PyState]
+  var _aggregation: Pointer[U8] val
+  let _name: String
+
+  new val create(aggregation: Pointer[U8] val) =>
+    _aggregation = aggregation
+    _name = Machida.get_name(_aggregation)
+
+  fun initial_accumulator(): PyState =>
+    Machida.initial_accumulator(_aggregation)
+
+  fun update(data: PyData val, acc: PyState) =>
+    Machida.aggregation_update(_aggregation, data.obj(), acc.obj())
+
+  fun combine(acc1: PyState, acc2: PyState): PyState =>
+    Machida.aggregation_combine(_aggregation, acc1.obj(), acc2.obj())
+
+  fun output(key: Key, acc: PyState): (PyData val | None) =>
+    let data =
+      Machida.aggregation_output(_aggregation, key.cstring(), acc.obj())
+
+    recover if Machida.is_py_none(data) then
+        Machida.dec_ref(data)
+        None
+      else
+        PyData(data)
+      end
+    end
+
+  fun name(): String =>
+    _name
+
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_aggregation)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_aggregation, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _aggregation = recover Machida.user_deserialization(bytes) end
+
+  fun _final() =>
+    Machida.dec_ref(_aggregation)
 
 class PyTCPEncoder is TCPSinkEncoder[PyData val]
   var _sink_encoder: Pointer[U8] val
@@ -636,7 +701,36 @@ primitive Machida
     r
 
   fun initial_state(computation: Pointer[U8] val): PyState =>
-    PyState(@initial_state(computation))
+    let s = @initial_state(computation)
+    print_errors()
+    if s.is_null() then Fail() end
+    PyState(consume s)
+
+  fun initial_accumulator(aggregation: Pointer[U8] val): PyState =>
+    let s = @initial_accumulator(aggregation)
+    if print_errors() then Fail() end
+    PyState(consume s)
+
+  fun aggregation_update(aggregation: Pointer[U8] val, data: Pointer[U8] val,
+    acc: Pointer[U8] val)
+  =>
+    @aggregation_update(aggregation, data, acc)
+    if print_errors() then Fail() end
+    None
+
+  fun aggregation_combine(aggregation: Pointer[U8] val, acc1: Pointer[U8] val,
+    acc2: Pointer[U8] val): PyState
+  =>
+    let s = @aggregation_combine(aggregation, acc1, acc2)
+    if print_errors() then Fail() end
+    PyState(consume s)
+
+  fun aggregation_output(aggregation: Pointer[U8] val, key: Pointer[U8] tag,
+    acc: Pointer[U8] val): Pointer[U8] val
+  =>
+    let s = @aggregation_output(aggregation, key, acc)
+    if print_errors() then Fail() end
+    s
 
   fun key_hash(key: Pointer[U8] val): USize =>
     let r = @key_hash(key)
@@ -783,7 +877,7 @@ primitive _SourceConfig
       let gen = recover val
         let g = @PyTuple_GetItem(source_config_tuple, 1)
         Machida.inc_ref(g)
-        PyGenSourceHandler(g)
+        PyGenSourceHandlerBuilder(g)
       end
       GenSourceConfig[PyData val](gen)
     | "tcp" =>
@@ -801,7 +895,11 @@ primitive _SourceConfig
         PyFramedSourceHandler(d)?
       end
 
-      TCPSourceConfig[(PyData val | None)](decoder, host, port)
+      let parallelism = recover val
+        USize.from[I64](@PyInt_AsLong(@PyTuple_GetItem(source_config_tuple, 4)))
+      end
+
+      TCPSourceConfig[(PyData val | None)](decoder, host, port, parallelism)
     | "kafka-internal" =>
       let kafka_source_name = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
@@ -1118,11 +1216,35 @@ class val PyPipelineTree
         PyStateComputation(state_computationp)
       end
       pipeline = pipeline.to[PyData val](state_computation)
+    | "to_range_windows" =>
+      let range = @PyInt_AsLong(@PyTuple_GetItem(stage, 1)).u64()
+      let slide = @PyInt_AsLong(@PyTuple_GetItem(stage, 2)).u64()
+      let delay = @PyInt_AsLong(@PyTuple_GetItem(stage, 3)).u64()
+      let raw_aggregation = @PyTuple_GetItem(stage, 4)
+      let aggregation = PyAggregation(raw_aggregation)
+      Machida.inc_ref(raw_aggregation)
+      let windows = Wallaroo.range_windows(range)
+                              .with_slide(slide)
+                              .with_delay(delay)
+                              .over[PyData val, PyData val, PyState](
+                                aggregation)
+      pipeline = pipeline.to[PyData val](windows)
+    | "to_count_windows" =>
+      let count = @PyInt_AsLong(@PyTuple_GetItem(stage, 1)).usize()
+      let raw_aggregation = @PyTuple_GetItem(stage, 2)
+      let aggregation = PyAggregation(raw_aggregation)
+      Machida.inc_ref(raw_aggregation)
+      let windows = Wallaroo.count_windows(count)
+                              .over[PyData val, PyData val, PyState](
+                                aggregation)
+      pipeline = pipeline.to[PyData val](windows)
     | "key_by" =>
       let raw_key_extractor = @PyTuple_GetItem(stage, 1)
       let key_extractor = PyKeyExtractor(raw_key_extractor)
       Machida.inc_ref(raw_key_extractor)
       pipeline = pipeline.key_by(key_extractor)
+    | "collect" =>
+      pipeline = pipeline.collect()
     | "to_sink" =>
       pipeline = pipeline.to_sink(
         _SinkConfig.from_tuple(@PyTuple_GetItem(stage, 1), env)?)

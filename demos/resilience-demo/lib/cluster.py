@@ -142,7 +142,7 @@ class Runner(threading.Thread):
             self.p.wait()
         except Exception as err:
             self.error = err
-            logging.warn("{}: Stopped running!".format(self.name))
+            logging.warning("{}: Stopped running!".format(self.name))
             raise
 
     def send_signal(self, signal):

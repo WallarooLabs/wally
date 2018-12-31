@@ -1,2 +1,0 @@
-# Exploring Core Features
-

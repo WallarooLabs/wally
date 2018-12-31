@@ -25,16 +25,19 @@ import wallaroo.experimental
 
 
 class Unbuffered(object):
-   def __init__(self, stream):
-       self.stream = stream
-   def write(self, data):
-       self.stream.write(data)
-       self.stream.flush()
-   def writelines(self, datas):
-       self.stream.writelines(datas)
-       self.stream.flush()
-   def __getattr__(self, attr):
-       return getattr(self.stream, attr)
+    def __init__(self, stream):
+        self.stream = stream
+
+    def write(self, data):
+        self.stream.write(data)
+        self.stream.flush()
+
+    def writelines(self, datas):
+        self.stream.writelines(datas)
+        self.stream.flush()
+
+    def __getattr__(self, attr):
+        return getattr(self.stream, attr)
 
 
 # If python is running with PIPE stdout/stderr, replace them with
@@ -63,10 +66,18 @@ def source(name, source_config):
 
 
 def build_application(app_name, pipeline):
-    if not pipeline.__is_closed__():
+    if not pipeline._is_closed():
         print("\nAPI_Error: An application must end with to_sink/s.")
         raise WallarooParameterError()
     return pipeline.__to_tuple__(app_name)
+
+
+def range_windows(wrange):
+    return RangeWindowsBuilder(wrange)
+
+
+def count_windows(wrange):
+    return CountWindowsBuilder(wrange)
 
 
 class Pipeline(object):
@@ -75,36 +86,47 @@ class Pipeline(object):
 
     @classmethod
     def from_source(class_object, name, source_config):
-        pipeline_tree = _PipelineTree(("source", name, source_config.to_tuple()))
+        pipeline_tree = _PipelineTree(("source", name,
+                                      source_config.to_tuple()))
         return Pipeline(pipeline_tree)
 
     def __to_tuple__(self, app_name):
         return self._pipeline_tree.to_tuple(app_name)
 
-    def __is_closed__(self):
+    def _is_closed(self):
         return self._pipeline_tree.is_closed
 
     def to(self, computation):
-        return self.clone().__to__(computation)
+        return self.clone()._to(computation)
 
-    def __to__(self, computation):
+    def _to(self, computation):
         if isinstance(computation, StateComputation):
             self._pipeline_tree.add_stage(("to_state", computation))
+        elif isinstance(computation, RangeWindows):
+            self._pipeline_tree.add_stage(("to_range_windows",
+                                           computation.range,
+                                           computation.slide,
+                                           computation.delay,
+                                           computation.aggregation))
+        elif isinstance(computation, CountWindows):
+            self._pipeline_tree.add_stage(("to_count_windows",
+                                           computation.count,
+                                           computation.aggregation))
         else:
             self._pipeline_tree.add_stage(("to", computation))
         return self
 
     def to_sink(self, sink_config):
-        return self.clone().__to_sink__(sink_config)
+        return self.clone()._to_sink(sink_config)
 
-    def __to_sink__(self, sink_config):
+    def _to_sink(self, sink_config):
         self._pipeline_tree.add_stage(("to_sink", sink_config.to_tuple()))
         return self
 
     def to_sinks(self, sink_configs):
-        return self.clone().__to_sinks__(sink_configs)
+        return self.clone()._to_sinks(sink_configs)
 
-    def __to_sinks__(self, sink_configs):
+    def _to_sinks(self, sink_configs):
         sinks = []
         for sc in sink_configs:
             sinks.append(sc.to_tuple())
@@ -112,16 +134,23 @@ class Pipeline(object):
         return self
 
     def key_by(self, key_extractor):
-        return self.clone().__key_by__(key_extractor)
+        return self.clone()._key_by(key_extractor)
 
-    def __key_by__(self, key_extractor):
+    def _key_by(self, key_extractor):
         self._pipeline_tree.add_stage(("key_by", key_extractor))
         return self
 
-    def merge(self, pipeline):
-        return self.clone().__merge__(pipeline.clone())
+    def collect(self):
+        return self.clone()._collect()
 
-    def __merge__(self, pipeline):
+    def _collect(self):
+        self._pipeline_tree.add_stage(("collect", ""))
+        return self
+
+    def merge(self, pipeline):
+        return self.clone()._merge(pipeline.clone())
+
+    def _merge(self, pipeline):
         self._pipeline_tree.merge(pipeline._pipeline_tree)
         return self
 
@@ -142,7 +171,8 @@ def _validate_arity_compatability(name, obj, arity):
     compatibility with our desired number of arguments.
     """
     if not callable(obj):
-        print("\nAPI_Error: Expected a callable object but got a {0} for {1}".format(obj, name))
+        print("\nAPI_Error: Expected a callable object but got a {0} for {1}"
+              .format(obj, name))
         raise WallarooParameterError()
     spec = inspect.getargspec(obj)
     upper_bound = len(spec.args)
@@ -153,8 +183,28 @@ def _validate_arity_compatability(name, obj, arity):
         else:
             param_term = 'parameters'
         print("\nAPI_Error: Incompatible function arity, your function {0} must have {1} {2}."
-            ).format(name, arity, param_term)
+             ).format(name, arity, param_term)
         raise WallarooParameterError()
+
+
+def _validate_aggregation(agg_cls):
+    ## TODO: add arity validation on these methods
+    if not hasattr(agg_cls, 'name'):
+        print("\nAPI_Error: Aggregation must have method 'name'.")
+        raise WallarooParameterError()
+    if not hasattr(agg_cls, 'initial_accumulator'):
+        print("\nAPI_Error: Aggregation must have method 'initial_accumulator'.")
+        raise WallarooParameterError()
+    if not hasattr(agg_cls, 'update'):
+        print("\nAPI_Error: Aggregation must have method 'update'.")
+        raise WallarooParameterError()
+    if not hasattr(agg_cls, 'combine'):
+        print("\nAPI_Error: Aggregation must have method 'combine'.")
+        raise WallarooParameterError()
+    if not hasattr(agg_cls, 'output'):
+        print("\nAPI_Error: Aggregation must have method 'output'.")
+        raise WallarooParameterError()
+
 
 def attach_to_module(cls, cls_name, func, idx=None):
     # Do some scope mangling to create a uniquely named class based on
@@ -186,15 +236,21 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
         # Stateful
         if issubclass(base_cls, StateComputation):
             state_class = kwargs.pop('state_class')
+
             def comp(self, data, state):
                 return func(data, state)
+
             def build_initial_state(self):
                 return state_class()
+
             _is_stateful = True
         # Stateless
         else:
             def comp(self, data):
                 return func(data)
+            build_initial_state = None
+            _is_stateful = False
+
             build_initial_state = None
             _is_stateful = False
 
@@ -204,6 +260,7 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
             __module__ = __module__
             initial_state = build_initial_state
             is_stateful = _is_stateful
+
             def name(self):
                 return name
 
@@ -260,11 +317,14 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
         if issubclass(base_cls, OctetDecoder):
             header_length = kwargs['header_length']
             length_fmt = kwargs['length_fmt']
+
             class C(base_cls):
                 def header_length(self):
                     return header_length
+
                 def payload_length(self, bs):
                     return struct.unpack(length_fmt, bs)[0]
+
                 def decode(self, bs):
                     return func(bs)
 
@@ -274,13 +334,17 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
                 def header_length(self):
                     # struct.calcsize('<I')
                     return 4
+
                 def payload_length(self, bs):
                     return struct.unpack("<I", bs)[0]
+
                 def decode(self, bs):
                     # We're dropping event_time for now. Pony will pick this up
-                    # itself. Slice bytes off the front: struct.calcsize('<q') = 8
+                    # itself. Slice bytes off the front:
+                    # struct.calcsize('<q') = 8
                     message_data = bs[8:]
                     return func(message_data)
+
                 def decoder(self):
                     return func
 
@@ -312,6 +376,11 @@ class StateComputation(Computation):
 
 class StateComputationMulti(StateComputation, ComputationMulti):
     pass
+
+
+class Aggregation(BaseWrapped):
+    def name(self):
+        return self.__class__.__name__
 
 
 class KeyExtractor(BaseWrapped):
@@ -357,6 +426,7 @@ def state_computation(name, state):
         return C()
     return wrapped
 
+
 def computation_multi(name):
     def wrapped(func):
         _validate_arity_compatability(name, func, 1)
@@ -364,40 +434,49 @@ def computation_multi(name):
         return C()
     return wrapped
 
+
 def state_computation_multi(name, state):
     def wrapped(func):
         _validate_arity_compatability(name, func, 2)
-        C = _wallaroo_wrap(name, func, StateComputationMulti, state_class=state)
+        C = _wallaroo_wrap(name, func, StateComputationMulti,
+                           state_class=state)
         return C()
     return wrapped
+
 
 def key_extractor(func):
     _validate_arity_compatability(func.__name__, func, 1)
     C = _wallaroo_wrap(func.__name__, func, KeyExtractor)
     return C()
 
+
 def decoder(header_length, length_fmt):
     def wrapped(func):
         _validate_arity_compatability(func.__name__, func, 1)
         C = _wallaroo_wrap(func.__name__, func, OctetDecoder,
-                           header_length = header_length,
-                           length_fmt = length_fmt)
+                           header_length=header_length,
+                           length_fmt=length_fmt)
         return C()
     return wrapped
+
 
 def encoder(func):
     _validate_arity_compatability(func.__name__, func, 1)
     C = _wallaroo_wrap(func.__name__, func, OctetEncoder)
     return C()
 
+
 class TCPSourceConfig(object):
-    def __init__(self, host, port, decoder):
+    def __init__(self, host, port, decoder, parallelism=10):
         self._host = host
         self._port = port
         self._decoder = decoder
+        self._parallelism = parallelism
 
     def to_tuple(self):
-        return ("tcp", self._host, self._port, self._decoder)
+        return ("tcp", self._host, self._port, self._decoder, self._parallelism)
+
+
 
 class GenSourceConfig(object):
     def __init__(self, gen_instance):
@@ -405,6 +484,7 @@ class GenSourceConfig(object):
 
     def to_tuple(self):
         return ("gen", self._gen)
+
 
 class TCPSinkConfig(object):
     def __init__(self, host, port, encoder):
@@ -415,10 +495,10 @@ class TCPSinkConfig(object):
     def to_tuple(self):
         return ("tcp", self._host, self._port, self._encoder)
 
+
 class CustomKafkaSourceCLIParser(object):
     def __init__(self, args, decoder):
-        (in_topic, in_brokers,
-        in_log_level) = kafka_parse_source_options(args)
+        (in_topic, in_brokers, in_log_level) = kafka_parse_source_options(args)
 
         self.topic = in_topic
         self.brokers = in_brokers
@@ -426,7 +506,9 @@ class CustomKafkaSourceCLIParser(object):
         self.decoder = decoder
 
     def to_tuple(self):
-        return ("kafka", self.topic, self.brokers, self.log_level, self.decoder)
+        return ("kafka", self.topic, self.brokers, self.log_level,
+                self.decoder)
+
 
 class CustomKafkaSinkCLIParser(object):
     def __init__(self, args, encoder):
@@ -442,7 +524,9 @@ class CustomKafkaSinkCLIParser(object):
 
     def to_tuple(self):
         return ("kafka", self.topic, self.brokers, self.log_level,
-                self.max_produce_buffer_ms, self.max_message_size, self.encoder)
+                self.max_produce_buffer_ms, self.max_message_size,
+                self.encoder)
+
 
 class DefaultKafkaSourceCLIParser(object):
     def __init__(self, decoder, name="kafka_source"):
@@ -452,6 +536,7 @@ class DefaultKafkaSourceCLIParser(object):
     def to_tuple(self):
         return ("kafka-internal", self.name, self.decoder)
 
+
 class DefaultKafkaSinkCLIParser(object):
     def __init__(self, encoder, name="kafka_sink"):
         self.encoder = encoder
@@ -460,6 +545,7 @@ class DefaultKafkaSinkCLIParser(object):
     def to_tuple(self):
         return ("kafka-internal", self.name, self.encoder)
 
+
 def tcp_parse_input_addrs(args):
     parser = argparse.ArgumentParser(prog="wallaroo")
     parser.add_argument('-i', '--in', dest="input_addrs")
@@ -467,12 +553,14 @@ def tcp_parse_input_addrs(args):
     # split H1:P1,H2:P2... into [(H1, P1), (H2, P2), ...]
     return [tuple(x.split(':')) for x in input_addrs.split(',')]
 
+
 def tcp_parse_output_addrs(args):
     parser = argparse.ArgumentParser(prog="wallaroo")
     parser.add_argument('-o', '--out', dest="output_addrs")
     output_addrs = parser.parse_known_args(args)[0].output_addrs
     # split H1:P1,H2:P2... into [(H1, P1), (H2, P2), ...]
     return [tuple(x.split(':')) for x in output_addrs.split(',')]
+
 
 def kafka_parse_source_options(args):
     parser = argparse.ArgumentParser(prog="wallaroo")
@@ -489,6 +577,7 @@ def kafka_parse_source_options(args):
     brokers = [_kafka_parse_broker(b) for b in known_args.brokers.split(",")]
 
     return (known_args.topic, brokers, known_args.log_level)
+
 
 def kafka_parse_sink_options(args):
     parser = argparse.ArgumentParser(prog="wallaroo")
@@ -515,6 +604,7 @@ def kafka_parse_sink_options(args):
     return (known_args.topic, brokers, known_args.log_level,
             known_args.max_produce_buffer_ms, known_args.max_message_size)
 
+
 def _kafka_parse_broker(broker):
     """
     `broker` is a string of `host[:port]`, return a tuple of `(host, port)`
@@ -529,8 +619,10 @@ def _kafka_parse_broker(broker):
 
     return (host, port)
 
-# Each node is a list of stages. Each of these lists will either begin with a "source" stage
-# (if it is a leaf of the tree) or a "merge" stage (if it is not a leaf).
+
+# Each node is a list of stages. Each of these lists will either begin with a
+# "source" stage (if it is a leaf of the tree) or a "merge" stage (if it is not
+# a leaf).
 class _PipelineTree(object):
     def __init__(self, source_stage):
         self.root_idx = 0
@@ -608,3 +700,93 @@ class _PipelineTree(object):
                 if step[0] == "to_sink":
                     sinks.append(step)
         return sinks
+
+
+class RangeWindowsBuilder(object):
+    def __init__(self, wrange):
+        self.range = wrange
+        self.slide = None
+        self.delay = None
+        self.default_slide = self.range
+        self.default_delay = 0
+
+    def with_slide(self, slide):
+        if self.slide is None:
+            self.slide = slide
+        else:
+            print("API_Error: Only call `with_slide()` once per window specification.")
+            raise WallarooParameterError()
+        return self
+
+    def with_delay(self, delay):
+        if self.delay is None:
+            self.delay = delay
+        else:
+            print("API_Error: Only call `with_delay()` once per window specification.")
+            raise WallarooParameterError()
+        return self
+
+    def over(self, aggregation_cls):
+        if self.slide is None:
+            slide = self.range
+        else:
+            slide = self.slide
+
+        if self.delay is None:
+            delay = 0
+        else:
+            delay = self.delay
+
+        return RangeWindows(self.range, slide, delay, aggregation_cls())
+
+
+
+class RangeWindows(object):
+    def __init__(self, wrange, slide, delay, agg):
+        self.range = wrange
+        self.slide = slide
+        self.delay = delay
+        _validate_aggregation(agg)
+        self.aggregation = agg
+
+
+class CountWindowsBuilder(object):
+    def __init__(self, count):
+        self.count = count
+
+    def over(self, aggregation_cls):
+        return CountWindows(self.count, aggregation_cls())
+
+
+class CountWindows(object):
+    def __init__(self, count, agg):
+        self.count = count
+        _validate_aggregation(agg)
+        self.aggregation = agg
+
+
+##############
+# Time Units
+##############
+def nanoseconds(x):
+    return x
+
+
+def microseconds(x):
+    return nanoseconds(x) * 1000
+
+
+def milliseconds(x):
+    return microseconds(x) * 1000
+
+
+def seconds(x):
+    return milliseconds(x) * 1000
+
+
+def minutes(x):
+    return seconds(x) * 60
+
+
+def hours(x):
+    return minutes(x) * 60

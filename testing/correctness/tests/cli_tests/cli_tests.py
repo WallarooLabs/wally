@@ -78,7 +78,7 @@ def _test_cluster_status_query(command):
 
 
 def _test_source_ids_query(command):
-    HARDCODED_NO_OF_SOURCE_IDS = 10
+    defined_source_parallelism = 13 # see dummy.py TCPSourceconfig
     with LoggingTestContext() as ctx:
         with ctx.Cluster(command=command, sources=1) as cluster:
             given_data_sent(cluster)
@@ -86,7 +86,7 @@ def _test_source_ids_query(command):
             got = q.result()['initializer']
 
         assert(list(got.keys()) == ["source_ids"])
-        assert(len(got["source_ids"]) == HARDCODED_NO_OF_SOURCE_IDS)
+        assert(len(got["source_ids"]) == defined_source_parallelism)
 
 
 def _test_state_entity_query(command):
@@ -113,7 +113,7 @@ def _test_state_entity_query(command):
                     continue
         # Check we have as many state keys as input items
         assert(len(part_ids) == INPUT_ITEMS)
-        assert(single_part_id == 'single-partition-key')
+        assert(single_part_id.split("-")[0] == 'collect')
         # check that there are two computation ids
         comp_ids = set()
         for w in got.values():

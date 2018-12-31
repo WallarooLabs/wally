@@ -9,7 +9,7 @@ each letter of the alphabet and send out the previous count for that letter at t
 - pony-stable
 - Wallaroo
 
-See [Wallaroo Environment Setup Instructions](https://github.com/WallarooLabs/wallaroo/book/getting-started/setup.md).
+See [Wallaroo Environment Setup Instructions](https://docs.wallaroolabs.com/python-installation/).
 
 ## Building
 

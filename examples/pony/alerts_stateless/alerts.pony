@@ -28,7 +28,7 @@ actor Main
     try
       let pipeline = recover val
         let transactions = Wallaroo.source[Transaction]("Alerts (stateless)",
-          GenSourceConfig[Transaction](TransactionsGenerator))
+          GenSourceConfig[Transaction](TransactionsGeneratorBuilder))
 
         transactions
           .to[Alert](CheckTransaction)
@@ -91,7 +91,11 @@ primitive AlertsEncoder
 /////////////////////////////////////////////////////////////////
 // A GENERATOR FOR CREATING SIMULATED INPUTS TO THE APPLICATION
 /////////////////////////////////////////////////////////////////
-primitive TransactionsGenerator
+class val TransactionsGeneratorBuilder
+  fun apply(): TransactionsGenerator =>
+    TransactionsGenerator
+
+class TransactionsGenerator
   fun initial_value(): Transaction =>
     Transaction(1)
 

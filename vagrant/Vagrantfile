@@ -7,7 +7,7 @@ $script = <<-SCRIPT
 set -o errexit
 set -o nounset
 
-export WALLAROO_VERSION="0.6.0"
+export WALLAROO_VERSION="0.6.1"
 
 wallaroo_up() {
   cd /tmp

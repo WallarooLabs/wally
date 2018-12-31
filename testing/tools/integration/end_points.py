@@ -13,6 +13,7 @@
 #  permissions and limitations under the License.
 
 import datetime
+import errno
 import io
 import logging
 import threading
@@ -195,7 +196,7 @@ class TCPReceiver(StoppableThread):
                         else:
                             raise err
                     except OSError as err:
-                        if err.errno == 53:
+                        if err.errno == errno.ECONNABORTED:
                             # [ECONNABORTED] A connection arrived, but it was
                             # closed while waiting on the listen queue.
                             # This happens on macOS during normal
@@ -224,7 +225,15 @@ class TCPReceiver(StoppableThread):
     def stop(self, *args, **kwargs):
         if not self.stopped():
             super(TCPReceiver, self).stop(*args, **kwargs)
-            self.sock.shutdown(socket.SHUT_RDWR)
+            try:
+                self.sock.shutdown(socket.SHUT_RDWR)
+            except OSError as err:
+                if err.errno == errno.ENOTCONN:
+                    # [ENOTCONN] Connection is already closed or unopened
+                    # and can't be shutdown.
+                    pass
+                else:
+                    raise
             self.sock.close()
             for cl in self.clients:
                 cl.stop()
@@ -383,8 +392,8 @@ class Sender(StoppableThread):
             logging.log(INFO2, "Sender received stop instruction.")
         super(Sender, self).stop(*args, **kwargs)
         if self.batch:
-            logging.warn("Sender stopped, but send buffer size is {}"
-                         .format(len(self.batch)))
+            logging.warning("Sender stopped, but send buffer size is {}"
+                            .format(len(self.batch)))
 
 
 class NoNonzeroError(ValueError):

@@ -19,32 +19,42 @@ Copyright 2018 The Wallaroo Authors.
 use "buffered"
 use "wallaroo/core/common"
 use "wallaroo/core/topology"
+use "wallaroo/core/windows"
 use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 
 primitive StepStateCheckpointer
   fun apply(runner: Runner, id: RoutingId, checkpoint_id: CheckpointId,
-    event_log: EventLog, wb: Writer = Writer)
+    event_log: EventLog, watermarks: StageWatermarks, auth: AmbientAuth,
+    wb: Writer = Writer)
   =>
     ifdef "checkpoint_trace" then
       @printf[I32]("StepStateCheckpointer apply()\n".cstring())
     end
-    match runner
-    | let r: SerializableStateRunner =>
-      let serialized: ByteSeq val = r.serialize_state()
-      ifdef "checkpoint_trace" then
-        @printf[I32]("-- Got %s serialized bytes\n".cstring(),
-          serialized.size().string().cstring())
+    let watermarks_bytes = StageWatermarksSerializer(watermarks, auth)
+    wb.u32_be(watermarks_bytes.size().u32())
+    wb.write(watermarks_bytes)
+    let state_bytes =
+      match runner
+      | let r: SerializableStateRunner =>
+        let serialized: ByteSeq val = r.serialize_state()
+        ifdef "checkpoint_trace" then
+          @printf[I32]("-- Got %s serialized bytes\n".cstring(),
+            serialized.size().string().cstring())
+        end
+        serialized
+      else
+        // Currently, non-state steps don't have anything to checkpoint.
+        ifdef "checkpoint_trace" then
+          @printf[I32]("Stateless Step %s calling EventLog.checkpoint_state()\n"
+            .cstring(), id.string().cstring())
+        end
+        recover val Array[U8] end
       end
-      wb.write(serialized)
-      let payload = wb.done()
-      event_log.checkpoint_state(id, checkpoint_id, consume payload)
-    else
-      // Currently, non-state steps don't have anything to checkpoint.
-      ifdef "checkpoint_trace" then
-        @printf[I32]("Stateless Step %s calling EventLog.checkpoint_state()\n"
-          .cstring(), id.string().cstring())
-      end
-      event_log.checkpoint_state(id, checkpoint_id,
-        recover val Array[ByteSeq] end)
+
+    wb.u32_be(state_bytes.size().u32())
+    if state_bytes.size() > 0 then
+      wb.write(state_bytes)
     end
+
+    event_log.checkpoint_state(id, checkpoint_id, wb.done())

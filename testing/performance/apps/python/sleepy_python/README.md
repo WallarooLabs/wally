@@ -18,7 +18,7 @@ There is a delay parameter that is used to configure processing time of a single
 
 ## Running Sleepy Python
 
-In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [MacOS](/book/getting-started/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool.
 
 ### Setting up the Metrics UI
 

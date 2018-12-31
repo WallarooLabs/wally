@@ -46,6 +46,9 @@ class TCPSourceNotify[In: Any val]
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
 
+  // Watermark
+  var _watermark_ts: U64 = 0
+
   new iso create(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
@@ -109,11 +112,15 @@ class TCPSourceNotify[In: Any val]
               " source\n").cstring())
           end
 
+          // This assumes that ingest_ts is monotonically increasing, which
+          // it should be.
+          _watermark_ts = ingest_ts
+
           if decoded isnt None then
             _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-              "tcp-source-key", _source_id, source, _router,
-              _msg_id_gen(), None, decode_end_ts, latest_metrics_id, ingest_ts,
-              _metrics_reporter)
+              "tcp-source-key", ingest_ts, _watermark_ts, _source_id, source,
+              _router, _msg_id_gen(), None, decode_end_ts, latest_metrics_id,
+              ingest_ts, _metrics_reporter)
           else
             (true, ingest_ts)
           end

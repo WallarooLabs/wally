@@ -22,8 +22,10 @@ def application_setup(args):
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
     pipeline = (wallaroo.source("Dummy",
-                    wallaroo.TCPSourceConfig(in_host, in_port, decoder))
+                    wallaroo.TCPSourceConfig(in_host, in_port, decoder,
+                                             parallelism=13))
       .to(pass_through)
+      .collect()
       .to(count)
       .key_by(partition)
       .to(count_partitioned)

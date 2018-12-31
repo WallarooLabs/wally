@@ -347,8 +347,8 @@ class Sender(StoppableThread):
         logging.log(INFO2, "Sender received stop instruction.")
         super(Sender, self).stop(error)
         if self.batch:
-            logging.warn("Sender stopped, but send buffer size is {}"
-                         .format(len(self.batch)))
+            logging.warning("Sender stopped, but send buffer size is {}"
+                            .format(len(self.batch)))
 
 
 class NoNonzeroError(ValueError):

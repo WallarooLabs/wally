@@ -57,9 +57,12 @@ use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-interface val GenSourceGenerator[V: Any val]
+interface val GenSourceGeneratorBuilder[V: Any val]
+  fun apply(): GenSourceGenerator[V]
+
+interface GenSourceGenerator[V: Any val]
   fun initial_value(): (V | None)
-  fun apply(v: V): (V | None)
+  fun ref apply(v: V): (V | None)
 
 actor GenSource[V: Any val] is Source
   """
@@ -111,8 +114,8 @@ actor GenSource[V: Any val] is Source
 
   new create(source_id: RoutingId, auth: AmbientAuth, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
-    router': Router, target_router: Router, generator: GenSourceGenerator[V],
-    event_log: EventLog,
+    router': Router, target_router: Router,
+    generator_builder: GenSourceGeneratorBuilder[V], event_log: EventLog,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     metrics_reporter': MetricsReporter iso, router_registry: RouterRegistry)
@@ -120,8 +123,8 @@ actor GenSource[V: Any val] is Source
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"
 
-    _cur_value = generator.initial_value()
-    _generator = generator
+    _generator = generator_builder()
+    _cur_value = _generator.initial_value()
 
     _source_id = source_id
     _auth = auth
@@ -170,6 +173,8 @@ actor GenSource[V: Any val] is Source
     let pipeline_time_spent: U64 = 0
     var latest_metrics_id: U16 = 1
 
+    let watermark_ts = ingest_ts
+
     ifdef "trace" then
       @printf[I32](("Rcvd msg at " + _pipeline_name + " source\n").cstring())
     end
@@ -186,7 +191,7 @@ actor GenSource[V: Any val] is Source
       _cur_value = _generator(next')
       (let is_finished, let last_ts) =
         _runner.run[V](_pipeline_name, pipeline_time_spent, next',
-          "gen-source-key", _source_id, this, _router,
+          "gen-source-key", ingest_ts, watermark_ts, _source_id, this, _router,
           _msg_id_gen(), None, decode_end_ts, latest_metrics_id, ingest_ts,
           _metrics_reporter)
 
@@ -528,6 +533,15 @@ actor GenSource[V: Any val] is Source
     else
       error
     end
+
+  ///////////////
+  // WATERMARKS
+  ///////////////
+  fun ref check_effective_input_watermark(current_ts: U64): U64 =>
+    current_ts
+
+  fun ref update_output_watermark(w: U64): (U64, U64) =>
+    (w, w)
 
   //////////
   // MUTING

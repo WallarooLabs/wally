@@ -30,6 +30,7 @@ use initialization = "core/initialization"
 use recovery = "ent/recovery"
 use spike = "ent/spike"
 use topology = "core/topology"
+use windows = "core/windows"
 
 actor Main is TestList
   new create(env: Env) =>
@@ -45,3 +46,4 @@ actor Main is TestList
     recovery.Main.make().tests(test)
     spike.Main.make().tests(test)
     topology.Main.make().tests(test)
+    windows.Main.make().tests(test)

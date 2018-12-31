@@ -46,6 +46,9 @@ class ConnectorSourceNotify[In: Any val]
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
 
+  // Watermark !@ How do we handle this respecting per-connector-type policies
+  var _watermark_ts: U64 = 0
+
   new iso create(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
@@ -117,10 +120,16 @@ class ConnectorSourceNotify[In: Any val]
           // needs a way to provide the Kafka key here.
           let initial_key = msg_uid.string()
 
+          // TOOD: We need a way to assign watermarks based on the policy
+          // for any particular connector.
+          if ingest_ts > _watermark_ts then
+            _watermark_ts = ingest_ts
+          end
+
           if decoded isnt None then
             _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-              consume initial_key, _source_id, source, _router,
-              msg_uid, None, decode_end_ts,
+              consume initial_key, ingest_ts, _watermark_ts, _source_id,
+              source, _router, msg_uid, None, decode_end_ts,
               latest_metrics_id, ingest_ts, _metrics_reporter)
           else
             (true, ingest_ts)

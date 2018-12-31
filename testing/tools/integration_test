@@ -440,6 +440,8 @@ def CLI():
     parser.add_argument('--batch-size', type=int, default=1,
                         help=("The batch size to use in the senders. "
                               "The same batch size is used in all senders."))
+    parser.add_argument('--sender-interval', type=float, default=0.001,
+                        help=("The interval between batch sends in the sender"))
     parser.add_argument('--resilience-dir', type=str, default=None,
                         help=("The path of the resilience data files. "
                               "(default=random directory in /tmp created by "
@@ -544,6 +546,7 @@ def CLI():
                     sinks = args.sinks,
                     mode = args.sink_mode,
                     batch_size = args.batch_size,
+                    sender_interval = args.sender_interval,
                     sink_expect = args.sink_expect,
                     sink_expect_allow_more = args.sink_expect_allow_more,
                     sink_stop_timeout = args.sink_stop_timeout,
@@ -562,7 +565,7 @@ def CLI():
                 logging.info("Run phase complete. Proceeding to validation.")
                 break
             except RunnerHasntStartedError:
-                logging.warn("Runner failed to start properly.")
+                logging.warning("Runner failed to start properly.")
                 if attempt < args.max_retries:
                     logging.info("Restarting the test!")
                     time.sleep(0.5)
@@ -579,7 +582,7 @@ def CLI():
         try:
             save_logs_to_file(base_dir, log_stream, persistent_data)
         except Exception as err:
-            logging.warn("failed to save logs to file")
+            logging.warning("failed to save logs to file")
             logging.exception(err)
         parser.exit(1)
 

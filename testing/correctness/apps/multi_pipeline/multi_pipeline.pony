@@ -33,17 +33,15 @@ actor Main
         let inputs1 = Wallaroo.source[F32]("Celsius Conversion",
             TCPSourceConfig[F32].from_options(CelsiusDecoder,
               TCPSourceConfigCLIParser(env.args)?(0)?))
-            .key_by(Constant)
+            .collect()
             .to[F32](Multiply)
-            .key_by(Constant)
             .to[F32](Add)
 
         let inputs2 = Wallaroo.source[F32]("Celsius Conversion",
             TCPSourceConfig[F32].from_options(CelsiusDecoder,
               TCPSourceConfigCLIParser(env.args)?(1)?))
-            .key_by(Constant)
+            .collect()
             .to[F32](Multiply)
-            .key_by(Constant)
             .to[F32](Add)
 
         inputs1.merge[F32](inputs2)
@@ -54,10 +52,6 @@ actor Main
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end
-
-primitive Constant
-  fun apply(f: F32): String =>
-    "constant"
 
 primitive Multiply is StatelessComputation[F32, F32]
   fun apply(input: F32): F32 =>

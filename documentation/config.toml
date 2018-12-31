@@ -1,0 +1,75 @@
+baseURL = "https://docs.wallaroolabs.com/"
+languageCode = "en-us"
+title = "Wallaroo"
+theme = "ananke"
+canonifyurls = false
+preserveTaxonomyNames = true
+
+# Do not reformat `wallaroo_version` and `docker_version_url` params
+# They are substituted programatically
+[params]
+wallaroo_version="0.6.1"
+docker_version_url="release/wallaroo:0.6.1-c0604d0"
+custom_css = ["css/jquery-ui.min.css", "css/jquery-ui.theme.min.css", "cshighlight.css", "css/my.css"]
+background_color_class = "bg-green"
+
+[related]
+threshold = 80
+includeNewer = true
+toLower = false
+
+[[related.indices]]
+name = "tags"
+weight = 100
+
+[menu]
+
+[[menu.docs]]
+name = "Core Concepts"
+weight = 1
+identifier = "core-concepts"
+url = "/core-concepts"
+
+[[menu.docs]]
+name = "Python Installation Guide"
+weight = 2
+identifier = "pyinstallation"
+url = "/python-installation"
+
+[[menu.docs]]
+name = "Python Tutorial"
+weight = 3
+identifier = "pytutorial"
+url = "/python-tutorial"
+
+[[menu.docs]]
+name = "Operators Manual"
+weight = 4
+identifier = "operators-manual"
+url = "/operators-manual"
+
+[[menu.docs]]
+name = "Appendix"
+weight = 5
+identifier = "appendix"
+url = "/appendix"
+
+[[menu.main]]
+name = "Core Concepts"
+url = "/core-concepts/"
+weight = 1
+
+[[menu.main]]
+name = "Installation"
+url = "/python-installation/"
+weight = 10
+
+[[menu.main]]
+name = "Tutorial"
+url = "/python-tutorial/"
+weight = 20
+
+[[menu.main]]
+name = "Operators Manual"
+url = "/operators-manual/"
+weight = 30

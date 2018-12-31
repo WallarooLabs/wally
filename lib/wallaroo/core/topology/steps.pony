@@ -28,6 +28,7 @@ use "wallaroo_labs/time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/state"
+use "wallaroo/core/windows"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
@@ -82,6 +83,11 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   // Checkpoint
   var _next_checkpoint_id: CheckpointId = 1
 
+  // Watermarks
+  var _watermarks: StageWatermarks = _watermarks.create()
+
+  let _timers: Timers = Timers
+
   new create(auth: AmbientAuth, runner: Runner iso,
     metrics_reporter': MetricsReporter iso,
     id: U128, event_log: EventLog,
@@ -115,6 +121,11 @@ actor Step is (Producer & Consumer & BarrierProcessor)
 
     _step_message_processor = NormalStepMessageProcessor(this)
     _barrier_forwarder = BarrierStepForwarder(_id, this)
+
+    match _runner
+    | let tr: TimeoutTriggeringRunner =>
+      tr.set_triggers(StepTimeoutTrigger(this), _watermarks)
+    end
 
   //
   // Application startup lifecycle event
@@ -265,26 +276,31 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     None
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    key: Key, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64)
+    key: Key, event_ts: U64, watermark_ts: U64, i_producer_id: RoutingId,
+    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
+    i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef "trace" then
       @printf[I32]("Received msg at Step\n".cstring())
     end
     _step_message_processor.run[D](metric_name, pipeline_time_spent, data, key,
-      i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, latest_ts,
-      metrics_id, worker_ingress_ts)
+      event_ts, watermark_ts, i_producer_id, i_producer, msg_uid, frac_ids,
+      i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
 
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, key: Key, i_producer_id: RoutingId,
-    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
+    watermark_ts: U64, i_producer_id: RoutingId, i_producer: Producer,
+    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     _seq_id_generator.new_id()
+    let process_ts = Time.nanos()
+
+    let input_watermark_ts =
+      _watermarks.receive_watermark(i_producer_id, watermark_ts, process_ts)
 
     let my_latest_ts = ifdef "detailed-metrics" then
-        Time.nanos()
+        process_ts
       else
         latest_ts
       end
@@ -303,9 +319,9 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
 
     (let is_finished, let last_ts) = _runner.run[D](metric_name,
-      pipeline_time_spent, data, key, _id, this, _router,
-      msg_uid, frac_ids, my_latest_ts, my_metrics_id, worker_ingress_ts,
-      _metrics_reporter)
+      pipeline_time_spent, data, key, event_ts, input_watermark_ts, _id, this,
+      _router, msg_uid, frac_ids, my_latest_ts, my_metrics_id,
+      worker_ingress_ts, _metrics_reporter)
 
     if is_finished then
       ifdef "trace" then
@@ -402,6 +418,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       @printf[I32]("Disposing Step %s\n".cstring(), _id.string().cstring())
       _event_log.unregister_resilient(_id, this)
       _unregister_all_outputs()
+      _timers.dispose()
       _step_message_processor = DisposedStepMessageProcessor
     end
 
@@ -537,7 +554,8 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
     _next_checkpoint_id = checkpoint_id + 1
     ifdef "resilience" then
-      StepStateCheckpointer(_runner, _id, checkpoint_id, _event_log)
+      StepStateCheckpointer(_runner, _id, checkpoint_id, _event_log,
+        _watermarks, _auth)
     end
 
   be prepare_for_rollback() =>
@@ -551,6 +569,46 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   =>
     _next_checkpoint_id = checkpoint_id + 1
     ifdef "resilience" then
-      StepRollbacker(payload, _runner)
+      StepRollbacker(payload, _runner, this)
     end
     event_log.ack_rollback(_id)
+
+  fun ref rollback_watermarks(bs: ByteSeq val) =>
+    try
+      _watermarks = StageWatermarksDeserializer(bs as Array[U8] val, _auth)?
+    else
+      Fail()
+    end
+
+  ///////////////
+  // WATERMARKS
+  ///////////////
+  fun ref check_effective_input_watermark(current_ts: U64): U64 =>
+    _watermarks.check_effective_input_watermark(current_ts)
+
+  fun ref update_output_watermark(w: U64): (U64, U64) =>
+    _watermarks.update_output_watermark(w)
+
+  fun input_watermark(): U64 =>
+    _watermarks.input_watermark()
+
+  fun output_watermark(): U64 =>
+    _watermarks.output_watermark()
+
+  /////////////
+  // TIMEOUTS
+  /////////////
+  fun ref set_timeout(t: U64) =>
+    _timers(Timer(StepTimeoutNotify(this), t))
+
+  be trigger_timeout() =>
+    match _step_message_processor
+    | let d: DisposedStepMessageProcessor => None
+    else
+      match _runner
+      | let tr: TimeoutTriggeringRunner =>
+        tr.on_timeout(_id, this, _router, _metrics_reporter, _watermarks)
+      else
+        Fail()
+      end
+    end

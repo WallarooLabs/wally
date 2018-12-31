@@ -207,13 +207,13 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
             with open(os.path.join(base_dir, sink_log_name), 'wb') as f:
                 for d in sk.data:
                     f.write(d)
-        logging.warn("Error logs saved to {}".format(base_dir))
+        logging.warning("Error logs saved to {}".format(base_dir))
 
         # save core files if they exist
         rex = re.compile('core.*')
         cores = list(filter(lambda s: rex.match(s), os.listdir(os.getcwd())))
         if cores:
-            logging.warn("Core files detected: {}".format(cores))
+            logging.warning("Core files detected: {}".format(cores))
         for core in cores:
             logging.info("Moving core {} to {}".format(core, base_dir))
             shutil.move(core, os.path.join(base_dir, core))

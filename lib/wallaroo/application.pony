@@ -29,6 +29,7 @@ use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/state"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
+use "wallaroo/core/windows"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo_labs/collection_helpers"
@@ -49,6 +50,12 @@ primitive Wallaroo
     else
       FatalUserError("A pipeline must terminate in a sink!")
     end
+
+  fun range_windows(range: U64): RangeWindowsBuilder =>
+    RangeWindowsBuilder(where range = range)
+
+  fun count_windows(count: USize): CountWindowsBuilder =>
+    CountWindowsBuilder(where count = count)
 
 trait BasicPipeline
   fun graph(): this->Dag[Stage]
@@ -197,6 +204,10 @@ class Pipeline[Out: Any val] is BasicPipeline
       _try_add_to_finished_pipeline()
       Pipeline[Out](_stages, _dag_sink_ids)
     end
+
+  fun ref collect(): Pipeline[Out] =>
+    let collect_key = CollectKeyGenerator()
+    key_by(CollectKeyExtractor[Out](collect_key))
 
   fun graph(): this->Dag[Stage] => _stages
 

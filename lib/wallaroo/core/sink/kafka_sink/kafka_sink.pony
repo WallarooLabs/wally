@@ -277,18 +277,19 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     None
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    key: Key, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    _message_processor.process_message[D](metric_name, pipeline_time_spent,
-      data, key, i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id,
-      latest_ts, metrics_id, worker_ingress_ts)
-
-  fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, key: Key, i_producer_id: RoutingId,
+    key: Key, event_ts: U64, watermark_ts: U64, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    _message_processor.process_message[D](metric_name, pipeline_time_spent,
+      data, key, event_ts, watermark_ts, i_producer_id, i_producer, msg_uid,
+      frac_ids, i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
+
+  fun ref process_message[D: Any val](metric_name: String,
+    pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
+    watermark_ts: U64, i_producer_id: RoutingId, i_producer: Producer,
+    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     var my_latest_ts: U64 = latest_ts
     var my_metrics_id = ifdef "detailed-metrics" then

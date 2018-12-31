@@ -16,18 +16,35 @@ Copyright 2018 The Wallaroo Authors.
 
 */
 
+use "buffered"
 use "wallaroo/core/common"
 use "wallaroo/core/topology"
+use "wallaroo_labs/mort"
 
 primitive StepRollbacker
-  fun apply(payload: ByteSeq val, runner: Runner) =>
-    match runner
-    | let r: RollbackableRunner =>
-      ifdef "checkpoint_trace" then
-        @printf[I32]("Step rolling back!\n".cstring())
+  fun apply(payload: ByteSeq val, runner: Runner, step: Step ref,
+    rb: Reader = Reader)
+  =>
+    rb.append(payload)
+    try
+      let w_bytes_size = rb.u32_be()?.usize()
+      let watermarks_bytes = rb.block(w_bytes_size)?
+      step.rollback_watermarks(consume watermarks_bytes)
+      let s_bytes_size = rb.u32_be()?.usize()
+      if s_bytes_size > 0 then
+        let state_bytes = rb.block(s_bytes_size)?
+        match runner
+        | let r: RollbackableRunner =>
+          ifdef "checkpoint_trace" then
+            @printf[I32]("Step rolling back!\n".cstring())
+          end
+          r.rollback(consume state_bytes)
+        else
+          @printf[I32]("Trying to rollback on a non-rollbackable runner!"
+            .cstring())
+          Fail()
+        end
       end
-      r.rollback(payload)
     else
-      @printf[I32]("trying to rollback on a non-rollbackable runner!"
-        .cstring())
+      Fail()
     end
