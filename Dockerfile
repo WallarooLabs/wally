@@ -6,7 +6,7 @@ RUN locale-gen en_US.UTF-8
 ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US:en
 
-ENV WALLAROO_VERSION release-0.6.1
+ENV WALLAROO_VERSION 0.6.1
 
 RUN apt-get install -y \
     curl \
