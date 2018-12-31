@@ -840,3 +840,12 @@ actor ConnectorSource[In: Any val] is Source
       last_message_id)
     _notify.stream_notify_result(session_tag, success,
       stream_id, point_of_reference, last_message_id)
+
+  be get_all_streams_result(session_tag: USize,
+    data: Array[(U64,String,U64)] val)
+  =>
+    @printf[I32]("^*^* %s.%s(%lu, ...%d...)\n".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      session_tag, data.size())
+    _notify.get_all_streams_result(session_tag, data)
+
