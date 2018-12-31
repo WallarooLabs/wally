@@ -2,6 +2,8 @@ import asyncore
 import asynchat
 import socket
 import struct
+import sys
+import traceback
 
 from wallaroo.experimental import connector_wire_messages as cwm
 
@@ -49,6 +51,21 @@ class AsyncServer(asynchat.async_chat, object):
             # respond with an ok or an error
             ok = cwm.Ok(10, [])
             self.write(ok)
+        elif isinstance(msg, cwm.Notify):
+            # respond with notifyack
+            notify_ack = cwm.NotifyAck(
+                True if msg.stream_id % 2 == 0 else False,
+                msg.stream_id,
+                msg.point_of_ref * 10)
+            self.write(notify_ack)
+        elif isinstance(msg, cwm.Message):
+            # no response, just print
+            print("received message: {}".format(msg))
+        elif isinstance(msg, cwm.Error):
+            # Got error message from worker
+            # close the connection and pass msg to the error handler
+            self.close()
+            raise Exception(msg.message)
         else:
             # write the original message back
             self.write(msg)
@@ -57,6 +74,14 @@ class AsyncServer(asynchat.async_chat, object):
         print("write {}".format(msg))
         data = cwm.Frame.encode(msg)
         super(AsyncServer, self).push(data)
+
+    def handle_error(self):
+        _type, _value, _traceback = sys.exc_info()
+        traceback.print_exception(_type, _value, _traceback)
+
+    def close(self):
+        print("Closing the connection")
+        super(AsyncServer, self).close()
 
 
 class EchoServer(asyncore.dispatcher):
