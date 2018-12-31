@@ -35,8 +35,22 @@ use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
-primitive _MyStream
+primitive _MyStream         // SLF TODO: old-school remove
   fun apply(): U64 => 4242
+
+type _ProtoFsmState is (_ProtoFsmConnected | _ProtoFsmHandshake |
+                        _ProtoFsmStreaming | _ProtoFsmError |
+                        _ProtoFsmDisconnected)
+primitive _ProtoFsmConnected
+  fun apply(): U8 => 1
+primitive _ProtoFsmHandshake
+  fun apply(): U8 => 2
+primitive _ProtoFsmStreaming
+  fun apply(): U8 => 3
+primitive _ProtoFsmError
+  fun apply(): U8 => 4
+primitive _ProtoFsmDisconnected
+  fun apply(): U8 => 5
 
 class _StreamState
   var pending_query: Bool
@@ -74,9 +88,10 @@ class ConnectorSourceNotify[In: Any val]
   var _connector_source: (None|ConnectorSource[In]) = None
 
   let _stream_map: Map[U64, _StreamState] = _stream_map.create()
-  var _body_count: U64 = 0
+  var _body_count: U64 = 0 // SLF TODO old-school remove
   var _session_active: Bool = false
   var _session_tag: USize = 0
+  var _fsm_state: _ProtoFsmState = _ProtoFsmDisconnected
 
   // Watermark !TODO! How do we handle this respecting per-connector-type
   // policies
@@ -121,7 +136,7 @@ class ConnectorSourceNotify[In: Any val]
       _metrics_reporter.pipeline_ingest(_pipeline_name, _source_name)
       let ingest_ts = Time.nanos()
       let pipeline_time_spent: U64 = 0
-      let latest_metrics_id: U16 = 1 // SLF TODO is this right?
+      let latest_metrics_id: U16 = 1
 
       if true then // SLF TODO remove compat for old school
         received_old_school(source, consume data, latest_metrics_id,
@@ -183,7 +198,7 @@ class ConnectorSourceNotify[In: Any val]
             __loc.type_name().cstring(), __loc.method_name().cstring(),
             s.last_message_id)
           if s.pending_query then
-            // SLF TODO: No reply yet from active stream registry.
+            // No reply yet from active stream registry.
             // This is an error: tell the client, etc etc.
             @printf[I32]("^*^* %s.%s synchronous protocol error: client didn't wait for NOTIFY_ACK for stream id %lu\n".cstring(),
               __loc.type_name().cstring(), __loc.method_name().cstring(),
@@ -229,8 +244,6 @@ class ConnectorSourceNotify[In: Any val]
         end
 
         // SLF TODO:
-        // 0. Add new state var(s) for managing protocol state machine:
-        //    Connected/Handshake/Streaming
         // 1. Send new message to active stream registry: gimme everything
         //    you've got.
         //    - Include the session_tag arg like stream_notify() uses.
@@ -245,7 +258,7 @@ class ConnectorSourceNotify[In: Any val]
         ifdef "trace" then
           @printf[I32]("^*^* got OkMsg\n".cstring())
         end
-
+        return _to_error_state(source)
         // SLF TODO:
         // Send ERROR("I SEND OK TO YOU, SILLY") to client,
         // close connection.
@@ -398,6 +411,9 @@ class ConnectorSourceNotify[In: Any val]
   fun ref _continue_perhaps(source: ConnectorSource[In] ref): Bool =>
     source.expect(_header_size)
     _header = true
+    _continue_perhaps2()
+
+  fun ref _continue_perhaps2(): Bool =>    
     ifdef linux then
       true
     else
@@ -421,6 +437,12 @@ class ConnectorSourceNotify[In: Any val]
 
   fun ref accepted(source: ConnectorSource[In] ref) =>
     @printf[I32]((_source_name + ": accepted a connection\n").cstring())
+    if not (_fsm_state is _ProtoFsmDisconnected) then
+      @printf[I32]("ERROR: %s.connected: state is %d\n".cstring(),
+        __loc.type_name(), _fsm_state())
+      Fail()
+    end
+    _fsm_state = _ProtoFsmConnected
     _header = true
     _session_active = true
     _session_tag = _session_tag + 1
@@ -431,6 +453,7 @@ class ConnectorSourceNotify[In: Any val]
   fun ref closed(source: ConnectorSource[In] ref) =>
     @printf[I32]("ConnectorSource connection closed\n".cstring())
     _session_active = false
+    _fsm_state = _ProtoFsmDisconnected
     _clear_stream_map()
 
   fun ref connecting(conn: ConnectorSource[In] ref, count: U32) =>
@@ -440,20 +463,20 @@ class ConnectorSourceNotify[In: Any val]
     of connections we're trying. The notifier will be informed each time the
     count changes, until a connection is made or connect_failed() is called.
     """
-    None
+    Fail()
 
   fun ref connected(conn: ConnectorSource[In] ref) =>
     """
     Called when we have successfully connected to the server.
     """
-    None
+    Fail()
 
   fun ref connect_failed(conn: ConnectorSource[In] ref) =>
     """
     Called when we have failed to connect to all possible addresses for the
     server. At this point, the connection will never be established.
     """
-    None
+    Fail()
 
   fun ref expect(conn: ConnectorSource[In] ref, qty: USize): USize =>
     """
@@ -589,4 +612,10 @@ class ConnectorSourceNotify[In: Any val]
     else
       Fail()
     end
+
+  fun ref _to_error_state(source: ConnectorSource[In] ref): Bool =>
+    _fsm_state = _ProtoFsmError
+    source.close()
+    _continue_perhaps2()
+
 
