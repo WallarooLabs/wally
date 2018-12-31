@@ -5,8 +5,10 @@ from time import sleep
 from datetime import datetime
 
 from wallaroo.experimental import (
-                                   #conector_wire_messages as cwm,
-                                   SourceConnector)
+                                   conector_wire_messages as cwm,
+                                   AtLeastOnceSourceConnector,
+                                   ProtocolError,
+                                   ConnectorError)
 
 
 class FramedFileReader(object):
@@ -46,11 +48,16 @@ class FramedFileReader(object):
             pass
 
 
-#        data = self.request[0].strip()
-#        connector.write(data)
+# TODO: write subclass adding __init__ for files as streams
+#       1-1 filename to stream_id
+#       and use `stream_updated` to reset file position when relevant
+class MyFileReaderConnector(AtLeastOnceSourceConnector):
+    def stream_updated(self, stream):
+        super(MyFileReaderConnector, self).stream_updated(stream)
+        pass
 
-connector = SourceConnector(required_params=['filename'],
-                            optional_params=['delay'])
+connector = AtLeastOnceSourceConnector(required_params=['filename'],
+                                       optional_params=['delay'])
 params = connector.params
 print('params', params)
 filename = params.filename
@@ -72,5 +79,3 @@ print('\n')
 ffr.reset(5104)
 for i, (x, pos)  in enumerate(ffr):
     print(i, pos, repr(x), unpack('>f', x)[0])
-
-
