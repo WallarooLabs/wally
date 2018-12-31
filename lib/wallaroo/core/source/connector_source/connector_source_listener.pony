@@ -87,7 +87,8 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   // SLF TODO: log all map mutations to resilience dir
   // SLF TODO: add DOS server mirroring of resilience dir writes
   // SLF TODO: slurp in map state from resilience dir
-  let _active_streams: Map[U64, (Any tag,U64,U64)] = _active_streams.create()
+  let _active_streams: Map[U64, (String,Any tag,U64,U64)] =
+    _active_streams.create()
 
   new create(env: Env, worker_name: WorkerName, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
@@ -342,8 +343,20 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     end
 
   // Active Stream Registry
+
+  be get_all_streams(session_tag: USize,
+    connector_source: ConnectorSource[In] tag)
+  =>
+    let data: Array[(U64,String,U64)] trn = recover data.create() end
+
+    for (stream_id, (stream_name, _, p_o_r, last_message_id)) in _active_streams.pairs()
+    do
+      data.push((stream_id, stream_name, p_o_r))
+    end
+    connector_source.get_all_streams_result(session_tag, consume data)
+
   be stream_notify(session_tag: USize,
-    stream_id: U64, point_of_reference: U64,
+    stream_id: U64, stream_name: String, point_of_reference: U64,
     connector_source: ConnectorSource[In] tag)
   =>
     // TODO pass in GUID instead?  Hmmmm, the implementation of the source
@@ -358,17 +371,21 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       stream_id, point_of_reference)
     if _active_streams.contains(stream_id) then
       try
-        (let tag_or_none: Any tag, let p_o_r, let last_message_id) = _active_streams(stream_id)?
+        (let stream_name': String, let tag_or_none: Any tag,
+          let p_o_r, let last_message_id) = _active_streams(stream_id)?
         @printf[I32]("^*^* %s.%s existing stream_id %lu @ p-o-r %lu l-msgid %lu in-use %s\n".cstring(),
           __loc.type_name().cstring(), __loc.method_name().cstring(),
           stream_id, p_o_r, last_message_id, (not (tag_or_none is None)).string().cstring())
+        if stream_name' != stream_name then
+          Fail()
+        end
 
         if tag_or_none is None then
           // SLF TODO: what if the connector's PoR doesn't agree with our
           // last recorded PoR?
           // SLF TODO: should we also be saving checkpoint_id?
           _active_streams(stream_id) =
-            (connector_source, p_o_r, last_message_id)
+            (stream_name, connector_source, p_o_r, last_message_id)
           connector_source.stream_notify_result(session_tag, true,
             stream_id, p_o_r, last_message_id)
           @printf[I32]("^*^* %s.%s existing stream_id %lu is ok\n".cstring(),
@@ -390,7 +407,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
         stream_id, point_of_reference)
       // SLF TODO: should we also be saving checkpoint_id?
       _active_streams(stream_id) =
-        (connector_source, point_of_reference, point_of_reference)
+        (stream_name, connector_source, point_of_reference, point_of_reference)
       connector_source.stream_notify_result(session_tag, true,
         stream_id, point_of_reference, point_of_reference)
     end
@@ -413,7 +430,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       None // fall through
     else
       try
-        if _active_streams(stream_id)?._1 is None then
+        if _active_streams(stream_id)?._2 is None then
           return // session is not active
         else
           None // fall through
@@ -430,6 +447,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       else
         "not None"
       end).cstring())
-    // SLF TODO: should we also be saving checkpoint_id?
+    let stream_name = try _active_streams(stream_id)?._1 else Fail(); "" end
     _active_streams(stream_id) =
-      (connector_source, point_of_reference, last_message_id)
+      (stream_name, connector_source, point_of_reference, last_message_id)

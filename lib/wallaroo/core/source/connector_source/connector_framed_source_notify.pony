@@ -92,6 +92,9 @@ class ConnectorSourceNotify[In: Any val]
   var _session_active: Bool = false
   var _session_tag: USize = 0
   var _fsm_state: _ProtoFsmState = _ProtoFsmDisconnected
+  let _cookie: String = "dragons love tacos" // SLF TODO: configurable!
+  var _program_name: String = ""
+  var _instance_name: String = ""
 
   // Watermark !TODO! How do we handle this respecting per-connector-type
   // policies
@@ -182,7 +185,7 @@ class ConnectorSourceNotify[In: Any val]
         if (_body_count == 0) then
           try
             (_active_stream_registry as ConnectorSourceListener[In]).
-              stream_notify(_session_tag, _MyStream(), 0,
+              stream_notify(_session_tag, _MyStream(), "_MyStream", 0,
                 _connector_source as ConnectorSource[In])
             _stream_map(_MyStream()) = _StreamState(true, 0, 0, 0, 0, 0)
           else
@@ -242,15 +245,36 @@ class ConnectorSourceNotify[In: Any val]
         ifdef "trace" then
           @printf[I32]("^*^* got HelloMsg\n".cstring())
         end
+        if _fsm_state isnt _ProtoFsmConnected then
+          @printf[I32]("ERROR: %s.received_connector_msg: state is %d\n".cstring(),
+            __loc.type_name(), _fsm_state())
+          Fail()
+        end
+
+        if m.version != "0.0001" then
+          @printf[I32]("ERROR: %s.received_connector_msg: unknown protocol version %s\n".cstring(),
+            __loc.type_name(), m.version.cstring())
+          return _to_error_state("Unknown protocol version", source)
+        end
+        if m.cookie != _cookie then
+          @printf[I32]("ERROR: %s.received_connector_msg: bad cookie %s\n".cstring(),
+            __loc.type_name(), m.cookie.cstring())
+          return _to_error_state("Bad cookie", source)
+        end
+
+        // SLF TODO: add routing logic to handle
+        // m.program_name and m.instance_name routing requirements
+        // Right now, we assume that all messages are to be processed
+        // by this connector's one & only pipeline as defined by the
+        // app's pipeline definition.
+
+        _fsm_state = _ProtoFsmHandshake
+        (_active_stream_registry as ConnectorSourceListener[In]).
+          get_all_streams(_session_tag,
+            _connector_source as ConnectorSource[In])
+        return _continue_perhaps(source)
 
         // SLF TODO:
-        // 1. Send new message to active stream registry: gimme everything
-        //    you've got.
-        //    - Include the session_tag arg like stream_notify() uses.
-        // 2. Add behavior to connector_source receive reply from registry
-        // 3. Add callback to this notify class to get reply args from #2 msg.
-        //    - Check session_tag arg like stream_notify_result() does,
-        //      to ignore late-arriving replies.
         // 4. That callback sends reply to socket, manages state vars for FSM,
         //    etc.
 
@@ -282,8 +306,8 @@ class ConnectorSourceNotify[In: Any val]
         try
           if not _stream_map.contains(m.stream_id) then
             (_active_stream_registry as ConnectorSourceListener[In])
-              .stream_notify(_session_tag, m.stream_id, m.point_of_ref,
-                _connector_source as ConnectorSource[In])
+              .stream_notify(_session_tag, m.stream_id, m.stream_name,
+                m.point_of_ref, _connector_source as ConnectorSource[In])
             _stream_map(m.stream_id) = _StreamState(true, 0, 0, 0, 0, 0)
           else
             // SLF TODO: create NOTIFY_ACK with success=false & send to socket.
@@ -425,7 +449,7 @@ class ConnectorSourceNotify[In: Any val]
 
   fun ref accepted(source: ConnectorSource[In] ref) =>
     @printf[I32]((_source_name + ": accepted a connection\n").cstring())
-    if not (_fsm_state is _ProtoFsmDisconnected) then
+    if _fsm_state isnt _ProtoFsmDisconnected then
       @printf[I32]("ERROR: %s.connected: state is %d\n".cstring(),
         __loc.type_name(), _fsm_state())
       Fail()
@@ -601,10 +625,41 @@ class ConnectorSourceNotify[In: Any val]
       Fail()
     end
 
+  fun ref get_all_streams_result(session_tag: USize,
+    data: Array[(U64,String,U64)] val)
+  =>
+    if (session_tag != _session_tag) or (not _session_active) then
+      return
+    end
+    @printf[I32]("^*^* %s.%s(%lu, ...%d...)\n".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      session_tag, data.size())
+
+    let initial_credits: U32 = 20 // SLF TODO: configurable?
+    let w: Writer = w.create()
+    cwm.OkMsg(initial_credits, data).encode(w)
+    let reply = w.done()
+
+    _fsm_state = _ProtoFsmStreaming
+
   fun ref _to_error_state(msg: String, source: ConnectorSource[In] ref): Bool
   =>
+    // SLF TODO: create reply message & send to client
+    _send_reply(source, cwm.ErrorMsg(msg))
+
     _fsm_state = _ProtoFsmError
     source.close()
     _continue_perhaps2()
+
+  fun _send_reply(source: ConnectorSource[In] ref, msg: cwm.MessageTrait) =>
+    let w1: Writer = w1.create()
+    let w2: Writer = w2.create()
+
+    msg.encode(w1)
+    w2.u64_be(w1.size().u64())
+    let b1 = w1.done()
+    w2.writev(consume b1)
+    let b2 = w2.done()
+    source.writev(consume b2) // SLF TODO: oops, lots to do here in connector_source.pony !!
 
 
