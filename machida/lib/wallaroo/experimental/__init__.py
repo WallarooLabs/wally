@@ -127,20 +127,23 @@ class SourceConnector(BaseConnector):
 Stream = namedtuple('Stream', ['id', 'name', 'point_of_ref', 'is_open'])
 
 
-class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, object):
-# TODO: replace __init__ with the one that users BaseConnector's __init__
-#
-#    def __init__(self, args=None, required_params=['host', 'port'],
-#                 optional_params=['timeout']):
-#        super(SourceConnector, self).__init__(args, required_params,
-#                                              optional_params)
-#        self._conn = None
-    def __init__(self, host, port, timeout=0.05):
-        # connection details
-        self.host = host
-        self.port = port
+class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, BaseConnector):
+    # TODO (Nisan): revisit parse_connector_args
+    # The way we require host and port args, but then get them from the app topo
+    # and ignore the ones in the parsed params object is confusing and doesn't
+    # make much sense to me. Ping Brian before making changes to this.
+    def __init__(self, args=None, required_params=['host', 'port'],
+                 optional_params=['timeout']):
+        # Use BaseConnector to do any argument parsing
+        BaseConnector.__init__(self, args, required_params, optional_params)
+
+        # connection details are given from the base
+        self._port = int(self._port)  # but convert port to int
         self.credits = 0
-        self._timeout = timeout
+        if self.params.timeout:
+            self._timeout = float(self.params.timeout)
+        else:
+            self._timeout = 0.05
 
         # Stream details
         self._streams = {}  # stream_id: Stream
@@ -276,7 +279,7 @@ class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, object):
 
     def initiate_handshake(self, hello):
         conn = socket.socket()
-        conn.connect( (self.host, self.port) )
+        conn.connect( (self._host, self._port) )
         self._conn = conn
 
         self.in_handshake = True
