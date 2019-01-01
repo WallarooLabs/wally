@@ -16,6 +16,7 @@ import argparse
 import asynchat
 import asyncore
 from collections import namedtuple
+from datetime import datetime
 import inspect
 from select import select
 import socket
@@ -25,9 +26,13 @@ import threading
 import time
 import traceback
 
-
+# A note on import dependencies:
+# This only works if `machida/lib/` is in your PYTHONNPATH. This is fine here
+# because you can't use wallaroo without that anyway.
+# Anyway, don't use relative imports here.
 import wallaroo
-from . import connector_wire_messages as cwm
+from wallaroo import dt_to_timestamp
+from  . import connector_wire_messages as cwm
 
 
 class ConnectorError(Exception):
@@ -128,10 +133,13 @@ Stream = namedtuple('Stream', ['id', 'name', 'point_of_ref', 'is_open'])
 
 
 class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, BaseConnector):
-    # TODO (Nisan): revisit parse_connector_args
+    # TODO :
+    # 1. implement credits based flow control
+    # 2. revisit parse_connector_args
     # The way we require host and port args, but then get them from the app topo
     # and ignore the ones in the parsed params object is confusing and doesn't
     # make much sense to me. Ping Brian before making changes to this.
+
     def __init__(self, args=None, required_params=['host', 'port'],
                  optional_params=['timeout']):
         # Use BaseConnector to do any argument parsing
@@ -295,7 +303,6 @@ class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, BaseConn
         self._handle_frame(frame)
 
     def write(self, msg):
-        print("write {}".format(msg))
         if not self.is_alive():
             raise ConnectorError("Can't write to a closed conection")
         if (isinstance(msg, (cwm.Error, cwm.Notify)) or
@@ -319,6 +326,15 @@ class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, BaseConn
                 self.producer_fifo.append(data[i:i+sabs])
         else:
             self.producer_fifo.append(data)
+
+    def pending_sends(self):
+        """
+        Are there any pending sends
+        """
+        if len(self.producer_fifo) > 0:
+            return True
+        else:
+            return False
 
     def notify(self, stream_id, stream_name=None, point_of_ref=None):
         old = self._streams.get(stream_id, None)
@@ -346,6 +362,41 @@ class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, BaseConn
                               new.name,
                               new.point_of_ref))
 
+    def end_of_stream(self, stream_id, event_time=None, key=None):
+        """
+        Send an EOS message for a stream_id, with an optional key and
+        event_time.
+        event_time must be either a datetime or a float of seconds since
+        epoch (it may be negtive for dates before 1970-1-1)
+        """
+        flags = cwm.Message.Eos | cwm.Message.Ephemeral
+        if event_time is not None:
+            flags |= cwm.Message.EventTime
+            if isinstance(event_time, datetime):
+                ts = dt_to_timestamp(event_time)
+            elif isinstance(event_time, (int, float)):
+                ts = event_time
+            else:
+                raise ProtocolError("Event_time must be a datetime or a float")
+        else:
+            ts = None
+        if key:
+            flags |= cw.Message.key
+            if isinstance(key, bytes):
+                en_key = key
+            else:
+                en_key = key.encode()
+        else:
+            en_key = None
+        msg = cwm.Message(
+            stream_id = stream_id,
+            flags = flags,
+            message_id = None,
+            event_time = ts,
+            key = en_key,
+            message = None)
+        self.write(msg)
+
     ########################
     # User defined methods #
     ########################
@@ -358,7 +409,6 @@ class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, BaseConn
             - stream has been open (Stream.is_open = True)
             - point of reference has been updated (either forward or back!)
         """
-        print("Stream updated: {}".format(stream))
         pass
 
     def handle_invalid_message(self, msg):
