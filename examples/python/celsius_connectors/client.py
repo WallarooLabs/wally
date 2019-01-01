@@ -14,9 +14,16 @@ from wallaroo.experimental import (AtLeastOnceSourceConnector,
 
 
 
-# TODO: call source class init with required_params, etc, like in udp_source
 hello = cwm.Hello("version", "cookie", "program", "instance")
-client = AtLeastOnceSourceConnector('127.0.0.1', 8080)
+args = ['--application-module', 'celsius',
+        '--connector', 'celsius_feed',
+        '--celsius_feed-host', '127.0.0.1',
+        '--celsius_feed-port', '7100',
+        '--celsius_feed-timeout', '0.05']
+client = AtLeastOnceSourceConnector(
+        args=args,
+        required_params=['host', 'port'],
+        optional_params=['timeout', 'delay'])
 client.initiate_handshake(hello)
 client.start()
 
