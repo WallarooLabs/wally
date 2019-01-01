@@ -99,7 +99,7 @@ class EchoServer(asyncore.dispatcher):
         handler = AsyncServer(self.count, sock)
         self.count += 1
 
-server = EchoServer('127.0.0.1', 8080)
+server = EchoServer('127.0.0.1', 7100)
 print("server: ", server)
 print("asyncore file: ", asyncore.__file__)
 asyncore.loop()
