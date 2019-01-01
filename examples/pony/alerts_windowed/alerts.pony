@@ -40,7 +40,6 @@ actor Main
           .to[Alert](Wallaroo.range_windows(Seconds(5))
                       .over[Transaction, Alert, TransactionTotal](
                         TotalAggregation))
-          // .to[Alert](TotalAggregation)
           .to_sink(TCPSinkConfig[Alert].from_options(
             AlertsEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
       end
