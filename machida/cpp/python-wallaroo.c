@@ -256,20 +256,15 @@ extern void aggregation_update(PyObject *aggregation, PyObject *data, PyObject *
 
   pFunc = PyObject_GetAttrString(aggregation, "update");
   PyObject_CallFunctionObjArgs(pFunc, data, acc, NULL);
-  // PyObject_CallFunctionObjArgs(pFunc, aggregation, data, acc, NULL);
-  // PyObject_CallMethod(aggregation, (char*)"update", data, acc, NULL);
   Py_DECREF(pFunc);
 }
 
 extern PyObject *aggregation_combine(PyObject *aggregation, PyObject *acc1, PyObject *acc2)
 {
   PyObject *pFunc, *pState;
-  // PyObject *pState;
 
   pFunc = PyObject_GetAttrString(aggregation, "combine");
   pState = PyObject_CallFunctionObjArgs(pFunc, acc1, acc2, NULL);
-  // pState = PyObject_CallFunctionObjArgs(pFunc, aggregation, acc1, acc2, NULL);
-  // pState = PyObject_CallMethod(aggregation, (char*)"combine", acc1, acc2, NULL);
   Py_DECREF(pFunc);
 
   return pState;
@@ -278,14 +273,11 @@ extern PyObject *aggregation_combine(PyObject *aggregation, PyObject *acc1, PyOb
 extern PyObject *aggregation_output(PyObject *aggregation, char *key, PyObject *acc)
 {
   PyObject *pFunc, *pData, *pKey;
-  // PyObject *pData, *pKey;
 
   pKey = PyString_FromString(key);
 
   pFunc = PyObject_GetAttrString(aggregation, "output");
   pData = PyObject_CallFunctionObjArgs(pFunc, pKey, acc, NULL);
-  // pData = PyObject_CallFunctionObjArgs(pFunc, aggregation, pKey, acc, NULL);
-  // pData = PyObject_CallMethod(aggregation, (char*)"output", pKey, acc, NULL);
   Py_DECREF(pKey);
   Py_DECREF(pFunc);
 
