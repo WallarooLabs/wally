@@ -51,6 +51,7 @@ class FramedFileReader(object):
 # TODO: write subclass adding __init__ for files as streams
 #       1-1 filename to stream_id
 #       and use `stream_updated` to reset file position when relevant
+# TODO: move stuff from client.py over here
 class MyFileReaderConnector(AtLeastOnceSourceConnector):
     def stream_updated(self, stream):
         super(MyFileReaderConnector, self).stream_updated(stream)
