@@ -21,8 +21,6 @@ import struct
 import inspect
 import sys
 
-import wallaroo.experimental
-
 
 # Stand-in for the full command line args tuple to be created during startup.
 _ARGS = tuple()
@@ -396,7 +394,7 @@ class ConnectorDecoder(Decoder):
 
 # datetime.datetime.timestamp() is only available in python 3.3+
 if sys.version_info.major >= 3 and sys.version_info.minor >= 3:
-    def dt_to_timestmap(dt):
+    def dt_to_timestamp(dt):
         return dt.timestamp()
 else:
     def dt_to_timestamp(dt):

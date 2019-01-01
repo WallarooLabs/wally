@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import asyncore
 import asynchat
 import socket
@@ -12,12 +14,15 @@ class AsyncServer(asynchat.async_chat, object):
         print("AsyncServer.__init__", handler_id, sock)
         self._id = handler_id
         self._conn = sock
-        super(AsyncServer, self).__init__(sock=self._conn)
+        asynchat.async_chat.__init__(self, sock=self._conn)
         self.in_buffer = []
         self.out_buffer = []
         self.reading_header = True
         self.set_terminator(4) # first frame header
         self.in_handshake = True
+        self._streams = {}
+        self.received_count = 0
+        self._reset_count = {}
 
     def collect_incoming_data(self, data):
         """Buffer the data"""
@@ -43,24 +48,29 @@ class AsyncServer(asynchat.async_chat, object):
             self._handle_frame(frame_data)
 
     def _handle_frame(self, frame):
+        self.received_count += 1
         print("Received {!r}".format(frame))
         msg = cwm.Frame.decode(frame)
         print("got msg: {}".format(msg))
         # Hello, Ok, Error, Notify, NotifyAck, Message, Ack, Restart
         if isinstance(msg, cwm.Hello):
             # respond with an ok or an error
-            ok = cwm.Ok(10, [])
+            ok = cwm.Ok(100, [])
             self.write(ok)
         elif isinstance(msg, cwm.Notify):
             # respond with notifyack
             notify_ack = cwm.NotifyAck(
-                True if msg.stream_id % 2 == 0 else False,
+                True,
                 msg.stream_id,
-                msg.point_of_ref * 10)
+                800)
+            self._streams[msg.stream_id] = [msg.stream_id,
+                                            msg.stream_name,
+                                            msg.point_of_ref]
             self.write(notify_ack)
         elif isinstance(msg, cwm.Message):
             # no response, just print
             print("received message: {}".format(msg))
+            self.handle_message(msg)
         elif isinstance(msg, cwm.Error):
             # Got error message from worker
             # close the connection and pass msg to the error handler
@@ -69,6 +79,20 @@ class AsyncServer(asynchat.async_chat, object):
         else:
             # write the original message back
             self.write(msg)
+
+    def handle_message(self, msg):
+        # send an ack every 100 messages
+        self._streams[msg.stream_id][2] = msg.message_id
+        if self.received_count % 100 == 0:
+            # but reset point_of_ref back to 0 every 500
+            # ... yes this will cause the sender to run forever.
+            print("Sending ack for streams!")
+            ack = cwm.Ack(
+                credits = 100,
+                acks = [
+                    (sid, por) for sid, _, por in self._streams.values()])
+            self.write(ack)
+
 
     def write(self, msg):
         print("write {}".format(msg))
@@ -91,7 +115,7 @@ class EchoServer(asyncore.dispatcher):
         self.create_socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.set_reuse_addr()
         self.bind((host, port))
-        self.listen(10)
+        self.listen(1)
         self.count = 0
 
     def handle_accepted(self, sock, addr):
