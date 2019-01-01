@@ -342,8 +342,8 @@ class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, BaseConn
         # update locally
         self._streams[stream_id] = new
         # send to wallaroo worker
-        self.write(cwm.Notify(new.stream_id,
-                              new.stream_name,
+        self.write(cwm.Notify(new.id,
+                              new.name,
                               new.point_of_ref))
 
     ########################
