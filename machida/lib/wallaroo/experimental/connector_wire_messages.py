@@ -281,12 +281,18 @@ class Message(object):
         self.flags = flags
         self.message_id = message_id
         self.event_time = event_time
-        self.key = key
-        self.message = message
+        if key is None or isinstance(key, bytes):
+            self.key = key
+        else:
+            self.key = key.encode()
+        if message is None or isinstance(message, bytes):
+            self.message = message
+        else:
+            self.message = message.encode()
 
     def __str__(self):
-        return ("Message(stream_id={}, flags={}, message_id={}, event_time"
-                "={}, key={}, message={})".format(
+        return ("Message(stream_id={!r}, flags={!r}, message_id={!r}, event_time"
+                "={!r}, key={!r}, message={!r})".format(
                     self.stream_id,
                     self.flags,
                     self.message_id,
@@ -311,10 +317,9 @@ class Message(object):
                      if self.message_id else b'')
         event_time = (struct.pack('>q', self.event_time)
                       if self.event_time else b'')
-        en_key = self.key.encode() if self.key else b''
-        key = (struct.pack('>H{}s'.format(len(en_key)), len(en_key), en_key)
+        key = (struct.pack('>H{}s'.format(len(self.key)), len(self.key), self.key)
                if self.key else b'')
-        msg = self.message.encode() if self.message else b''
+        msg = self.message if self.message else b''
         return b''.join((sid, flags, messageid, event_time, key, msg))
 
     @classmethod
