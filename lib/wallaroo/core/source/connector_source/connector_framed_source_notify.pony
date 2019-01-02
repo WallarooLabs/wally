@@ -36,9 +36,6 @@ use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
-primitive _MyStream         // SLF TODO: old-school remove
-  fun apply(): U64 => 4242
-
 type _ProtoFsmState is (_ProtoFsmConnected | _ProtoFsmHandshake |
                         _ProtoFsmStreaming | _ProtoFsmError |
                         _ProtoFsmDisconnected)
@@ -89,7 +86,6 @@ class ConnectorSourceNotify[In: Any val]
   var _connector_source: (None|ConnectorSource[In] ref) = None
 
   let _stream_map: Map[U64, _StreamState] = _stream_map.create()
-  var _body_count: U64 = 0 // SLF TODO old-school remove
   var _session_active: Bool = false
   var _session_tag: USize = 0
   var _fsm_state: _ProtoFsmState = _ProtoFsmDisconnected
@@ -142,96 +138,9 @@ class ConnectorSourceNotify[In: Any val]
       let pipeline_time_spent: U64 = 0
       let latest_metrics_id: U16 = 1
 
-      if false then // SLF TODO remove compat for old school
-        received_old_school(source, consume data, latest_metrics_id,
-          ingest_ts, pipeline_time_spent)
-      else
-        received_connector_msg(source, consume data, latest_metrics_id,
-          ingest_ts, pipeline_time_spent)
-      end
+      received_connector_msg(source, consume data, latest_metrics_id,
+        ingest_ts, pipeline_time_spent)
     end
-
-  fun ref received_old_school(source: ConnectorSource[In] ref,
-    data: Array[U8] iso,
-    latest_metrics_id: U16,
-    ingest_ts: U64,
-    pipeline_time_spent: U64)
-    : Bool
-  =>
-    let data': Array[U8] val = consume data
-    let event_timestamp': U64 = try
-        Bytes.to_u64(data'(0)?, data'(1)?, data'(2)?, data'(3)?, data'(4)?,
-            data'(5)?, data'(6)?, data'(7)?)
-      else
-        0
-      end
-    let key_length: U32 = try
-        Bytes.to_u32(data'(8)?, data'(9)?, data'(10)?, data'(11)?)
-      else
-        0
-      end
-    let key_bytes = recover val data'.slice(12, 12+key_length.usize()) end
-    let key_string = String.from_array(key_bytes)
-    let decoder_data = recover val data'.slice(12+key_length.usize()) end
-
-    // This is a big temporary hack to simulate receiving MESSAGE
-    // messages with stream-id numbers & stuff.
-    // It pretends that we received a NOTIFY message and sends a
-    // query to the active stream registry and then processes the
-    // message without waiting for a response.  A real impl will
-    // wait for the response from the active registry before allowing
-    // MESSAGE messages.
-    let decoded =
-      if true then
-        if (_body_count == 0) then
-          try
-            (_active_stream_registry as ConnectorSourceListener[In]).
-              stream_notify(_session_tag, _MyStream(), "_MyStream", 0,
-                _connector_source as ConnectorSource[In])
-            _stream_map(_MyStream()) = _StreamState(true, 0, 0, 0, 0, 0)
-          else
-            Fail()
-          end
-        end
-
-        _body_count = _body_count + 1
-        try
-          let s = _stream_map(_MyStream())?
-          s.last_message_id = s.base_point_of_reference + _body_count
-          @printf[I32]("^*^* %s.%s got pseudo-msg-id %lu\n".cstring(),
-            __loc.type_name().cstring(), __loc.method_name().cstring(),
-            s.last_message_id)
-          if s.pending_query then
-            // No reply yet from active stream registry.
-            // This is an error: tell the client, etc etc.
-            @printf[I32]("^*^* %s.%s synchronous protocol error: client didn't wait for NOTIFY_ACK for stream id %lu\n".cstring(),
-              __loc.type_name().cstring(), __loc.method_name().cstring(),
-              _MyStream())
-          end
-          if s.last_message_id < s.filter_message_id then
-            @printf[I32]("^*^* %s.%s DEDUPLICATE %lu < %lu\n".cstring(),
-              __loc.type_name().cstring(), __loc.method_name().cstring(),
-              s.last_message_id, s.filter_message_id)
-            return _continue_perhaps(source)
-          else
-            _handler.decode(decoder_data)?
-          end
-        else
-          @printf[I32](("Unable to decode message at " + _pipeline_name +
-            " source\n").cstring())
-          ifdef debug then
-            Fail()
-          end
-          return _continue_perhaps(source)
-        end
-      end // if true
-
-    ifdef "trace" then
-      @printf[I32](("Msg decoded at " + _pipeline_name +
-        " source\n").cstring())
-    end
-    _run_and_subsequent_activity(latest_metrics_id, ingest_ts,
-      pipeline_time_spent, key_string, source, decoded)
 
   fun ref received_connector_msg(source: ConnectorSource[In] ref,
     data: Array[U8] iso,
@@ -460,7 +369,6 @@ class ConnectorSourceNotify[In: Any val]
     _session_active = true
     _session_tag = _session_tag + 1
     _stream_map.clear()
-    _body_count = 0
     source.expect(_header_size)
 
   fun ref closed(source: ConnectorSource[In] ref) =>
@@ -510,10 +418,10 @@ class ConnectorSourceNotify[In: Any val]
     qty
 
   fun ref _clear_stream_map() =>
-    for s in _stream_map.values() do
+    for (stream_id, s) in _stream_map.pairs() do
       try
         (_active_stream_registry as ConnectorSourceListener[In]).stream_update(
-          _MyStream(), s.barrier_checkpoint_id, s.barrier_last_message_id,
+          stream_id, s.barrier_checkpoint_id, s.barrier_last_message_id,
           s.last_message_id, None)
       else
         Fail()
@@ -585,13 +493,13 @@ class ConnectorSourceNotify[In: Any val]
   fun ref barrier_complete(checkpoint_id: CheckpointId) =>
     // SLF TODO
     if _session_active then
-      for s in _stream_map.values() do
+      for (stream_id, s) in _stream_map.pairs() do
         @printf[I32]("^*^* %s.%s(%lu) _barrier_last_message_id = %lu, _last_message_id = %lu\n".cstring(),
           __loc.type_name().cstring(), __loc.method_name().cstring(),
           checkpoint_id, s.barrier_last_message_id, s.last_message_id)
         try
           (_active_stream_registry as ConnectorSourceListener[In]).stream_update(
-              _MyStream(), checkpoint_id, s.barrier_last_message_id,
+              stream_id, checkpoint_id, s.barrier_last_message_id,
               s.last_message_id,
               (_connector_source as ConnectorSource[In]))
         else
