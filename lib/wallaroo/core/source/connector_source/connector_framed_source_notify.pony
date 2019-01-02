@@ -158,18 +158,18 @@ class ConnectorSourceNotify[In: Any val]
         end
         if _fsm_state isnt _ProtoFsmConnected then
           @printf[I32]("ERROR: %s.received_connector_msg: state is %d\n".cstring(),
-            __loc.type_name(), _fsm_state())
+            __loc.type_name().cstring(), _fsm_state())
           Fail()
         end
 
         if m.version != "0.0.1" then
           @printf[I32]("ERROR: %s.received_connector_msg: unknown protocol version %s\n".cstring(),
-            __loc.type_name(), m.version.cstring())
+            __loc.type_name().cstring(), m.version.cstring())
           return _to_error_state(source, "Unknown protocol version")
         end
         if m.cookie != _cookie then
           @printf[I32]("ERROR: %s.received_connector_msg: bad cookie %s\n".cstring(),
-            __loc.type_name(), m.cookie.cstring())
+            __loc.type_name().cstring(), m.cookie.cstring())
           return _to_error_state(source, "Bad cookie")
         end
 
@@ -362,7 +362,7 @@ class ConnectorSourceNotify[In: Any val]
     @printf[I32]((_source_name + ": accepted a connection\n").cstring())
     if _fsm_state isnt _ProtoFsmDisconnected then
       @printf[I32]("ERROR: %s.connected: state is %d\n".cstring(),
-        __loc.type_name(), _fsm_state())
+        __loc.type_name().cstring(), _fsm_state())
       Fail()
     end
     _fsm_state = _ProtoFsmConnected
