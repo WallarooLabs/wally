@@ -199,7 +199,7 @@ tag_release_latest_docker_images() {
     docker tag "$wallaroo_docker_image_path" "$wallaroo_docker_image_latest_path"
     # tagging Metrics UI image as latest
     metrics_ui_docker_image_latest_path=$wallaroo_docker_repo_host/$wallaroo_docker_image_repo/metrics_ui:latest
-    docker tag "$metrics_ui_docker_image_path" "metrics_ui_docker_image_latest_path"
+    docker tag "$metrics_ui_docker_image_path" "$metrics_ui_docker_image_latest_path"
   else
     echo "Not on release branch, skipping tag of Wallaroo and Metrics UI Docker images to latest..."
   fi
