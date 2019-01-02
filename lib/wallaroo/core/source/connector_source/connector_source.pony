@@ -153,7 +153,6 @@ actor ConnectorSource[In: Any val] is Source
     _layout_initializer = layout_initializer
     _router_registry = router_registry
     _active_stream_registry = listen
-    _notify.set_active_stream_registry(_active_stream_registry, this)
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
@@ -167,6 +166,7 @@ actor ConnectorSource[In: Any val] is Source
 
     _router = router'
     _update_router(router')
+    _notify.set_active_stream_registry(_active_stream_registry, this)
 
     _notify.update_boundaries(_outgoing_boundaries)
 
