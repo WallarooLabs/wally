@@ -92,7 +92,8 @@ class ConnectorSourceNotify[In: Any val]
   var _session_active: Bool = false
   var _session_tag: USize = 0
   var _fsm_state: _ProtoFsmState = _ProtoFsmDisconnected
-  let _cookie: String = "dragons love tacos" // SLF TODO: configurable!
+  // let _cookie: String = "dragons love tacos" // SLF TODO: configurable!
+  let _cookie: String = "1234" // SLF TODO: configurable!
   var _program_name: String = ""
   var _instance_name: String = ""
 
@@ -141,7 +142,7 @@ class ConnectorSourceNotify[In: Any val]
       let pipeline_time_spent: U64 = 0
       let latest_metrics_id: U16 = 1
 
-      if true then // SLF TODO remove compat for old school
+      if false then // SLF TODO remove compat for old school
         received_old_school(source, consume data, latest_metrics_id,
           ingest_ts, pipeline_time_spent)
       else
@@ -251,7 +252,7 @@ class ConnectorSourceNotify[In: Any val]
           Fail()
         end
 
-        if m.version != "0.0001" then
+        if m.version != "0.0.1" then
           @printf[I32]("ERROR: %s.received_connector_msg: unknown protocol version %s\n".cstring(),
             __loc.type_name(), m.version.cstring())
           return _to_error_state(source, "Unknown protocol version")
@@ -629,7 +630,11 @@ class ConnectorSourceNotify[In: Any val]
           end
         end
       let m = cwm.NotifyAckMsg(success_reply, stream_id, point_of_reference)
-      _send_reply(source, m)
+      try
+        _send_reply(_connector_source as ConnectorSource[In] ref, m)
+      else
+        Fail()
+      end
     else
       Fail()
     end
@@ -663,17 +668,24 @@ class ConnectorSourceNotify[In: Any val]
     source.close()
     _continue_perhaps2()
 
-  fun _send_reply(source: ConnectorSource[In] ref, msg: cwm.MessageTrait) =>
+  fun _send_reply(source: ConnectorSource[In] ref, msg: cwm.Message) =>
     let w1: Writer = w1.create()
     let w2: Writer = w2.create()
 
-    try
-      msg.encode(w1)?
-      w2.u64_be(w1.size().u64())
-      let b1 = w1.done()
-      w2.writev(consume b1)
-      let b2 = w2.done()
-      source.writev_final(consume b2)
-    else
-      Fail()
-    end
+    let b1 = cwm.Frame.encode(msg, w1)
+    w2.u32_be(b1.size().u32())
+    //@printf[I32]("b1: %s\n".cstring(), _print_array[U8](b1).cstring())
+    w2.writev([b1])
+
+    let b2 = recover trn w2.done() end
+    //for s in b2.values() do
+    //  @printf[I32]("b2: partial %s\n".cstring(), _print_array[U8](s).cstring())
+    //end
+    source.writev_final(consume b2)
+
+  fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
+    """
+    Generate a printable string of the contents of the given readseq to use in
+    error messages.
+    """
+    "[len=" + array.size().string() + ": " + ", ".join(array.values()) + "]"
