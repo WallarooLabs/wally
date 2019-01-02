@@ -185,10 +185,6 @@ class ConnectorSourceNotify[In: Any val]
             _connector_source as ConnectorSource[In])
         return _continue_perhaps(source)
 
-        // SLF TODO:
-        // 4. That callback sends reply to socket, manages state vars for FSM,
-        //    etc.
-
       | let m: cwm.OkMsg =>
         ifdef "trace" then
           @printf[I32]("^*^* got OkMsg\n".cstring())
@@ -206,9 +202,11 @@ class ConnectorSourceNotify[In: Any val]
           @printf[I32]("^*^* got NotifyMsg: %lu %s %lu\n".cstring(),
             m.stream_id, m.stream_name.cstring(), m.point_of_ref)
         end
+        if _fsm_state isnt _ProtoFsmStreaming then
+          return _to_error_state(source, "Bad protocol FSM state")
+        end
 
         // SLF TODO:
-        // 0. Send ERROR & close if not in Streaming state.
         // 1. Send query to active stream registry if no key and if query
         //    isn't already in flight.
         // 2. Update _stream_map for pending query
@@ -235,10 +233,14 @@ class ConnectorSourceNotify[In: Any val]
         return _to_error_state(source, "Invalid message: notify_ack")
 
       | let m: cwm.MessageMsg =>
-        @printf[I32]("^*^* got MessageMsg message of the message family of messages, SLF TODO do stuff below\n".cstring())
+        ifdef "trace" then
+          @printf[I32]("^*^* got MessageMsg\n".cstring())
+        end
+        if _fsm_state isnt _ProtoFsmStreaming then
+          return _to_error_state(source, "Bad protocol FSM state")
+        end
 
         // SLF TODO:
-        // 0. Send ERROR & close if not in Streaming state.
         // 1. Check m.flags for sanity, send ErrorMsg if bad.
         // 2. Check m.stream_id for active & not-pending status in
         //    _stream_map, send ErrorMsg if bad.
@@ -255,6 +257,7 @@ class ConnectorSourceNotify[In: Any val]
         //    it isn't perfect but it "works" at demo quality.
         // 7. Finish with: return _run_and_subsequent_activity(...)
         //    - Do not fall through to end of match statement.
+        @printf[I32]("^*^* got MessageMsg message of the message family of messages, SLF TODO do stuff below\n".cstring())
 
       | let m: cwm.AckMsg =>
         ifdef "trace" then
@@ -275,6 +278,7 @@ class ConnectorSourceNotify[In: Any val]
       ifdef debug then
         Fail()
       end
+      return _to_error_state(source, "Unable to decode message")
     end
     _continue_perhaps(source)
 
