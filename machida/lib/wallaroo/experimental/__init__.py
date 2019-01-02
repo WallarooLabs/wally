@@ -43,10 +43,6 @@ class ProtocolError(Exception):
     pass
 
 
-class ConnectorUnknownMessageError(ConnectorError):
-  pass
-
-
 def stream_message_decoder(func):
     wallaroo._validate_arity_compatability(func.__name__, func, 1)
     C = wallaroo._wallaroo_wrap(func.__name__, func, wallaroo.ConnectorDecoder)
@@ -207,8 +203,11 @@ class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, BaseConn
             self._handle_ok(msg)
         elif isinstance(msg, cwm.Error):
             # Got error message from worker
-            # close the connection and pass msg to the error handler
-            self.close()
+            # close the connection and pass msg to the error handler but only
+            # if not in handshake. If in handshake, let the initiate_handshake
+            # function deal with this.
+            if not self.in_handshake:
+                self.close()
             raise ConnectorError(msg.message)
         elif isinstance(msg, cwm.NotifyAck):
             self._handle_notify_ack(msg)
@@ -300,7 +299,12 @@ class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, BaseConn
         header_bytes = self._conn.recv(4)
         frame_size = struct.unpack('>I', header_bytes)[0]
         frame = self._conn.recv(frame_size)
-        self._handle_frame(frame)
+        try:
+            self._handle_frame(frame)
+        except Exception as err:
+            # close the connection and raise the error
+            self._conn.close()
+            raise err
 
     def write(self, msg):
         if not self.is_alive():
