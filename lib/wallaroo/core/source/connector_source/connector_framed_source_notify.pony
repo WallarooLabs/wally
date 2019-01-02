@@ -86,7 +86,7 @@ class ConnectorSourceNotify[In: Any val]
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
   var _active_stream_registry: (None|ConnectorSourceListener[In]) = None
-  var _connector_source: (None|ConnectorSource[In]) = None
+  var _connector_source: (None|ConnectorSource[In] ref) = None
 
   let _stream_map: Map[U64, _StreamState] = _stream_map.create()
   var _body_count: U64 = 0 // SLF TODO old-school remove
@@ -254,12 +254,12 @@ class ConnectorSourceNotify[In: Any val]
         if m.version != "0.0001" then
           @printf[I32]("ERROR: %s.received_connector_msg: unknown protocol version %s\n".cstring(),
             __loc.type_name(), m.version.cstring())
-          return _to_error_state("Unknown protocol version", source)
+          return _to_error_state(source, "Unknown protocol version")
         end
         if m.cookie != _cookie then
           @printf[I32]("ERROR: %s.received_connector_msg: bad cookie %s\n".cstring(),
             __loc.type_name(), m.cookie.cstring())
-          return _to_error_state("Bad cookie", source)
+          return _to_error_state(source, "Bad cookie")
         end
 
         // SLF TODO: add routing logic to handle
@@ -282,7 +282,7 @@ class ConnectorSourceNotify[In: Any val]
         ifdef "trace" then
           @printf[I32]("^*^* got OkMsg\n".cstring())
         end
-        return _to_error_state("Invalid message: ok", source)
+        return _to_error_state(source, "Invalid message: ok")
 
       | let m: cwm.ErrorMsg =>
         @printf[I32]("Client sent us ERROR msg: %s\n".cstring(),
@@ -321,7 +321,7 @@ class ConnectorSourceNotify[In: Any val]
         ifdef "trace" then
           @printf[I32]("^*^* got NotifyAckMsg\n".cstring())
         end
-        return _to_error_state("Invalid message: notify_ack", source)
+        return _to_error_state(source, "Invalid message: notify_ack")
 
       | let m: cwm.MessageMsg =>
         @printf[I32]("^*^* got MessageMsg message of the message family of messages, SLF TODO do stuff below\n".cstring())
@@ -349,13 +349,13 @@ class ConnectorSourceNotify[In: Any val]
         ifdef "trace" then
           @printf[I32]("^*^* got AckMsg\n".cstring())
         end
-        return _to_error_state("Invalid message: ack", source)
+        return _to_error_state(source, "Invalid message: ack")
 
       | let m: cwm.RestartMsg =>
         ifdef "trace" then
           @printf[I32]("^*^* got RestartMsg\n".cstring())
         end
-        return _to_error_state("Invalid message: restart", source)
+        return _to_error_state(source, "Invalid message: restart")
 
       end
     else
@@ -522,7 +522,7 @@ class ConnectorSourceNotify[In: Any val]
 
   fun ref set_active_stream_registry(
     active_stream_registry: ConnectorSourceListener[In],
-    connector_source: ConnectorSource[In]) =>
+    connector_source: ConnectorSource[In] ref) =>
     @printf[I32]("^*^* %s.%s\n".cstring(),
       __loc.type_name().cstring(), __loc.method_name().cstring())
     _active_stream_registry = active_stream_registry
@@ -590,9 +590,9 @@ class ConnectorSourceNotify[In: Any val]
           checkpoint_id, s.barrier_last_message_id, s.last_message_id)
         try
           (_active_stream_registry as ConnectorSourceListener[In]).stream_update(
-            _MyStream(), checkpoint_id, s.barrier_last_message_id,
-            s.last_message_id,
-            recover tag (_connector_source as ConnectorSource[In]) end)
+              _MyStream(), checkpoint_id, s.barrier_last_message_id,
+              s.last_message_id,
+              (_connector_source as ConnectorSource[In]))
         else
           Fail()
         end
@@ -629,8 +629,7 @@ class ConnectorSourceNotify[In: Any val]
           end
         end
       let m = cwm.NotifyAckMsg(success_reply, stream_id, point_of_reference)
-
-      // SLF TODO: SEND REPLY TO CONNECTOR CLIENT
+      _send_reply(source, m)
     else
       Fail()
     end
@@ -647,12 +646,16 @@ class ConnectorSourceNotify[In: Any val]
 
     let initial_credits: U32 = 20 // SLF TODO: configurable?
     let w: Writer = w.create()
-    cwm.OkMsg(initial_credits, data).encode(w)
-    let reply = w.done()
+    try
+      _send_reply(_connector_source as ConnectorSource[In] ref,
+        cwm.OkMsg(initial_credits, data))
+    else
+      Fail()
+    end
 
     _fsm_state = _ProtoFsmStreaming
 
-  fun ref _to_error_state(msg: String, source: ConnectorSource[In] ref): Bool
+  fun ref _to_error_state(source: ConnectorSource[In] ref, msg: String): Bool
   =>
     _send_reply(source, cwm.ErrorMsg(msg))
 
