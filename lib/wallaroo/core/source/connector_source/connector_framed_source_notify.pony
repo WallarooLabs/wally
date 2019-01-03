@@ -575,6 +575,9 @@ class ConnectorSourceNotify[In: Any val]
   fun ref barrier_complete(checkpoint_id: CheckpointId) =>
     // SLF TODO
     if _session_active then
+      let cs: Array[(cwm.StreamId, cwm.PointOfRef)] trn =
+        recover trn cs.create() end
+
       for (stream_id, s) in _stream_map.pairs() do
         @printf[I32]("^*^* %s.%s(%lu) _barrier_last_message_id = %lu, _last_message_id = %lu\n".cstring(),
           __loc.type_name().cstring(), __loc.method_name().cstring(),
@@ -584,10 +587,13 @@ class ConnectorSourceNotify[In: Any val]
               stream_id, checkpoint_id, s.barrier_last_message_id,
               s.last_message_id,
               (_connector_source as ConnectorSource[In]))
+          cs.push((stream_id, s.barrier_last_message_id))
         else
           Fail()
         end
       end
+      let new_credits: U32 = 10 // SLF TODO: we need to add new ack code when credits run low
+      _send_reply(_connector_source, cwm.AckMsg(new_credits, consume cs))
     end
 
   fun ref stream_notify_result(session_tag: USize, success: Bool,
@@ -618,11 +624,7 @@ class ConnectorSourceNotify[In: Any val]
           end
         end
       let m = cwm.NotifyAckMsg(success_reply, stream_id, point_of_reference)
-      try
-        _send_reply(_connector_source as ConnectorSource[In] ref, m)
-      else
-        Fail()
-      end
+      _send_reply(_connector_source, m)
     else
       Fail()
     end
@@ -639,37 +641,37 @@ class ConnectorSourceNotify[In: Any val]
 
     let initial_credits: U32 = 20 // SLF TODO: configurable?
     let w: Writer = w.create()
-    try
-      _send_reply(_connector_source as ConnectorSource[In] ref,
-        cwm.OkMsg(initial_credits, data))
-    else
-      Fail()
-    end
+     _send_reply(_connector_source, cwm.OkMsg(initial_credits, data))
 
     _fsm_state = _ProtoFsmStreaming
 
-  fun ref _to_error_state(source: ConnectorSource[In] ref, msg: String): Bool
+  fun ref _to_error_state(source: (ConnectorSource[In] ref|None), msg: String): Bool
   =>
     _send_reply(source, cwm.ErrorMsg(msg))
 
     _fsm_state = _ProtoFsmError
-    source.close()
+    try (source as ConnectorSource[In] ref).close() else Fail() end
     _continue_perhaps2()
 
-  fun _send_reply(source: ConnectorSource[In] ref, msg: cwm.Message) =>
-    let w1: Writer = w1.create()
-    let w2: Writer = w2.create()
+  fun _send_reply(source: (ConnectorSource[In] ref|None), msg: cwm.Message) =>
+    match source
+    | let s: ConnectorSource[In] ref =>
+      let w1: Writer = w1.create()
+      let w2: Writer = w2.create()
 
-    let b1 = cwm.Frame.encode(msg, w1)
-    w2.u32_be(b1.size().u32())
-    //@printf[I32]("b1: %s\n".cstring(), _print_array[U8](b1).cstring())
-    w2.writev([b1])
+      let b1 = cwm.Frame.encode(msg, w1)
+      w2.u32_be(b1.size().u32())
+      @printf[I32]("b1: %s\n".cstring(), _print_array[U8](b1).cstring())
+      w2.writev([b1])
 
-    let b2 = recover trn w2.done() end
-    //for s in b2.values() do
-    //  @printf[I32]("b2: partial %s\n".cstring(), _print_array[U8](s).cstring())
-    //end
-    source.writev_final(consume b2)
+      let b2 = recover trn w2.done() end
+      //for s in b2.values() do
+      //  @printf[I32]("b2: partial %s\n".cstring(), _print_array[U8](s).cstring())
+      //end
+      s.writev_final(consume b2)
+    else
+      Fail()
+    end
 
   fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
     """
