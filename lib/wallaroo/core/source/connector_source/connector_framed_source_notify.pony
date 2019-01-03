@@ -50,6 +50,10 @@ primitive _ProtoFsmError
 primitive _ProtoFsmDisconnected
   fun apply(): U8 => 5
 
+primitive _Credits
+  fun initial(): U32 => 10 // SLF TODO: make this configurable
+  fun low(): U32     =>  9 // SLF TODO: make this configurable
+
 class _StreamState
   var pending_query: Bool
   var base_point_of_reference: U64
@@ -91,6 +95,7 @@ class ConnectorSourceNotify[In: Any val]
   let _cookie: String = "1234" // SLF TODO: configurable!
   var _program_name: String = ""
   var _instance_name: String = ""
+  var _credits: U32 = _Credits.initial()
 
   // Watermark !@ How do we handle this respecting per-connector-type policies
   var _watermark_ts: U64 = 0
@@ -146,6 +151,13 @@ class ConnectorSourceNotify[In: Any val]
     ingest_ts: U64,
     pipeline_time_spent: U64): Bool
   =>
+    _credits = _credits - 1
+    if (_credits <= _Credits.low()) and (_fsm_state is _ProtoFsmStreaming) then
+      // Our client's credits are running low and we haven't replenished
+      // them after barrier_complete() processing.  Replenish now.
+      _send_ack()
+    end
+
     try
       let connector_msg = cwm.Frame.decode(consume data)?
       match connector_msg
@@ -451,6 +463,7 @@ class ConnectorSourceNotify[In: Any val]
     _session_active = true
     _session_tag = _session_tag + 1
     _stream_map.clear()
+    _credits = _Credits.initial()
     source.expect(_header_size)
 
   fun ref closed(source: ConnectorSource[In] ref) =>
@@ -579,9 +592,6 @@ class ConnectorSourceNotify[In: Any val]
   fun ref barrier_complete(checkpoint_id: CheckpointId) =>
     // SLF TODO
     if _session_active then
-      let cs: Array[(cwm.StreamId, cwm.PointOfRef)] trn =
-        recover trn cs.create() end
-
       for (stream_id, s) in _stream_map.pairs() do
         @printf[I32]("^*^* %s.%s(%lu) _barrier_last_message_id = %lu, _last_message_id = %lu\n".cstring(),
           __loc.type_name().cstring(), __loc.method_name().cstring(),
@@ -591,13 +601,15 @@ class ConnectorSourceNotify[In: Any val]
               stream_id, checkpoint_id, s.barrier_last_message_id,
               s.last_message_id,
               (_connector_source as ConnectorSource[In]))
-          cs.push((stream_id, s.barrier_last_message_id))
         else
           Fail()
         end
       end
-      let new_credits: U32 = 10 // SLF TODO: we need to add new ack code when credits run low
-      _send_reply(_connector_source, cwm.AckMsg(new_credits, consume cs))
+
+      if _fsm_state is _ProtoFsmStreaming then
+        // Send an Ack message to replenish credits
+        _send_ack()
+      end
 
       if (checkpoint_id % 5) == 4 then
         // SLF TODO: the Python side of the world raises an exception when
@@ -611,6 +623,17 @@ class ConnectorSourceNotify[In: Any val]
         // twiddle all of the appropriate state variables.
       end
     end
+
+  fun ref _send_ack() =>
+    let new_credits = _Credits.initial() - _credits
+    let cs: Array[(cwm.StreamId, cwm.PointOfRef)] trn =
+      recover trn cs.create() end
+
+    for (stream_id, s) in _stream_map.pairs() do
+      cs.push((stream_id, s.barrier_last_message_id))
+    end
+    _send_reply(_connector_source, cwm.AckMsg(new_credits, consume cs))
+    _credits = _credits + new_credits
 
   fun ref stream_notify_result(session_tag: USize, success: Bool,
     stream_id: U64, point_of_reference: U64, last_message_id: U64) =>
