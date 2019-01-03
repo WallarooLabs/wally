@@ -54,18 +54,16 @@ class _StreamState
   var pending_query: Bool
   var base_point_of_reference: U64
   var last_message_id: U64
-  var filter_message_id: U64
   var barrier_last_message_id: U64
   var barrier_checkpoint_id: CheckpointId
 
   new ref create(pending_query': Bool, base_point_of_reference': U64,
-    last_message_id': U64, filter_message_id': U64,
+    last_message_id': U64,
     barrier_last_message_id': U64, barrier_checkpoint_id': CheckpointId)
 =>
   pending_query = pending_query'
   base_point_of_reference = base_point_of_reference'
   last_message_id = last_message_id'
-  filter_message_id = filter_message_id'
   barrier_last_message_id = barrier_last_message_id'
   barrier_checkpoint_id = barrier_checkpoint_id'
 
@@ -217,7 +215,7 @@ class ConnectorSourceNotify[In: Any val]
             (_active_stream_registry as ConnectorSourceListener[In])
               .stream_notify(_session_tag, m.stream_id, m.stream_name,
                 m.point_of_ref, _connector_source as ConnectorSource[In])
-            _stream_map(m.stream_id) = _StreamState(true, 0, 0, 0, 0, 0)
+            _stream_map(m.stream_id) = _StreamState(true, 0, 0, 0, 0)
           else
             // SLF TODO: create NOTIFY_ACK with success=false & send to socket.
             None
@@ -239,25 +237,103 @@ class ConnectorSourceNotify[In: Any val]
         if _fsm_state isnt _ProtoFsmStreaming then
           return _to_error_state(source, "Bad protocol FSM state")
         end
+        if not cwm.FlagsAllowed(m.flags) then
+          return _to_error_state(source, "Bad MessageMsg flags")
+        end
 
-        // SLF TODO:
-        // 1. Check m.flags for sanity, send ErrorMsg if bad.
-        // 2. Check m.stream_id for active & not-pending status in
-        //    _stream_map, send ErrorMsg if bad.
-        // 3. If message_id is lower than last-received-id, then
-        //    drop message (i.e. we dedupe).
-        //    - If ephemeral flag, then don't check & don't dedupe?
-        // 3. If UnstableReference flag, then ... don't dedupe?
-        // 4. If Boundary flag, then ... anything extra?
-        // 5. If Eos flag, then close this session:
-        //    - remove from _stream_map
-        //    - send stream_update() to active stream registry
-        //      see this.closed() for example usage
-        // 6. What did I forget?  See received_old_school() for hints:
-        //    it isn't perfect but it "works" at demo quality.
-        // 7. Finish with: return _run_and_subsequent_activity(...)
-        //    - Do not fall through to end of match statement.
-        @printf[I32]("^*^* got MessageMsg message of the message family of messages, SLF TODO do stuff below\n".cstring())
+        let stream_id = m.stream_id
+        let decoded = if not _stream_map.contains(stream_id) then
+          return _to_error_state(source, "Bad stream_id " + stream_id.string())
+        else
+          try
+            let s = _stream_map(stream_id)?
+            @printf[I32]("^*^* STREAM pending %s base-p-o-r %llu last-msg-id %llu barrier-last-msg-id %llu barrier-ckpt-id %llu\n".cstring(), s.pending_query.string().cstring(), s.base_point_of_reference, s.last_message_id, s.barrier_last_message_id, s.barrier_checkpoint_id)
+            if s.pending_query then
+              return _to_error_state(source, "Duplicate stream_id " + stream_id.string())
+            end
+
+            let msg_id' = if m.message_id is None then "<None>" else (m.message_id as cwm.MessageId).string() end
+            let event_time' = if m.event_time is None then "<None>" else (m.event_time as cwm.EventTimeType).string() end
+            let key' = if m.key is None then "<None>" else _print_array[U8](m.key as cwm.KeyBytes) end
+            let message' = if m.message is None then "<None>" else _print_array[U8](m.message as cwm.MessageBytes) end
+            @printf[I32]("^*^* MSG: stream-id %llu flags %u msg_id %s event_time %s key %s message %s\n".cstring(), stream_id, m.flags, msg_id'.cstring(), event_time'.cstring(), key'.cstring(), message'.cstring())
+
+            if cwm.Ephemeral.is_set(m.flags) or
+              cwm.UnstableReference.is_set(m.flags)
+            then
+              @printf[I32]("^*^* SLF TODO line %d\n".cstring(), __loc.line())
+              // SLF TODO: what's appropriate?
+              None // return _continue_perhaps(source)
+            else
+              try
+                let msg_id = m.message_id as cwm.MessageId
+
+                if msg_id <= s.last_message_id then
+                  @printf[I32]("^*^* MessageMsg: 2 stale id in stream-id %llu flags %u msg_id %llu <= last_message_id %llu\n".cstring(), stream_id, m.flags, m.message_id as cwm.MessageId, s.last_message_id)
+                  return _continue_perhaps(source)
+                else
+                  // SLF TODO: avoid this update until after parse & run?
+                  s.last_message_id = msg_id
+                  // Pony obj & ptr magic, no need to explicitly update map
+                end
+
+                if cwm.Eos.is_set(m.flags) then
+                  (_active_stream_registry as ConnectorSourceListener[In]).stream_update(
+                    stream_id, s.barrier_checkpoint_id, s.barrier_last_message_id,
+                    msg_id, None)
+                  try _stream_map.remove(stream_id)? else Fail() end
+                end
+
+                if not cwm.Boundary.is_set(m.flags) then
+                  try
+                    let bytes = match (m.message as cwm.MessageBytes)
+                    | let str: String      => str.array()
+                    | let b: Array[U8] val => b
+                    end
+                    _handler.decode(bytes)?
+                  else
+                    if m.message is None then
+                      return _to_error_state(source, "No message bytes and BOUNDARY not set")
+                    end
+                    @printf[I32](("Unable to decode message at " + _pipeline_name + " source\n").cstring())
+                    ifdef debug then
+                      Fail()
+                    end
+                    return _continue_perhaps(source)
+                  end
+                end
+
+                // SLF TODO:
+                // 6. What did I forget?  See received_old_school() for hints:
+                //    it isn't perfect but it "works" at demo quality.
+              else
+                Fail()
+              end
+            end
+          else
+            Fail()
+          end
+        end
+
+        ifdef "trace" then
+          @printf[I32](("Msg decoded at " + _pipeline_name +
+            " source\n").cstring())
+        end
+        let key_string =
+          match m.key
+          | None =>
+            ""
+          | let str: String val =>
+            str
+          | let a: Array[U8] val =>
+            let k' = recover trn String(a.size()) end
+            for c in a.values() do
+              k'.push(c)
+            end
+            consume k'
+          end
+        _run_and_subsequent_activity(latest_metrics_id, ingest_ts,
+          pipeline_time_spent, key_string, source, decoded)
 
       | let m: cwm.AckMsg =>
         ifdef "trace" then
@@ -310,11 +386,13 @@ class ConnectorSourceNotify[In: Any val]
 
     (let is_finished, let last_ts) =
       try
+        @printf[I32]("^*^* BEFORE _runner.run()\n".cstring())
         _runner.run[In](_pipeline_name, pipeline_time_spent, decoded as In,
           consume initial_key, _source_id, source, _router,
           msg_uid, None, decode_end_ts,
           latest_metrics_id', ingest_ts, _metrics_reporter)
       else
+        @printf[I32]("^*^* OOPS _runner.run()\n".cstring())
         (true, ingest_ts)
       end
 
@@ -535,8 +613,6 @@ class ConnectorSourceNotify[In: Any val]
           if success and s.pending_query then
             s.pending_query = false
             s.base_point_of_reference = point_of_reference
-            s.base_point_of_reference = last_message_id // SLF TODO simulation HACK, deleteme!
-            s.filter_message_id = last_message_id
             true
           else
             false
