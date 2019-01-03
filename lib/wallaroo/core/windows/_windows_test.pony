@@ -62,7 +62,7 @@ class iso _TestTumblingWindowsTimeoutTrigger is UnitTest
     // given
     let watermark: U64 = Seconds(111)
     let range: U64 = Seconds(1)
-    let tw = _TumblingWindow(range, _Sum)
+    let tw = _TotalTumblingWindow(range, _Sum)
              .>apply(111, watermark, watermark)
 
     // when
@@ -80,7 +80,7 @@ class iso _TestTumblingWindowsOutputEventTimes is UnitTest
   fun apply(h: TestHelper) ? =>
     // given
     let range: U64 = Seconds(3)
-    let tw = _TumblingWindow(range, _Sum)
+    let tw = _TotalTumblingWindow(range, _Sum)
              .>apply(1, Seconds(111), Seconds(111))
              .>apply(2, Seconds(112), Seconds(112))
 
@@ -142,7 +142,7 @@ class iso _TestOnTimeoutWatermarkTsIsJustBeforeNextWindowStart is UnitTest
     let range: U64 = Milliseconds(50)
     let slide = range
     let delay: U64 = 0
-    let tw = _TumblingWindow(Milliseconds(50), _NonZeroSum)
+    let tw = _TotalTumblingWindow(Milliseconds(50), _NonZeroSum)
              .>apply(1, Milliseconds(5000), Milliseconds(5000))
 
     // when
@@ -160,7 +160,7 @@ class iso _TestEventInNewWindowCausesPreviousToFlush is UnitTest
 
   fun apply(h: TestHelper) ? =>
     // given
-    let tw = _TumblingWindow(Milliseconds(50), _NonZeroSum)
+    let tw = _TotalTumblingWindow(Milliseconds(50), _NonZeroSum)
              .>apply(1, Milliseconds(5000), Milliseconds(5000))
              .>apply(2, Milliseconds(5025), Milliseconds(5025))
     // when
@@ -175,7 +175,7 @@ class iso _TestTimeoutAfterEndOfWindowCausesFlush is UnitTest
 
   fun apply(h: TestHelper) ? =>
     // given
-    let tw = _TumblingWindow(Milliseconds(50), _NonZeroSum)
+    let tw = _TotalTumblingWindow(Milliseconds(50), _NonZeroSum)
              .>apply(1, Milliseconds(5000), Milliseconds(5000))
              .>apply(2, Milliseconds(5025), Milliseconds(5025))
     // when
@@ -190,7 +190,7 @@ class iso _Test10 is UnitTest  // TODO: Rename this test
 
   fun apply(h: TestHelper) ? =>
     // given
-    let tw = _TumblingWindow(Milliseconds(50000), _NonZeroSum)
+    let tw = _TotalTumblingWindow(Milliseconds(50000), _NonZeroSum)
              .>apply(1, Milliseconds(5000), Milliseconds(5000))
              .>apply(3, Milliseconds(5300), Milliseconds(5300))
              .>apply(11, Milliseconds(6050), Milliseconds(6050))
@@ -213,7 +213,7 @@ class iso _TestTumblingWindowCountIsCorrectAfterFlush is UnitTest
 
   fun apply(h: TestHelper) =>
     // given
-    let tw = _TumblingWindow(Milliseconds(50), _NonZeroSum)
+    let tw = _TotalTumblingWindow(Milliseconds(50), _NonZeroSum)
              .>apply(1, Milliseconds(5000), Milliseconds(5000))
 
     // when
@@ -1034,7 +1034,7 @@ primitive _ForceArrayArray
       consume a'
     else error end
 
-primitive _TumblingWindow
+primitive _TotalTumblingWindow
   fun apply(range: U64, calculation: Aggregation[USize, USize, _Total]):
     RangeWindows[USize, USize, _Total]
   =>
@@ -1042,6 +1042,15 @@ primitive _TumblingWindow
     let delay: U64 = 0
     RangeWindows[USize, USize, _Total]("key",
       _NonZeroSum, range, slide, delay, _Zeros)
+
+primitive _CollectTumblingWindow
+  fun apply(range: U64, calculation: Aggregation[USize, Array[USize] val,
+    Collected]): RangeWindows[USize, Array[USize] val, Collected]
+  =>
+    let slide = range
+    let delay: U64 = 0
+    RangeWindows[USize, Array[USize] val, Collected]("key",
+      _Collect, range, slide, delay, _Zeros)
 
 
 class _Zeros is Random

@@ -31,3 +31,4 @@ actor Main is TestList
     _WindowTests.make().tests(test)
     _ExpandSlidingWindowTests.make().tests(test)
     _WatermarkTests.make().tests(test)
+    _LateDataPolicyTests.make().tests(test)
