@@ -54,9 +54,10 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   let _slide: U64
   let _delay: U64
   var _highest_seen_event_ts: U64
+  let _late_data_policy: U16
 
   new create(key: Key, agg: Aggregation[In, Out, Acc], range: U64, slide: U64,
-    delay: U64, watermark_ts: U64, rand: Random)
+    delay: U64, late_data_policy: U16, watermark_ts: U64, rand: Random)
   =>
     _key = key
     _agg = agg
@@ -64,6 +65,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     _slide = slide
     _identity_acc = _agg.initial_accumulator()
     _highest_seen_event_ts = watermark_ts
+    _late_data_policy = late_data_policy
 
     // To avoid the thundering herd problems that can come with perfectly
     // aligned windows, we randomly offset every window with an offset up to
@@ -101,15 +103,17 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   =>
     _highest_seen_event_ts = _highest_seen_event_ts.max(event_ts)
     try
+      var is_late_data = false
       (let earliest_ts, let end_ts) = _earliest_and_end_ts()?
       var applied = false
       if not _is_past_end_ts(event_ts, end_ts) then
-        _apply_input(input, event_ts, earliest_ts)
+        is_late_data = _apply_input(input, event_ts, earliest_ts)
         applied = true
       end
 
       // Check if we need to trigger and clear windows
-      (let outs, let output_watermark_ts) = attempt_to_trigger(watermark_ts)
+      (var outs, let output_watermark_ts) = attempt_to_trigger(watermark_ts)
+
       // If we haven't already applied the input, do it now.
       if not applied then
         (var new_earliest_ts, let new_end_ts) = _earliest_and_end_ts()?
@@ -119,16 +123,41 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
           _expand_windows(event_ts, new_end_ts)?
           new_earliest_ts = _earliest_ts()?
         end
-
-        _apply_input(input, event_ts, new_earliest_ts)
+        is_late_data = _apply_input(input, event_ts, new_earliest_ts)
       end
-      (outs, output_watermark_ts)
+
+      if is_late_data then
+        match _late_data_policy
+        | LateDataPolicy.drop() =>
+          ifdef debug then
+            @printf[I32]("Event ts %s is earlier than earliest window %s. Ignoring\n".cstring(), event_ts.string().cstring(), earliest_ts.string().cstring())
+          end
+        | LateDataPolicy.fire_per_message() =>
+          let acc = _agg.initial_accumulator()
+          _agg.update(input, acc)
+          // We are currently using the event timestamp of the late message
+          // as the window end timestamp.
+          match _agg.output(_key, event_ts, acc)
+          | let o: Out =>
+            // We are currently using the event timestamp of the late message
+            // as the window end timestamp.
+            outs.push((o, event_ts))
+          end
+        | LateDataPolicy.place_in_oldest_window() =>
+          let new_earliest_ts = _earliest_ts()?
+          _apply_input(input, new_earliest_ts, new_earliest_ts)
+        end
+      end
+      (consume outs, output_watermark_ts)
     else
       Fail()
       (recover Array[(Out, U64)] end, 0)
     end
 
-  fun ref _apply_input(input: In, event_ts: U64, earliest_ts: U64) =>
+  // TODO: Update signature -> `true` is not very clear as the return value.
+  // Return true if the input is late, which means we need to handle it
+  // according to the late data policy.
+  fun ref _apply_input(input: In, event_ts: U64, earliest_ts: U64): Bool =>
     ifdef debug then
       try
         Invariant(not _is_past_end_ts(event_ts, _earliest_and_end_ts()?._2))
@@ -151,16 +180,13 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       else
         Fail()
       end
+      false
     else
-      ifdef debug then
-        @printf[I32](("Event ts %s is earlier than earliest window %s. "+
-                     "Ignoring\n").cstring(),
-        event_ts.string().cstring(), earliest_ts.string().cstring())
-      end
+      true
     end
 
   fun ref attempt_to_trigger(input_watermark_ts: U64):
-    (Array[(Out, U64)] val, U64)
+    (Array[(Out, U64)] iso^, U64)
   =>
     let outs = recover iso Array[(Out, U64)] end
     var output_watermark_ts: U64 = 0
