@@ -599,6 +599,18 @@ class ConnectorSourceNotify[In: Any val]
       end
       let new_credits: U32 = 10 // SLF TODO: we need to add new ack code when credits run low
       _send_reply(_connector_source, cwm.AckMsg(new_credits, consume cs))
+
+      if (checkpoint_id % 5) == 4 then
+        // SLF TODO: the Python side of the world raises an exception when
+        // it gets an ErrorMsg, and the rest of the code is fragile when
+        // that exception is not caught.
+        // _to_error_state(_connector_source, "BYEBYE")
+
+        _send_reply(_connector_source, cwm.RestartMsg)
+        try (_connector_source as ConnectorSource[In] ref).close() else Fail() end
+        // The .close() method ^^^ calls our closed() method which will
+        // twiddle all of the appropriate state variables.
+      end
     end
 
   fun ref stream_notify_result(session_tag: USize, success: Bool,
