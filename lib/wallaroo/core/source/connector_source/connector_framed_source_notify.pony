@@ -215,12 +215,6 @@ class ConnectorSourceNotify[In: Any val]
           return _to_error_state(source, "Bad protocol FSM state")
         end
 
-        // SLF TODO:
-        // 1. Send query to active stream registry if no key and if query
-        //    isn't already in flight.
-        // 2. Update _stream_map for pending query
-        // 3. Edit stream_notify_result(): Create reply msg & send to socket.
-
         try
           if not _stream_map.contains(m.stream_id) then
             (_active_stream_registry as ConnectorSourceListener[In])
@@ -228,8 +222,8 @@ class ConnectorSourceNotify[In: Any val]
                 m.point_of_ref, _connector_source as ConnectorSource[In])
             _stream_map(m.stream_id) = _StreamState(true, 0, 0, 0, 0)
           else
-            // SLF TODO: create NOTIFY_ACK with success=false & send to socket.
-            None
+            _send_reply(source, cwm.NotifyAckMsg(false, m.stream_id, 0))
+            return _continue_perhaps(source)
           end
         else
           Fail()
@@ -274,18 +268,15 @@ class ConnectorSourceNotify[In: Any val]
             then
               @printf[I32]("^*^* SLF TODO line %d\n".cstring(), __loc.line())
               // SLF TODO: what's appropriate?
-              None // return _continue_perhaps(source)
+              // qqq ^^^
+              None
             else
               try
                 let msg_id = m.message_id as cwm.MessageId
 
                 if msg_id <= s.last_message_id then
-                  @printf[I32]("^*^* MessageMsg: 2 stale id in stream-id %llu flags %u msg_id %llu <= last_message_id %llu\n".cstring(), stream_id, m.flags, m.message_id as cwm.MessageId, s.last_message_id)
+                  @printf[I32]("^*^* MessageMsg: stale id in stream-id %llu flags %u msg_id %llu <= last_message_id %llu\n".cstring(), stream_id, m.flags, m.message_id as cwm.MessageId, s.last_message_id)
                   return _continue_perhaps(source)
-                else
-                  // SLF TODO: avoid this update until after parse & run?
-                  s.last_message_id = msg_id
-                  // Pony obj & ptr magic, no need to explicitly update map
                 end
 
                 if cwm.Eos.is_set(m.flags) then
@@ -295,7 +286,9 @@ class ConnectorSourceNotify[In: Any val]
                   try _stream_map.remove(stream_id)? else Fail() end
                 end
 
-                if not cwm.Boundary.is_set(m.flags) then
+                if cwm.Boundary.is_set(m.flags) then
+                  None
+                else
                   try
                     let bytes = match (m.message as cwm.MessageBytes)
                     | let str: String      => str.array()
