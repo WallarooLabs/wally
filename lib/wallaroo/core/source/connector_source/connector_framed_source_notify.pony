@@ -558,6 +558,10 @@ class ConnectorSourceNotify[In: Any val]
         (_active_stream_registry as ConnectorSourceListener[In]).stream_update(stream_id, barrier_checkpoint_id,
             barrier_last_message_id, last_message_id, None)
       end
+        _send_reply(_connector_source, cwm.RestartMsg)
+        (_connector_source as ConnectorSource[In] ref).close()
+        // The .close() method ^^^ calls our closed() method which will
+        // twiddle all of the appropriate state variables.
     end
 
   fun ref initiate_barrier(checkpoint_id: CheckpointId) =>
