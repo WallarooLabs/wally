@@ -96,6 +96,7 @@ class ConnectorSourceNotify[In: Any val]
   var _program_name: String = ""
   var _instance_name: String = ""
   var _credits: U32 = _Credits.initial()
+  var _prep_for_rollback: Bool = false
 
   // Watermark !@ How do we handle this respecting per-connector-type policies
   var _watermark_ts: U64 = 0
@@ -151,6 +152,13 @@ class ConnectorSourceNotify[In: Any val]
     ingest_ts: U64,
     pipeline_time_spent: U64): Bool
   =>
+    if _prep_for_rollback then
+      // Anything that the connector sends us is ignored while we wait
+      // for the rollback to finish.  Tell the connector to restart later.
+      _send_restart()
+      return _continue_perhaps(source)
+    end
+
     _credits = _credits - 1
     if (_credits <= _Credits.low()) and (_fsm_state is _ProtoFsmStreaming) then
       // Our client's credits are running low and we haven't replenished
@@ -268,7 +276,6 @@ class ConnectorSourceNotify[In: Any val]
             then
               @printf[I32]("^*^* SLF TODO line %d\n".cstring(), __loc.line())
               // SLF TODO: what's appropriate?
-              // qqq ^^^
               None
             else
               try
@@ -457,6 +464,7 @@ class ConnectorSourceNotify[In: Any val]
     _session_tag = _session_tag + 1
     _stream_map.clear()
     _credits = _Credits.initial()
+    _prep_for_rollback = false
     source.expect(_header_size)
 
   fun ref closed(source: ConnectorSource[In] ref) =>
@@ -537,9 +545,10 @@ class ConnectorSourceNotify[In: Any val]
     w.done()
 
   fun ref prepare_for_rollback() =>
-    // SLF TODO
     if _session_active then
       _clear_stream_map()
+      _send_restart()
+      _prep_for_rollback = true
       @printf[I32]("^*^* %s.%s\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring())
     end
@@ -564,11 +573,9 @@ class ConnectorSourceNotify[In: Any val]
         (_active_stream_registry as ConnectorSourceListener[In]).stream_update(stream_id, barrier_checkpoint_id,
             barrier_last_message_id, last_message_id, None)
       end
-        _send_reply(_connector_source, cwm.RestartMsg)
-        (_connector_source as ConnectorSource[In] ref).close()
-        // The .close() method ^^^ calls our closed() method which will
-        // twiddle all of the appropriate state variables.
     end
+    _prep_for_rollback = false
+    _send_restart()
 
   fun ref initiate_barrier(checkpoint_id: CheckpointId) =>
     // SLF TODO
@@ -610,23 +617,9 @@ class ConnectorSourceNotify[In: Any val]
         // that exception is not caught.
         // _to_error_state(_connector_source, "BYEBYE")
 
-        _send_reply(_connector_source, cwm.RestartMsg)
-        try (_connector_source as ConnectorSource[In] ref).close() else Fail() end
-        // The .close() method ^^^ calls our closed() method which will
-        // twiddle all of the appropriate state variables.
+        _send_restart()
       end
     end
-
-  fun ref _send_ack() =>
-    let new_credits = _Credits.initial() - _credits
-    let cs: Array[(cwm.StreamId, cwm.PointOfRef)] trn =
-      recover trn cs.create() end
-
-    for (stream_id, s) in _stream_map.pairs() do
-      cs.push((stream_id, s.barrier_last_message_id))
-    end
-    _send_reply(_connector_source, cwm.AckMsg(new_credits, consume cs))
-    _credits = _credits + new_credits
 
   fun ref stream_notify_result(session_tag: USize, success: Bool,
     stream_id: U64, point_of_reference: U64, last_message_id: U64) =>
@@ -671,9 +664,9 @@ class ConnectorSourceNotify[In: Any val]
       __loc.type_name().cstring(), __loc.method_name().cstring(),
       session_tag, data.size())
 
-    let initial_credits: U32 = 20 // SLF TODO: configurable?
     let w: Writer = w.create()
-     _send_reply(_connector_source, cwm.OkMsg(initial_credits, data))
+    _credits = _Credits.initial()
+     _send_reply(_connector_source, cwm.OkMsg(_credits, data))
 
     _fsm_state = _ProtoFsmStreaming
 
@@ -684,6 +677,23 @@ class ConnectorSourceNotify[In: Any val]
     _fsm_state = _ProtoFsmError
     try (source as ConnectorSource[In] ref).close() else Fail() end
     _continue_perhaps2()
+
+  fun ref _send_ack() =>
+    let new_credits = _Credits.initial() - _credits
+    let cs: Array[(cwm.StreamId, cwm.PointOfRef)] trn =
+      recover trn cs.create() end
+
+    for (stream_id, s) in _stream_map.pairs() do
+      cs.push((stream_id, s.barrier_last_message_id))
+    end
+    _send_reply(_connector_source, cwm.AckMsg(new_credits, consume cs))
+    _credits = _credits + new_credits
+
+  fun ref _send_restart() =>
+    _send_reply(_connector_source, cwm.RestartMsg)
+    try (_connector_source as ConnectorSource[In] ref).close() else Fail() end
+    // The .close() method ^^^ calls our closed() method which will
+    // twiddle all of the appropriate state variables.
 
   fun _send_reply(source: (ConnectorSource[In] ref|None), msg: cwm.Message) =>
     match source
@@ -697,9 +707,6 @@ class ConnectorSourceNotify[In: Any val]
       w2.writev([b1])
 
       let b2 = recover trn w2.done() end
-      //for s in b2.values() do
-      //  @printf[I32]("b2: partial %s\n".cstring(), _print_array[U8](s).cstring())
-      //end
       s.writev_final(consume b2)
     else
       Fail()
