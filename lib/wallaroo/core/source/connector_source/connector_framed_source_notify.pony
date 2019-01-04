@@ -256,11 +256,13 @@ class ConnectorSourceNotify[In: Any val]
         end
 
         let stream_id = m.stream_id
+        var s = _StreamState(true, 0, 0, 0, 0) // Will be overwritten below
+
         let decoded = if not _stream_map.contains(stream_id) then
           return _to_error_state(source, "Bad stream_id " + stream_id.string())
         else
           try
-            let s = _stream_map(stream_id)?
+            s = _stream_map(stream_id)?
             @printf[I32]("^*^* STREAM pending %s base-p-o-r %llu last-msg-id %llu barrier-last-msg-id %llu barrier-ckpt-id %llu\n".cstring(), s.pending_query.string().cstring(), s.base_point_of_reference, s.last_message_id, s.barrier_last_message_id, s.barrier_checkpoint_id)
             if s.pending_query then
               return _to_error_state(source, "Duplicate stream_id " + stream_id.string())
@@ -311,7 +313,7 @@ class ConnectorSourceNotify[In: Any val]
                     ifdef debug then
                       Fail()
                     end
-                    return _continue_perhaps(source)
+                    return _to_error_state(source, "Unable to decode message")
                   end
                 end
 
@@ -323,13 +325,16 @@ class ConnectorSourceNotify[In: Any val]
               end
             end
           else
-            Fail()
+            return _to_error_state(source, "Unknown StreamId")
           end
         end
 
         ifdef "trace" then
           @printf[I32](("Msg decoded at " + _pipeline_name +
             " source\n").cstring())
+        end
+        if s.pending_query then // assert sanity
+          Fail()
         end
         let key_string =
           match m.key
@@ -345,7 +350,7 @@ class ConnectorSourceNotify[In: Any val]
             consume k'
           end
         _run_and_subsequent_activity(latest_metrics_id, ingest_ts,
-          pipeline_time_spent, key_string, source, decoded)
+          pipeline_time_spent, key_string, source, decoded, s, m.message_id)
 
       | let m: cwm.AckMsg =>
         ifdef "trace" then
@@ -375,7 +380,9 @@ class ConnectorSourceNotify[In: Any val]
     pipeline_time_spent: U64,
     key_string: String val,
     source: ConnectorSource[In] ref,
-    decoded: (In val| None val)): Bool
+    decoded: (In val| None val),
+    s: _StreamState,
+    message_id: (cwm.MessageId|None)): Bool
    =>
     let decode_end_ts = Time.nanos()
     _metrics_reporter.step_metric(_pipeline_name,
@@ -404,9 +411,14 @@ class ConnectorSourceNotify[In: Any val]
           msg_uid, None, decode_end_ts,
           latest_metrics_id', ingest_ts, _metrics_reporter)
       else
-        @printf[I32]("^*^* OOPS _runner.run()\n".cstring())
+        // decoded is None
         (true, ingest_ts)
       end
+
+    match message_id
+    | let m_id: U64 =>
+      s.last_message_id = m_id
+    end
 
     if is_finished then
       let end_ts = Time.nanos()
