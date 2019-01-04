@@ -93,7 +93,7 @@ class val ConnectorSourceConfig[In: Any val] is SourceConfig
     _worker_source_config = WorkerConnectorSourceConfig(source_name, _host,
       _service)
 
-  new val from_options(handler': FramedSourceHandler[In] val,
+  new val from_options(foo: Bool, handler': FramedSourceHandler[In] val,
     opts: ConnectorSourceConfigOptions, parallelism': USize = 10)
   =>
     handler = handler'

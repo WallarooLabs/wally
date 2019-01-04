@@ -28,7 +28,10 @@ def application_setup(args):
         "celsius_feed",
         encoder=encode_feed,
         decoder=decode_feed,
-        port=7100)
+        port=7100,
+        cookie="Dragons Love Tacos!",
+        max_credits=10,
+        refill_credits=8)
     fahrenheit_conversion = wallaroo.experimental.SinkConnectorConfig(
         "fahrenheit_conversion",
         encoder=encode_conversion,
