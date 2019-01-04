@@ -318,7 +318,7 @@ class ConnectorSourceNotify[In: Any val]
                   end
                 end
 
-                // SLF TODO:
+                // TODO:
                 // 6. What did I forget?  See received_old_school() for hints:
                 //    it isn't perfect but it "works" at demo quality.
               else
@@ -490,12 +490,12 @@ class ConnectorSourceNotify[In: Any val]
   fun ref throttled(source: ConnectorSource[In] ref) =>
     @printf[I32]("%s.throttled: %s Experiencing backpressure!\n".cstring(),
       __loc.type_name().cstring(), _pipeline_name.cstring())
-    Backpressure.apply(_auth) // SLF TODO: appropriate?
+    Backpressure.apply(_auth) // TODO: appropriate?
 
   fun ref unthrottled(source: ConnectorSource[In] ref) =>
     @printf[I32]("%s.unthrottled: %s Releasing backpressure!\n".cstring(),
       __loc.type_name().cstring(), _pipeline_name.cstring())
-    Backpressure.release(_auth) // SLF TODO: appropriate?
+    Backpressure.release(_auth) // TODO: appropriate?
 
   fun ref connecting(conn: ConnectorSource[In] ref, count: U32) =>
     """
