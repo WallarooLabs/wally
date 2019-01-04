@@ -157,6 +157,7 @@ class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, BaseConn
         self.out_buffer = []
         self.reading_header = True
         self.set_terminator(4) # first frame header
+        self.error = None
 
         # Thread details
         threading.Thread.__init__(self)
@@ -214,7 +215,7 @@ class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, BaseConn
         elif isinstance(msg, cwm.Ack):
             self._handle_ack(msg)
         elif isinstance(msg, cwm.Restart):
-            self.handle_restart(msg)
+            self.handle_restart()
         # messages that should only go connector->wallaroo
         # Notify, Hello, Message
         elif isinstance(msg, (cwm.Hello, cwm.Message, cwm.Notify)):
@@ -265,7 +266,7 @@ class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, BaseConn
             new = Stream(stream_id, stream_name, point_of_ref, is_open)
         else:
             if stream_name is not None:
-                if old.name != steam_name:
+                if old.name != stream_name:
                     # stream collision... throw error and close connection
                     raise ConnectorError("Got wrong stream name for "
                                          "stream. Expected {} but got {}."
@@ -308,7 +309,10 @@ class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, BaseConn
 
     def write(self, msg):
         if not self.is_alive():
-            raise ConnectorError("Can't write to a closed conection")
+            if self.error:
+                raise self.error
+            else:
+                raise ConnectorError("Can't write to a closed conection")
         if (isinstance(msg, (cwm.Error, cwm.Notify)) or
             (msg.stream_id in self._streams and
             self._streams[msg.stream_id].is_open)):
@@ -421,11 +425,25 @@ class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, BaseConn
         pass
 
     def handle_restart(self):
+        # TODO:
+        # 1. close the connection
+        # 2. start new handshake
+        # 3. notify all current streams
+        #    cannot assume that any messages sent with message_id's larger
+        #    than those last acked (e.g. last point_of_ref in self._streams)
+        #    have been processed.
+        # TODO: should we reset streams to last acked point, or wait for the
+        #       worker to respond to the notify acks? Or at least to the `Ok`?
+        #       What if once reconnected, not all streams in self._streams`
+        #       show up in the Ok message?
+        print("Got RESTART... now what?")
+        raise ProtocolError("Don't know what to do with restart!")
         pass
 
     def handle_error(self):
         """
         Default error handler: print a normal error traceback to sys.stderr
+        and close the connection.
 
         Users may override this with custom handlers
 
@@ -442,6 +460,9 @@ class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, BaseConn
         """
         _type, _value, _traceback = sys.exc_info()
         traceback.print_exception(_type, _value, _traceback)
+        print("ERROR: Closing the connection after encountering an error")
+        self.error = _value
+        self.close()
 
 
 class SinkConnector(object):

@@ -54,6 +54,7 @@ class AsyncServer(asynchat.async_chat, object):
         msg = cwm.Frame.decode(frame)
         print("got msg: {}".format(msg))
         # Hello, Ok, Error, Notify, NotifyAck, Message, Ack, Restart
+        self.count = 0
         if isinstance(msg, cwm.Hello):
             # respond with an ok or an error
             ok = cwm.Ok(100, [])
@@ -95,7 +96,9 @@ class AsyncServer(asynchat.async_chat, object):
                 acks = [
                     (sid, por) for sid, _, por in self._streams.values()])
             self.write(ack)
-
+        if self.received_count % 501 == 0:
+            # send a restart every 501 messages
+            self.write(cwm.Restart())
 
     def write(self, msg):
         print("write {}".format(msg))
