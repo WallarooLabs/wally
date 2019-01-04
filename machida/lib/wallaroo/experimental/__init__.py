@@ -56,15 +56,19 @@ def stream_message_encoder(func):
 
 
 class SourceConnectorConfig(object):
-    def __init__(self, name, encoder, decoder, port, host='127.0.0.1'):
+    def __init__(self, name, encoder, decoder, port, cookie,
+                 max_credits, refill_credits, host='127.0.0.1'):
         self._name = name
-        self._host = host
-        self._port = port
         self._encoder = encoder
         self._decoder = decoder
+        self._port = port
+        self._cookie = cookie
+        self._max_credits = max_credits
+        self._refill_credits = refill_credits
+        self._host = host
 
     def to_tuple(self):
-        return ("source_connector", self._name, self._host, str(self._port), self._encoder, self._decoder)
+        return ("source_connector", self._name, self._host, str(self._port), self._encoder, self._decoder, self._cookie, self._max_credits, self._refill_credits)
 
 
 class SinkConnectorConfig(object):
@@ -91,12 +95,14 @@ class BaseConnector(object):
                     source = step[2]
         if source is None:
             raise RuntimeError("Unable to find a source connector with the name " + params.connector_name)
-        (_, _name, host, port, encoder, _decoder) = source
+        (_, _name, host, port, encoder, _decoder, cookie, max_credits, refill_credits) = source
         self.params = params
         self._encoder = encoder
         self._host = host
         self._port = port
-
+        self._cookie = cookie
+        self._max_credits = max_credits
+        self._refill_credits = refill_credits
 
 class SourceConnector(BaseConnector):
     def __init__(self, args=None, required_params=['host', 'port'],
