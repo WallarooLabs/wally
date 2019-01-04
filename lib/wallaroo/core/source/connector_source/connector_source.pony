@@ -523,8 +523,8 @@ actor ConnectorSource[In: Any val] is Source
     for (id, consumer) in _outputs.pairs() do
       outputs_to_remove(id) = consumer
     end
-    for (id, consumer) in outputs_to_remove.pairs() do
-      _unregister_output(id, consumer)
+    for (id', consumer') in outputs_to_remove.pairs() do
+      _unregister_output(id', consumer')
     end
 
   be dispose_with_promise(promise: Promise[None]) =>
@@ -576,7 +576,6 @@ actor ConnectorSource[In: Any val] is Source
   be update_worker_data_service(worker: WorkerName,
     host: String, service: String)
   =>
-    @printf[I32]("SLF: ConnectorSource: update_worker_data_service: %s -> %s %s\n".cstring(), worker.cstring(), host.cstring(), service.cstring())
     try
       let b = _outgoing_boundaries(worker)?
       b.update_worker_data_service(worker, host, service)
@@ -626,24 +625,11 @@ actor ConnectorSource[In: Any val] is Source
     match token
     | let sbt: CheckpointBarrierToken =>
       _notify.barrier_complete(sbt.id)
-    | let srt: CheckpointRollbackBarrierToken =>
-      if not _muted then
-        @printf[I32]("^*^* %s.%s not muted when %s\n".cstring(),
-          __loc.type_name().cstring(), __loc.method_name().cstring(),
-          token.string().cstring())
-      end
-      None // SLF TODO
-    | let srt: CheckpointRollbackResumeBarrierToken =>
-      if not _muted then
-        @printf[I32]("^*^* %s.%s not muted when %s\n".cstring(),
-          __loc.type_name().cstring(), __loc.method_name().cstring(),
-          token.string().cstring())
-      end
-      None // SLF TODO
     else
-      @printf[I32]("^*^* %s.%s other token %s\n".cstring(),
-        __loc.type_name().cstring(), __loc.method_name().cstring(), token.string().cstring())
-      Fail()
+      @printf[I32]("^*^* %s.%s when %s\n".cstring(),
+        __loc.type_name().cstring(), __loc.method_name().cstring(),
+        token.string().cstring())
+      Fail() // TODO does this happen in practice?
     end
     None
 
@@ -651,10 +637,6 @@ actor ConnectorSource[In: Any val] is Source
   // CHECKPOINTS
   //////////////
   fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
-    """
-    SLF TODO: .....
-    ConnectorSources don't currently write out any data as part of the checkpoint.
-    """
     _next_checkpoint_id = checkpoint_id + 1
     let state = _notify.create_checkpoint_state()
     _event_log.checkpoint_state(_source_id, checkpoint_id, state)
@@ -668,10 +650,6 @@ actor ConnectorSource[In: Any val] is Source
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
   =>
-    """
-    SLF TODO: .....
-    There is nothing for a ConnectorSource to rollback to.
-    """
     let p: String ref = p.create()
     match payload
     | let ss: String =>
@@ -1027,7 +1005,6 @@ actor ConnectorSource[In: Any val] is Source
 
   be stream_notify_result(session_tag: USize, success: Bool,
     stream_id: U64, point_of_reference: U64, last_message_id: U64) =>
-    // SLF TODO
     @printf[I32]("^*^* %s.%s(%s, %lu, %lu, %lu)\n".cstring(),
       __loc.type_name().cstring(), __loc.method_name().cstring(),
       success.string().cstring(), stream_id, point_of_reference,
