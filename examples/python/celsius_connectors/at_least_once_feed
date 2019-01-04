@@ -184,6 +184,12 @@ class MultiFileReaderConnector(AtLeastOnceSourceConnector, BaseIter):
 
     # Make this class an iterable:
     def __next__(self):
+        if self.error:
+            # TODO: Maybe we should raise StopIteration here and ask the user
+            # to check `self.error` before choosing how to procede?
+            raise ConnectorError("Connector connection has been closed after "
+                "receiving an error message from Wallaroo: {}"
+                .format(self.error.message))
         if len(self.keys) > 0:
             try:
                 # get next position
