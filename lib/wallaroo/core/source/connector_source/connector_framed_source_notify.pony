@@ -275,55 +275,47 @@ class ConnectorSourceNotify[In: Any val]
             let message' = if m.message is None then "<None>" else _print_array[U8](m.message as cwm.MessageBytes) end
             @printf[I32]("^*^* MSG: stream-id %llu flags %u msg_id %s event_time %s key %s message %s\n".cstring(), stream_id, m.flags, msg_id'.cstring(), event_time'.cstring(), key'.cstring(), message'.cstring())
 
-            if cwm.Ephemeral.is_set(m.flags) or
-              cwm.UnstableReference.is_set(m.flags)
-            then
-              @printf[I32]("^*^* SLF TODO line %d\n".cstring(), __loc.line())
-              // SLF TODO: what's appropriate?
-              None
-            else
-              try
-                let msg_id = m.message_id as cwm.MessageId
+            try
+              let msg_id = m.message_id as cwm.MessageId
 
-                if msg_id <= s.last_message_id then
-                  @printf[I32]("^*^* MessageMsg: stale id in stream-id %llu flags %u msg_id %llu <= last_message_id %llu\n".cstring(), stream_id, m.flags, m.message_id as cwm.MessageId, s.last_message_id)
-                  return _continue_perhaps(source)
-                end
-
-                if cwm.Eos.is_set(m.flags) then
-                  (_active_stream_registry as ConnectorSourceListener[In]).stream_update(
-                    stream_id, s.barrier_checkpoint_id, s.barrier_last_message_id,
-                    msg_id, None)
-                  try _stream_map.remove(stream_id)? else Fail() end
-                end
-
-                if cwm.Boundary.is_set(m.flags) then
-                  None
-                else
-                  try
-                    let bytes = match (m.message as cwm.MessageBytes)
-                    | let str: String      => str.array()
-                    | let b: Array[U8] val => b
-                    end
-                    _handler.decode(bytes)?
-                  else
-                    if m.message is None then
-                      return _to_error_state(source, "No message bytes and BOUNDARY not set")
-                    end
-                    @printf[I32](("Unable to decode message at " + _pipeline_name + " source\n").cstring())
-                    ifdef debug then
-                      Fail()
-                    end
-                    return _to_error_state(source, "Unable to decode message")
-                  end
-                end
-
-                // TODO:
-                // 6. What did I forget?  See received_old_school() for hints:
-                //    it isn't perfect but it "works" at demo quality.
-              else
-                Fail()
+              if msg_id <= s.last_message_id then
+                @printf[I32]("^*^* MessageMsg: stale id in stream-id %llu flags %u msg_id %llu <= last_message_id %llu\n".cstring(), stream_id, m.flags, m.message_id as cwm.MessageId, s.last_message_id)
+                return _continue_perhaps(source)
               end
+
+              if cwm.Eos.is_set(m.flags) then
+                (_active_stream_registry as ConnectorSourceListener[In]).stream_update(
+                  stream_id, s.barrier_checkpoint_id, s.barrier_last_message_id,
+                  msg_id, None)
+                try _stream_map.remove(stream_id)? else Fail() end
+              end
+
+              if cwm.Boundary.is_set(m.flags) then
+                None
+              else
+                try
+                  let bytes = match (m.message as cwm.MessageBytes)
+                  | let str: String      => str.array()
+                  | let b: Array[U8] val => b
+                  end
+                  _handler.decode(bytes)?
+                else
+                  if m.message is None then
+                    return _to_error_state(source, "No message bytes and BOUNDARY not set")
+                  end
+                  @printf[I32](("Unable to decode message at " + _pipeline_name + " source\n").cstring())
+                  ifdef debug then
+                    Fail()
+                  end
+                  return _to_error_state(source, "Unable to decode message")
+                end
+              end
+
+              // TODO:
+              // 6. What did I forget?  See received_old_school() for hints:
+              //    it isn't perfect but it "works" at demo quality.
+            else
+              Fail()
             end
           else
             return _to_error_state(source, "Unknown StreamId")
@@ -351,7 +343,8 @@ class ConnectorSourceNotify[In: Any val]
             consume k'
           end
         _run_and_subsequent_activity(latest_metrics_id, ingest_ts,
-          pipeline_time_spent, key_string, source, decoded, s, m.message_id)
+          pipeline_time_spent, key_string, source, decoded, s,
+          m.message_id, m.flags)
 
       | let m: cwm.AckMsg =>
         ifdef "trace" then
@@ -383,7 +376,8 @@ class ConnectorSourceNotify[In: Any val]
     source: ConnectorSource[In] ref,
     decoded: (In val| None val),
     s: _StreamState,
-    message_id: (cwm.MessageId|None)): Bool
+    message_id: (cwm.MessageId|None),
+    flags: cwm.Flags): Bool
    =>
     let decode_end_ts = Time.nanos()
     _metrics_reporter.step_metric(_pipeline_name,
@@ -418,7 +412,10 @@ class ConnectorSourceNotify[In: Any val]
 
     match message_id
     | let m_id: U64 =>
-      s.last_message_id = m_id
+      if not (cwm.Ephemeral.is_set(flags) or
+        cwm.UnstableReference.is_set(flags)) then
+        s.last_message_id = m_id
+      end
     end
 
     if is_finished then
