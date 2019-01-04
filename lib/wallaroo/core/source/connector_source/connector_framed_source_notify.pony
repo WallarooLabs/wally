@@ -570,8 +570,6 @@ class ConnectorSourceNotify[In: Any val]
       __loc.type_name().cstring(), __loc.method_name().cstring(),
       checkpoint_id)
 
-    // SLF TODO: invalidate/clear/destroy items in active stream registry
-    // that we inserted into the registry.
     let r = Reader
     r.append(payload)
     try
@@ -590,7 +588,6 @@ class ConnectorSourceNotify[In: Any val]
     _send_restart()
 
   fun ref initiate_barrier(checkpoint_id: CheckpointId) =>
-    // SLF TODO
     if _session_active then
       for s in _stream_map.values() do
         s.barrier_checkpoint_id = checkpoint_id
@@ -602,7 +599,6 @@ class ConnectorSourceNotify[In: Any val]
     end
 
   fun ref barrier_complete(checkpoint_id: CheckpointId) =>
-    // SLF TODO
     if _session_active then
       for (stream_id, s) in _stream_map.pairs() do
         @printf[I32]("^*^* %s.%s(%lu) _barrier_last_message_id = %lu, _last_message_id = %lu\n".cstring(),
@@ -623,6 +619,7 @@ class ConnectorSourceNotify[In: Any val]
         _send_ack()
       end
 
+      // SLF TODO: this if clause is for debugging purposes only
       if (checkpoint_id % 5) == 4 then
         // SLF TODO: the Python side of the world raises an exception when
         // it gets an ErrorMsg, and the rest of the code is fragile when
