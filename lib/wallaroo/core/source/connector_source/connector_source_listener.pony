@@ -86,10 +86,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   let _available_sources: Array[ConnectorSource[In]] = _available_sources.create()
 
   // Active Stream Registry
-  // SLF TODO: bogus map to bool isn't useful, yet
-  // SLF TODO: log all map mutations to resilience dir
-  // SLF TODO: add DOS server mirroring of resilience dir writes
-  // SLF TODO: slurp in map state from resilience dir
   let _active_streams: Map[U64, (String,Any tag,U64,U64)] =
     _active_streams.create()
 
@@ -149,7 +145,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       + host + ":" + service + "\n").cstring())
 
     for i in Range(0, _limit) do
-      //let source_id = _routing_id_gen() // SLF TODO: HACK JOHN SAID SO
       let source_id = _hack_counter
       _hack_counter = _hack_counter + 1
       let notify = ConnectorSourceNotify[In](source_id, _pipeline_name,
@@ -367,13 +362,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     stream_id: U64, stream_name: String, point_of_reference: U64,
     connector_source: ConnectorSource[In] tag)
   =>
-    // TODO pass in GUID instead?  Hmmmm, the implementation of the source
-    // connector limits the total # of TCP connections to some limit, and
-    // all of the connector_source actors and connector_framed_source_notify
-    // objects are allocated ahead of time ... so, using their address
-    // should be unique enough?
-
-    // SLF: TODO
     @printf[I32]("^*^* %s.%s(%lu, %lu, ...)\n".cstring(),
       __loc.type_name().cstring(), __loc.method_name().cstring(),
       stream_id, point_of_reference)
@@ -389,9 +377,14 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
         end
 
         if tag_or_none is None then
-          // SLF TODO: what if the connector's PoR doesn't agree with our
-          // last recorded PoR?
-          // SLF TODO: should we also be saving checkpoint_id?
+          if point_of_reference != p_o_r then
+            // TODO any other action needed?
+            ifdef "trace" then
+              @printf[I32](("stream_notify: stream-id %d stream %s " +
+                "point_of_reference %lu != recorded p_o_r %lu").cstring(),
+              stream_id, stream_name.cstring(), point_of_reference, p_o_r)
+            end
+          end
           _active_streams(stream_id) =
             (stream_name, connector_source, p_o_r, last_message_id)
           connector_source.stream_notify_result(session_tag, true,
@@ -413,7 +406,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       @printf[I32]("^*^* %s.%s new stream_id %lu @ p-o-r %lu\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring(),
         stream_id, point_of_reference)
-      // SLF TODO: should we also be saving checkpoint_id?
       _active_streams(stream_id) =
         (stream_name, connector_source, point_of_reference, point_of_reference)
       connector_source.stream_notify_result(session_tag, true,
@@ -424,37 +416,31 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     point_of_reference: U64, last_message_id: U64,
     connector_source: (ConnectorSource[In] tag|None))
   =>
-    // SLF: TODO
-    @printf[I32]("^*^* %s.%s(stmid %lu, chkp %lu, p-o-r %lu, l-msgid %lu, conn %s)\n".cstring(),
-      __loc.type_name().cstring(), __loc.method_name().cstring(),
-      stream_id, checkpoint_id, point_of_reference, last_message_id,
-      (if connector_source is None then
-        "None"
+    let update = if connector_source is None then
+        true
       else
-        "not None"
-      end).cstring())
-
-    if connector_source is None then
-      None // fall through
-    else
-      try
-        if _active_streams(stream_id)?._2 is None then
-          return // session is not active
+        try
+          if _active_streams(stream_id)?._2 is None then
+            false
+          else
+            true
+          end
         else
-          None // fall through
+          false
         end
-      else
-        return // stream_id not found
       end
+    ifdef "trace" then
+      @printf[I32]("^*^* %s.%s(stmid %lu, chkp %lu, p-o-r %lu, l-msgid %lu, conn %s) update %s\n".cstring(),
+        __loc.type_name().cstring(), __loc.method_name().cstring(),
+        stream_id, checkpoint_id, point_of_reference, last_message_id,
+        (if connector_source is None then
+          "None"
+        else
+          "not None"
+        end).cstring(), update.string().cstring())
     end
-    @printf[I32]("^*^* %s.%s(stmid %lu, chkp %lu, p-o-r %lu, l-msgid %lu, conn %s) UPDATED\n".cstring(),
-      __loc.type_name().cstring(), __loc.method_name().cstring(),
-      stream_id, checkpoint_id, point_of_reference, last_message_id,
-      (if connector_source is None then
-        "None"
-      else
-        "not None"
-      end).cstring())
-    let stream_name = try _active_streams(stream_id)?._1 else Fail(); "" end
-    _active_streams(stream_id) =
-      (stream_name, connector_source, point_of_reference, last_message_id)
+    if update then
+      let stream_name = try _active_streams(stream_id)?._1 else Fail(); "" end
+      _active_streams(stream_id) =
+        (stream_name, connector_source, point_of_reference, last_message_id)
+    end
