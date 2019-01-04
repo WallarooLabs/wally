@@ -47,7 +47,8 @@ primitive ConnectorSourceConfigCLIParser
 
     for input in inputs.split(",").values() do
       let i = input.split(":")
-      opts.push(ConnectorSourceConfigOptions(i(0)?, i(1)?))
+      opts.push(ConnectorSourceConfigOptions(i(0)?, i(1)?, i(2)?,
+        i(3)?.u32()?, i(4)?.u32()?))
     end
 
     consume opts
@@ -55,36 +56,61 @@ primitive ConnectorSourceConfigCLIParser
 class val ConnectorSourceConfigOptions
   let host: String
   let service: String
+  let connector_cookie: String
+  let connector_max_credits: U32
+  let connector_refill_credits: U32
 
-  new val create(host': String, service': String) =>
+  new val create(host': String,
+    service': String,
+    connector_cookie': String = "default_cookie",
+    connector_max_credits': U32 = 4_000,
+    connector_refill_credits': U32 = 3_000) =>
     host = host'
     service = service'
+    connector_cookie = connector_cookie'
+    connector_max_credits = connector_max_credits'
+    connector_refill_credits = connector_refill_credits'
 
 class val ConnectorSourceConfig[In: Any val]
   let _handler: FramedSourceHandler[In] val
   let _host: String
   let _service: String
   let _parallelism: USize
+  let _connector_cookie: String
+  let _connector_max_credits: U32
+  let _connector_refill_credits: U32
 
-  new val create(handler': FramedSourceHandler[In] val, host': String,
-    service': String, parallelism': USize = 10)
+  new val create(handler': FramedSourceHandler[In] val,
+    host': String,
+    service': String,
+    connector_cookie': String,
+    connector_max_credits': U32,
+    connector_refill_credits': U32,
+    parallelism': USize = 10)
   =>
     _handler = handler'
     _host = host'
     _service = service'
     _parallelism = parallelism'
+    _connector_cookie = connector_cookie'
+    _connector_max_credits = connector_max_credits'
+    _connector_refill_credits = connector_refill_credits'
 
-  new val from_options(handler': FramedSourceHandler[In] val,
+  new val from_options(foo: Bool, handler': FramedSourceHandler[In] val,
     opts: ConnectorSourceConfigOptions, parallelism': USize = 10)
   =>
     _handler = handler'
     _host = opts.host
     _service = opts.service
     _parallelism = parallelism'
+    _connector_cookie = opts.connector_cookie
+    _connector_max_credits = opts.connector_max_credits
+    _connector_refill_credits = opts.connector_refill_credits
 
   fun source_listener_builder_builder(): ConnectorSourceListenerBuilderBuilder[In] =>
     ConnectorSourceListenerBuilderBuilder[In](_host, _service, _parallelism,
-      _handler)
+      _handler, _connector_cookie,
+      _connector_max_credits, _connector_refill_credits)
 
   fun default_partitioner_builder(): PartitionerBuilder =>
     PassthroughPartitionerBuilder

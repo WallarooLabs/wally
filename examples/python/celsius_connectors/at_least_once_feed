@@ -228,7 +228,8 @@ client = MultiFileReaderConnector(
         optional_params=['timeout', 'delay'])
 
 # Open a connection with a hello message
-hello = cwm.Hello("0.0.1", "1234", "celsius at least once", "instance")
+hello = cwm.Hello("0.0.1", "Dragons Love Tacos!",
+                  "celsius at least once", "instance")
 client.initiate_handshake(hello)
 client.start()
 
