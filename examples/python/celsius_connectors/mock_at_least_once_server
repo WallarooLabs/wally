@@ -50,9 +50,7 @@ class AsyncServer(asynchat.async_chat, object):
 
     def _handle_frame(self, frame):
         self.received_count += 1
-        print("Received {!r}".format(frame))
         msg = cwm.Frame.decode(frame)
-        print("got msg: {}".format(msg))
         # Hello, Ok, Error, Notify, NotifyAck, Message, Ack, Restart
         self.count = 0
         if isinstance(msg, cwm.Hello):
@@ -72,11 +70,11 @@ class AsyncServer(asynchat.async_chat, object):
             self.write(notify_ack)
         elif isinstance(msg, cwm.Message):
             # no response, just print
-            print("received message: {}".format(msg))
             self.handle_message(msg)
         elif isinstance(msg, cwm.Error):
             # Got error message from worker
             # close the connection and pass msg to the error handler
+            print("Received an error message. closing the connection")
             self.close()
             raise Exception(msg.message)
         else:
@@ -96,9 +94,9 @@ class AsyncServer(asynchat.async_chat, object):
                 acks = [
                     (sid, por) for sid, _, por in self._streams.values()])
             self.write(ack)
-        if self.received_count % 501 == 0:
-            # send a restart every 501 messages
-            self.write(cwm.Restart())
+        #if self.received_count % 501 == 0:
+        #    # send a restart every 501 messages
+        #    self.write(cwm.Restart())
 
     def write(self, msg):
         print("write {}".format(msg))
@@ -111,6 +109,9 @@ class AsyncServer(asynchat.async_chat, object):
 
     def close(self):
         print("Closing the connection")
+        print("last received id by stream:\n\t{}".format(
+            "\n\t".join("{}, {}: {}".format(sid, sn, mid)
+                      for sid, sn, mid in self._streams.values())))
         super(AsyncServer, self).close()
 
 
@@ -132,4 +133,4 @@ class EchoServer(asyncore.dispatcher):
 server = EchoServer('127.0.0.1', 7100)
 print("server: ", server)
 print("asyncore file: ", asyncore.__file__)
-asyncore.loop()
+asyncore.loop(timeout=0.0001)
