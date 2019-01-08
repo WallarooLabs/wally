@@ -276,6 +276,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
                            is_open = msg.notify_success)
 
     def _handle_ack(self, msg):
+        print("handle_ack: {}".format(msg))
         self.credits += msg.credits
         for (stream_id, point_of_ref) in msg.acks:
             self.update_stream(stream_id,
@@ -382,6 +383,8 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
                     self._write(data)
                     # use up 1 credit
                     self.credits -= 1
+                else:
+                    raise
             except:
                 raise ProtocolError("Message cannot be sent. Stream ({}) is "
                                     "not in an open state. Use notify() to "
@@ -460,6 +463,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
         event_time must be either a datetime or a float of seconds since
         epoch (it may be negtive for dates before 1970-1-1)
         """
+        print("sending EOS: {} {}".format(stream_id, key))
         flags = cwm.Message.Eos | cwm.Message.Ephemeral
         if event_time is not None:
             flags |= cwm.Message.EventTime
@@ -486,6 +490,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
             event_time = ts,
             key = en_key,
             message = None)
+        print("EOS msg: {}".format(msg))
         self.write(msg)
 
     ########################
