@@ -144,9 +144,11 @@ class MultiFileReaderConnector(AtLeastOnceSourceConnector, BaseIter):
         self._idx = -1
         self.joining = set()
         self.open = set()
+        self.closed = set()
         self._added_source = False
 
     def stream_updated(self, stream):
+        print("stream_updated: {}".format(stream))
         super(MultiFileReaderConnector, self).stream_updated(stream)
         source = self.sources.pop(stream.id, None)
         # stream already in sources
@@ -154,6 +156,7 @@ class MultiFileReaderConnector(AtLeastOnceSourceConnector, BaseIter):
             # if stream is closed, close the file, then remove the source
             if not stream.is_open:
                 self.open.remove(stream.id)
+                self.closed.add(stream.id)
                 source.close()
                 # don't put it back in sources...
             # otherwise... check if you need to reset its position
@@ -167,7 +170,12 @@ class MultiFileReaderConnector(AtLeastOnceSourceConnector, BaseIter):
                 self.sources[stream.id] = source
                 self.open.add(stream.id)
         # stream is new to us
+        elif stream.id in self.closed:
+            print("Stream {} has been closed already.".format(stream.id))
+            pass
         else:
+            print("stream: {}".format(stream))
+            print("closed: {}".format(self.closed))
             if stream.is_open:
                 # This is an error for MultiFileReaderConnector
                 raise ConnectorError("Can't open a new source from a stream. "
@@ -194,6 +202,11 @@ class MultiFileReaderConnector(AtLeastOnceSourceConnector, BaseIter):
 
     # Make this class an iterable:
     def __next__(self):
+        # TODO (Nisan): decomplicate this!
+        # Users should not implement this iterator
+        # TOOD: sources should not be closed until a server ack
+        #       with a closed stream?
+        # 
         if len(self.keys) > 0:
             try:
                 # get next position
@@ -219,6 +232,7 @@ class MultiFileReaderConnector(AtLeastOnceSourceConnector, BaseIter):
                 # if the source threw a StopIteration, send an EOS message
                 # for it, then close it and remove it from sources
                 self.end_of_stream(stream_id = key)
+                self.closed.add(key)
                 source.close()
                 del self.sources[key]
                 self.keys.pop(self._idx)
@@ -235,18 +249,13 @@ class MultiFileReaderConnector(AtLeastOnceSourceConnector, BaseIter):
 client = MultiFileReaderConnector(
         "0.0.1", "monster", "celsius at least once", "instance",
         args=None,
-        required_params=['host', 'port', 'filenames'],
-        optional_params=['delay'])
+        required_params=['host', 'port', 'filenames'])
 
 # Open a connection with a hello message
 client.connect()
 
 params = client.params
 filenames = params.filenames.split(',')
-if params.delay:
-    delay = float(params.delay)
-else:
-    delay = 0.001
 
 
 # Open FramedFileReader
