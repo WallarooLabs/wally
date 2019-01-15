@@ -16,6 +16,8 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
+use "wallaroo_labs/time"
+
 interface SourceHandler[In: Any val]
   fun decode(data: Array[U8] val): In ?
 
@@ -23,3 +25,5 @@ interface FramedSourceHandler[In: Any val]
   fun header_length(): USize
   fun payload_length(data: Array[U8] iso): USize ?
   fun decode(data: Array[U8] val): In ?
+  fun event_time_ns(event: In) : U64 =>
+    WallClock.nanoseconds()

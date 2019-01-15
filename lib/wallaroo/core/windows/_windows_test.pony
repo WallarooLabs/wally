@@ -25,6 +25,38 @@ use "wallaroo/core/state"
 use "wallaroo/core/topology"
 use "wallaroo_labs/time"
 
+class iso _TestTumblingWindowsTimeoutTrigger is UnitTest
+  fun name(): String => "windows/_TestTumblingWindowsTimeoutTrigger"
+
+  fun apply(h: TestHelper) ? =>
+    // given
+    let range: U64 = Seconds(1)
+    let slide = range
+    let delay: U64 = 0
+    let upstream_id: U128 = 1000
+    let now: U64 = 1000
+    let w = StageWatermarks
+    let tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+      delay)
+    let watermark: U64 = Seconds(111)
+    tw(111, watermark, watermark)
+    w.receive_watermark(upstream_id, watermark, now)
+
+    // when
+    let res = tw.on_timeout(U64.max_value(), w.output_watermark(), w)
+
+    // then
+    match res
+    |(let arr: Array[USize] val, let n: U64) =>
+       h.assert_eq[USize](arr.size(), 2)
+       h.assert_eq[USize](arr(0)?, 0)
+       h.assert_eq[USize](arr(1)?, 111)
+       h.assert_true(n != U64.max_value())
+       h.assert_true(w.output_watermark() != U64.max_value())
+    else
+      h.fail("boo")
+    end
+
 
 class iso _TestTumblingWindows is UnitTest
   fun name(): String => "windows/_TestTumblingWindows"

@@ -34,6 +34,7 @@ actor Main is TestList
   fun tag tests(test: PonyTest) =>
     // Windows
     test(_TestTumblingWindows)
+    test(_TestTumblingWindowsTimeoutTrigger)
     test(_TestSlidingWindows)
     test(_TestSlidingWindowsNoDelay)
     test(_TestSlidingWindowsOutOfOrder)
@@ -49,4 +50,5 @@ actor Main is TestList
     test(_TestExpandSlidingWindow)
 
     // // Watermarks
+    test(_TestTimeoutTriggerWatermark)
     test(_TestStageWatermarks)

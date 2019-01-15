@@ -25,6 +25,26 @@ use "wallaroo/core/topology"
 use "wallaroo_labs/time"
 
 
+class iso _TestTimeoutTriggerWatermark is UnitTest
+  fun name(): String => "watermarks/_TestTimeoutTriggerWatermark"
+
+  fun apply(h: TestHelper) =>
+    // given
+    let u1: RoutingId = 1
+    let u1w = Seconds(1)
+    let last_heard_threshold = Seconds(10)
+    let w = StageWatermarks(last_heard_threshold)
+    let now = Seconds(2)
+
+    // when
+    let input_watermark = w.receive_watermark(u1, u1w, now)
+
+    // then
+    let eim = w.check_effective_input_watermark(now+Seconds(12))
+    h.assert_eq[U64](input_watermark, u1w)
+    h.assert_eq[U64](eim, U64.max_value())
+
+
 class iso _TestStageWatermarks is UnitTest
   fun name(): String => "watermarks/_TestStageWatermarks"
 

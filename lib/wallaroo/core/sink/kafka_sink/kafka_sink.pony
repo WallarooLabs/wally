@@ -34,6 +34,7 @@ use "wallaroo/ent/barrier"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
+use "wallaroo_labs/time"
 
 actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   // Steplike
@@ -163,11 +164,11 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
         error
       end
 
-      let end_ts = Time.nanos()
+      let end_ts = WallClock.nanoseconds()
       _metrics_reporter.step_metric(metric_name, "Kafka send time", metrics_id,
         send_ts, end_ts)
 
-      let final_ts = Time.nanos()
+      let final_ts = WallClock.nanoseconds()
       let time_spent = final_ts - worker_ingress_ts
 
       ifdef "detailed-metrics" then
@@ -293,7 +294,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   =>
     var my_latest_ts: U64 = latest_ts
     var my_metrics_id = ifdef "detailed-metrics" then
-      my_latest_ts = Time.nanos()
+      my_latest_ts = WallClock.nanoseconds()
       _metrics_reporter.step_metric(metric_name, "Before receive at sink",
         metrics_id, latest_ts, my_latest_ts)
         metrics_id + 1
@@ -308,7 +309,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
       (let encoded_value, let encoded_key, let part_id) =
         _encoder.encode[D](data, _wb)?
       my_metrics_id = ifdef "detailed-metrics" then
-          var old_ts = my_latest_ts = Time.nanos()
+          var old_ts = my_latest_ts = WallClock.nanoseconds()
           _metrics_reporter.step_metric(metric_name, "Sink encoding time",
             9998, old_ts, my_latest_ts)
           metrics_id + 1

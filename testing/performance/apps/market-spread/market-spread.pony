@@ -129,7 +129,7 @@ primitive CheckMarketData is StateComputation[
     | let order: FixOrderMessage val =>
       if state.should_reject_trades then
         let res = OrderResult(order, state.last_bid, state.last_offer,
-          Time.nanos())
+          WallClock.nanoseconds())
         res
       else
         None

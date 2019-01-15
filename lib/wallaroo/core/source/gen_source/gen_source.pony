@@ -48,6 +48,7 @@ use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
+use "wallaroo_labs/time"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
@@ -169,7 +170,8 @@ actor GenSource[V: Any val] is Source
 
   fun ref process_message() =>
     _metrics_reporter.pipeline_ingest(_pipeline_name, _source_name)
-    let ingest_ts = Time.nanos()
+    let ingest_ts = WallClock.nanoseconds()
+
     let pipeline_time_spent: U64 = 0
     var latest_metrics_id: U16 = 1
 
@@ -179,7 +181,7 @@ actor GenSource[V: Any val] is Source
       @printf[I32](("Rcvd msg at " + _pipeline_name + " source\n").cstring())
     end
 
-    let decode_end_ts = Time.nanos()
+    let decode_end_ts = WallClock.nanoseconds()
     _metrics_reporter.step_metric(_pipeline_name,
       "Decode Time in TCP Source", latest_metrics_id, ingest_ts,
       decode_end_ts)
@@ -196,7 +198,7 @@ actor GenSource[V: Any val] is Source
           _metrics_reporter)
 
       if is_finished then
-        let end_ts = Time.nanos()
+        let end_ts = WallClock.nanoseconds()
         let time_spent = end_ts - ingest_ts
 
         ifdef "detailed-metrics" then

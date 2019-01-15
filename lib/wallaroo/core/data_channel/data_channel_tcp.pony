@@ -297,7 +297,7 @@ class _DataReceiver is _DataReceiverWrapper
   fun ref decode_and_process(conn: DataChannel ref, data: Array[U8] val) =>
     // because we received this from another worker
     let ingest_ts = WallClock.nanoseconds()
-    let my_latest_ts = Time.nanos()
+    let my_latest_ts = ingest_ts
 
     match ChannelMsgDecoder(data, _auth)
     | let data_msg: DataMsg =>
