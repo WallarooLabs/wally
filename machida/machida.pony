@@ -420,7 +420,8 @@ class val PyAggregation is
   fun combine(acc1: PyState, acc2: PyState): PyState =>
     Machida.aggregation_combine(_aggregation, acc1.obj(), acc2.obj())
 
-  fun output(key: Key, acc: PyState): (PyData val | None) =>
+  fun output(key: Key, window_end_ts: U64, acc: PyState): (PyData val | None)
+  =>
     let data =
       Machida.aggregation_output(_aggregation, key.cstring(), acc.obj())
 

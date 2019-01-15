@@ -34,7 +34,7 @@ interface val Aggregation[In: Any val, Out: Any val, Acc: State ref] is
   fun combine(acc1: Acc, acc2: Acc): Acc
 
   // Create an output based on an accumulator when the window is triggered.
-  fun output(key: Key, acc: Acc): (Out | None)
+  fun output(key: Key, window_end_ts: U64, acc: Acc): (Out | None)
 
   fun name(): String
 

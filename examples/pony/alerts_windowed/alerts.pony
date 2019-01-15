@@ -136,7 +136,9 @@ primitive TotalAggregation is
     new_t.total = t1.total + t2.total
     new_t
 
-  fun output(user: Key, t: TransactionTotal): (Alert | None) =>
+  fun output(user: Key, window_end_ts: U64, t: TransactionTotal):
+    (Alert | None)
+  =>
     if t.total > 2000 then
       DepositAlert(user, t.total)
     elseif t.total < -2000 then

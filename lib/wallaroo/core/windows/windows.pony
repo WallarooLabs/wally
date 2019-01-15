@@ -165,7 +165,7 @@ class GlobalWindow[In: Any val, Out: Any val, Acc: State ref] is
   =>
     _agg.update(input, _acc)
     // We trigger a result per message
-    let res = _agg.output(_key, _acc)
+    let res = _agg.output(_key, event_ts, _acc)
     (res, watermark_ts)
 
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64,
@@ -386,7 +386,7 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
     _current_count = _current_count + 1
 
     if _current_count >= _count_trigger then
-      out = _trigger()
+      out = _trigger(event_ts)
     end
 
     (out, watermark_ts)
@@ -397,14 +397,14 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
     var out: (Out | None) = None
     var new_output_watermark_ts = output_watermark_ts
     if _current_count > 0 then
-      out = _trigger()
+      out = _trigger(new_output_watermark_ts)
       new_output_watermark_ts = input_watermark_ts
     end
     (out, new_output_watermark_ts)
 
-  fun ref _trigger(): (Out | None) =>
+  fun ref _trigger(output_watermark_ts: U64): (Out | None) =>
     var out: (Out | None) = None
-    out = _agg.output(_key, _acc)
+    out = _agg.output(_key, output_watermark_ts, _acc)
     _acc = _agg.initial_accumulator()
     _current_count = 0
     out
