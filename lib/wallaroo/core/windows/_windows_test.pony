@@ -1035,7 +1035,7 @@ class _Sum is Aggregation[USize, USize, _Total]
     let new_t = _Total
     new_t.v = acc1.v + acc2.v
     new_t
-  fun output(key: Key, acc: _Total): (USize | None) =>
+  fun output(key: Key, window_end_ts: U64, acc: _Total): (USize | None) =>
     acc.v
   fun name(): String => "_Sum"
 
@@ -1052,7 +1052,7 @@ primitive _Collect is Aggregation[USize, Array[USize] val, Collected]
       new_arr.push(m2)
     end
     new_arr
-  fun output(key: Key, acc: Collected): Array[USize] val =>
+  fun output(key: Key, window_end_ts: U64, acc: Collected): Array[USize] val =>
     let arr: Array[USize] iso = recover Array[USize] end
     for m in acc.values() do
       arr.push(m)

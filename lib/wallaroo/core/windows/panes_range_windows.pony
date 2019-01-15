@@ -183,8 +183,10 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     let outs: Array[Out] iso = recover Array[Out] end
     try
       while normalized_last_trigger_boundary >= latest_output_watermark_ts do
+        let next_earliest_ts = _earliest_ts()?
+        let next_window_end_ts = earliest_ts + _range
         (let out, latest_output_watermark_ts) =
-          _trigger_next(_panes_start_ts(_earliest_window_idx)?, 0)?
+          _trigger_next(next_earliest_ts, next_window_end_ts, 0)?
         match out
         | let o: Out => outs.push(o)
         end
@@ -203,7 +205,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
 
       if _should_trigger(earliest_ts, watermark_ts) then
         (let out, let output_watermark_ts) = _trigger_next(earliest_ts,
-          trigger_diff)?
+          window_end_ts, trigger_diff)?
         (out, output_watermark_ts, false)
       else
         (None, 0, true)
@@ -213,8 +215,8 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       (None, 0, true)
     end
 
-  fun ref _trigger_next(earliest_ts: U64, trigger_diff: U64):
-    ((Out | None), U64) ?
+  fun ref _trigger_next(earliest_ts: U64, window_end_ts: U64,
+    trigger_diff: U64): ((Out | None), U64) ?
   =>
     var running_acc = _identity_acc
     var pane_idx = _earliest_window_idx
@@ -226,7 +228,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       end
       pane_idx = (pane_idx + 1) % _panes.size()
     end
-    let out = _agg.output(_key, running_acc)
+    let out = _agg.output(_key, window_end_ts, running_acc)
 
     var next_start_ts = earliest_ts + _all_pane_range() + trigger_diff
 
