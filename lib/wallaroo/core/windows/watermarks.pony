@@ -80,7 +80,6 @@ class StageWatermarks
 
   fun ref check_effective_input_watermark(current_ts: U64): U64 =>
     var found_live_value = false
-
     var new_min: U64 = U64.max_value()
 
     for (u, (next_w, last_heard)) in _upstreams.pairs() do

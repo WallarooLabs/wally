@@ -1,6 +1,6 @@
 /*
 
-Copyright 2017 The Wallaroo Authors.
+Copyright 2017-2019 The Wallaroo Authors.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -83,7 +83,7 @@ class ConnectorSourceNotify[In: Any val]
       true
     else
       _metrics_reporter.pipeline_ingest(_pipeline_name, _source_name)
-      let ingest_ts = Time.nanos()
+      let ingest_ts = WallClock.nanoseconds()
       let pipeline_time_spent: U64 = 0
       var latest_metrics_id: U16 = 1
 
@@ -102,7 +102,7 @@ class ConnectorSourceNotify[In: Any val]
               end
               error
             end
-          let decode_end_ts = Time.nanos()
+          let decode_end_ts = WallClock.nanoseconds()
           _metrics_reporter.step_metric(_pipeline_name,
             "Decode Time in Connector Source", latest_metrics_id, ingest_ts,
             decode_end_ts)
@@ -144,7 +144,7 @@ class ConnectorSourceNotify[In: Any val]
         end
 
       if is_finished then
-        let end_ts = Time.nanos()
+        let end_ts = WallClock.nanoseconds()
         let time_spent = end_ts - ingest_ts
 
         ifdef "detailed-metrics" then

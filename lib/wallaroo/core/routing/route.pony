@@ -20,12 +20,12 @@ use "time"
 use "wallaroo_labs/guid"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
-use "wallaroo_labs/mort"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/topology"
-
+use "wallaroo_labs/mort"
+use "wallaroo_labs/time"
 
 primitive Route
   fun run[D: Any val](metric_name: String, pipeline_time_spent: U64,
@@ -37,7 +37,7 @@ primitive Route
     let o_seq_id = cfp.next_sequence_id()
 
     let my_latest_ts = ifdef "detailed-metrics" then
-        Time.nanos()
+        WallClock.nanoseconds()
       else
         latest_ts
       end

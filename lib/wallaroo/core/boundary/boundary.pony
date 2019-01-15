@@ -329,7 +329,7 @@ actor OutgoingBoundary is Consumer
     end
 
     let my_latest_ts = ifdef "detailed-metrics" then
-        Time.nanos()
+        WallClock.nanoseconds()
       else
         latest_ts
       end
@@ -347,7 +347,7 @@ actor OutgoingBoundary is Consumer
 
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
         i_producer_id,
-        pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
+        pipeline_time_spent + (WallClock.nanoseconds() - worker_ingress_ts),
         _seq_id, _wb, _auth, WallClock.nanoseconds(),
         new_metrics_id, metric_name)?
       _add_to_upstream_backup(outgoing_msg)
@@ -358,7 +358,7 @@ actor OutgoingBoundary is Consumer
         _unsent.push(outgoing_msg)
       end
 
-      let end_ts = Time.nanos()
+      let end_ts = WallClock.nanoseconds()
 
       ifdef "detailed-metrics" then
         _metrics_reporter.step_metric(metric_name,

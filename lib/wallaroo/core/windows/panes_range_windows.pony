@@ -64,7 +64,6 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
 
     (let pane_count, _pane_size, _panes_per_slide, _panes_per_window,
       _delay) = _InitializePaneParameters(range, slide, delay)
-
     _panes = Array[(Acc | EmptyPane)](pane_count)
     _panes_start_ts = Array[U64](pane_count)
     _earliest_window_idx = 0
@@ -80,7 +79,6 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   =>
     try
       (let earliest_ts, let end_ts) = _earliest_and_end_ts()?
-
       var applied = false
       if event_ts < end_ts then
         _apply_input(input, event_ts, earliest_ts)
@@ -99,7 +97,6 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
         end
         _apply_input(input, event_ts, new_earliest_ts)
       end
-
       (outs, output_watermark_ts)
     else
       Fail()
@@ -131,7 +128,8 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       end
     else
       ifdef debug then
-        @printf[I32]("Event ts %s is earlier than earliest window %s. Ignoring\n".cstring(), event_ts.string().cstring(), earliest_ts.string().cstring())
+        @printf[I32]("Event ts %s is earlier than earliest window %s. Ignoring\n".cstring(),
+        event_ts.string().cstring(), earliest_ts.string().cstring())
       end
     end
 
@@ -202,7 +200,6 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     try
       let earliest_ts = _earliest_ts()?
       let window_end_ts = earliest_ts + _range
-
       if _should_trigger(earliest_ts, watermark_ts) then
         (let out, let output_watermark_ts) = _trigger_next(earliest_ts,
           window_end_ts, trigger_diff)?

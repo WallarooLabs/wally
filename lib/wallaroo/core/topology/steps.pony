@@ -294,7 +294,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     _seq_id_generator.new_id()
-    let process_ts = Time.nanos()
+    let process_ts = WallClock.nanoseconds()
 
     let input_watermark_ts =
       _watermarks.receive_watermark(i_producer_id, watermark_ts, process_ts)
@@ -328,7 +328,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
         @printf[I32]("Filtering\n".cstring())
       end
 
-      let end_ts = Time.nanos()
+      let end_ts = WallClock.nanoseconds()
       let time_spent = end_ts - worker_ingress_ts
 
       ifdef "detailed-metrics" then

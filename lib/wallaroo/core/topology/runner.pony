@@ -227,9 +227,9 @@ class StatelessComputationRunner[In: Any val, Out: Any val] is Runner
   =>
     match data
     | let input: In =>
-      let computation_start = Time.nanos()
+      let computation_start = WallClock.nanoseconds()
       let result = _computation(input)
-      let computation_end = Time.nanos()
+      let computation_end = WallClock.nanoseconds()
 
       let new_metrics_id = ifdef "detailed-metrics" then
           // increment by 2 because we'll be reporting 2 step metrics below
@@ -327,8 +327,8 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     router: Router, metrics_reporter: MetricsReporter ref,
     watermarks: StageWatermarks)
   =>
-    // @printf[I32]("!@ on_timeout called on StateRunner\n".cstring())
-    let on_timeout_ts = Time.nanos()
+    //@printf[I32]("!@ on_timeout called on StateRunner\n".cstring())
+    let on_timeout_ts = WallClock.nanoseconds()
     for (key, sw) in _state_map.pairs() do
       let input_watermark_ts = watermarks.check_effective_input_watermark(
         on_timeout_ts)
@@ -346,19 +346,19 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
       let pipeline_time_spent: U64 = 0
       var metrics_id: U16 = 1
 
-      let latest_ts = Time.nanos()
+      let latest_ts = WallClock.nanoseconds()
 
       match out
       | let o: Out =>
         OutputProcessor[Out](
           _next_runner, metrics_name, pipeline_time_spent,
-          o, key, on_timeout_ts, new_watermark_ts, old_watermark_ts,
+          o, key, output_watermark_ts, new_watermark_ts, old_watermark_ts,
           producer_id, producer, router, new_i_msg_uid, None, latest_ts,
           metrics_id, on_timeout_ts, metrics_reporter)
       | let os: Array[Out] val =>
         OutputProcessor[Out](
           _next_runner, metrics_name, pipeline_time_spent,
-          os, key, on_timeout_ts, new_watermark_ts, old_watermark_ts,
+          os, key, output_watermark_ts, new_watermark_ts, old_watermark_ts,
           producer_id, producer, router, new_i_msg_uid, None, latest_ts,
           metrics_id, on_timeout_ts, metrics_reporter)
       end
@@ -409,7 +409,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
           metrics_id + 1
         end
 
-      let computation_start = Time.nanos()
+      let computation_start = WallClock.nanoseconds()
 
       (let result, let output_watermark_ts) =
         // !TODO!: This match is a hack to avoid segfaulting on the
@@ -425,7 +425,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
           state_wrapper(input, event_ts, watermark_ts)
         end
         // state_wrapper(input, event_ts, watermark_ts)
-      let computation_end = Time.nanos()
+      let computation_end = WallClock.nanoseconds()
 
       (let new_watermark_ts, let old_watermark_ts) =
         producer.update_output_watermark(output_watermark_ts)

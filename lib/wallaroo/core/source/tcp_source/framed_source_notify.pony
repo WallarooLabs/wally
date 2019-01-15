@@ -82,14 +82,13 @@ class TCPSourceNotify[In: Any val]
       true
     else
       _metrics_reporter.pipeline_ingest(_pipeline_name, _source_name)
-      let ingest_ts = Time.nanos()
       let pipeline_time_spent: U64 = 0
       var latest_metrics_id: U16 = 1
 
       ifdef "trace" then
         @printf[I32](("Rcvd msg at " + _pipeline_name + " source\n").cstring())
       end
-
+      let ingest_ts = WallClock.nanoseconds()
       (let is_finished, let last_ts) =
         try
           let decoded =
@@ -101,7 +100,7 @@ class TCPSourceNotify[In: Any val]
               end
               error
             end
-          let decode_end_ts = Time.nanos()
+          let decode_end_ts = WallClock.nanoseconds()
           _metrics_reporter.step_metric(_pipeline_name,
             "Decode Time in TCP Source", latest_metrics_id, ingest_ts,
             decode_end_ts)
@@ -111,14 +110,12 @@ class TCPSourceNotify[In: Any val]
             @printf[I32](("Msg decoded at " + _pipeline_name +
               " source\n").cstring())
           end
-
-          // This assumes that ingest_ts is monotonically increasing, which
-          // it should be.
-          _watermark_ts = ingest_ts
+          let event_ts = _handler.event_time_ns(decoded)
+          _watermark_ts = _watermark_ts.max(event_ts)
 
           if decoded isnt None then
             _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-              "tcp-source-key", ingest_ts, _watermark_ts, _source_id, source,
+              "tcp-source-key", event_ts, _watermark_ts, _source_id, source,
               _router, _msg_id_gen(), None, decode_end_ts, latest_metrics_id,
               ingest_ts, _metrics_reporter)
           else
@@ -134,8 +131,8 @@ class TCPSourceNotify[In: Any val]
         end
 
       if is_finished then
-        let end_ts = Time.nanos()
-        let time_spent = end_ts - ingest_ts
+        let end_ts = WallClock.nanoseconds()
+        let time_spent = end_ts - ingest_ts // I'm unsure of this stuff
 
         ifdef "detailed-metrics" then
           _metrics_reporter.step_metric(_pipeline_name,

@@ -40,6 +40,7 @@ use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
+use "wallaroo_labs/time"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
@@ -218,7 +219,7 @@ actor ConnectorSink is Sink
   =>
     var receive_ts: U64 = 0
     ifdef "detailed-metrics" then
-      receive_ts = Time.nanos()
+      receive_ts = WallClock.nanoseconds()
       _metrics_reporter.step_metric(metric_name, "Before receive at sink",
         9998, latest_ts, receive_ts)
     end
@@ -234,7 +235,7 @@ actor ConnectorSink is Sink
 
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
-      let end_ts = Time.nanos()
+      let end_ts = WallClock.nanoseconds()
       let time_spent = end_ts - worker_ingress_ts
 
       ifdef "detailed-metrics" then
