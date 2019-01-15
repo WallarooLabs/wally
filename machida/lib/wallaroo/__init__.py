@@ -426,17 +426,16 @@ else:
 class ConnectorEncoder(Encoder):
     def _encode(self, encoded_data, event_time=0, key=None):
         if isinstance(event_time, datetime.datetime):
-            # We'll assume naive datetime values should be treated as
-            # UTC. Python's brain-dead datetime package is mostly
-            # useless for fixing this without a mountain of caveats
-            # like improper DST handling. We'll assume the user can
-            # import a library that handles this better than Python
-            # does itself.
+            # If event_time is a datetime, we do a best-effort conversion
+            # to a microseconds since epoch.
+            # If a timezone is set for the datetime object, it is used,
+            # otherwise, the system timezone is used in converting to UTC.
+            # If the system timezone is not set (e.g. default to UTC), but
+            # the system is not actually in the UTC timezone, this may lead to
+            # erroneous behaviour.
             #
             # Convert to an integer number of ms from the floating
             # point seconds that Python uses.
-            # timestamp() is only available in python3.3+
-
             event_time = int(dt_to_timestamp(event_time) * 1000)
         encoded_key = key.encode() if key else ''.encode()
         return struct.pack(

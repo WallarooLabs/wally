@@ -31,7 +31,7 @@ from wallaroo.experimental.connectors import (
 
 
 client = MultiSourceConnector(
-        "0.0.1", "monster", "celsius at least once", "instance",
+        "0.0.1", "Dragons Love Tacos!", "celsius at least once", "instance",
         args=None,
         required_params=['host', 'port', 'filenames'])
 
