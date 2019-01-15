@@ -130,25 +130,18 @@ class SourceConnector(BaseConnector):
             raise RuntimeError("Please call connect before writing")
         payload = self._encoder.encode(message, event_time, key)
         self._conn.sendall(payload)
-        self.count = self.count + 1
-        if self.count > 3:
-            self._conn.close()
-            self._conn = None
-            self.count = 0
-            time.sleep(0.25)
-            self.connect()
-
+        self.count += 1
 
 Stream = namedtuple('Stream', ['id', 'name', 'point_of_ref', 'is_open'])
 
 
 class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
     # TODO :
-    # 1. implement credits based flow control
-    # 2. revisit parse_connector_args
-    # The way we require host and port args, but then get them from the app topo
-    # and ignore the ones in the parsed params object is confusing and doesn't
-    # make much sense to me. Ping Brian before making changes to this.
+    # 1. revisit parse_connector_args
+    #    The way we require host and port args, but then get them from the app
+    #    topo and ignore the ones in the parsed params object is confusing and
+    #    doesn't make much sense to me. Ping Brian before making changes to
+    #    this.
 
     def __init__(self, version, cookie, program_name, instance_name,
                  args=None, required_params=['host', 'port'],
@@ -267,9 +260,13 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
         # messages that should only go connector->wallaroo
         # Notify, Hello, Message
         elif isinstance(msg, (cwm.Hello, cwm.Message, cwm.Notify)):
-            # TODO: send error to wallaroo before closing
-            # close and raise error
-            self.close()
+            # send error to wallaroo then shutdown and raise a protocol
+            # exception
+            try:
+                self.error("Received an illegal message on the connector"
+                           "side: {}".format(msg))
+            except TimeoutError:
+                pass
             raise ProtocolError(
                 "{} should never be received at the connector.".format(msg))
         else: # handle unknown messages
@@ -294,7 +291,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
             self.set_terminator(4)
 
     def _handle_notify_ack(self, msg):
-        print("handle_notify_ack({})".format(msg))
+        print("NH: handle_notify_ack({})".format(msg))
         self.update_stream(msg.stream_id,
                            point_of_ref = msg.point_of_ref,
                            is_open = msg.notify_success)
@@ -375,31 +372,34 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
                         break
                 self.initiate_send()
             except StopIteration:
+                self.initiate_send()
                 self.shutdown()
         else:
             self.initiate_send()
 
     def shutdown(self, error=None):
-        t0 = time.time()
+        self.del_channel(self._socket_map) # remove the connection from asyncore loop
+        self._loop_sentinel.set() # exit the asyncore loop
+        self._conn.setblocking(1)
         if error is None:
-            while self.producer_fifo and self.connected:
-                if time.time() - t0 > 5:
-                    raise TimeoutError("shutdown timed out after 5 seconds")
-                self.initiate_send()
-        self.del_channel(self._socket_map)
+            # If this is a clean shutdown, try to synchronously send any
+            # remaining data that was queued
+            while self.producer_fifo:
+                self._conn.sendall(self.producer_fifo.popleft())
         if isinstance(error, cwm.Error):
-            self._conn.setblocking(1)
+            # If this is an error, synchronously send the error message
             self._conn.sendall(cwm.Frame.encode(error))
+        self._conn.close()
         self.stopped.set()
 
     def writable(self):
-        res = self.credits >= 0
-        return res
+        return self.credits >= 0
 
     def write(self, msg):
         if isinstance(msg, cwm.Message):
             # TODO: what to do when stream is closed?
             # For now: if stream isn't open (or doesn't exist), raise error
+            # In the future, maybe this should automatically send a notify
             try:
                 if self._streams[msg.stream_id].is_open:
                     data = cwm.Frame.encode(msg)
@@ -454,7 +454,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
         self.shutdown(error=message)
 
     def notify(self, stream_id, stream_name=None, point_of_ref=None):
-        print("notify: {}, {}, {}".format(stream_id, stream_name, point_of_ref))
+        print("NH: notify: {}, {}, {}".format(stream_id, stream_name, point_of_ref))
         old = self._streams.get(stream_id, None)
         if old:
             if point_of_ref is None:
@@ -487,7 +487,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
         event_time must be either a datetime or a float of seconds since
         epoch (it may be negtive for dates before 1970-1-1)
         """
-        print("sending EOS: {} {}".format(stream_id, key))
+        print("NH: sending EOS: {} {}".format(stream_id, key))
         flags = cwm.Message.Eos | cwm.Message.Ephemeral
         if event_time is not None:
             flags |= cwm.Message.EventTime
@@ -514,7 +514,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
             event_time = ts,
             key = en_key,
             message = None)
-        print("EOS msg: {}".format(msg))
+        print("NH: EOS msg: {}".format(msg))
         self.write(msg)
 
     ########################
@@ -555,6 +555,11 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
         self.credits = 0
         # close connection
         self._conn.close()
+        # close streams
+        for stream in self._streams.values():
+            print("Closing stream: {}".format(stream))
+            self.stream_updated(Stream(stream.id, stream.name,
+                                       stream.point_of_ref, False))
         # try to connect again
         self.connect()
         self.handle_restarted()

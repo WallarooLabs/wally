@@ -183,7 +183,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
         self._added_source = False
 
     def stream_updated(self, stream):
-        print("stream_updated: {}".format(stream))
+        print("NH: stream_updated: {}".format(stream))
         super(MultiSourceConnector, self).stream_updated(stream)
         source = self.sources.pop(stream.id, None)
         # stream already in sources
@@ -192,13 +192,14 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             if not stream.is_open:
                 # source is open?
                 if stream.id in self.open:
-                    print("Closing stream and moving to joining")
+                    print("NH: Closing stream and moving to joining")
                     # this source is waiting for a NotifyAck
                     # move it to joining
                     self.open.remove(stream.id)
                     self.joining.add(stream.id)
                     self.sources[stream.id] = source
                 else: # source has been closed, so remove it entirely
+                    print("NH: closing source? {}".format(source))
                     self.closed.add(stream.id)
                     del source  # trigger whatever is in source's __del__
 
@@ -206,21 +207,21 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             else:
                 # if stream just joined, remove it from joining
                 if stream.id in self.joining:
-                    print("stream joined: {}".format(stream.id))
+                    print("NH: stream joined: {}".format(stream.id))
                     self.joining.remove(stream.id)
                     if stream.point_of_ref != source.point_of_ref():
                         source.reset(stream.point_of_ref)
                 # put it back
-                print("Stream is in open")
+                print("NH: Stream is in open")
                 self.sources[stream.id] = source
                 self.open.add(stream.id)
         # stream is new to us
         elif stream.id in self.closed:
-            print("Stream {} has been closed already.".format(stream.id))
+            print("Stream {} does not have a matching source".format(stream.id))
             pass
         else:
-            print("stream: {}".format(stream))
-            print("closed: {}".format(self.closed))
+            print("NH: stream: {}".format(stream))
+            print("NH: closed: {}".format(self.closed))
             if stream.is_open:
                 # This is an error for MultiSourceConnector
                 raise ConnectorError("Can't open a new source from a stream. "
