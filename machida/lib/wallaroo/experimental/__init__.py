@@ -179,9 +179,9 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
         # as we connect, we will add the socket to the map once the
         # synchronous handshake part is complete
         self._socket_map = {}
-        self._asyncore_loop_timeout = 0.0001
+        self._asyncore_loop_timeout = 0.000001
         self._loop_sentinel = threading.Event()
-        self._loop = threading.Thread(target=self.loop)
+        self._loop = threading.Thread(target=self._asyncore_loop)
         self._loop.daemon = True
         self._loop.start()
 
@@ -196,12 +196,21 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
         if provided. If not timeout is provided this may block forever.
         """
         # wait for this
-        self.stopped.wait(timeout)
+        dt = 0.0001
+        if timeout is not None:
+            if dt > timeout:
+                dt == timeout
+        while True:
+            self.stopped.wait(dt)
+            if self.stopped.is_set():
+                break
+            else:
+                time.sleep(dt)
 
     #############################################
     # asyncore loop to run in background thread #
     #############################################
-    def loop(self):
+    def _asyncore_loop(self):
         poll_fun = asyncore.poll
 
         while not self._loop_sentinel.is_set():
@@ -285,12 +294,12 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
             self.set_terminator(4)
 
     def _handle_notify_ack(self, msg):
+        print("handle_notify_ack({})".format(msg))
         self.update_stream(msg.stream_id,
                            point_of_ref = msg.point_of_ref,
                            is_open = msg.notify_success)
 
     def _handle_ack(self, msg):
-        print("handle_ack: {}".format(msg))
         self.credits += msg.credits
         for (stream_id, point_of_ref) in msg.acks:
             self.update_stream(stream_id,
@@ -445,6 +454,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
         self.shutdown(error=message)
 
     def notify(self, stream_id, stream_name=None, point_of_ref=None):
+        print("notify: {}, {}, {}".format(stream_id, stream_name, point_of_ref))
         old = self._streams.get(stream_id, None)
         if old:
             if point_of_ref is None:
@@ -511,6 +521,18 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
     # User defined methods #
     ########################
 
+    def handle_restarted(self):
+        """
+        Logic to execute after successfully completing a restart
+
+        The default is to send a new notify for every known stream.
+        User may override this to provide their own logic based on the state
+        of their sources.
+        """
+        # if restarting, send new notifys for existing streams to reopen them
+        for stream in self._streams.values():
+            self.notify(stream.id, stream.name, stream.point_of_ref)
+
     def stream_updated(self, stream):
         """
         User handler can handle updates to their streams here.
@@ -527,20 +549,15 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
         pass
 
     def handle_restart(self):
-        # TODO:
-        # 1. close the connection
-        # 2. start new handshake
-        # 3. notify all current streams
-        #    cannot assume that any messages sent with message_id's larger
-        #    than those last acked (e.g. last point_of_ref in self._streams)
-        #    have been processed.
-        # TODO: should we reset streams to last acked point, or wait for the
-        #       worker to respond to the notify acks? Or at least to the `Ok`?
-        #       What if once reconnected, not all streams in self._streams`
-        #       show up in the Ok message?
-        print("Got RESTART... now what?")
-        raise ProtocolError("Don't know what to do with restart!")
-        pass
+        print("WARNING: Received RESTART message. Closing streams and "
+              "reinitiating handshake.")
+        # reset credits
+        self.credits = 0
+        # close connection
+        self._conn.close()
+        # try to connect again
+        self.connect()
+        self.handle_restarted()
 
     def handle_error(self):
         """
