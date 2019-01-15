@@ -34,6 +34,12 @@ import wallaroo
 from wallaroo import dt_to_timestamp
 from  . import connector_wire_messages as cwm
 
+# get a version comptible base metaclass
+if sys.version_info.major == 2:
+    from .base_meta2 import BaseMeta, abstractmethod
+else:
+    from .base_meta3 import BaseMeta, abstractmethod
+
 
 class ConnectorError(Exception):
     pass
@@ -130,25 +136,18 @@ class SourceConnector(BaseConnector):
             raise RuntimeError("Please call connect before writing")
         payload = self._encoder.encode(message, event_time, key)
         self._conn.sendall(payload)
-        self.count = self.count + 1
-        if self.count > 3:
-            self._conn.close()
-            self._conn = None
-            self.count = 0
-            time.sleep(0.25)
-            self.connect()
-
+        self.count += 1
 
 Stream = namedtuple('Stream', ['id', 'name', 'point_of_ref', 'is_open'])
 
 
-class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
+class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
     # TODO :
-    # 1. implement credits based flow control
-    # 2. revisit parse_connector_args
-    # The way we require host and port args, but then get them from the app topo
-    # and ignore the ones in the parsed params object is confusing and doesn't
-    # make much sense to me. Ping Brian before making changes to this.
+    # 1. revisit parse_connector_args
+    #    The way we require host and port args, but then get them from the app
+    #    topo and ignore the ones in the parsed params object is confusing and
+    #    doesn't make much sense to me. Ping Brian before making changes to
+    #    this.
 
     def __init__(self, version, cookie, program_name, instance_name,
                  args=None, required_params=['host', 'port'],
@@ -165,7 +164,8 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
         self.instance_name = instance_name
 
         # Stream details
-        self._streams = {}  # stream_id: Stream
+        self._streams = {}  # {stream_id: {'stream': Stream, 'por': por}}
+        self._pending_eos = {}  # {stream_id: point_of_ref}
 
         self.handshake_complete = False
         self.in_buffer = []
@@ -267,9 +267,13 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
         # messages that should only go connector->wallaroo
         # Notify, Hello, Message
         elif isinstance(msg, (cwm.Hello, cwm.Message, cwm.Notify)):
-            # TODO: send error to wallaroo before closing
-            # close and raise error
-            self.close()
+            # send error to wallaroo then shutdown and raise a protocol
+            # exception
+            try:
+                self.error("Received an illegal message on the connector"
+                           "side: {}".format(msg))
+            except TimeoutError:
+                pass
             raise ProtocolError(
                 "{} should never be received at the connector.".format(msg))
         else: # handle unknown messages
@@ -284,48 +288,60 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
             # deposit the credits
             self.credits += msg.initial_credits
             for stream_id, stream_name, point_of_ref in msg.credit_list:
-                self.update_stream(stream_id,
-                                   stream_name = stream_name,
-                                   point_of_ref = point_of_ref,
-                                   is_open = False)
+                # Try to get old stream data
+                old = self._streams.get(stream_id, None)
+
+                # New stream: call stream_added (this is the normal behaviour)
+                if old is None:
+                    new = Stream(stream_id, stream_name, point_of_ref, False)
+                    self._streams[stream_id] = new
+                    self.stream_added(new)
+
+                # if notify was called before connect(), we may have known
+                # streams in _streams
+                else:
+                    # stream collision... throw error and close connection
+                    if old.name != stream_name:
+                        raise ConnectorError("Got wrong stream name for "
+                                             "stream. Expected {} but got {}."
+                                             .format(old.name, stream_name))
+                    # save it as closed
+                    new = Stream(stream_id, stream_name, point_of_ref, False)
+                    self._streams[stream_id] = new
+                    # stream_acked, to ensure source is reset if necessary
+                    self.stream_acked(new)
+
             # set handshake_complete
             self.handshake_complete = True
             # set terminator to 4
             self.set_terminator(4)
 
     def _handle_notify_ack(self, msg):
-        print("handle_notify_ack({})".format(msg))
-        self.update_stream(msg.stream_id,
-                           point_of_ref = msg.point_of_ref,
-                           is_open = msg.notify_success)
+        old = self._streams.get(msg.stream_id, None)
+        if old is not None:
+            new = Stream(old.id, old.name, msg.point_of_ref,
+                         msg.notify_success)
+            self._streams[old.id] = new
+            self.stream_added(new)
+            if new.is_open:
+                self.stream_opened(new)
+        else:
+            # shouldn't get an ack for a stream we never notified
+            # but it's not strictly an error, so don't crash
+            print("WARNING: received a NotifyAck for a stream that wasn't"
+                  " notified: {}".format(msg))
 
     def _handle_ack(self, msg):
         self.credits += msg.credits
         for (stream_id, point_of_ref) in msg.acks:
-            self.update_stream(stream_id,
-                               point_of_ref = point_of_ref)
-
-    def update_stream(self, stream_id, stream_name=None,
-                      point_of_ref=None, is_open=None):
-        old = self._streams.get(stream_id, None)
-        if old is None:
-            new = Stream(stream_id, stream_name, point_of_ref, is_open)
-        else:
-            if stream_name is not None:
-                if old.name != stream_name:
-                    # stream collision... throw error and close connection
-                    raise ConnectorError("Got wrong stream name for "
-                                         "stream. Expected {} but got {}."
-                                         .format(old.name, stream_name))
-            new = Stream(stream_id,
-                         old.name if old is not None else stream_name,
-                         (point_of_ref if point_of_ref is not None else
-                          old.point_of_ref),
-                         is_open if is_open is not None else old.is_open)
-        # update the stream information
-        self._streams[stream_id] = new
-        # Call optional user handler with updated stream
-        self.stream_updated(new)
+            # Try to get old stream data
+            old = self._streams.get(stream_id, None)
+            if old:
+                if point_of_ref != old.point_of_ref:
+                    new = Stream(stream_id, old.name, point_of_ref,
+                                 old.is_open)
+                    self._streams[stream_id] = new
+                    self.stream_acked(new)
 
     ##########################
     # Outoing communications #
@@ -375,31 +391,34 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
                         break
                 self.initiate_send()
             except StopIteration:
+                self.initiate_send()
                 self.shutdown()
         else:
             self.initiate_send()
 
     def shutdown(self, error=None):
-        t0 = time.time()
+        self.del_channel(self._socket_map) # remove the connection from asyncore loop
+        self._loop_sentinel.set() # exit the asyncore loop
+        self._conn.setblocking(1)
         if error is None:
-            while self.producer_fifo and self.connected:
-                if time.time() - t0 > 5:
-                    raise TimeoutError("shutdown timed out after 5 seconds")
-                self.initiate_send()
-        self.del_channel(self._socket_map)
+            # If this is a clean shutdown, try to synchronously send any
+            # remaining data that was queued
+            while self.producer_fifo:
+                self._conn.sendall(self.producer_fifo.popleft())
         if isinstance(error, cwm.Error):
-            self._conn.setblocking(1)
+            # If this is an error, synchronously send the error message
             self._conn.sendall(cwm.Frame.encode(error))
+        self._conn.close()
         self.stopped.set()
 
     def writable(self):
-        res = self.credits >= 0
-        return res
+        return self.credits >= 0
 
     def write(self, msg):
         if isinstance(msg, cwm.Message):
             # TODO: what to do when stream is closed?
             # For now: if stream isn't open (or doesn't exist), raise error
+            # In the future, maybe this should automatically send a notify
             try:
                 if self._streams[msg.stream_id].is_open:
                     data = cwm.Frame.encode(msg)
@@ -454,7 +473,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
         self.shutdown(error=message)
 
     def notify(self, stream_id, stream_name=None, point_of_ref=None):
-        print("notify: {}, {}, {}".format(stream_id, stream_name, point_of_ref))
         old = self._streams.get(stream_id, None)
         if old:
             if point_of_ref is None:
@@ -473,21 +491,29 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
                          stream_name,
                          0 if point_of_ref is None else point_of_ref,
                          False)
-        # update locally
-        self._streams[stream_id] = new
+
+        # update locally and call stream_added
+        self._streams[new.id] = new
+        self.stream_added(new)
+
         # send to wallaroo worker
         self.write(cwm.Notify(new.id,
                               new.name,
                               new.point_of_ref))
 
-    def end_of_stream(self, stream_id, event_time=None, key=None):
+    def end_of_stream(self, stream_id, point_of_ref, event_time=None,
+                      key=None):
         """
-        Send an EOS message for a stream_id, with an optional key and
-        event_time.
+        Send an EOS message for a stream_id and point_of_ref,
+        with an optional key and event_time.
         event_time must be either a datetime or a float of seconds since
         epoch (it may be negtive for dates before 1970-1-1)
         """
-        print("sending EOS: {} {}".format(stream_id, key))
+        # TODO: Wallaroo needs to ack and connector should implement a
+        # stream_ended(stream) method.
+        # Without this, there is a race condition around end of streams and
+        # restarts which can result in the tail end of a stream not being resent
+        # if it was EOSd before a restart, but the rollback is to before the EOS.
         flags = cwm.Message.Eos | cwm.Message.Ephemeral
         if event_time is not None:
             flags |= cwm.Message.EventTime
@@ -514,14 +540,15 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
             event_time = ts,
             key = en_key,
             message = None)
-        print("EOS msg: {}".format(msg))
+        print("INFO: Sending End of Stream {}".format(msg))
         self.write(msg)
+        self._pending_eos[stream_id] = point_of_ref
 
-    ########################
-    # User defined methods #
-    ########################
+    ###########################
+    # User extensible methods #
+    ###########################
 
-    def handle_restarted(self):
+    def handle_restarted(self, streams):
         """
         Logic to execute after successfully completing a restart
 
@@ -530,23 +557,12 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
         of their sources.
         """
         # if restarting, send new notifys for existing streams to reopen them
-        for stream in self._streams.values():
+        for stream in streams.values():
             self.notify(stream.id, stream.name, stream.point_of_ref)
-
-    def stream_updated(self, stream):
-        """
-        User handler can handle updates to their streams here.
-        Updates may include:
-            - stream has been closed (Stream.is_open = False)
-            - stream has been open (Stream.is_open = True)
-            - point of reference has been updated (either forward or back!)
-        """
-        pass
 
     def handle_invalid_message(self, msg):
         print("WARNING: {}".format(ProtocolError(
             "Received an unrecognized message: {}".format(msg))))
-        pass
 
     def handle_restart(self):
         print("WARNING: Received RESTART message. Closing streams and "
@@ -555,9 +571,15 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
         self.credits = 0
         # close connection
         self._conn.close()
+        # close streams
+        for sid, stream in self._streams.items():
+            if stream.is_open:
+                new = Stream(stream.id, stream.name, stream.point_of_ref, False)
+                self._streams[sid] = new
+                self.stream_closed(new)
         # try to connect again
         self.connect()
-        self.handle_restarted()
+        self.handle_restarted(self._streams)
 
     def handle_error(self):
         """
@@ -579,320 +601,49 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector):
         """
         _type, _value, _traceback = sys.exc_info()
         traceback.print_exception(_type, _value, _traceback)
-
-
-Stream = namedtuple('Stream', ['id', 'name', 'point_of_ref', 'is_open'])
-
-
-class AtLeastOnceSourceConnector(threading.Thread, asynchat.async_chat, BaseConnector):
-    # TODO :
-    # 1. implement credits based flow control
-    # 2. revisit parse_connector_args
-    # The way we require host and port args, but then get them from the app topo
-    # and ignore the ones in the parsed params object is confusing and doesn't
-    # make much sense to me. Ping Brian before making changes to this.
-
-    def __init__(self, args=None, required_params=['host', 'port'],
-                 optional_params=['timeout']):
-        # Use BaseConnector to do any argument parsing
-        BaseConnector.__init__(self, args, required_params, optional_params)
-
-        # connection details are given from the base
-        self._port = int(self._port)  # but convert port to int
-        self.credits = 0
-        if self.params.timeout:
-            self._timeout = float(self.params.timeout)
-        else:
-            self._timeout = 0.05
-
-        # Stream details
-        self._streams = {}  # stream_id: Stream
-
-        self.handshake_complete = False
-        self.in_buffer = []
-        self.out_buffer = []
-        self.reading_header = True
-        self.set_terminator(4) # first frame header
-
-        # Thread details
-        threading.Thread.__init__(self)
-        self.daemon = True
-
-    ###########################
-    # Incoming communications #
-    ###########################
-
-    def run(self):
-        # only allow starting after handshake is complete
-        if not self.handshake_complete:
-            raise ProtocolError("Cannot start async loop before handshake"
-                                " is complete")
-        asyncore.loop(timeout=self._timeout)
-
-    def collect_incoming_data(self, data):
-        """Buffer the data"""
-        self.in_buffer.append(data)
-
-    def found_terminator(self):
-        """Data is going to be in two parts:
-        1. a 32-bit unsigned integer length header
-        2. a payload of the size specified by (1)
-        """
-        if self.reading_header:
-            # Read the header and set the terminator size for the payload
-            self.reading_header = False
-            h = struct.unpack(">I", b"".join(self.in_buffer))[0]
-            self.in_buffer = []
-            self.set_terminator(h)
-        else:
-            # Read the payload and pass it to _handle_frame
-            self.set_terminator(4) # read next frame header
-            self.reading_header = True
-            frame = b"".join(self.in_buffer)
-            self.in_buffer = []
-            self._handle_frame(frame)
-
-    def _handle_frame(self, frame):
-        msg = cwm.Frame.decode(frame)
-        # Ok, Error, NotifyAck, Ack, Restart
-        if isinstance(msg, cwm.Ok):
-            self._handle_ok(msg)
-        elif isinstance(msg, cwm.Error):
-            # Got error message from worker
-            # close the connection and pass msg to the error handler
-            self.close()
-            raise ConnectorError(msg.message)
-        elif isinstance(msg, cwm.NotifyAck):
-            self._handle_notify_ack(msg)
-        elif isinstance(msg, cwm.Ack):
-            self._handle_ack(msg)
-        elif isinstance(msg, cwm.Restart):
-            self.handle_restart(msg)
-        # messages that should only go connector->wallaroo
-        # Notify, Hello, Message
-        elif isinstance(msg, (cwm.Hello, cwm.Message, cwm.Notify)):
-            # close and raise error
-            self.close()
-            raise ProtocolError(
-                "{} should never be received at the connector.".format(msg))
-        else: # handle unknown messages
-            self.handle_invalid_message(msg, close=False)
-
-    def _handle_ok(self, msg):
-        if not self.in_handshake:
-            self.close()
-            raise ProtocolError("Got an Ok message outside of a"
-                                " handshake")
-        else:
-            # deposit the credits
-            self.credits += msg.initial_credits
-            for stream_id, stream_name, point_of_ref in msg.credit_list:
-                self.update_stream(stream_id,
-                                   stream_name = stream_name,
-                                   point_of_ref = point_of_ref,
-                                   is_open = False)
-            # set handshake_complete
-            self.handshake_complete = True
-            # set terminator to 4
-            self.set_terminator(4)
-            # set socket to nonblocking
-            self._conn.setblocking(0)
-            # initialize the asynchat handler
-            asynchat.async_chat.__init__(self, sock=self._conn)
-
-    def _handle_notify_ack(self, msg):
-        self.update_stream(msg.stream_id,
-                           point_of_ref = msg.point_of_ref,
-                           is_open = msg.notify_success)
-
-    def _handle_ack(self, msg):
-        self.credits += msg.credits
-        for (stream_id, point_of_ref) in msg.acks:
-            self.update_stream(stream_id,
-                               point_of_ref = point_of_ref)
-
-    def update_stream(self, stream_id, stream_name=None,
-                      point_of_ref=None, is_open=None):
-        old = self._streams.get(stream_id, None)
-        if old is None:
-            new = Stream(stream_id, stream_name, point_of_ref, is_open)
-        else:
-            if stream_name is not None:
-                if old.name != steam_name:
-                    # stream collision... throw error and close connection
-                    raise ConnectorError("Got wrong stream name for "
-                                         "stream. Expected {} but got {}."
-                                         .format(old.name, stream_name))
-            new = Stream(stream_id,
-                         old.name if old is not None else stream_name,
-                         (point_of_ref if point_of_ref is not None else
-                          old.point_of_ref),
-                         is_open if is_open is not None else old.is_open)
-        # update the stream information
-        self._streams[stream_id] = new
-        # Call optional user handler with updated stream
-        self.stream_updated(new)
-
-    ##########################
-    # Outoing communications #
-    ##########################
-
-    def initiate_handshake(self, hello):
-        conn = socket.socket()
-        conn.connect( (self._host, self._port) )
-        self._conn = conn
-
-        self.in_handshake = True
-        self.version = hello.version
-        self.cookie = hello.cookie
-        self.program_name = hello.program_name
-        self.instance_name = hello.instance_name
-        self._conn.setblocking(1) # Set socket to blocking mode
-        self._conn.sendall(cwm.Frame.encode(hello))
-        header_bytes = self._conn.recv(4)
-        frame_size = struct.unpack('>I', header_bytes)[0]
-        frame = self._conn.recv(frame_size)
-        self._handle_frame(frame)
-
-    def write(self, msg):
-        if not self.is_alive():
-            raise ConnectorError("Can't write to a closed conection")
-        if (isinstance(msg, (cwm.Error, cwm.Notify)) or
-            (msg.stream_id in self._streams and
-            self._streams[msg.stream_id].is_open)):
-            data = cwm.Frame.encode(msg)
-            self._write(data)
-        else:
-            raise ProtocolError("Message cannot be sent. Stream ({}) is not "
-                                "in an open state. Use notify() to open it."
-                                .format(msg.stream_id))
-
-    def _write(self, data):
-        """
-        Replaces asynchat.async_chat.push, which does a synchronous send
-        i.e. without calling `initiate_send()` at the end
-        """
-        sabs = self.ac_out_buffer_size
-        if len(data) > sabs:
-            for i in xrange(0, len(data), sabs):
-                self.producer_fifo.append(data[i:i+sabs])
-        else:
-            self.producer_fifo.append(data)
-
-    def pending_sends(self):
-        """
-        Are there any pending sends
-        """
-        if len(self.producer_fifo) > 0:
-            return True
-        else:
-            return False
-
-    def notify(self, stream_id, stream_name=None, point_of_ref=None):
-        old = self._streams.get(stream_id, None)
-        if old:
-            if point_of_ref is None:
-                raise ConnectorError("Cannot update a stream without a valid "
-                                     "point_of_ref value")
-            new = Stream(stream_id,
-                         old.name if old is not None else stream_name,
-                         (point_of_ref if point_of_ref is not None else
-                          old.point_of_ref),
-                         old.is_open)
-        else:
-            if stream_name is None:
-                raise ConnectorError("Cannot notify a new stream without "
-                                     "a Stream name!")
-            new = Stream(stream_id,
-                         stream_name,
-                         0 if point_of_ref is None else point_of_ref,
-                         False)
-        # update locally
-        self._streams[stream_id] = new
-        # send to wallaroo worker
-        self.write(cwm.Notify(new.id,
-                              new.name,
-                              new.point_of_ref))
-
-    def end_of_stream(self, stream_id, event_time=None, key=None):
-        """
-        Send an EOS message for a stream_id, with an optional key and
-        event_time.
-        event_time must be either a datetime or a float of seconds since
-        epoch (it may be negtive for dates before 1970-1-1)
-        """
-        flags = cwm.Message.Eos | cwm.Message.Ephemeral
-        if event_time is not None:
-            flags |= cwm.Message.EventTime
-            if isinstance(event_time, datetime):
-                ts = dt_to_timestamp(event_time)
-            elif isinstance(event_time, (int, float)):
-                ts = event_time
-            else:
-                raise ProtocolError("Event_time must be a datetime or a float")
-        else:
-            ts = None
-        if key:
-            flags |= cw.Message.key
-            if isinstance(key, bytes):
-                en_key = key
-            else:
-                en_key = key.encode()
-        else:
-            en_key = None
-        msg = cwm.Message(
-            stream_id = stream_id,
-            flags = flags,
-            message_id = None,
-            event_time = ts,
-            key = en_key,
-            message = None)
-        self.write(msg)
+        print("ERROR: Closing the connection after encountering an error")
+        self.error = _value
+        self.close()
 
     ########################
     # User defined methods #
     ########################
 
-    def stream_updated(self, stream):
+    def stream_added(self, stream):
         """
-        User handler can handle updates to their streams here.
-        Updates may include:
-            - stream has been closed (Stream.is_open = False)
-            - stream has been open (Stream.is_open = True)
-            - point of reference has been updated (either forward or back!)
+        Action to take when a new stream is added [optional]
         """
         pass
 
-    def handle_invalid_message(self, msg):
-        print("WARNING: {}".format(ProtocolError(
-            "Received an unrecognized message: {}".format(msg))))
+    def stream_removed(self, stream):
+        """
+        Action to take when a stream is removed [optional]
+        """
         pass
 
-    def handle_restart(self):
-        pass
-
-    def handle_error(self):
+    @abstractmethod
+    def stream_opened(self, stream):
         """
-        Default error handler: print a normal error traceback to sys.stderr
-
-        Users may override this with custom handlers
-
-        e.g. trigger a callback in the user class to stop a TCP server
-
-        ```python
-        class MyTCPServer(AsyncClient):
-            def handle_error(self):
-                # print the error using the subclass method
-                super(MyTCPServer, self).handle_error()
-                # Stop MyTCPServer as well
-                self.stop_server()
-        ```
+        Action to take when a stream status changes from closed to open
+        [required]
         """
-        _type, _value, _traceback = sys.exc_info()
-        traceback.print_exception(_type, _value, _traceback)
-        print("ERROR: Closing the connection after encountering an error")
-        self.error = _value
-        self.close()
+        raise NotImplementedError
+
+    @abstractmethod
+    def stream_closed(self, stream):
+        """
+        Action to take when a stream status changes from open to closed
+        [required]
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def stream_acked(self, stream):
+        """
+        Action to take when a stream's point of reference is updated
+        [required]
+        """
+        raise NotImplementedError
 
 
 class SinkConnector(object):
