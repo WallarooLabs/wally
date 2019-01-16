@@ -101,7 +101,7 @@ Build the Market Spread application and Wallaroo tools:
 
 ```bash
 cd ~/wallaroo
-make build-testing-performance-apps-market-spread build-giles-all build-utils-cluster_shutdown build-testing-tools-fixed_length_message_blaster
+make build-testing-performance-apps-market-spread build-giles-all build-utils-cluster_shutdown build-testing-tools-fixed_length_message_blaster build-utils-data_receiver
 ```
 
 `scp` Wallaroo to other workers on the cluster:
@@ -140,7 +140,7 @@ SSH into `wallaroo-follower-2`
 Start the Metrics UI:
 
 ```bash
-docker run -d -u root --cpuset-cpus 10-18 --privileged  -v /usr/bin:/usr/bin:ro   -v /var/run/docker.sock:/var/run/docker.sock -v /bin:/bin:ro  -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/apps/metrics_reporter_ui/log  -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 --name mui -h mui --net=host wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.5.2
+docker run -d -u root --cpuset-cpus 10-18 --privileged  -v /usr/bin:/usr/bin:ro   -v /var/run/docker.sock:/var/run/docker.sock -v /bin:/bin:ro  -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/apps/metrics_reporter_ui/log  -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 --name mui -h mui --net=host wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.6.1
 
 ```
 
@@ -163,7 +163,7 @@ SSH into `wallaroo-follower-2`
 Start Data Receiver with the following command:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -w -l wallaroo-follower-2:5555 > received.txt
+sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -n -l wallaroo-follower-2:5555 > received.txt
 ```
 
 #### Start the Market Spread Application
@@ -276,7 +276,7 @@ ssh into `wallaroo-leader-1` and build the Market Spread application and Wallaro
 
 ```bash
 cd ~/wallaroo
-make build-testing-performance-apps-market-spread build-giles-all build-utils-cluster_shutdown
+make build-testing-performance-apps-market-spread build-giles-all build-utils-cluster_shutdown build-testing-tools-fixed_length_message_blaster build-utils-data_receiver
 ```
 
 `scp` Wallaroo to other workers on the cluster:
@@ -318,7 +318,7 @@ SSH into `wallaroo-follower-2`
 Start the Metrics UI:
 
 ```bash
-docker run -d -u root --cpuset-cpus 10-18 --privileged  -v /usr/bin:/usr/bin:ro   -v /var/run/docker.sock:/var/run/docker.sock -v /bin:/bin:ro  -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/apps/metrics_reporter_ui/log  -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 --name mui -h mui --net=host wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.5.2
+docker run -d -u root --cpuset-cpus 10-18 --privileged  -v /usr/bin:/usr/bin:ro   -v /var/run/docker.sock:/var/run/docker.sock -v /bin:/bin:ro  -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/apps/metrics_reporter_ui/log  -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 --name mui -h mui --net=host wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.6.1
 
 ```
 
@@ -341,7 +341,7 @@ SSH into `wallaroo-follower-2`
 Start Data Receiver with the following command:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -w -l wallaroo-follower-2:5555 > received.txt
+sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -n -l wallaroo-follower-2:5555 > received.txt
 ```
 
 #### Start the Market Spread Application
@@ -359,7 +359,8 @@ SSH into `wallaroo-follower-3`
 Start the Market Spread application's 2nd Worker with the following command:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1-8,17 chrt -f 80 ~/wallaroo/testing/performance/apps/market-spread/market-spread  -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -n worker2 --ponythreads=8 --ponypinasio --ponynoblock --ponyminthreads=999
+sudo cset proc -s user -e numactl -- -C 1-8,17 chrt -f 80 ~/wallaroo/testing/performance/apps/market-spread/market-spread  -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -x wallaroo-follower-3:12500 -y wallaroo-follower-3:12501 -n worker2 --ponythreads=8 --ponypinasio --ponynoblock --ponyminthreads=999
+
 ```
 
 #### Start Giles Senders
