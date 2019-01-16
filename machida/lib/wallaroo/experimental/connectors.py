@@ -174,7 +174,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                                             instance_name,
                                             args, required_params,
                                             optional_params)
-        self.sources = {} # stream_id: source instance
+        self.sources = {} # stream_id: [source instance, acked point of ref]
         self.keys = []
         self._idx = -1
         self.joining = set()
@@ -182,57 +182,16 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
         self.closed = set()
         self._added_source = False
 
-    def stream_updated(self, stream):
-        print("NH: stream_updated: {}".format(stream))
-        super(MultiSourceConnector, self).stream_updated(stream)
-        source = self.sources.pop(stream.id, None)
-        # stream already in sources
-        if source:
-            # if stream is closed
-            if not stream.is_open:
-                # source is open?
-                if stream.id in self.open:
-                    print("NH: Closing stream and moving to joining")
-                    # this source is waiting for a NotifyAck
-                    # move it to joining
-                    self.open.remove(stream.id)
-                    self.joining.add(stream.id)
-                    self.sources[stream.id] = source
-                else: # source has been closed, so remove it entirely
-                    print("NH: closing source? {}".format(source))
-                    self.closed.add(stream.id)
-                    del source  # trigger whatever is in source's __del__
-
-            # otherwise... check if joining or open, in which case maybe reset
-            else:
-                # if stream just joined, remove it from joining
-                if stream.id in self.joining:
-                    print("NH: stream joined: {}".format(stream.id))
-                    self.joining.remove(stream.id)
-                    if stream.point_of_ref != source.point_of_ref():
-                        source.reset(stream.point_of_ref)
-                # put it back
-                print("NH: Stream is in open")
-                self.sources[stream.id] = source
-                self.open.add(stream.id)
-        # stream is new to us
-        elif stream.id in self.closed:
-            print("Stream {} does not have a matching source".format(stream.id))
-            pass
-        else:
-            print("NH: stream: {}".format(stream))
-            print("NH: closed: {}".format(self.closed))
-            if stream.is_open:
-                # This is an error for MultiSourceConnector
-                raise ConnectorError("Can't open a new source from a stream. "
-                                     "Please use the add_source interface.")
-            # nothing to do with a closed stream for which there is no source
-
     def add_source(self, source):
         self._added_source = True
         # add to self.sources
         _id = self.get_id(source.name)
-        self.sources[_id] = source
+        # check if we already have some ack data for this source
+        _, acked = self.sources.get(_id, (None, None))
+        if acked is not None:
+            print("NH: resetting source from a priori ack")
+            source.reset(acked)
+        self.sources[_id] = [source, acked]
         self.keys.append(_id)
         # add to joining set so we can control the starting sequence
         self.joining.add(_id)
@@ -271,7 +230,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                 if not key in self.open:
                     return None
                 # get source at key
-                source = self.sources[key]
+                source = self.sources[key][0]
                 # get value from source
                 value, point_of_ref = next(source)
                 # send it as a message
@@ -285,12 +244,13 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             except StopIteration:
                 # if the source threw a StopIteration, send an EOS message
                 # for it, then close it and remove it from sources
-                self.end_of_stream(stream_id = key)
                 self.closed.add(key)
+                self.open.discard(key)
                 source.close()
                 del self.sources[key]
                 self.keys.pop(self._idx)
                 self._idx -= 1 # to avoid skipping in the round-robin sender
+                self.end_of_stream(stream_id = key)
                 return None
             except IndexError:
                 # Index might have overflowed due to manual remove_source
@@ -302,3 +262,76 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             return None
         else:
             raise StopIteration
+
+    def stream_added(self, stream):
+        print("NH: stream_added({})".format(stream))
+        source, acked = self.sources.get(stream.id, (None, None))
+        if source:
+            if stream.point_of_ref != source.point_of_ref():
+                print("NH: updating point of ref")
+                source.reset(stream.point_of_ref)
+
+        # probably got this as part of the _handle_ok logic. Store the ack
+        # and use when a source matching the stream id is added
+        else:
+            print("NH: unknown source id, storing ack por for later")
+            self.sources[stream.id] = [None, stream.point_of_ref]
+
+    def stream_removed(self, stream):
+        print("NH: stream_removed({})".format(stream))
+
+    def stream_opened(self, stream):
+        print("NH: stream_opened({})".format(stream))
+        source, acked = self.sources.get(stream.id, (None, None))
+        if source:
+            if stream.id in self.joining:
+                print("NH: stream joined: {}".format(stream.id))
+                self.joining.remove(stream.id)
+                if stream.point_of_ref != source.point_of_ref():
+                    print("NH: updating point of ref")
+                    source.reset(stream.point_of_ref)
+            self.open.add(stream.id)
+        else:
+            raise ConnectorError("Stream {} was opened for unknown source. "
+                                 "Please use the add_source interface."
+                                 .format(stream))
+
+    def stream_closed(self, stream):
+        print("NH: stream_closed({})".format(stream))
+        source, acked = self.sources.get(stream.id, (None, None))
+        if source:
+            if stream.id in self.open:
+                print("NH: Closing stream and moving to joining")
+                # this source is waiting for a NotifyAck
+                # move it to joining
+                self.open.remove(stream.id)
+                self.joining.add(stream.id)
+            else: # source has been closed, so remove it entirely
+                print("NH: closing source? {}".format(source))
+                self.closed.add(stream.id)
+                # trigger whatever is in source's __del__
+                del source
+        else:
+            pass
+
+    def stream_acked(self, stream):
+        print("NH: stream_acked({})".format(stream))
+        source, acked = self.sources.get(stream.id, (None, None))
+        print("NH: source, acked : {}, {}".format(source, acked))
+        if source:
+            if acked:
+                if stream.point_of_ref < acked:
+                    print("WARNING: got an ack for older point of reference"
+                          " for stream {}".format(stream))
+                    source.reset(stream.point_of_ref)
+            else:
+                # source was added before connect()\handle_ok => reset
+                source.reset(stream.point_of_ref)
+            # update acked point of ref for the source
+            self.sources[stream.id][1] = stream.point_of_ref
+        elif stream.id in self.closed:
+            pass
+        else:
+            raise ConnectorError("Stream {} was opened for unknown source. "
+                                 "Please use the add_source interface."
+                                 .format(stream))
