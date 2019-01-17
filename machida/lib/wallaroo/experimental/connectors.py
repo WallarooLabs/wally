@@ -11,9 +11,9 @@ from . import (connector_wire_messages as cwm,
 
 
 if sys.version_info.major == 2:
-    from base_meta2 import BaseMeta, abstractmethod
+    from .base_meta2 import BaseMeta, abstractmethod
 else:
-    from base_meta3 import BaseMeta, abstractmethod
+    from .base_meta3 import BaseMeta, abstractmethod
 
 
 class BaseIter(BaseMeta):
@@ -99,8 +99,8 @@ class FramedFileReader(BaseIter, BaseSource):
         self.key = filename.encode()
 
     def __str__(self):
-        return ("FramedFileReader(filename: {}, closed: {})"
-                .format(self.name, self.file.closed))
+        return ("FramedFileReader(filename: {}, closed: {}, point_of_ref: {})"
+                .format(self.name, self.file.closed, self.point_of_ref()))
 
     def point_of_ref(self):
         try:
@@ -214,10 +214,6 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                 self.closing.add(_id)
                 # send end of stream
                 self.end_of_stream(stream_id = _id)
-
-
-    # TODO:
-    # Why is the stream_closed bit not working right?
 
     def _close_and_delete_source(self, source):
         key = self.get_id(source.name)
@@ -357,6 +353,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                 source.reset(stream.point_of_ref)
             # update acked point of ref for the source
             self.sources[stream.id][1] = stream.point_of_ref
+
         elif stream.id in self.closed:
             pass
         else:
