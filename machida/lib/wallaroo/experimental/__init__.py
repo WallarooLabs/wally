@@ -316,7 +316,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             self.set_terminator(4)
 
     def _handle_notify_ack(self, msg):
-        print("NH: handle_notify_ack({})".format(msg))
         old = self._streams.get(msg.stream_id, None)
         if old is not None:
             new = Stream(old.id, old.name, msg.point_of_ref,
@@ -332,7 +331,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                   " notified: {}".format(msg))
 
     def _handle_ack(self, msg):
-        print("NH: handle_ack({})".format(msg))
         self.credits += msg.credits
         for (stream_id, point_of_ref) in msg.acks:
             # Try to get old stream data
@@ -474,7 +472,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self.shutdown(error=message)
 
     def notify(self, stream_id, stream_name=None, point_of_ref=None):
-        print("NH: notify: {}, {}, {}".format(stream_id, stream_name, point_of_ref))
         old = self._streams.get(stream_id, None)
         if old:
             if point_of_ref is None:
@@ -510,7 +507,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         event_time must be either a datetime or a float of seconds since
         epoch (it may be negtive for dates before 1970-1-1)
         """
-        print("NH: sending EOS: {} {}".format(stream_id, key))
         flags = cwm.Message.Eos | cwm.Message.Ephemeral
         if event_time is not None:
             flags |= cwm.Message.EventTime
@@ -537,7 +533,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             event_time = ts,
             key = en_key,
             message = None)
-        print("NH: EOS msg: {}".format(msg))
+        print("INFO: Sending End of Stream {}".format(msg))
         self.write(msg)
         old = self._streams[stream_id]
         new = Stream(old.id, old.name, old.point_of_ref, False)
@@ -548,7 +544,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
     # User extensible methods #
     ###########################
 
-    def handle_restarted(self):
+    def handle_restarted(self, streams):
         """
         Logic to execute after successfully completing a restart
 
@@ -557,7 +553,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         of their sources.
         """
         # if restarting, send new notifys for existing streams to reopen them
-        for stream in self._streams.values():
+        for stream in streams.values():
             self.notify(stream.id, stream.name, stream.point_of_ref)
 
     def handle_invalid_message(self, msg):
@@ -572,14 +568,16 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         # close connection
         self._conn.close()
         # close streams
+        streams = {}
         for sid, stream in self._streams.items():
-            print("Closing stream: {}".format(stream))
-            new = Stream(stream.id, stream.name, stream.point_of_ref, False)
-            self._streams[sid] = new
-            self.stream_closed(new)
+            if stream.is_open:
+                new = Stream(stream.id, stream.name, stream.point_of_ref, False)
+                self._streams[sid] = new
+                self.stream_closed(new)
+                streams[sid] = new
         # try to connect again
         self.connect()
-        self.handle_restarted()
+        self.handle_restarted(streams)
 
     def handle_error(self):
         """
