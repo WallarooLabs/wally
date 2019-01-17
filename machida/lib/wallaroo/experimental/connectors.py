@@ -109,7 +109,8 @@ class FramedFileReader(BaseIter, BaseSource):
             return -1
 
     def reset(self, pos=0):
-        print("resetting {} to position {}".format(self.__str__(), pos))
+        print("INFO: resetting {} from {} to position {}"
+              .format(self.__str__(), self.point_of_ref(), pos))
         self.file.seek(pos)
 
     def __next__(self):
@@ -175,10 +176,12 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                                             args, required_params,
                                             optional_params)
         self.sources = {} # stream_id: [source instance, acked point of ref]
+        self.closed_sources = {} # stream_id: acked point of ref
         self.keys = []
         self._idx = -1
         self.joining = set()
         self.open = set()
+        self.closing = set()
         self.closed = set()
         self._added_source = False
 
@@ -189,7 +192,6 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
         # check if we already have some ack data for this source
         _, acked = self.sources.get(_id, (None, None))
         if acked is not None:
-            print("NH: resetting source from a priori ack")
             source.reset(acked)
         self.sources[_id] = [source, acked]
         self.keys.append(_id)
@@ -199,14 +201,51 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
         self.notify(_id, source.name, source.point_of_ref())
 
     def remove_source(self, source):
+        """
+        Start an asynchronous closing of a source.
+        This can only be completed via the `stream_closed` callback.
+        """
         _id = self.get_id(source.name)
         if _id in self.sources:
+            # Remove it from the open set
+            if _id in self.open:
+                self.open.remove(_id)
+                # Add it to the set of sources pending closing
+                self.closing.add(_id)
+                # send end of stream
+                self.end_of_stream(stream_id = _id)
+
+
+    # TODO:
+    # Why is the stream_closed bit not working right?
+
+    def _close_and_delete_source(self, source):
+        key = self.get_id(source.name)
+        if key in self.sources:
+            try:
+                self.closing.remove(key)
+            except KeyError:
+                raise ConnectorError("Cannot close source {}. It has not been"
+                                     "properly removed yet. Please use "
+                                     "`remove_source(source)` first."
+                                     .format(source))
             # close and remove the source
-            self.sources.pop(_id)
-            self.keys.remove(_id)
+            _, acked = self.sources.pop(key, (None, None))
+            try:
+                idx = self.keys.index(key) # value error
+                self.keys.pop(idx) # index error
+                if self._idx >= idx:
+                    # to avoid skipping in the round-robin sender
+                    self._idx -= 1
+            except (ValueError, IndexError):
+                # print warning
+                print("WARNING: Tried to delete source {} with key {} but "
+                      "could not find it in keys collection: {}"
+                      .format(source, key, self.keys))
             source.close()
             # add it to closed so we keep track of it
-            self.closed.add(_id)
+            self.closed.add(key)
+            self.closed_sources[key] = acked
 
     @staticmethod
     def get_id(text):
@@ -221,14 +260,14 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
     # Make this class an iterable:
     def __next__(self):
         if len(self.keys) > 0:
+            # get next position
+            self._idx = (self._idx + 1) % len(self.keys)
+            # get key of that position
+            key = self.keys[self._idx]
+            # if stream is not in an open state, return nothing.
+            if not key in self.open:
+                return None
             try:
-                # get next position
-                self._idx = (self._idx + 1) % len(self.keys)
-                # get key of that position
-                key = self.keys[self._idx]
-                # if stream is not in an open state, return nothing.
-                if not key in self.open:
-                    return None
                 # get source at key
                 source = self.sources[key][0]
                 # get value from source
@@ -242,15 +281,10 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                     message = value)
                 return msg
             except StopIteration:
-                # if the source threw a StopIteration, send an EOS message
-                # for it, then close it and remove it from sources
-                self.closed.add(key)
-                self.open.discard(key)
-                source.close()
-                del self.sources[key]
-                self.keys.pop(self._idx)
-                self._idx -= 1 # to avoid skipping in the round-robin sender
-                self.end_of_stream(stream_id = key)
+                # if the source threw a StopIteration, remove it
+                source, _ = self.sources.get(key, (None, None))
+                if source:
+                    self.remove_source(source)
                 return None
             except IndexError:
                 # Index might have overflowed due to manual remove_source
@@ -264,31 +298,25 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             raise StopIteration
 
     def stream_added(self, stream):
-        print("NH: stream_added({})".format(stream))
         source, acked = self.sources.get(stream.id, (None, None))
         if source:
             if stream.point_of_ref != source.point_of_ref():
-                print("NH: updating point of ref")
                 source.reset(stream.point_of_ref)
 
         # probably got this as part of the _handle_ok logic. Store the ack
         # and use when a source matching the stream id is added
         else:
-            print("NH: unknown source id, storing ack por for later")
             self.sources[stream.id] = [None, stream.point_of_ref]
 
     def stream_removed(self, stream):
-        print("NH: stream_removed({})".format(stream))
+        pass
 
     def stream_opened(self, stream):
-        print("NH: stream_opened({})".format(stream))
         source, acked = self.sources.get(stream.id, (None, None))
         if source:
             if stream.id in self.joining:
-                print("NH: stream joined: {}".format(stream.id))
                 self.joining.remove(stream.id)
                 if stream.point_of_ref != source.point_of_ref():
-                    print("NH: updating point of ref")
                     source.reset(stream.point_of_ref)
             self.open.add(stream.id)
         else:
@@ -297,27 +325,27 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                                  .format(stream))
 
     def stream_closed(self, stream):
-        print("NH: stream_closed({})".format(stream))
         source, acked = self.sources.get(stream.id, (None, None))
         if source:
             if stream.id in self.open:
-                print("NH: Closing stream and moving to joining")
+                # source was open, so move it back to joining state
                 # this source is waiting for a NotifyAck
                 # move it to joining
                 self.open.remove(stream.id)
                 self.joining.add(stream.id)
-            else: # source has been closed, so remove it entirely
-                print("NH: closing source? {}".format(source))
-                self.closed.add(stream.id)
-                # trigger whatever is in source's __del__
-                del source
+            elif stream.id in self.closing:
+                # source was pending closing, so close and delete it
+                self._close_and_delete_source(source)
+            elif stream.id in self.closed:
+                print("INFO: tried to close an already closed source: {}"
+                      .format(Source))
+            else:
+                pass
         else:
             pass
 
     def stream_acked(self, stream):
-        print("NH: stream_acked({})".format(stream))
         source, acked = self.sources.get(stream.id, (None, None))
-        print("NH: source, acked : {}, {}".format(source, acked))
         if source:
             if acked:
                 if stream.point_of_ref < acked:
