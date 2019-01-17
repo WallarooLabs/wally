@@ -36,9 +36,9 @@ from  . import connector_wire_messages as cwm
 
 # get a version comptible base metaclass
 if sys.version_info.major == 2:
-    from base_meta2 import BaseMeta, abstractmethod
+    from .base_meta2 import BaseMeta, abstractmethod
 else:
-    from base_meta3 import BaseMeta, abstractmethod
+    from .base_meta3 import BaseMeta, abstractmethod
 
 
 class ConnectorError(Exception):
@@ -507,6 +507,11 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         event_time must be either a datetime or a float of seconds since
         epoch (it may be negtive for dates before 1970-1-1)
         """
+        # TODO: Wallaroo needs to ack and connector should implement a
+        # stream_ended(stream) method.
+        # Without this, there is a race condition around end of streams and
+        # restarts which can result in the tail end of a stream not being resent
+        # if it was EOSd before a restart, but the rollback is to before the EOS.
         flags = cwm.Message.Eos | cwm.Message.Ephemeral
         if event_time is not None:
             flags |= cwm.Message.EventTime
@@ -552,6 +557,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         User may override this to provide their own logic based on the state
         of their sources.
         """
+        print("NH: handle_restarted({})".format(streams))
         # if restarting, send new notifys for existing streams to reopen them
         for stream in streams.values():
             self.notify(stream.id, stream.name, stream.point_of_ref)
@@ -568,16 +574,14 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         # close connection
         self._conn.close()
         # close streams
-        streams = {}
         for sid, stream in self._streams.items():
             if stream.is_open:
                 new = Stream(stream.id, stream.name, stream.point_of_ref, False)
                 self._streams[sid] = new
                 self.stream_closed(new)
-                streams[sid] = new
         # try to connect again
         self.connect()
-        self.handle_restarted(streams)
+        self.handle_restarted(self._streams)
 
     def handle_error(self):
         """
