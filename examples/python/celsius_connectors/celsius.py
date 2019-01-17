@@ -24,6 +24,7 @@ import wallaroo.experimental
 
 
 def application_setup(args):
+    out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
     celsius_feed = wallaroo.experimental.SourceConnectorConfig(
         "celsius_feed",
         encoder=encode_feed,
@@ -32,16 +33,18 @@ def application_setup(args):
         cookie="Dragons Love Tacos!",
         max_credits=10,
         refill_credits=8)
-    fahrenheit_conversion = wallaroo.experimental.SinkConnectorConfig(
-        "fahrenheit_conversion",
-        encoder=encode_conversion,
-        decoder=decode_conversion,
-        port=7200)
+    #fahrenheit_conversion = wallaroo.experimental.SinkConnectorConfig(
+    #    "fahrenheit_conversion",
+    #    encoder=encode_conversion,
+    #    decoder=decode_conversion,
+    #    port=7200)
+    sink_config = wallaroo.TCPSinkConfig(out_host, out_port, encode_conversion)
     pipeline = (
         wallaroo.source("convert temperature readings", celsius_feed)
         .to(multiply)
         .to(add)
-        .to_sink(fahrenheit_conversion)
+        #.to_sink(fahrenheit_conversion)
+        .to_sink(sink_config)
     )
     return wallaroo.build_application("Celsius to Fahrenheit", pipeline)
 
@@ -66,9 +69,10 @@ def decode_feed(data):
     return struct.unpack(">f", data)[0]
 
 
-@wallaroo.experimental.stream_message_encoder
+#@wallaroo.experimental.stream_message_encoder
+@wallaroo.encoder
 def encode_conversion(data):
-    return str(data).encode('utf-8')
+    return "{}\n".format(data).encode('utf-8')
 
 
 @wallaroo.experimental.stream_message_decoder
