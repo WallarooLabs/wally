@@ -169,7 +169,9 @@ class ConnectorSourceNotify[In: Any val]
     end
 
     try
-      let connector_msg = cwm.Frame.decode(consume data)?
+      let data': Array[U8] val = consume data
+      @printf[I32]("NH: decode data: %s\n".cstring(), _print_array[U8](data').cstring())
+      let connector_msg = cwm.Frame.decode(consume data')?
       match connector_msg
       | let m: cwm.HelloMsg =>
         ifdef "trace" then
@@ -276,13 +278,16 @@ class ConnectorSourceNotify[In: Any val]
             @printf[I32]("^*^* MSG: stream-id %llu flags %u msg_id %s event_time %s key %s message %s\n".cstring(), stream_id, m.flags, msg_id'.cstring(), event_time'.cstring(), key'.cstring(), message'.cstring())
 
             try
+              @printf[I32]("NH: processing body 1\n".cstring())
               let msg_id = m.message_id as cwm.MessageId
 
+              @printf[I32]("NH: processing body 2\n".cstring())
               if msg_id <= s.last_message_id then
                 @printf[I32]("^*^* MessageMsg: stale id in stream-id %llu flags %u msg_id %llu <= last_message_id %llu\n".cstring(), stream_id, m.flags, m.message_id as cwm.MessageId, s.last_message_id)
                 return _continue_perhaps(source)
               end
 
+              @printf[I32]("NH: processing body 3\n".cstring())
               if cwm.Eos.is_set(m.flags) then
                 (_active_stream_registry as ConnectorSourceListener[In]).stream_update(
                   stream_id, s.barrier_checkpoint_id, s.barrier_last_message_id,
@@ -290,6 +295,7 @@ class ConnectorSourceNotify[In: Any val]
                 try _stream_map.remove(stream_id)? else Fail() end
               end
 
+              @printf[I32]("NH: processing body 4\n".cstring())
               if cwm.Boundary.is_set(m.flags) then
                 None
               else
@@ -315,6 +321,7 @@ class ConnectorSourceNotify[In: Any val]
               // 6. What did I forget?  See received_old_school() for hints:
               //    it isn't perfect but it "works" at demo quality.
             else
+              @printf[I32]("NH: processing body failed!\n".cstring())
               Fail()
             end
           else
@@ -436,11 +443,13 @@ class ConnectorSourceNotify[In: Any val]
     _continue_perhaps(source)
 
   fun ref _continue_perhaps(source: ConnectorSource[In] ref): Bool =>
+    @printf[I32]("NH: _continue_perhaps: %s\n".cstring(),
+      _header_size.string().cstring())
     source.expect(_header_size)
     _header = true
     _continue_perhaps2()
 
-  fun ref _continue_perhaps2(): Bool =>    
+  fun ref _continue_perhaps2(): Bool =>
     ifdef linux then
       true
     else
