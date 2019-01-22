@@ -168,10 +168,6 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
     """
     def __init__(self, version, cookie, program_name, instance_name,
                  args=None, required_params=[], optional_params=[]):
-        print("__init__({}, {}, {}, {}, {}, {}, {})"
-            .format(version, cookie, program_name, instance_name,
-                    args, required_params, optional_params))
-        print("NH: 1111")
         AtLeastOnceSourceConnector.__init__(self,
                                             version,
                                             cookie,
