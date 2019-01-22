@@ -149,8 +149,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
     #    doesn't make much sense to me. Ping Brian before making changes to
     #    this.
 
-    # TODO nisan: why is this not the __init__ that is being run
-    # by connectors.py:175 in MultiSourceConnector.__init__?
     def __init__(self, version, cookie, program_name, instance_name,
                  args=None, required_params=['host', 'port'],
                  optional_params=[]):
@@ -605,6 +603,49 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         """
         _type, _value, _traceback = sys.exc_info()
         traceback.print_exception(_type, _value, _traceback)
+        print("ERROR: Closing the connection after encountering an error")
+        self.error = _value
+        self.close()
+
+    ########################
+    # User defined methods #
+    ########################
+
+    def stream_added(self, stream):
+        """
+        Action to take when a new stream is added [optional]
+        """
+        pass
+
+    def stream_removed(self, stream):
+        """
+        Action to take when a stream is removed [optional]
+        """
+        pass
+
+    @abstractmethod
+    def stream_opened(self, stream):
+        """
+        Action to take when a stream status changes from closed to open
+        [required]
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def stream_closed(self, stream):
+        """
+        Action to take when a stream status changes from open to closed
+        [required]
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def stream_acked(self, stream):
+        """
+        Action to take when a stream's point of reference is updated
+        [required]
+        """
+        raise NotImplementedError
 
 
 class SinkConnector(object):
