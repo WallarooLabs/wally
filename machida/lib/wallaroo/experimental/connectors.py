@@ -168,13 +168,18 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
     """
     def __init__(self, version, cookie, program_name, instance_name,
                  args=None, required_params=[], optional_params=[]):
+        print("__init__({}, {}, {}, {}, {}, {}, {})"
+            .format(version, cookie, program_name, instance_name,
+                    args, required_params, optional_params))
+        print("NH: 1111")
         AtLeastOnceSourceConnector.__init__(self,
                                             version,
                                             cookie,
                                             program_name,
                                             instance_name,
-                                            args, required_params,
-                                            optional_params)
+                                            args=args,
+                                            required_params=required_params,
+                                            optional_params=optional_params)
         self.sources = {} # stream_id: [source instance, acked point of ref]
         self.closed_sources = {} # stream_id: acked point of ref
         self.keys = []
