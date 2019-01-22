@@ -149,9 +149,11 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
     #    doesn't make much sense to me. Ping Brian before making changes to
     #    this.
 
-    def __init__(self, version, cookie, program_name, instance_name,
-                 args=None, required_params=['host', 'port'],
-                 optional_params=[]):
+    # TODO nisan: why is this not the __init__ that is being run
+    # by connectors.py:175 in MultiSourceConnector.__init__?
+    def __init__(self, *args, **kwargs):
+        print("ALOSC.__init({}, {})".format(args, kwargs))
+        exit(1)
         # Use BaseConnector to do any argument parsing
         BaseConnector.__init__(self, args, required_params, optional_params)
 
