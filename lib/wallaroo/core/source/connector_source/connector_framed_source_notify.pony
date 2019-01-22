@@ -405,13 +405,20 @@ class ConnectorSourceNotify[In: Any val]
         msg_uid.string()
       end
 
+    // TOOD: We need a way to assign watermarks based on the policy
+    // for any particular connector.
+    if ingest_ts > _watermark_ts then
+      _watermark_ts = ingest_ts
+    end
+
     (let is_finished, let last_ts) =
-      try
+      match decoded
+      | let d: In =>
         @printf[I32]("^*^* BEFORE _runner.run()\n".cstring())
-        _runner.run[In](_pipeline_name, pipeline_time_spent, decoded as In,
-          consume initial_key, _source_id, source, _router,
-          msg_uid, None, decode_end_ts,
-          latest_metrics_id', ingest_ts, _metrics_reporter)
+        _runner.run[In](_pipeline_name, pipeline_time_spent, d,
+          consume initial_key, ingest_ts, _watermark_ts, _source_id,
+          source, _router, msg_uid, None, decode_end_ts,
+          latest_metrics_id, ingest_ts, _metrics_reporter)
       else
         // decoded is None
         (true, ingest_ts)
