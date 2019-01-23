@@ -145,6 +145,7 @@ install_go() {
 install_changelog_tool() {
   git clone https://github.com/ponylang/changelog-tool
   cd changelog-tool
+  git checkout 7b0d91c2cf2b3edae1cc337ae035e49184f8659a
   make
   sudo make install
 }
