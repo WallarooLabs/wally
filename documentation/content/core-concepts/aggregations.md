@@ -1,7 +1,7 @@
 ---
 title: "Aggregations"
 menu:
-  docs:
+  toc:
     parent: "core-concepts"
     weight: 5
 toc: true

@@ -1,7 +1,7 @@
 ---
 title: "Windows"
 menu:
-  docs:
+  toc:
     parent: "core-concepts"
     weight: 6
 toc: true

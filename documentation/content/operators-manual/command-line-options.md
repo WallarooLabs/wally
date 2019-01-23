@@ -1,7 +1,7 @@
 ---
 title: "Command-Line Options"
 menu:
-  docs:
+  toc:
     parent: "operators-manual"
     weight: 40
 toc: true

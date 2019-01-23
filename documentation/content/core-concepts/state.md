@@ -1,7 +1,7 @@
 ---
 title: "State"
 menu:
-  docs:
+  toc:
     parent: "core-concepts"
     weight: 2
 toc: true

@@ -1,7 +1,7 @@
 ---
 title: "Wallaroo Metrics UI"
 menu:
-  docs:
+  toc:
     parent: "operators-manual"
     weight: 50
 toc: true

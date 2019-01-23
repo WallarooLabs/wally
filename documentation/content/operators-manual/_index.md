@@ -1,9 +1,8 @@
 ---
 title: "Operators Manual"
 menu:
-  docs:
+  toc:
     parent: "operators-manual"
     weight: 1
-toc: true
 layout: single
 ---

@@ -1,7 +1,7 @@
 ---
 title: "Wallaroo Core Concepts"
 menu:
-  docs:
+  toc:
     parent: "core-concepts"
     weight: 1
 toc: true

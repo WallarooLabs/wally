@@ -1,0 +1,59 @@
+.icon {
+    font-family: Icon;
+    speak: none;
+    font-style: normal;
+    font-weight: 400;
+    font-variant: normal;
+    text-transform: none;
+    line-height: 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale
+}
+
+.icon-search:before {
+    content: "\e600"
+}
+
+.icon-back:before {
+    content: "\e601"
+}
+
+.icon-link:before {
+    content: "\e602"
+}
+
+.icon-close:before {
+    content: "\e603"
+}
+
+.icon-menu:before {
+    content: "\e604"
+}
+
+.icon-forward:before {
+    content: "\e605"
+}
+
+.icon-twitter:before {
+    content: "\e606"
+}
+
+.icon-github:before {
+    content: "\e607"
+}
+
+.icon-download:before {
+    content: "\e608"
+}
+
+.icon-star:before {
+    content: "\e609"
+}
+
+.icon-warning:before {
+    content: "\e610"
+}
+
+.icon-note:before {
+    content: "\e611"
+}

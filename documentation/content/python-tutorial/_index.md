@@ -1,7 +1,7 @@
 ---
 title: "Python API Introduction"
 menu:
-  docs:
+  toc:
     parent: "pytutorial"
     weight: 1
 toc: true

@@ -1,7 +1,7 @@
 ---
 title: "Tips for using Wallaroo in Docker"
 menu:
-  docs:
+  toc:
     parent: "appendix"
     weight: 1
 toc: true

@@ -1,7 +1,7 @@
 ---
 title: "Wallaroo Python API Classes"
 menu:
-  docs:
+  toc:
     parent: "pytutorial"
     weight: 70
 toc: true
