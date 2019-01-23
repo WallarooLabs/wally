@@ -63,10 +63,6 @@ update_version() {
 
 build_book() {
   echo "Building book..."
-  pushd documentation/themes/ananke
-  git submodule init
-  git submodule update
-  popd
   pushd documentation
   hugo
   popd
