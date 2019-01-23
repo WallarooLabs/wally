@@ -164,7 +164,8 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self.instance_name = instance_name
 
         # Stream details
-        self._streams = {}  # stream_id: Stream
+        self._streams = {}  # {stream_id: {'stream': Stream, 'por': por}}
+        self._pending_eos = {}  # {stream_id: point_of_ref}
 
         self.handshake_complete = False
         self.in_buffer = []
@@ -500,10 +501,11 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                               new.name,
                               new.point_of_ref))
 
-    def end_of_stream(self, stream_id, event_time=None, key=None):
+    def end_of_stream(self, stream_id, point_of_ref, event_time=None,
+                      key=None):
         """
-        Send an EOS message for a stream_id, with an optional key and
-        event_time.
+        Send an EOS message for a stream_id and point_of_ref,
+        with an optional key and event_time.
         event_time must be either a datetime or a float of seconds since
         epoch (it may be negtive for dates before 1970-1-1)
         """
@@ -540,10 +542,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             message = None)
         print("INFO: Sending End of Stream {}".format(msg))
         self.write(msg)
-        old = self._streams[stream_id]
-        new = Stream(old.id, old.name, old.point_of_ref, False)
-        self._streams[stream_id] = new
-        self.stream_closed(new)
+        self._pending_eos[stream_id] = point_of_ref
 
     ###########################
     # User extensible methods #
@@ -557,7 +556,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         User may override this to provide their own logic based on the state
         of their sources.
         """
-        print("NH: handle_restarted({})".format(streams))
         # if restarting, send new notifys for existing streams to reopen them
         for stream in streams.values():
             self.notify(stream.id, stream.name, stream.point_of_ref)
