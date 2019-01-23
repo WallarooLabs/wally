@@ -208,7 +208,7 @@ class Runner(threading.Thread):
         if self._output:
             return self._output[start_from:]
         self._file.flush()
-        with open(self._file.name, 'r') as ro:
+        with open(self._file.name, 'r', errors='backslashreplace') as ro:
             ro.seek(start_from)
             return ro.read()
 
