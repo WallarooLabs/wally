@@ -1,0 +1,42 @@
+{{ define "main" }}
+  <article class="w-100 ph4 pb5 pb6-ns pt1 pt5-ns">
+      <div class="order-0 w-20 dn db-l doc-menu" id="doc-menu">
+        {{ partial "toc.html" . }}
+      </div>
+    <div class="flex-l" id="the-body">
+      {{- if or (.Params.toc) (.Site.RegularPages.Related .) -}}
+      <div class="order-2 w-100 w-20-l ph5-m ph0-l mb4 sticky dn db-l" id="context-menu">
+      {{- partial "menu-contextual.html" . -}}
+      </div>
+      {{- end -}}
+
+      <div class="order-1 w-60-l mw9 ph0 ph5-ns mid-gray nested-copy-line-height no-underline nested-links nested-img nested-copy-seperator nested-blockquote mt0-ns" style="flex-grow:1;">
+        <div class="order-0 mt4 w-100 center mw7" style="clear: both;">
+          <a id="doc-menu-toggle" class="icon icon-menu" href="javascript:void(0)" onClick="hideShowDM()"></a>
+          {{- if or (.Params.toc) (.Site.RegularPages.Related .) -}}
+          <a id="context-menu-toggle" class="icon icon-menu" href="javascript:void(0)" onClick="hideShowCM()"></a>
+          {{- end -}}
+        </div>
+
+        <div class="documentation-copy center mw7">
+          <header class="mt4 w-100">
+            <p class="f6 b helvetica tracked">
+                {{/*
+                CurrentSection allows us to use the section title instead of inferring from the folder.
+                https://gohugo.io/variables/page/#section-variables-and-methods
+                */}}
+              {{with .Params.section }}{{. | upper }}{{end}}
+            </p>
+            <h1 class="f1 athelas mb1">
+              {{- .Title -}}
+            </h1>
+          </header>
+
+          <main class="nested-copy-line-height lh-copy serif f4 nested-links nested-img mid-gray pr4-l">
+            {{- .Content -}}
+          </main>
+        </div>
+      </div>
+    </div>
+  </article>
+{{ end }}

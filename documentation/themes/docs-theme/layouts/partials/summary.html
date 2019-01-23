@@ -1,0 +1,16 @@
+<div class="relative w-100 mb4 bg-white nested-copy-line-height">
+  <div class="bg-white mb3 pa4 gray overflow-hidden">
+    <h1 class="f3 near-black">
+      <a href="{{ .URL }}" class="link black dim">
+        {{ .Title }}
+      </a>
+    </h1>
+    <div class="nested-links f5 lh-copy nested-copy-line-height">
+      {{ if not .Params.summary }}
+        <p>{{ .Summary }}</p>
+      {{ else }}
+        <p>{{ .Params.summary | markdownify }}</p>
+      {{ end }}
+    </div>
+  </div>
+</div>

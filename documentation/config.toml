@@ -1,7 +1,7 @@
 baseURL = "https://docs.wallaroolabs.com/"
 languageCode = "en-us"
 title = "Wallaroo"
-theme = "ananke"
+theme = "docs-theme"
 canonifyurls = false
 preserveTaxonomyNames = true
 
