@@ -1,6 +1,5 @@
 #doc-menu {
   position: absolute;
-  top: 100px;
   width: 250px;
   box-sizing: border-box;
   z-index: 1;
@@ -10,7 +9,6 @@
 #the-body {
   left: 300px;
   position: absolute;
-  top: 100px;
   right: 0;
   overflow: hidden;
 }
