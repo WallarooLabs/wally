@@ -1,7 +1,7 @@
 ---
 title: "Working with State"
 menu:
-  docs:
+  toc:
     parent: "core-concepts"
     weight: 3
 toc: true

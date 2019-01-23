@@ -2,7 +2,7 @@
 title: "Writing Your Own Stateful Application"
 menu:
   docs:
-    parent: "pytutorial"
+    toc: "pytutorial"
     weight: 30
 toc: true
 ---

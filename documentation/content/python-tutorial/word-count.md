@@ -2,7 +2,7 @@
 title: "Word Count"
 menu:
   docs:
-    parent: "pytutorial"
+    toc: "pytutorial"
     weight: 40
 toc: true
 ---

@@ -1,7 +1,7 @@
 ---
 title: "Choosing an Installation Option"
 menu:
-  docs:
+  toc:
     parent: "pyinstallation"
     weight: 1
 toc: true

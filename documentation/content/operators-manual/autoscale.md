@@ -1,7 +1,7 @@
 ---
 title: "Autoscale"
 menu:
-  docs:
+  toc:
     parent: "operators-manual"
     weight: 20
 toc: true

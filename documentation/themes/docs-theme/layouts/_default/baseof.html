@@ -37,7 +37,7 @@
     <link href="{{ relURL "dist/css/app.css" }}" rel="stylesheet">
     <link href="{{ relURL "dist/css/highlight.css" }}" rel="stylesheet">
     <link href="{{ relURL "dist/css/icon.css" }}" rel="stylesheet">
-    <link href="{{ relURL "dist/css/pony.css" }}" rel="stylesheet">
+    <link href="{{ relURL "dist/css/wallaroo.css" }}" rel="stylesheet">
 
     {{ range .Site.Params.custom_css }}
       <link rel="stylesheet" href="{{ relURL ($.Site.BaseURL) }}{{ . }}">
@@ -61,6 +61,9 @@
     {{ if eq (getenv "HUGO_ENV") "production" | or (eq .Site.Params.env "production")  }}
       {{ template "_internal/google_analytics_async.html" . }}
     {{ end }}
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
   </head>
 
   <body class="ma0 {{ $.Param "body_classes"  | default "avenir bg-near-white"}}{{ with getenv "HUGO_ENV" }} {{ . }}{{ end }}">

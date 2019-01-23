@@ -2,7 +2,7 @@
 title: "Starting a new shell"
 menu:
   docs:
-    parent: "pytutorial"
+    toc: "pytutorial"
     weight: 100
 toc: true
 ---

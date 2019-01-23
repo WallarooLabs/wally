@@ -65,4 +65,11 @@ function toggleClass() {
 
     }
   }
+
+  let codeBlocks = document.getElementsByTagName('code')
+  for (let [key, codeBlock] of Object.entries(codeBlocks)){
+  var widthDif = codeBlock.scrollWidth - codeBlock.clientWidth
+  if (widthDif > 0)
+    codeBlock.parentNode.classList.add('expand')
+  }
 </script>

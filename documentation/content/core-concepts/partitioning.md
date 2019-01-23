@@ -1,7 +1,7 @@
 ---
 title: "Partitioning"
 menu:
-  docs:
+  toc:
     parent: "core-concepts"
     weight: 4
 toc: true

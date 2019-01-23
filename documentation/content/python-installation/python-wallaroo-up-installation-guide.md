@@ -1,7 +1,7 @@
 ---
 title: "Installing with Wallaroo Up"
 menu:
-  docs:
+  toc:
     parent: "pyinstallation"
     weight: 4
 toc: true
