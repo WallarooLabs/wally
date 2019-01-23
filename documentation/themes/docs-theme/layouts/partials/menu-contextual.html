@@ -4,10 +4,10 @@
 */}}
 
 {{- if .Params.toc -}}
-  <nav role="toc" class="toc bg-light-gray pl3 pr3 nested-list-reset nested-copy-line-height nested-links">
+  <div class="bg-light-gray pa3 nested-list-reset nested-copy-line-height nested-links">
     <p class="f5 b mb3">What's in this document</p>
       {{ .TableOfContents }}
-  </nav>
+  </div>
 {{- end -}}
 
 {{/*

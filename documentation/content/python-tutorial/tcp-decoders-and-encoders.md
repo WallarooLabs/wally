@@ -1,7 +1,7 @@
 ---
 title: "TCP Decoders and Encoders"
 menu:
-  docs:
+  toc:
     parent: "pytutorial"
     weight: 85
 toc: true

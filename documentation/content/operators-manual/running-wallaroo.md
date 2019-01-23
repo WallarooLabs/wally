@@ -1,7 +1,7 @@
 ---
 title: "Running Wallaroo"
 menu:
-  docs:
+  toc:
     parent: "operators-manual"
     weight: 10
 toc: true

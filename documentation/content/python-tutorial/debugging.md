@@ -1,7 +1,7 @@
 ---
 title: "Debugging"
 menu:
-  docs:
+  toc:
     parent: "pytutorial"
     weight: 80
 toc: true

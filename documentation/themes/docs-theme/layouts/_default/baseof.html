@@ -17,10 +17,27 @@
       <META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
     {{ end }}
 
-    {{ $stylesheet := .Site.Data.webpack_assets.app }}
-    {{ with $stylesheet.css }}
-      <link href="{{ relURL (printf "%s%s" "dist/" .) }}" rel="stylesheet">
-    {{ end }}
+    <style>
+      @font-face {
+        font-family: 'Icon';
+        src: url('{{ "dist/fonts/icon.eot?52m981" | relURL }}');
+        src: url('{{ "dist/fonts/icon.eot?#iefix52m981" | relURL }}')
+               format('embedded-opentype'),
+             url('{{ "dist/fonts/icon.woff?52m981" | relURL }}')
+               format('woff'),
+             url('{{ "dist/fonts/icon.ttf?52m981" | relURL }}')
+               format('truetype'),
+             url('{{ "dist/fonts/icon.svg?52m981#icon" | relURL }}')
+               format('svg');
+        font-weight: normal;
+        font-style: normal;
+      }
+    </style>
+
+    <link href="{{ relURL "dist/css/app.css" }}" rel="stylesheet">
+    <link href="{{ relURL "dist/css/highlight.css" }}" rel="stylesheet">
+    <link href="{{ relURL "dist/css/icon.css" }}" rel="stylesheet">
+    <link href="{{ relURL "dist/css/wallaroo.css" }}" rel="stylesheet">
 
     {{ range .Site.Params.custom_css }}
       <link rel="stylesheet" href="{{ relURL ($.Site.BaseURL) }}{{ . }}">
@@ -52,10 +69,9 @@
   <body class="ma0 {{ $.Param "body_classes"  | default "avenir bg-near-white"}}{{ with getenv "HUGO_ENV" }} {{ . }}{{ end }}">
 
     {{ block "header" . }}{{ partial "site-header.html" .}}{{ end }}
-    <main class="pb7" role="main">
+    <main role="main">
       {{ block "main" . }}{{ end }}
     </main>
-    {{ block "footer" . }}{{ partial "site-footer.html" . }}{{ end }}
     {{ block "scripts" . }}{{ partial "site-scripts.html" . }}{{ end }}
   </body>
 </html>

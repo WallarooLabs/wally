@@ -1,7 +1,7 @@
 ---
 title: "Installing with Vagrant"
 menu:
-  docs:
+  toc:
     parent: "pyinstallation"
     weight: 3
 toc: true

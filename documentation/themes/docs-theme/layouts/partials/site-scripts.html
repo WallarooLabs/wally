@@ -6,11 +6,39 @@
 <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.10.0/languages/pony.min.js"></script>
 <script>hljs.initHighlightingOnLoad();</script>
 
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+
 <script>
   var toggleBtns = document.getElementsByClassName('js-toggle')
   for (var i = 0; i < toggleBtns.length; i++) {
     toggleBtns[i].addEventListener('click', toggleClass, false)
   }
+
+  var myToggleBtns = document.getElementsByClassName('hide-show-toggle')
+  for (var i = 0; i < myToggleBtns.length; i++) {
+    myToggleBtns[i].addEventListener('click', hideShow, false)
+  }
+
+function hideShowDM() {
+  var menu = document.getElementById("doc-menu")
+  var thebody = document.getElementById("the-body")
+  if (window.getComputedStyle(menu).display == "none") {
+    menu.style.display = "block";
+    thebody.style.left = "300px";
+  } else {
+    menu.style.display = "none";
+    thebody.style.left = "0px";
+  }
+}
+
+function hideShowCM() {
+  var menu = document.getElementById("context-menu")
+  if (window.getComputedStyle(menu).display == "none") {
+    menu.style.display = "block";
+  } else {
+    menu.style.display = "none";
+  }
+}
 
 function toggleClass() {
   // Define the data target via the dataset "target" (e.g. data-target=".docsmenu")
@@ -38,15 +66,10 @@ function toggleClass() {
     }
   }
 
-//let article = document.getElementById('prose')
-
-//if (article) {
   let codeBlocks = document.getElementsByTagName('code')
-    for (let [key, codeBlock] of Object.entries(codeBlocks)){
-    var widthDif = codeBlock.scrollWidth - codeBlock.clientWidth
-    if (widthDif > 0)
-      codeBlock.parentNode.classList.add('expand')
+  for (let [key, codeBlock] of Object.entries(codeBlocks)){
+  var widthDif = codeBlock.scrollWidth - codeBlock.clientWidth
+  if (widthDif > 0)
+    codeBlock.parentNode.classList.add('expand')
   }
-//}
 </script>
-

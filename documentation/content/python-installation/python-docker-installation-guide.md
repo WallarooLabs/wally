@@ -1,7 +1,7 @@
 ---
 title: "Installing with Docker"
 menu:
-  docs:
+  toc:
     parent: "pyinstallation"
     weight: 2
 toc: true

@@ -1,0 +1,56 @@
+#doc-menu {
+  position: absolute;
+  width: 250px;
+  box-sizing: border-box;
+  z-index: 1;
+  clear: both;
+}
+
+#the-body {
+  left: 300px;
+  position: absolute;
+  right: 0;
+  overflow: hidden;
+}
+
+#context-menu {
+  display: block;
+}
+
+#context-menu-toggle {
+  float: right;
+}
+
+#context-menu-toggle:link {
+  color: black;
+  text-decoration: none;
+}
+
+#doc-menu-toggle:link {
+  color: black;
+  text-decoration: none;
+}
+
+@media screen and (max-width: 60em) {
+  #doc-menu {
+    display: none;
+  }
+
+  #context-menu {
+    display: none;
+  }
+
+  #context-menu-toggle {
+    display: none;
+  }
+
+  #the-body {
+    left: 0px;
+    padding: .5rem;
+  }
+}
+
+/* Don't show ### level items in Table of Contents */
+#TableOfContents > ul > li > ul > li > ul > li {
+  display: none;
+}

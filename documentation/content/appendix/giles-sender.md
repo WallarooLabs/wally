@@ -1,7 +1,7 @@
 ---
 title: "Giles sender"
 menu:
-  docs:
+  toc:
     parent: "appendix"
     weight: 1
 toc: true

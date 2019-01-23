@@ -1,7 +1,7 @@
 ---
 title: "Data Redundancy"
 menu:
-  docs:
+  toc:
     parent: "operators-manual"
     weight: 30
 toc: true
