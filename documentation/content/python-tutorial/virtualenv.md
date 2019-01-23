@@ -1,8 +1,8 @@
 ---
 title: "Wallaroo and Virtualenv"
 menu:
-  docs:
-    toc: "pytutorial"
+  toc:
+    parent: "pytutorial"
     weight: 90
 toc: true
 ---

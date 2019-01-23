@@ -1,8 +1,8 @@
 ---
 title: "Inter-worker Serialization and Resilience"
 menu:
-  docs:
-    toc: "pytutorial"
+  toc:
+    parent: "pytutorial"
     weight: 50
 toc: true
 ---

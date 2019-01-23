@@ -1,8 +1,8 @@
 ---
 title: "Writing Your Own Application"
 menu:
-  docs:
-    toc: "pytutorial"
+  toc:
+    parent: "pytutorial"
     weight: 20
 toc: true
 ---

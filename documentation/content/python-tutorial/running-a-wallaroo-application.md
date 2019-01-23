@@ -1,8 +1,8 @@
 ---
 title: "Running A Wallaroo Application"
 menu:
-  docs:
-    toc: "pytutorial"
+  toc:
+    parent: "pytutorial"
     weight: 10
 toc: true
 ---

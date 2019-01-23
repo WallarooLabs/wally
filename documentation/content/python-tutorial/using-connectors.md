@@ -1,8 +1,8 @@
 ---
 title: "Using Connectors as Sources & Sinks"
 menu:
-  docs:
-    toc: "pytutorial"
+  toc:
+    parent: "pytutorial"
     weight: 60
 toc: true
 ---
