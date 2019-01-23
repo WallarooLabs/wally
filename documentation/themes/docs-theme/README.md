@@ -1,4 +1,3 @@
-# hugo-documentation-site-theme
-Hugo theme used for Pony Tutorial and Pony Patterns websites
+# Wallaroo Docs Theme
 
-Based on [Anake](https://github.com/budparr/gohugo-theme-ananke).
+Based on the Pony Tutorial and Pony Patterns theme.
