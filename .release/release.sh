@@ -83,7 +83,7 @@ update_version() {
   # Update version in config.toml
   sed -i "s/^wallaroo_version=.*/wallaroo_version=\"${for_version}\"/" documentation/config.toml
   # Update docker version in config.toml
-  DOCKER_VERSION=$(< VERSION)-$(git log -n 1 --oneline | cut -d' ' -f1)
+  DOCKER_VERSION=$for_version
   DOCKER_URL="release\/wallaroo:$DOCKER_VERSION"
   sed -i "s/^docker_version_url=.*/docker_version_url=\"${DOCKER_URL}\"/" documentation/config.toml
 }
