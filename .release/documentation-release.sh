@@ -24,12 +24,18 @@ verify_branch() {
   if [[ "$BRANCH" == "master" ]]
   then
     remote_branch=master
+    DOCKER_VERSION=$(< VERSION)
+    DOCKER_URL="release\/wallaroo:$DOCKER_VERSION"
   elif [[ "$BRANCH" == "release" ]]
   then
     remote_branch=release
+    DOCKER_VERSION=$(< VERSION)
+    DOCKER_URL="release\/wallaroo:$DOCKER_VERSION"
   elif [[ "$BRANCH" == *"release-"* ]]
   then
     remote_branch=rc
+    DOCKER_VERSION=$(< VERSION)-$(git log -n 1 --oneline | cut -d' ' -f1)
+    DOCKER_URL="dev\/wallaroo:$DOCKER_VERSION"
   else
     echo "No remote repo to push book to. Exiting"
     exit 0
@@ -47,6 +53,12 @@ verify_commit_on_branch() {
 
 checkout_to_commit() {
   git checkout "$commit"
+}
+
+update_version() {
+  echo "Updating version for docker image in config.toml..."
+  # Update docker version in config.toml
+  sed -i "s/^docker_version_url=.*/docker_version_url=\"${DOCKER_URL}\"/" documentation/config.toml
 }
 
 build_book() {
@@ -94,6 +106,7 @@ verify_args
 verify_branch
 verify_commit_on_branch
 checkout_to_commit
+update_version
 build_book
 upload_book
 git_clean
