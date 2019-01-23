@@ -452,12 +452,12 @@ def test_message():
             # raise if ephemeral & boundary
             if fv & M.Boundary:
                 with pytest.raises(Exception) as e_info:
-                    M.test_flags(allowed, fv, None, event_time, key, message)
+                    M.test_flags_allowed(fv, None, event_time, key, message)
 
             # raise if ephemeral & unstable reference
             if fv & M.UnstableReference == M.UnstableReference:
                 with pytest.raises(Exception) as e_info:
-                    M.test_flags(allowed, fv, None, event_time, key, message)
+                    M.test_flags_allowed(fv, None, event_time, key, message)
 
             fv = fv & ~M.Boundary & ~M.UnstableReference
 

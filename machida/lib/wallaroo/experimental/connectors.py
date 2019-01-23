@@ -182,7 +182,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
         self._idx = -1
         self.joining = set()
         self.open = set()
-        self.closing = set()
+        self.pending_eos_ack = {}  # {stream_id: point_of_ref}
         self.closed = set()
         self._added_source = False
 
@@ -212,15 +212,17 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             if _id in self.open:
                 self.open.remove(_id)
                 # Add it to the set of sources pending closing
-                self.closing.add(_id)
+                point_of_ref = source.point_of_ref()
+                self.pending_eos_ack[_id] = point_of_ref
                 # send end of stream
-                self.end_of_stream(stream_id = _id)
+                self.end_of_stream(stream_id = _id,
+                                   point_of_ref = point_of_ref)
 
     def _close_and_delete_source(self, source):
         key = self.get_id(source.name)
         if key in self.sources:
             try:
-                self.closing.remove(key)
+                del self.pending_eos_ack[key]
             except KeyError:
                 raise ConnectorError("Cannot close source {}. It has not been"
                                      "properly removed yet. Please use "
@@ -325,14 +327,14 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
         source, acked = self.sources.get(stream.id, (None, None))
         if source:
             if stream.id in self.open:
-                # source was open, so move it back to joining state
-                # this source is waiting for a NotifyAck
-                # move it to joining
+                # source was open so move it back to joining state
                 self.open.remove(stream.id)
                 self.joining.add(stream.id)
-            elif stream.id in self.closing:
-                # source was pending closing, so close and delete it
-                self._close_and_delete_source(source)
+            elif stream.id in self.pending_eos_ack:
+                # source was pending eos ack, but that was interrupted
+                # move it back to joining
+                del self.pending_eos_ack[stream.id]
+                self.joining.add(stream.id)
             elif stream.id in self.closed:
                 print("INFO: tried to close an already closed source: {}"
                       .format(Source))
@@ -344,7 +346,24 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
     def stream_acked(self, stream):
         source, acked = self.sources.get(stream.id, (None, None))
         if source:
-            if acked:
+            # check if there's an eos pending this ack
+            eos_point_of_ref = self.pending_eos_ack.get(stream.id, None)
+            if eos_point_of_ref:
+                # source was pending eos ack
+                # check ack's point of ref
+                if stream.point_of_ref == eos_point_of_ref:
+                    # can finish closing it now
+                    self._close_and_delete_source(source)
+                    return
+                elif stream.point_of_ref < eos_point_of_ref:
+                    pass
+                else:
+                    raise ConnectorError("Got ack point of ref that is larger"
+                        " than the ended stream's point of ref.\n"
+                        "Expected: {}, Received: {}"
+                        .format(eos_point_of_ref, stream))
+            elif acked:
+                # regular ack (incremental ack of a live stream)
                 if stream.point_of_ref < acked:
                     print("WARNING: got an ack for older point of reference"
                           " for stream {}".format(stream))
