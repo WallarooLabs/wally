@@ -25,10 +25,13 @@ from .cluster import (Cluster,
                      runner_data_format)
 from .control import (SinkAwaitValue,
                      SinkExpect)
-from .end_points import (Sender,
-                        Reader)
+from .end_points import (ALOSender,
+                         Sender,
+                         Reader)
 from .errors import PipelineTestError
 from .logger import INFO2
+
+from wallaroo.experimental.connectors import BaseSource
 
 try:
     basestring
@@ -42,6 +45,9 @@ DEFAULT_RUNNER_JOIN_TIMEOUT = 30
 
 FROM_TAIL = int(os.environ.get("FROM_TAIL", 10))
 
+
+VERSION = '0.0.1'
+COOKIE = 'cookie'
 
 def pipeline_test(generator, expected, command, workers=1, sources=1,
                   mode='framed', sinks=1, decoder=None, pre_processor=None,
@@ -160,11 +166,21 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             if generator:
                 if not isinstance(generator, list):
                     generator = [(generator, 0)]
-                for gen, idx in generator:
-                    reader = Reader(gen)
-                    sender = Sender(cluster.source_addrs[idx], reader,
-                                    batch_size=batch_size,
-                                    interval=sender_interval)
+                for i, (gen, idx) in enumerate(generator):
+                    if isinstance(gen, BaseSource):
+                        # AtLeastOnce Sender: ALOSender
+                        sender = ALOSender(gen,
+                                           VERSION,
+                                           COOKIE,
+                                           command,
+                                           'instance_{}'.format(i),
+                                           cluster.source_addrs[idx])
+                    else:
+                        # plain old TCP sender
+                        reader = Reader(gen)
+                        sender = Sender(cluster.source_addrs[idx], reader,
+                                        batch_size=batch_size,
+                                        interval=sender_interval)
                     cluster.add_sender(sender)
 
             # start each sender and await its completion before starting the next
