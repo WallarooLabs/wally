@@ -166,35 +166,37 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
     print("Reached the end of all files. Shutting down.")
     ```
     """
-    def __init__(self, version, cookie, program_name, instance_name,
-                 args=None, required_params=[], optional_params=[]):
+    def __init__(self, version, cookie, program_name, instance_name, host,
+                 port):
         AtLeastOnceSourceConnector.__init__(self,
                                             version,
                                             cookie,
                                             program_name,
                                             instance_name,
-                                            args=args,
-                                            required_params=required_params,
-                                            optional_params=optional_params)
+                                            host,
+                                            port)
         self.sources = {} # stream_id: [source instance, acked point of ref]
         self.closed_sources = {} # stream_id: acked point of ref
         self.keys = []
         self._idx = -1
         self.joining = set()
         self.open = set()
+        self.was_ever_opened = set()
         self.pending_eos_ack = {}  # {stream_id: point_of_ref}
         self.closed = set()
         self._added_source = False
+        print("ALO: init: {}".format(self))
 
     def add_source(self, source):
+        print("ALO: {} add_source".format(self), source)
         self._added_source = True
         # add to self.sources
         _id = self.get_id(source.name)
-        # check if we already have some ack data for this source
-        _, acked = self.sources.get(_id, (None, None))
-        if acked is not None:
-            source.reset(acked)
-        self.sources[_id] = [source, acked]
+        # check if we already have source... if we do raise error
+        if _id in self.sources:
+            raise ConnectorError("Cannot add Source {}. A source exists"
+                " with that ID: {}".format(source, self.sources[_id]))
+        self.sources[_id] = [source, source.point_of_ref()]
         self.keys.append(_id)
         # add to joining set so we can control the starting sequence
         self.joining.add(_id)
@@ -206,10 +208,13 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
         Start an asynchronous closing of a source.
         This can only be completed via the `stream_closed` callback.
         """
+        print("ALO: {} remove_source".format(self), source)
         _id = self.get_id(source.name)
         if _id in self.sources:
+            print("ALO: {} remove_source A".format(self), source)
             # Remove it from the open set
             if _id in self.open:
+                print("ALO: {} remove_source B".format(self), source)
                 self.open.remove(_id)
                 # Add it to the set of sources pending closing
                 point_of_ref = source.point_of_ref()
@@ -219,6 +224,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                                    point_of_ref = point_of_ref)
 
     def _close_and_delete_source(self, source):
+        print("ALO: {} _close_and_delete_source".format(self), source)
         key = self.get_id(source.name)
         if key in self.sources:
             try:
@@ -247,25 +253,37 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             self.closed_sources[key] = acked
 
     @staticmethod
-    def get_id(text):
+    def get_id(bs):
         """
-        Repeatable hash from text to 64-bit unsigned integer using a truncated
+        Repeatable hash from bytes to 64-bit unsigned integer using a truncated
         SHA256.
         """
         h = hashlib.new('sha256')
-        h.update(text)
+        h.update(bs)
         return int(h.hexdigest()[:16], 16)
 
     # Make this class an iterable:
     def __next__(self):
         if len(self.keys) > 0:
             # get next position
+            print("ALO: {} next: len(sources) {}".format(self, len(self.sources)))
             self._idx = (self._idx + 1) % len(self.keys)
             # get key of that position
             key = self.keys[self._idx]
             # if stream is not in an open state, return nothing.
             if not key in self.open:
-                return None
+                print("ALO: {} not key in open, _idx {} key {}".format(self, self._idx, key))
+                # We know 'return None' is bad: infinite loop of sender
+                # never finishing and is never thread.join'able.
+                #
+                # We know always 'raise StopIteration' is not good: the
+                # stream_added() method may not have been called yet, so
+                # we will never iterate anything.
+                if key in self.was_ever_opened:
+                    print("ALO: {} key in was_ever_opened, key {}".format(self, key))
+                    raise StopIteration
+                else:
+                    return None
             try:
                 # get source at key
                 source = self.sources[key][0]
@@ -278,25 +296,32 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                     message_id = point_of_ref,
                     key = source.key,
                     message = value)
+                print("ALO: {} stm {} mid {} key {} val {}".format(self, key, point_of_ref, source.key, value))
+                time.sleep(0.115) ## SLF TODO: debugging hack
                 return msg
             except StopIteration:
+                print("ALO: {} StopIteration".format(self))
                 # if the source threw a StopIteration, remove it
                 source, _ = self.sources.get(key, (None, None))
                 if source:
                     self.remove_source(source)
                 return None
             except IndexError:
+                print("ALO: {} IndexError".format(self))
                 # Index might have overflowed due to manual remove_source
                 # will be corrected in the next iteration
                 return None
         elif not self._added_source:
+            print("ALO: {} not added source".format(self))
             # In very fast select loops, we might reach the end condition
             # before we have a chance to add our first source
             return None
         else:
+            print("ALO: {} MultiSourceConnector raise StopIteration".format(self))
             raise StopIteration
 
     def stream_added(self, stream):
+        print("MultiSourceConnector added {}".format(stream))
         source, acked = self.sources.get(stream.id, (None, None))
         if source:
             if stream.point_of_ref != source.point_of_ref():
@@ -308,9 +333,11 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             self.sources[stream.id] = [None, stream.point_of_ref]
 
     def stream_removed(self, stream):
+        print("MultiSourceConnector removed {}".format(stream))
         pass
 
     def stream_opened(self, stream):
+        print("MultiSourceConnector stream_opened {}".format(stream))
         source, acked = self.sources.get(stream.id, (None, None))
         if source:
             if stream.id in self.joining:
@@ -318,12 +345,14 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                 if stream.point_of_ref != source.point_of_ref():
                     source.reset(stream.point_of_ref)
             self.open.add(stream.id)
+            self.was_ever_opened.add(stream.id)
         else:
             raise ConnectorError("Stream {} was opened for unknown source. "
                                  "Please use the add_source interface."
                                  .format(stream))
 
     def stream_closed(self, stream):
+        print("MultiSourceConnector closed {}".format(stream))
         source, acked = self.sources.get(stream.id, (None, None))
         if source:
             if stream.id in self.open:
@@ -344,6 +373,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             pass
 
     def stream_acked(self, stream):
+        print("MultiSourceConnector acked {}".format(stream.point_of_ref))
         source, acked = self.sources.get(stream.id, (None, None))
         if source:
             # check if there's an eos pending this ack
@@ -362,7 +392,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                         " than the ended stream's point of ref.\n"
                         "Expected: {}, Received: {}"
                         .format(eos_point_of_ref, stream))
-            elif acked:
+            elif isinstance(acked, int):  # acked may be 0 & use this clause!
                 # regular ack (incremental ack of a live stream)
                 if stream.point_of_ref < acked:
                     print("WARNING: got an ack for older point of reference"
@@ -371,6 +401,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             else:
                 # source was added before connect()\handle_ok => reset
                 source.reset(stream.point_of_ref)
+
             # update acked point of ref for the source
             self.sources[stream.id][1] = stream.point_of_ref
 
@@ -380,3 +411,4 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             raise ConnectorError("Stream {} was opened for unknown source. "
                                  "Please use the add_source interface."
                                  .format(stream))
+

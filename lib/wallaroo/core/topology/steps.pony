@@ -126,6 +126,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     | let tr: TimeoutTriggeringRunner =>
       tr.set_triggers(StepTimeoutTrigger(this), _watermarks)
     end
+    @printf[I32]("YYY create: %s 0x%lx\n".cstring(), __loc.type_name().cstring(), this)
 
   //
   // Application startup lifecycle event
@@ -184,6 +185,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     match _barrier_forwarder
     | let bf: BarrierStepForwarder =>
       if bf.barrier_in_progress() then
+        @printf[I32]("QQQ: %s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
         bf.check_completion(inputs())
       end
     end

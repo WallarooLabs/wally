@@ -22,6 +22,7 @@ import time
 import struct
 
 import wallaroo
+import wallaroo.experimental
 
 
 def application_setup(args):
@@ -37,8 +38,12 @@ def application_setup(args):
     parser.add_argument("--window-slide", type=int, default=25,
                         help=("Window slide size, in milliseconds. "
                               "(Default: 25)"))
-    parser.add_argument("--gen-source", action='store_true',
-                    help="Use an internal source for resilience tests")
+    parser.add_argument("--source", choices=['tcp', 'gensource', 'alo'],
+                         default='tcp',
+                         help=("Choose source type for resilience tests. "
+                               "'tcp' for standard TCP, 'gensource' for internal "
+                               "generator source, and 'alo' for an external at-"
+                               "least-once connector source."))
     parser.add_argument("--partitions", type=int, default=40,
                     help="Number of partitions for use with internal source")
     pargs, _ = parser.parse_known_args(args)
@@ -51,10 +56,22 @@ def application_setup(args):
         print("Using internal source generator")
         source = wallaroo.GenSourceConfig(source_name,
             MultiPartitionGenerator(pargs.partitions))
-    else:
+    elif pargs.source == 'tcp':
         print("Using TCP Source")
         in_name, in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
         source = wallaroo.TCPSourceConfig(in_name, in_host, in_port, decoder)
+    elif pargs.source == 'alo':
+        print("Using at-least-once source")
+        in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+        source = wallaroo.experimental.SourceConnectorConfig(
+            "window_detector_feed",
+            encoder=encode_feed,
+            decoder=decode_feed,
+            host=in_host,
+            port=in_port,
+            cookie="cookie",
+            max_credits=67,
+            refill_credits=10)
 
     p = wallaroo.source(source_name, source)
     p = p.key_by(extract_key)
@@ -161,6 +178,7 @@ class Collect(wallaroo.Aggregation):
         print("Collect.output", ts, key, [str(m) for m in accumulator])
         assert(len(keys) <= 1)
         try:
+            print("key = {}".format(key))
             assert(keys.pop().split(".")[0] == key)
         except KeyError: # key set is empty because accumulator is empty
             return None
@@ -173,8 +191,19 @@ def split_accumulated(data):
     return [(key, v, ts) for v in values]
 
 
-@wallaroo.decoder(header_length=4, length_fmt=">I")
-def decoder(bs):
+@wallaroo.encoder
+def encoder(msg):
+    print("encoder", time.time(), msg)
+    s = json.dumps({'key': msg[0], 'value': msg[1], 'ts': msg[2]}).encode()
+    return struct.pack(">I{}s".format(len(s)), len(s), s)
+
+
+@wallaroo.experimental.stream_message_encoder
+def encode_feed(data):
+    return data
+
+
+def base_decoder(bs):
     # Expecting a 64-bit unsigned int in big endian followed by a string
     val, key = struct.unpack(">Q", bs[:8])[0], bs[8:]
     key = key.decode("utf-8")  # python3 compat in downstream string concat
@@ -182,8 +211,7 @@ def decoder(bs):
     return Message(key, val)
 
 
-@wallaroo.encoder
-def encoder(msg):
-    print("encoder", time.time(), msg)
-    s = json.dumps({'key': msg[0], 'value': msg[1], 'ts': msg[2]}).encode()
-    return struct.pack(">I{}s".format(len(s)), len(s), s)
+# manually create the decorated version of base_decoder for both types
+# of decoders (ConnectorDecoder and OctetDecoder)
+decoder = wallaroo.decoder(header_length=4, length_fmt=">I")(base_decoder)
+decode_feed = wallaroo.experimental.stream_message_decoder(base_decoder)

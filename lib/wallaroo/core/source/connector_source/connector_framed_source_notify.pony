@@ -93,6 +93,7 @@ class ConnectorSourceNotify[In: Any val]
   var _program_name: String = ""
   var _instance_name: String = ""
   var _prep_for_rollback: Bool = false
+  let _debug_disconnect: Bool = false
 
   // Watermark !TODO! How do we handle this respecting per-connector-type
   // policies
@@ -119,6 +120,7 @@ class ConnectorSourceNotify[In: Any val]
     _cookie = cookie
     _max_credits = max_credits
     _refill_credits = refill_credits
+    @printf[I32]("SLF: max_credits = %lu, refill_credits = %lu\n".cstring(), max_credits, refill_credits)
 
   fun routes(): Map[RoutingId, Consumer] val =>
     _router.routes()
@@ -156,6 +158,7 @@ class ConnectorSourceNotify[In: Any val]
     if _prep_for_rollback then
       // Anything that the connector sends us is ignored while we wait
       // for the rollback to finish.  Tell the connector to restart later.
+      @printf[I32]("SLF: call _send_restart line %d\n".cstring(), __loc.line())
       _send_restart()
       return _continue_perhaps(source)
     end
@@ -165,6 +168,7 @@ class ConnectorSourceNotify[In: Any val]
         (_fsm_state is _ProtoFsmStreaming) then
       // Our client's credits are running low and we haven't replenished
       // them after barrier_complete() processing.  Replenish now.
+      @printf[I32]("SLF: _send_ack() when 0x%lx _credits = %lu\n".cstring(), this, _credits)
       _send_ack()
     end
 
@@ -234,6 +238,7 @@ class ConnectorSourceNotify[In: Any val]
                 m.point_of_ref, _connector_source as ConnectorSource[In])
             _stream_map(m.stream_id) = _StreamState(true, 0, 0, 0, 0)
           else
+            @printf[I32]("SLF: call _send_restart line %d\n".cstring(), __loc.line())
             _send_reply(source, cwm.NotifyAckMsg(false, m.stream_id, 0))
             return _continue_perhaps(source)
           end
@@ -279,16 +284,22 @@ class ConnectorSourceNotify[In: Any val]
 
             try
               @printf[I32]("NH: processing body 1\n".cstring())
-              let msg_id = m.message_id as cwm.MessageId
+              let msg_id = try
+                m.message_id as cwm.MessageId
+              else
+                @printf[I32]("SLF: as cwm.MessageId failed, use default\n".cstring())
+                0
+              end
 
               @printf[I32]("NH: processing body 2\n".cstring())
-              if msg_id <= s.last_message_id then
-                @printf[I32]("^*^* MessageMsg: stale id in stream-id %llu flags %u msg_id %llu <= last_message_id %llu\n".cstring(), stream_id, m.flags, m.message_id as cwm.MessageId, s.last_message_id)
+              if (msg_id > 0) and (msg_id <= s.last_message_id) then
+                @printf[I32]("^*^* MessageMsg: stale id in stream-id %llu flags %u msg_id %llu <= last_message_id %llu\n".cstring(), stream_id, m.flags, msg_id, s.last_message_id)
                 return _continue_perhaps(source)
               end
 
               @printf[I32]("NH: processing body 3\n".cstring())
               if cwm.Eos.is_set(m.flags) then
+                @printf[I32]("NH: processing body 3: EOS\n".cstring())
                 (_active_stream_registry as ConnectorSourceListener[In]).stream_update(
                   stream_id, s.barrier_checkpoint_id, s.barrier_last_message_id,
                   msg_id, None)
@@ -304,7 +315,11 @@ class ConnectorSourceNotify[In: Any val]
                   | let str: String      => str.array()
                   | let b: Array[U8] val => b
                   end
-                  _handler.decode(bytes)?
+                  if cwm.Eos.is_set(m.flags) or (bytes.size() == 0) then
+                    None
+                  else
+                    _handler.decode(bytes)?
+                  end
                 else
                   if m.message is None then
                     return _to_error_state(source, "No message bytes and BOUNDARY not set")
@@ -413,15 +428,15 @@ class ConnectorSourceNotify[In: Any val]
 
     (let is_finished, let last_ts) =
       match decoded
+      | None =>
+        @printf[I32]("^*^* BEFORE _runner.run() but None\n".cstring())
+        (true, ingest_ts)
       | let d: In =>
         @printf[I32]("^*^* BEFORE _runner.run()\n".cstring())
         _runner.run[In](_pipeline_name, pipeline_time_spent, d,
           consume initial_key, ingest_ts, _watermark_ts, _source_id,
           source, _router, msg_uid, None, decode_end_ts,
           latest_metrics_id, ingest_ts, _metrics_reporter)
-      else
-        // decoded is None
-        (true, ingest_ts)
       end
 
     match message_id
@@ -495,7 +510,7 @@ class ConnectorSourceNotify[In: Any val]
     source.expect(_header_size)
 
   fun ref closed(source: ConnectorSource[In] ref) =>
-    @printf[I32]("ConnectorSource connection closed\n".cstring())
+    @printf[I32]("ConnectorSource connection closed 0x%lx\n".cstring(), source)
     _session_active = false
     _fsm_state = _ProtoFsmDisconnected
     _clear_stream_map()
@@ -574,6 +589,7 @@ class ConnectorSourceNotify[In: Any val]
   fun ref prepare_for_rollback() =>
     if _session_active then
       _clear_stream_map()
+      @printf[I32]("SLF: call _send_restart line %d\n".cstring(), __loc.line())
       _send_restart()
       _prep_for_rollback = true
       @printf[I32]("^*^* %s.%s\n".cstring(),
@@ -600,6 +616,7 @@ class ConnectorSourceNotify[In: Any val]
       end
     end
     _prep_for_rollback = false
+    @printf[I32]("SLF: call _send_restart line %d\n".cstring(), __loc.line())
     _send_restart()
 
   fun ref initiate_barrier(checkpoint_id: CheckpointId) =>
@@ -635,12 +652,13 @@ class ConnectorSourceNotify[In: Any val]
       end
 
       // SLF TODO: this if clause is for debugging purposes only
-      if (checkpoint_id % 5) == 4 then
+      if _debug_disconnect and ((checkpoint_id % 5) == 4) then
         // SLF TODO: the Python side of the world raises an exception when
         // it gets an ErrorMsg, and the rest of the code is fragile when
         // that exception is not caught.
         // _to_error_state(_connector_source, "BYEBYE")
 
+        @printf[I32]("SLF: call _send_restart line %d\n".cstring(), __loc.line())
         _send_restart()
       end
     end
@@ -714,6 +732,8 @@ class ConnectorSourceNotify[In: Any val]
     _credits = _credits + new_credits
 
   fun ref _send_restart() =>
+    @printf[I32]("^*^* %s.%s()\n".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring())
     _send_reply(_connector_source, cwm.RestartMsg)
     try (_connector_source as ConnectorSource[In] ref).close() else Fail() end
     // The .close() method ^^^ calls our closed() method which will
