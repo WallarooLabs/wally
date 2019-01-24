@@ -309,7 +309,11 @@ class ConnectorSourceNotify[In: Any val]
                   | let str: String      => str.array()
                   | let b: Array[U8] val => b
                   end
-                  _handler.decode(bytes)?
+                  if cwm.Eos.is_set(m.flags) or (bytes.size() == 0) then
+                    None
+                  else
+                    _handler.decode(bytes)?
+                  end
                 else
                   if m.message is None then
                     return _to_error_state(source, "No message bytes and BOUNDARY not set")
@@ -418,15 +422,15 @@ class ConnectorSourceNotify[In: Any val]
 
     (let is_finished, let last_ts) =
       match decoded
+      | None =>
+        @printf[I32]("^*^* BEFORE _runner.run() but None\n".cstring())
+        (true, ingest_ts)
       | let d: In =>
         @printf[I32]("^*^* BEFORE _runner.run()\n".cstring())
         _runner.run[In](_pipeline_name, pipeline_time_spent, d,
           consume initial_key, ingest_ts, _watermark_ts, _source_id,
           source, _router, msg_uid, None, decode_end_ts,
           latest_metrics_id, ingest_ts, _metrics_reporter)
-      else
-        // decoded is None
-        (true, ingest_ts)
       end
 
     match message_id
