@@ -280,11 +280,16 @@ class ConnectorSourceNotify[In: Any val]
 
             try
               @printf[I32]("NH: processing body 1\n".cstring())
-              let msg_id = m.message_id as cwm.MessageId
+              let msg_id = try
+                m.message_id as cwm.MessageId
+              else
+                @printf[I32]("SLF: as cwm.MessageId failed, use default\n".cstring())
+                0
+              end
 
               @printf[I32]("NH: processing body 2\n".cstring())
               if msg_id <= s.last_message_id then
-                @printf[I32]("^*^* MessageMsg: stale id in stream-id %llu flags %u msg_id %llu <= last_message_id %llu\n".cstring(), stream_id, m.flags, m.message_id as cwm.MessageId, s.last_message_id)
+                @printf[I32]("^*^* MessageMsg: stale id in stream-id %llu flags %u msg_id %llu <= last_message_id %llu\n".cstring(), stream_id, m.flags, msg_id, s.last_message_id)
                 return _continue_perhaps(source)
               end
 
