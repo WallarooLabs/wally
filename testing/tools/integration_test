@@ -11,7 +11,8 @@ import struct
 import time
 
 from integration.cluster import runner_data_format
-from integration.end_points import (files_generator,
+from integration.end_points import (ALOSequenceGenerator,
+                                    files_generator,
                                     iter_generator,
                                     sequence_generator)
 from integration.errors import RunnerHasntStartedError
@@ -49,6 +50,42 @@ class CSVGenAction(argparse.Action):
                    "'>I'".format(f=self.dest))
             raise argparse.ArgumentTypeError(msg)
 
+        try:
+            dest = getattr(namespace, self.dest)
+            if not dest:
+                dest= []
+                setattr(namespace, self.dest, dest)
+        except AttributeError:
+            dest = []
+            setattr(namespace, self.dest, dest)
+        dest.append((gen, source))
+
+
+class ALOSeqGenAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        # (part, stop, source-index)
+        if len(values) == 1:
+            # only part is specified
+            part = values[0]
+            stop = 100
+            source = 0
+        elif len(values) == 2:
+            # assume source idx is 0
+            part, stop = values
+            stop = int(stop)
+            source = 0
+        elif len(values) == 3:
+            # values[2] is source idx
+            part, stop, source = values
+            stop = int(stop)
+            source = int(source)
+        else:
+            msg = ('Argument "{f}" requires 2 or 3 arguments specifying '
+                   'stop [, partition [, source-index ]].\n'
+                   'When unspecified, source-index is 0.'
+                   .format(f=self.dest))
+            raise argparse.ArgumentTypeError(msg)
+        gen = ALOSequenceGenerator(part, stop)
         try:
             dest = getattr(namespace, self.dest)
             if not dest:
@@ -367,6 +404,11 @@ def CLI():
                       action=CSVGenAction, nargs='+',
                       metavar=('item1,item2,...', 'source_name', 'header_format'),
                       help="Send values from a comma delimited string")
+    gens.add_argument('--alo-sequence-sender', dest='generators',
+                      action=ALOSeqGenAction, nargs='+',
+                      metavar=('partition', 'stop', 'source-index'),
+                      help=("Send values from the set of integers up to "
+                            "STOP, using an at-least-once connector."))
 
     # Network parameters
     net1 = parser.add_argument_group('Network')
