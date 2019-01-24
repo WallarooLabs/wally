@@ -91,7 +91,7 @@ class AsyncServer(asynchat.async_chat, object):
             self._streams[msg.stream_id][2] = msg.message_id
         if msg.flags & cwm.Message.Eos:
             # ack eos
-            print("NH: sending eos for {}".format(msg))
+            print("NH: acking eos for {}".format(msg))
             self.write(cwm.Ack(credits = 1,
                                acks= [(msg.stream_id, self._streams[msg.stream_id][2])]))
 

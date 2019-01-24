@@ -72,6 +72,7 @@ class SourceConnectorConfig(object):
         self._max_credits = max_credits
         self._refill_credits = refill_credits
         self._host = host
+        print("QQQ: name {} encoder {} decoder {} max_credits {}".format(name, encoder, decoder, max_credits))
 
     def to_tuple(self):
         return ("source_connector", self._name, self._host, str(self._port), self._encoder, self._decoder, self._cookie, self._max_credits, self._refill_credits)
@@ -142,21 +143,11 @@ Stream = namedtuple('Stream', ['id', 'name', 'point_of_ref', 'is_open'])
 
 
 class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
-    # TODO :
-    # 1. revisit parse_connector_args
-    #    The way we require host and port args, but then get them from the app
-    #    topo and ignore the ones in the parsed params object is confusing and
-    #    doesn't make much sense to me. Ping Brian before making changes to
-    #    this.
-
     def __init__(self, version, cookie, program_name, instance_name,
-                 args=None, required_params=['host', 'port'],
-                 optional_params=[]):
-        # Use BaseConnector to do any argument parsing
-        BaseConnector.__init__(self, args, required_params, optional_params)
-
+                 host, port):
         # connection details are given from the base
-        self._port = int(self._port)  # but convert port to int
+        self._host = host
+        self._port = int(port)  # but convert port to int
         self.credits = 0
         self.version = version
         self.cookie = cookie
@@ -164,7 +155,10 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self.instance_name = instance_name
 
         # Stream details
+        # live streams for this connection
         self._streams = {}  # {stream_id: {'stream': Stream, 'por': por}}
+        self._ok = {} # same structure, but for _all_ streams the connector
+                        # may have told us about
         self._pending_eos = {}  # {stream_id: point_of_ref}
 
         self.handshake_complete = False
@@ -184,6 +178,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self._loop = threading.Thread(target=self._asyncore_loop)
         self._loop.daemon = True
         self._loop.start()
+        self._async_init = False
 
         self._sent = 0
 
@@ -288,6 +283,8 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             # deposit the credits
             self.credits += msg.initial_credits
             for stream_id, stream_name, point_of_ref in msg.credit_list:
+                # don't bother.
+                break
                 # Try to get old stream data
                 old = self._streams.get(stream_id, None)
 
@@ -295,7 +292,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 if old is None:
                     new = Stream(stream_id, stream_name, point_of_ref, False)
                     self._streams[stream_id] = new
-                    self.stream_added(new)
 
                 # if notify was called before connect(), we may have known
                 # streams in _streams
@@ -333,6 +329,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
 
     def _handle_ack(self, msg):
         self.credits += msg.credits
+        print("_handle_ack got {}".format(msg))
         for (stream_id, point_of_ref) in msg.acks:
             # Try to get old stream data
             old = self._streams.get(stream_id, None)
@@ -341,15 +338,23 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                     new = Stream(stream_id, old.name, point_of_ref,
                                  old.is_open)
                     self._streams[stream_id] = new
-                    self.stream_acked(new)
+                else:
+                    new = old
+                print("stream_acked B")
+                self.stream_acked(new)
 
     ##########################
     # Outoing communications #
     ##########################
 
     def connect(self):
+        self.handshake_complete = False
         conn = socket.socket()
-        conn.connect( (self._host, self._port) )
+        try:
+            conn.connect( (self._host, self._port) )
+        except:
+            self.stopped.set()
+            raise
         self._conn = conn
         self._conn.setblocking(1) # Set socket to blocking mode
 
@@ -369,6 +374,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         # set socket to nonblocking
         self._conn.setblocking(0)
         # handshake complete: initialize async_chat
+        self._async_init = True
         asynchat.async_chat.__init__(self,
                                      sock=self._conn,
                                      map=self._socket_map)
@@ -397,18 +403,31 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             self.initiate_send()
 
     def shutdown(self, error=None):
-        self.del_channel(self._socket_map) # remove the connection from asyncore loop
+        if self._async_init:
+            self.del_channel(self._socket_map) # remove the connection from asyncore loop
         self._loop_sentinel.set() # exit the asyncore loop
-        self._conn.setblocking(1)
+        try:
+            self._conn.setblocking(1)
+        except:
+            pass
         if error is None:
             # If this is a clean shutdown, try to synchronously send any
             # remaining data that was queued
-            while self.producer_fifo:
-                self._conn.sendall(self.producer_fifo.popleft())
+            try:
+                while self.producer_fifo:
+                    self._conn.sendall(self.producer_fifo.popleft())
+            except:
+                pass
         if isinstance(error, cwm.Error):
             # If this is an error, synchronously send the error message
-            self._conn.sendall(cwm.Frame.encode(error))
-        self._conn.close()
+            try:
+                self._conn.sendall(cwm.Frame.encode(error))
+            except:
+                pass
+        try:
+            self._conn.close()
+        except:
+            pass
         self.stopped.set()
 
     def writable(self):
@@ -452,11 +471,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         i.e. without calling `initiate_send()` at the end
         """
         self._sent += 1
-        #sabs = self.ac_out_buffer_size
-        #if len(data) > sabs:
-        #    for i in xrange(0, len(data), sabs):
-        #        self.producer_fifo.append(data[i:i+sabs])
-        #else:
         self.producer_fifo.append(data)
 
     def pending_sends(self):

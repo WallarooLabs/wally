@@ -25,10 +25,13 @@ from .cluster import (Cluster,
                      runner_data_format)
 from .control import (SinkAwaitValue,
                      SinkExpect)
-from .end_points import (Sender,
-                        Reader)
+from .end_points import (ALOSender,
+                         Sender,
+                         Reader)
 from .errors import PipelineTestError
 from .logger import INFO2
+
+from wallaroo.experimental.connectors import BaseSource
 
 try:
     basestring
@@ -42,6 +45,9 @@ DEFAULT_RUNNER_JOIN_TIMEOUT = 30
 
 FROM_TAIL = int(os.environ.get("FROM_TAIL", 10))
 
+
+VERSION = '0.0.1'
+COOKIE = 'cookie'
 
 def pipeline_test(sources, expected, command, workers=1,
                   mode='framed', sinks=1, decoder=None, pre_processor=None,
@@ -163,21 +169,36 @@ def pipeline_test(sources, expected, command, workers=1,
             if sources:
                 if not isinstance(sources, list):
                     sources = [sources]
-                for gen, src_name in sources:
-                    reader = Reader(gen)
-                    # TODO [NH]: figure out how to support sending to workers
-                    # other than initializer via command parameters
-                    sender = Sender(cluster.source_addrs[0][src_name], reader,
-                                    batch_size=batch_size,
-                                    interval=sender_interval)
+                for i, (gen, src_name) in enumerate(sources):
+                    if isinstance(gen, BaseSource):
+                        # AtLeastOnce Sender: ALOSender
+                        sender = ALOSender(gen,
+                                           VERSION,
+                                           COOKIE,
+                                           command,
+                                           'instance_{}'.format(i),
+                                           cluster.source_addrs[0][src_name])
+                    else:
+                        # plain old TCP sender
+                        reader = Reader(gen)
+                        # TODO [NH]: figure out how to support sending to workers
+                        # other than initializer via command parameters
+                        sender = Sender(cluster.source_addrs[0][src_name], reader,
+                                        batch_size=batch_size,
+                                        interval=sender_interval)
                     cluster.add_sender(sender)
 
             # start each sender and await its completion before starting the next
             if cluster.senders:
+                logging.debug("senders step A")
                 for sender in cluster.senders:
+                    logging.debug("senders step B sender {}".format(sender))
                     sender.start()
+                    logging.debug("senders step C")
                     sender.join()
+                    logging.debug("senders step D")
                     try:
+                        logging.debug("senders step E")
                         assert(sender.error is None)
                     except Exception as err:
                         logging.error("Sender exited with an error")
