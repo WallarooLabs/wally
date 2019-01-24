@@ -288,13 +288,14 @@ class ConnectorSourceNotify[In: Any val]
               end
 
               @printf[I32]("NH: processing body 2\n".cstring())
-              if msg_id <= s.last_message_id then
+              if (msg_id > 0) and (msg_id <= s.last_message_id) then
                 @printf[I32]("^*^* MessageMsg: stale id in stream-id %llu flags %u msg_id %llu <= last_message_id %llu\n".cstring(), stream_id, m.flags, msg_id, s.last_message_id)
                 return _continue_perhaps(source)
               end
 
               @printf[I32]("NH: processing body 3\n".cstring())
               if cwm.Eos.is_set(m.flags) then
+                @printf[I32]("NH: processing body 3: EOS\n".cstring())
                 (_active_stream_registry as ConnectorSourceListener[In]).stream_update(
                   stream_id, s.barrier_checkpoint_id, s.barrier_last_message_id,
                   msg_id, None)
