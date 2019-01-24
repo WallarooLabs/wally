@@ -166,16 +166,15 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
     print("Reached the end of all files. Shutting down.")
     ```
     """
-    def __init__(self, version, cookie, program_name, instance_name,
-                 args=None, required_params=[], optional_params=[]):
+    def __init__(self, version, cookie, program_name, instance_name, host,
+                 port):
         AtLeastOnceSourceConnector.__init__(self,
                                             version,
                                             cookie,
                                             program_name,
                                             instance_name,
-                                            args=args,
-                                            required_params=required_params,
-                                            optional_params=optional_params)
+                                            host,
+                                            port)
         self.sources = {} # stream_id: [source instance, acked point of ref]
         self.closed_sources = {} # stream_id: acked point of ref
         self.keys = []
@@ -190,11 +189,11 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
         self._added_source = True
         # add to self.sources
         _id = self.get_id(source.name)
-        # check if we already have some ack data for this source
-        _, acked = self.sources.get(_id, (None, None))
-        if acked is not None:
-            source.reset(acked)
-        self.sources[_id] = [source, acked]
+        # check if we already have source... if we do raise error
+        if _id in self.sources:
+            raise ConnectorError("Cannot add Source {}. A source exists"
+                " with that ID: {}".format(source, self.sources[_id]))
+        self.sources[_id] = [source, source.point_of_ref()]
         self.keys.append(_id)
         # add to joining set so we can control the starting sequence
         self.joining.add(_id)
@@ -247,13 +246,13 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             self.closed_sources[key] = acked
 
     @staticmethod
-    def get_id(text):
+    def get_id(bs):
         """
-        Repeatable hash from text to 64-bit unsigned integer using a truncated
+        Repeatable hash from bytes to 64-bit unsigned integer using a truncated
         SHA256.
         """
         h = hashlib.new('sha256')
-        h.update(text)
+        h.update(bs)
         return int(h.hexdigest()[:16], 16)
 
     # Make this class an iterable:
