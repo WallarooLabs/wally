@@ -93,6 +93,7 @@ class ConnectorSourceNotify[In: Any val]
   var _program_name: String = ""
   var _instance_name: String = ""
   var _prep_for_rollback: Bool = false
+  let _debug_disconnect: Bool = false
 
   // Watermark !TODO! How do we handle this respecting per-connector-type
   // policies
@@ -644,12 +645,13 @@ class ConnectorSourceNotify[In: Any val]
       end
 
       // SLF TODO: this if clause is for debugging purposes only
-      if (checkpoint_id % 5) == 4 then
+      if _debug_disconnect and ((checkpoint_id % 5) == 4) then
         // SLF TODO: the Python side of the world raises an exception when
         // it gets an ErrorMsg, and the rest of the code is fragile when
         // that exception is not caught.
         // _to_error_state(_connector_source, "BYEBYE")
 
+        @printf[I32]("SLF: call _send_restart line %d\n".cstring(), __loc.line())
         _send_restart()
       end
     end
@@ -723,6 +725,8 @@ class ConnectorSourceNotify[In: Any val]
     _credits = _credits + new_credits
 
   fun ref _send_restart() =>
+    @printf[I32]("^*^* %s.%s()\n".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring())
     _send_reply(_connector_source, cwm.RestartMsg)
     try (_connector_source as ConnectorSource[In] ref).close() else Fail() end
     // The .close() method ^^^ calls our closed() method which will
