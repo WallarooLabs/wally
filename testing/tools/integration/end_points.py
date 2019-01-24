@@ -25,6 +25,11 @@ from .errors import TimeoutError
 from .logger import INFO2
 from .stoppable_thread import StoppableThread
 
+from wallaroo.experimental.connectors import (BaseIter,
+                                              BaseSource,
+                                              MultiSourceConnector)
+
+
 try:
     basestring
 except:
@@ -638,3 +643,85 @@ class Reader(object):
         r = out.raw.read(num)
         self.overflow = out.raw.read()
         return r
+
+
+class ALOSequenceGenerator(BaseIter, BaseSource):
+    """
+    A sequence generator with a resettable position.
+    Starts at 1, and stops aftering sending `stop`.
+
+    Usage: `ALOSequenceGenerator(partition, stop=1000, data=None)`
+    if `data` is a list, data generated is appended to it in order
+    as (position, value) tuples.
+    """
+    def __init__(self, partition, stop=1000):
+        self.partition = partition
+        self.name = partition.encode()
+        self.key = partition.encode()
+        self.closed = False
+        self.position = 0
+        self.stop = stop
+        self.data = []
+
+    def __str__(self):
+        return ("ALOSequenceGenerator(partition: {}, closed: {}, point_of_ref: {})"
+                .format(self.name, self.closed, self.point_of_ref()))
+
+    def point_of_ref(self):
+        return self.position
+
+    def reset(self, pos=0):
+        print("INFO: resetting {} from {} to position {}"
+              .format(self.__str__(), self.point_of_ref(), pos))
+        self.position = pos
+
+    def __next__(self):
+        # read header
+        self.position += 1
+        if self.position > self.stop:
+            raise StopIteration
+        val, pos, key = (self.position, self.position, self.key)
+        payload = struct.pack('>Q{}s'.format(len(key)), val, key)
+        self.data.append(payload)
+        return (payload, pos)
+
+    def close(self):
+        self.closed = True
+
+
+class ALOSender(StoppableThread):
+    """
+    A wrapper for MultiSourceConnector to look like a regular TCP Sender
+    """
+    def __init__(self, source, version, cookie, program_name, instance_name,
+                 addr):
+        super(ALOSender, self).__init__()
+        host, port = addr.split(':')
+        port = int(port)
+        self.client = client = MultiSourceConnector(
+            version,
+            cookie,
+            program_name,
+            instance_name,
+            host, port)
+        self.name = "ALOSender_{}".format(source.name.decode())
+        self.source = source
+        self.data = source.data
+        self.host = host
+        self.port = port
+        self.start_time = None
+
+    def run(self):
+        self.start_time = datetime.datetime.now()
+        self.client.connect()
+        self.client.add_source(self.source)
+        self.client.join()
+
+    def stop(self, error=None):
+        self.client.shutdown(error=error)
+
+    def pause(self):
+        pass
+
+    def resume(self):
+        pass
