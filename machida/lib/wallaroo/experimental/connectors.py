@@ -392,7 +392,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                         " than the ended stream's point of ref.\n"
                         "Expected: {}, Received: {}"
                         .format(eos_point_of_ref, stream))
-            elif acked:
+            elif isinstance(acked, int):  # acked may be 0 & use this clause!
                 # regular ack (incremental ack of a live stream)
                 if stream.point_of_ref < acked:
                     print("WARNING: got an ack for older point of reference"
@@ -401,6 +401,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             else:
                 # source was added before connect()\handle_ok => reset
                 source.reset(stream.point_of_ref)
+
             # update acked point of ref for the source
             self.sources[stream.id][1] = stream.point_of_ref
 
