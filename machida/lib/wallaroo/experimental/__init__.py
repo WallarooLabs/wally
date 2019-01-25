@@ -72,6 +72,7 @@ class SourceConnectorConfig(object):
         self._max_credits = max_credits
         self._refill_credits = refill_credits
         self._host = host
+        print("QQQ: name {} encoder {} decoder {} max_credits {}".format(name, encoder, decoder, max_credits))
 
     def to_tuple(self):
         return ("source_connector", self._name, self._host, str(self._port), self._encoder, self._decoder, self._cookie, self._max_credits, self._refill_credits)
@@ -328,6 +329,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
 
     def _handle_ack(self, msg):
         self.credits += msg.credits
+        print("_handle_ack got {}".format(msg))
         for (stream_id, point_of_ref) in msg.acks:
             # Try to get old stream data
             old = self._streams.get(stream_id, None)
@@ -338,6 +340,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                     self._streams[stream_id] = new
                 else:
                     new = old
+                print("stream_acked B")
                 self.stream_acked(new)
 
     ##########################

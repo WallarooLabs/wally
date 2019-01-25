@@ -671,8 +671,8 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
         return self.position
 
     def reset(self, pos=0):
-        print("INFO: resetting {} from {} to position {}"
-              .format(self.__str__(), self.point_of_ref(), pos))
+        #print("INFO: resetting {} from {} to position {}"
+        #      .format(self.__str__(), self.point_of_ref(), pos))
         self.position = pos
 
     def __next__(self):
@@ -706,6 +706,7 @@ class ALOSender(StoppableThread):
             host, port)
         self.name = "ALOSender_{}".format(source.name.decode())
         self.source = source
+        print("ALO: source = {}".format(source))
         self.data = source.data
         self.host = host
         self.port = port
@@ -713,15 +714,22 @@ class ALOSender(StoppableThread):
 
     def run(self):
         self.start_time = datetime.datetime.now()
+        logging.debug("ALOSender step A")
         self.client.connect()
+        logging.debug("ALOSender step B")
         self.client.add_source(self.source)
+        logging.debug("ALOSender step C")
         self.client.join()
+        logging.debug("ALOSender step D")
 
     def stop(self, error=None):
+        logging.debug("ALOSender stop")
         self.client.shutdown(error=error)
 
     def pause(self):
+        logging.debug("ALOSender pause")
         pass
 
     def resume(self):
+        logging.debug("ALOSender resume")
         pass

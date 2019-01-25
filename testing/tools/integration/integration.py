@@ -185,10 +185,15 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
 
             # start each sender and await its completion before starting the next
             if cluster.senders:
+                logging.debug("senders step A")
                 for sender in cluster.senders:
+                    logging.debug("senders step B sender {}".format(sender))
                     sender.start()
+                    logging.debug("senders step C")
                     sender.join()
+                    logging.debug("senders step D")
                     try:
+                        logging.debug("senders step E")
                         assert(sender.error is None)
                     except Exception as err:
                         logging.error("Sender exited with an error")
