@@ -64,8 +64,8 @@ def application_setup(args):
             host=in_host,
             port=in_port,
             cookie="cookie",
-            max_credits=10,
-            refill_credits=8)
+            max_credits=67,
+            refill_credits=10)
 
     p = wallaroo.source("{} window".format(pargs.window_type), source)
     p = p.key_by(extract_key)

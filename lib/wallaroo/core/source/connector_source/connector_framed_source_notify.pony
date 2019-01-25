@@ -121,6 +121,7 @@ class ConnectorSourceNotify[In: Any val]
     _cookie = cookie
     _max_credits = max_credits
     _refill_credits = refill_credits
+    @printf[I32]("SLF: max_credits = %lu, refill_credits = %lu\n".cstring(), max_credits, refill_credits)
 
   fun routes(): Map[RoutingId, Consumer] val =>
     _router.routes()
@@ -158,6 +159,7 @@ class ConnectorSourceNotify[In: Any val]
     if _prep_for_rollback then
       // Anything that the connector sends us is ignored while we wait
       // for the rollback to finish.  Tell the connector to restart later.
+      @printf[I32]("SLF: call _send_restart line %d\n".cstring(), __loc.line())
       _send_restart()
       return _continue_perhaps(source)
     end
@@ -167,6 +169,7 @@ class ConnectorSourceNotify[In: Any val]
         (_fsm_state is _ProtoFsmStreaming) then
       // Our client's credits are running low and we haven't replenished
       // them after barrier_complete() processing.  Replenish now.
+      @printf[I32]("SLF: _send_ack() when 0x%lx _credits = %lu\n".cstring(), this, _credits)
       _send_ack()
     end
 
@@ -236,6 +239,7 @@ class ConnectorSourceNotify[In: Any val]
                 m.point_of_ref, _connector_source as ConnectorSource[In])
             _stream_map(m.stream_id) = _StreamState(true, 0, 0, 0, 0)
           else
+            @printf[I32]("SLF: call _send_restart line %d\n".cstring(), __loc.line())
             _send_reply(source, cwm.NotifyAckMsg(false, m.stream_id, 0))
             return _continue_perhaps(source)
           end
@@ -586,6 +590,7 @@ class ConnectorSourceNotify[In: Any val]
   fun ref prepare_for_rollback() =>
     if _session_active then
       _clear_stream_map()
+      @printf[I32]("SLF: call _send_restart line %d\n".cstring(), __loc.line())
       _send_restart()
       _prep_for_rollback = true
       @printf[I32]("^*^* %s.%s\n".cstring(),
@@ -612,6 +617,7 @@ class ConnectorSourceNotify[In: Any val]
       end
     end
     _prep_for_rollback = false
+    @printf[I32]("SLF: call _send_restart line %d\n".cstring(), __loc.line())
     _send_restart()
 
   fun ref initiate_barrier(checkpoint_id: CheckpointId) =>
