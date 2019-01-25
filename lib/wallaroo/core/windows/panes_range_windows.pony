@@ -19,6 +19,7 @@ Copyright 2018 The Wallaroo Authors.
 
 use "buffered"
 use "collections"
+use "random"
 use "time"
 use "serialise"
 use "wallaroo/core/aggregations"
@@ -55,7 +56,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   var _highest_seen_event_ts: U64
 
   new create(key: Key, agg: Aggregation[In, Out, Acc], range: U64, slide: U64,
-    delay: U64, watermark_ts: U64)
+    delay: U64, watermark_ts: U64, rand: Random)
   =>
     _key = key
     _agg = agg
@@ -64,13 +65,18 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     _identity_acc = _agg.initial_accumulator()
     _highest_seen_event_ts = watermark_ts
 
+    // To avoid the thundering herd problems that can come with perfectly
+    // aligned windows, we randomly offset every window with an offset up to
+    // 80% of the range.
+    let window_alignment_offset = ((rand.real() * 0.8) * _range.f64()).u64()
+
     (let pane_count, _pane_size, _panes_per_slide, _panes_per_window,
       _delay) = _InitializePaneParameters(range, slide, delay)
     _panes = Array[(Acc | EmptyPane)](pane_count)
     _panes_start_ts = Array[U64](pane_count)
     _earliest_window_idx = 0
-    var pane_start: U64 = watermark_ts - _delay
-
+    var pane_start: U64 =
+      (watermark_ts - _delay) + window_alignment_offset
     for i in Range(0, pane_count) do
       _panes.push(EmptyPane)
       _panes_start_ts.push(pane_start)

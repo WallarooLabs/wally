@@ -20,6 +20,7 @@ use "collections"
 use "itertools"
 use "ponytest"
 use "promises"
+use "random"
 use "wallaroo/core/aggregations"
 use "wallaroo/core/common"
 use "wallaroo/core/state"
@@ -250,7 +251,7 @@ class iso _TestTumblingWindows is UnitTest
     let slide = range
     let delay: U64 = Seconds(10)
     let tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay)
+      delay, _Zeros)
 
     // First window's data
     var res = tw(2, Seconds(96), Seconds(101))
@@ -293,7 +294,7 @@ class iso _TestSlidingWindows is UnitTest
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(10)
     let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay)
+      delay, _Zeros)
 
     // First 2 windows values
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(92), Seconds(100)))?)
@@ -354,8 +355,8 @@ class iso _TestSlidingWindowsNoDelay is UnitTest
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(0)
     let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay)
-    // First 2 windows values
+      delay, _Zeros)
+
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(92), Seconds(100)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(93), Seconds(102)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(94), Seconds(103)))?)
@@ -396,7 +397,7 @@ class iso _TestSlidingWindowsOutOfOrder is UnitTest
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(10)
     let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay)
+      delay, _Zeros)
 
     // First 2 windows values
     h.assert_array_eq[USize]([], _OutArray(sw(5, Seconds(95), Seconds(100)))?)
@@ -439,7 +440,7 @@ class iso _TestSlidingWindowsGCD is UnitTest
     // of the slide.
     let delay: U64 = Seconds(10)
     let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay)
+      delay, _Zeros)
 
     // First set of windows values
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(92), Seconds(100)))?)
@@ -498,7 +499,7 @@ class iso _TestSlidingWindowsLateData is UnitTest
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(10)
     let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay)
+      delay, _Zeros)
 
     // Some initial values
     h.assert_array_eq[USize]([], _OutArray(sw(1, Seconds(92), Seconds(100)))?)
@@ -521,7 +522,7 @@ class iso _TestSlidingWindowsEarlyData is UnitTest
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(10)
     let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay)
+      delay, _Zeros)
 
     // First values
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(92), Seconds(100)))?)
@@ -574,7 +575,7 @@ class iso _TestSlidingWindowsStragglers is UnitTest
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(1_000)
     let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay)
+      delay, _Zeros)
 
     // Last heard threshold of 100 seconds
     let watermarks = StageWatermarks(Seconds(100_000))
@@ -626,7 +627,7 @@ class iso _TestSlidingWindowsStragglersSequence is UnitTest
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(1_000)
     let sw = RangeWindows[USize, Array[USize] val, Collected]("key",
-      _Collect, range, slide, delay)
+      _Collect, range, slide, delay, _Zeros)
 
     // Last heard threshold of 100 seconds
     let watermarks = StageWatermarks(Seconds(100_000))
@@ -713,7 +714,7 @@ class iso _TestSlidingWindowsSequence is UnitTest
     let slide: U64 = Seconds(25)
     let delay: U64 = Seconds(3000)
     let sw = RangeWindows[USize, Array[USize] val, Collected]("key",
-      _Collect, range, slide, delay)
+      _Collect, range, slide, delay, _Zeros)
 
     // var wm: USize = 4_888
     // res = sw(0, Seconds(4_889), Seconds(wm))
@@ -991,3 +992,7 @@ primitive _TumblingWindow
     let slide = range
     let delay: U64 = 0
     RangeWindows[USize, USize, _Total]("key", _NonZeroSum, range, slide, delay)
+
+class _Zeros is Random
+  new ref create(x: U64 val = 0, y: U64 val = 0) => None
+  fun ref next(): U64 => 0

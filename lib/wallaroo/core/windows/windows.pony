@@ -19,8 +19,9 @@ Copyright 2018 The Wallaroo Authors.
 
 use "buffered"
 use "collections"
-use "time"
+use "random"
 use "serialise"
+use "time"
 use "wallaroo/core/aggregations"
 use "wallaroo/core/common"
 use "wallaroo/core/state"
@@ -124,7 +125,7 @@ class val GlobalWindowStateInitializer[In: Any val, Out: Any val,
   new val create(agg: Aggregation[In, Out, Acc]) =>
     _agg = agg
 
-  fun state_wrapper(key: Key): StateWrapper[In, Out, Acc] =>
+  fun state_wrapper(key: Key, rand: Random): StateWrapper[In, Out, Acc] =>
     GlobalWindow[In, Out, Acc](key, _agg)
 
   fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
@@ -214,8 +215,8 @@ class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
     _slide = slide
     _delay = delay
 
-  fun state_wrapper(key: Key): StateWrapper[In, Out, Acc] =>
-    RangeWindows[In, Out, Acc](key, _agg, _range, _slide, _delay)
+  fun state_wrapper(key: Key, rand: Random): StateWrapper[In, Out, Acc] =>
+    RangeWindows[In, Out, Acc](key, _agg, _range, _slide, _delay, rand)
 
   fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
     RunnerBuilder
@@ -225,13 +226,7 @@ class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
   fun timeout_interval(): U64 =>
     // !@ !TODO!: Decide if we should set a minimum to this interval to
     // avoid extremely frequent timer messages.
-    let range_delay_based = (_range + _delay) * 2
-    // if range_delay_based > Seconds(1) then
-    //   range_delay_based
-    // else
-    //   Seconds(1)
-    // end
-    range_delay_based
+    (_range + _delay) * 2
 
   fun val decode(in_reader: Reader, auth: AmbientAuth):
     StateWrapper[In, Out, Acc] ?
@@ -256,10 +251,10 @@ class RangeWindows[In: Any val, Out: Any val, Acc: State ref] is
   var _phase: WindowsPhase[In, Out, Acc] = EmptyWindowsPhase[In, Out, Acc]
 
   new create(key: Key, agg: Aggregation[In, Out, Acc], range: U64, slide: U64,
-    delay: U64)
+    delay: U64, rand: Random)
   =>
     let wrapper_builder = _SlidingWindowsWrapperBuilder[In, Out, Acc](key, agg,
-      range, slide, delay)
+      range, slide, delay, rand)
     _phase = InitialWindowsPhase[In, Out, Acc](this, wrapper_builder)
 
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
@@ -317,19 +312,21 @@ class _SlidingWindowsWrapperBuilder[In: Any val, Out: Any val, Acc: State ref]
   let _range: U64
   let _slide: U64
   let _delay: U64
+  let _rand: Random
 
   new create(key: Key, agg: Aggregation[In, Out, Acc], range: U64, slide: U64,
-    delay: U64)
+    delay: U64, rand: Random)
   =>
     _key = key
     _agg = agg
     _range = range
     _slide = slide
     _delay = delay
+    _rand = rand
 
   fun ref apply(watermark_ts: U64): _PanesSlidingWindows[In, Out, Acc] =>
     _PanesSlidingWindows[In, Out, Acc](_key, _agg, _range, _slide, _delay,
-      watermark_ts)
+      watermark_ts, _rand)
 
 
 ////////////////////////////
@@ -344,7 +341,7 @@ class val TumblingCountWindowsStateInitializer[In: Any val, Out: Any val,
     _agg = agg
     _count = count
 
-  fun state_wrapper(key: Key): StateWrapper[In, Out, Acc] =>
+  fun state_wrapper(key: Key, rand: Random): StateWrapper[In, Out, Acc] =>
     TumblingCountWindows[In, Out, Acc](key, _agg, _count)
 
   fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
