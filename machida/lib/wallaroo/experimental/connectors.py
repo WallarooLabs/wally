@@ -411,3 +411,4 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             raise ConnectorError("Stream {} was opened for unknown source. "
                                  "Please use the add_source interface."
                                  .format(stream))
+
