@@ -36,7 +36,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
 
 
 WINDOW_DETECTOR_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-window_detector_tests: LOGLEVEL = error
+window_detector_tests: LOGLEVEL = debug
 
 # standard rules generation makefile
 include $(rules_mk_path)
@@ -71,15 +71,15 @@ window_detector_tests_python: window_detector_tumbling_alo_source_test_python
 
 
 # Python3
-window_detector_tests_python3: window_detector_tumbling_test_python3
-window_detector_tests_python3: window_detector_sliding_test_python3
-window_detector_tests_python3: window_detector_counting_test_python3
-window_detector_tests_python3: window_detector_tumbling_gensource_test_python3
-window_detector_tests_python3: window_detector_counting_gensource_test_python3
-window_detector_tests_python3: window_detector_sliding_gensource_test_python3
-window_detector_tests_python3: window_detector_tumbling_alo_source_test_python3
-window_detector_tests_python3: window_detector_sliding_alo_source_test_python3
-window_detector_tests_python3: window_detector_counting_alo_source_test_python3
+#window_detector_tests_python3: window_detector_tumbling_test_python3
+#window_detector_tests_python3: window_detector_sliding_test_python3
+#window_detector_tests_python3: window_detector_counting_test_python3
+#window_detector_tests_python3: window_detector_tumbling_gensource_test_python3
+#window_detector_tests_python3: window_detector_counting_gensource_test_python3
+#window_detector_tests_python3: window_detector_sliding_gensource_test_python3
+#window_detector_tests_python3: window_detector_tumbling_alo_source_test_python3
+#window_detector_tests_python3: window_detector_sliding_alo_source_test_python3
+#window_detector_tests_python3: window_detector_counting_alo_source_test_python3
 
 # Individual test definitions below
 #
