@@ -115,7 +115,6 @@ class SinkExpect(StoppableThread):
                                                              self.expected))
                 self.stop()
                 break
-            print("YO control")
             time.sleep(0.1)
 
 
