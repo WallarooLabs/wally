@@ -297,6 +297,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                     key = source.key,
                     message = value)
                 print("ALO: {} stm {} mid {} key {} val {}".format(self, key, point_of_ref, source.key, value))
+                time.sleep(0.015) ## SLF TODO: debugging hack
                 return msg
             except StopIteration:
                 print("ALO: {} StopIteration".format(self))
