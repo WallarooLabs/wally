@@ -1043,6 +1043,7 @@ primitive _TumblingWindow
     RangeWindows[USize, USize, _Total]("key",
       _NonZeroSum, range, slide, delay, _Zeros)
 
+
 class _Zeros is Random
   new ref create(x: U64 val = 0, y: U64 val = 0) => None
   fun ref next(): U64 => 0
