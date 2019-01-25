@@ -20,6 +20,7 @@ use "buffered"
 use "collections"
 use "crypto"
 use "net"
+use "random"
 use "time"
 use "serialise"
 use "wallaroo/core/common"
@@ -299,6 +300,10 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
   let _auth: AmbientAuth
   var _step_id: (RoutingId | None)
 
+  // !TODO! This is for creating unaligned windows with random starting
+  // points. We should refactor so that we can control the seed for testing.
+  let _rand: Rand = Rand
+
   // Timeouts
   var _step_timeout_trigger: (StepTimeoutTrigger | None) = None
   let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
@@ -402,7 +407,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
           match producer
           | let s: Step ref =>
             s.register_key(_step_group, key)
-            let new_state = _state_initializer.state_wrapper(key)
+            let new_state = _state_initializer.state_wrapper(key, _rand)
             _state_map(key) = new_state
             new_state
           else
@@ -434,7 +439,6 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
         else
           state_wrapper(input, event_ts, watermark_ts)
         end
-        // state_wrapper(input, event_ts, watermark_ts)
       let computation_end = WallClock.nanoseconds()
 
       (let new_watermark_ts, let old_watermark_ts) =
@@ -520,7 +524,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     else
       // We got the key but no accompanying state, so we initialize
       // ourselves.
-      _state_map(key) = _state_initializer.state_wrapper(key)
+      _state_map(key) = _state_initializer.state_wrapper(key, _rand)
       step.register_key(s_group, key)
     end
 
@@ -530,7 +534,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
       try
         _state_map.remove(key)?._2
       else
-        _state_initializer.state_wrapper(key)
+        _state_initializer.state_wrapper(key, _rand)
       end
     state_wrapper.encode(_auth)
 

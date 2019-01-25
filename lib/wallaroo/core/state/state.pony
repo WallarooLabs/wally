@@ -17,6 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "buffered"
+use "random"
 use "serialise"
 use "wallaroo/core/common"
 use "wallaroo/core/topology"
@@ -55,7 +56,7 @@ primitive PonySerializeStateEncoderDecoder[S: State ref] is
 
 interface val StateInitializer[In: Any val, Out: Any val, S: State ref] is
   Computation[In, Out]
-  fun val state_wrapper(key: Key): StateWrapper[In, Out, S]
+  fun val state_wrapper(key: Key, rand: Rand): StateWrapper[In, Out, S]
   fun name(): String
   fun timeout_interval(): U64
   fun val decode(in_reader: Reader, auth: AmbientAuth):
