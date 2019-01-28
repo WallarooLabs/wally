@@ -41,11 +41,11 @@ interface val Aggregation[In: Any val, Out: Any val, Acc: State ref] is
   ////////////////////////////
   // Not implemented by user
   ////////////////////////////
-  fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
-    RunnerBuilder
+  fun val runner_builder(step_group_id: RoutingId, parallelization: USize,
+    local_routing: Bool): RunnerBuilder
   =>
     let global_window_initializer = GlobalWindowStateInitializer[In, Out, Acc](
       this)
     StateRunnerBuilder[In, Out, Acc](global_window_initializer, step_group_id,
-      parallelization)
+      parallelization, local_routing)
 

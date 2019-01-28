@@ -70,6 +70,7 @@ trait val RunnerBuilder
   fun name(): String
   fun routing_group(): RoutingId
   fun parallelism(): USize
+  fun local_routing(): Bool
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool
   fun is_multi(): Bool => false
@@ -78,8 +79,11 @@ class val RunnerSequenceBuilder is RunnerBuilder
   let _runner_builders: Array[RunnerBuilder] val
   let _routing_group: RoutingId
   let _parallelism: USize
+  let _local_routing: Bool
 
-  new val create(bs: Array[RunnerBuilder] val, parallelism': USize) =>
+  new val create(bs: Array[RunnerBuilder] val, parallelism': USize,
+    local_routing': Bool)
+  =>
     _runner_builders = bs
     _routing_group =
       try
@@ -88,6 +92,7 @@ class val RunnerSequenceBuilder is RunnerBuilder
         0
       end
     _parallelism = parallelism'
+    _local_routing = local_routing'
 
   fun apply(event_log: EventLog,
     auth: AmbientAuth,
@@ -127,6 +132,7 @@ class val RunnerSequenceBuilder is RunnerBuilder
   fun routing_group(): RoutingId =>
     _routing_group
   fun parallelism(): USize => _parallelism
+  fun local_routing(): Bool => _local_routing
   fun is_prestate(): Bool =>
     try
       _runner_builders(_runner_builders.size() - 1)?.is_prestate()
@@ -146,13 +152,15 @@ class val StatelessComputationRunnerBuilder[In: Any val, Out: Any val] is
   let _comp: StatelessComputation[In, Out]
   let _routing_group: RoutingId
   let _parallelism: USize
+  let _local_routing: Bool
 
   new val create(comp: StatelessComputation[In, Out],
-    routing_group': RoutingId, parallelism': USize)
+    routing_group': RoutingId, parallelism': USize, local_routing': Bool)
   =>
     _comp = comp
     _routing_group = routing_group'
     _parallelism = parallelism'
+    _local_routing = local_routing'
 
   fun apply(event_log: EventLog,
     auth: AmbientAuth,
@@ -171,6 +179,7 @@ class val StatelessComputationRunnerBuilder[In: Any val, Out: Any val] is
   fun name(): String => _comp.name()
   fun routing_group(): RoutingId => _routing_group
   fun parallelism(): USize => _parallelism
+  fun local_routing(): Bool => _local_routing
   fun is_stateful(): Bool => false
 
 class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
@@ -178,13 +187,15 @@ class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
   let _state_init: StateInitializer[In, Out, S] val
   let _step_group: RoutingId
   let _parallelism: USize
+  let _local_routing: Bool
 
   new val create(state_init: StateInitializer[In, Out, S] val,
-    step_group: RoutingId, parallelism': USize)
+    step_group: RoutingId, parallelism': USize, local_routing': Bool)
   =>
     _state_init = state_init
     _step_group = step_group
     _parallelism = parallelism'
+    _local_routing = local_routing'
 
   fun apply(event_log: EventLog,
     auth: AmbientAuth,
@@ -205,6 +216,7 @@ class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
   fun name(): String => _state_init.name()
   fun routing_group(): RoutingId => _step_group
   fun parallelism(): USize => _parallelism
+  fun local_routing(): Bool => _local_routing
   fun is_stateful(): Bool => true
 
 class StatelessComputationRunner[In: Any val, Out: Any val] is Runner

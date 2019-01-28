@@ -67,6 +67,7 @@ class val StepBuilder
   fun is_partitioned(): Bool => false
   fun partitioner_builder(): PartitionerBuilder => _partitioner_builder
   fun parallelism(): USize => _parallelism
+  fun local_routing(): Bool => _runner_builder.local_routing()
 
   fun apply(routing_id: RoutingId, worker_name: WorkerName, next: Router,
     metrics_conn: MetricsSink, event_log: EventLog,

@@ -652,9 +652,16 @@ actor LocalTopologyInitializer is LayoutInitializer
                   proxies(w) = HashedProxyRouter(w, ob, step_group, _auth)
                 end
 
+                let hash_partitions =
+                  if builder.local_routing() then
+                    HashPartitions([_worker_name])
+                  else
+                    HashPartitions(t.worker_names)
+                  end
+
                 let next_router = StatePartitionRouter(step_group,
                   _worker_name, router_state_steps, router_state_step_ids,
-                  consume proxies, HashPartitions(t.worker_names),
+                  consume proxies, hash_partitions,
                   t.step_group_routing_ids(step_group)?)
 
                 state_partition_routers(step_group) = next_router
@@ -705,8 +712,15 @@ actor LocalTopologyInitializer is LayoutInitializer
                   proxies(w) = proxy_router
                 end
 
+                let stateless_partition_workers =
+                  if builder.local_routing() then
+                    recover val [_worker_name] end
+                  else
+                    t.worker_names
+                  end
+
                 let next_router = StatelessPartitionRouter(step_group,
-                  _worker_name, t.worker_names,
+                  _worker_name, stateless_partition_workers,
                   router_stateless_steps, router_stateless_step_ids,
                   t.step_group_routing_ids(step_group)?,
                   consume proxies, execution_ids.size())

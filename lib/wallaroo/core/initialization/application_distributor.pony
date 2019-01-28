@@ -241,7 +241,7 @@ actor ApplicationDistributor is Distributor
               output_id = node.id
 
               let new_rb = RunnerSequenceBuilder(consume coalesced_comps,
-                parallelism)
+                parallelism, rb.local_routing())
               StepBuilder(_app_name, new_rb, node.id, rb.routing_group(),
                 partitioner_builder, rb.is_stateful())
             end
@@ -308,7 +308,8 @@ actor ApplicationDistributor is Distributor
             end
 
           let r_builder = RunnerSequenceBuilder(
-            recover Array[RunnerBuilder] end where parallelism' = 0)
+            recover Array[RunnerBuilder] end where parallelism' = 0,
+            local_routing' = false)
           let source_data = SourceData(node.id, source_name, r_builder,
             sc.source_listener_builder_builder(), partitioner_builder)
 
