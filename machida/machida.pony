@@ -41,6 +41,7 @@ use "wallaroo/core/windows"
 // these are included because of wallaroo issue #814
 use "serialise"
 use "wallaroo_labs/mort"
+use "wallaroo_labs/time" // yet another case of the same(?)
 
 use @set_user_serialization_fns[None](module: Pointer[U8] tag)
 use @user_serialization_get_size[USize](o: Pointer[U8] tag)
