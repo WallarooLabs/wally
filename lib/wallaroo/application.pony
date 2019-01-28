@@ -75,6 +75,9 @@ class Pipeline[Out: Any val] is BasicPipeline
 
   var _last_is_shuffle: Bool
   var _last_is_key_by: Bool
+  // A local_key_by call means we keep using worker-local routing until we
+  // come to collect() or key_by()
+  var _local_routing: Bool
 
   new from_source(n: String, source_config: TypedSourceConfig[Out]) =>
     _stages = Dag[Stage]
@@ -82,6 +85,7 @@ class Pipeline[Out: Any val] is BasicPipeline
     _finished = false
     _last_is_shuffle = false
     _last_is_key_by = false
+    _local_routing = false
     let sc_wrapper = SourceConfigWrapper(n, source_config)
     let source_id' = _stages.add_node(sc_wrapper)
     _dag_sink_ids.push(source_id')
@@ -91,6 +95,7 @@ class Pipeline[Out: Any val] is BasicPipeline
   new create(stages: Dag[Stage] = Dag[Stage],
     dag_sink_ids: Array[RoutingId] = Array[RoutingId],
     worker_source_configs': Map[SourceName, WorkerSourceConfig],
+    local_routing: Bool,
     finished: Bool = false,
     last_is_shuffle: Bool = false,
     last_is_key_by: Bool = false)
@@ -101,6 +106,7 @@ class Pipeline[Out: Any val] is BasicPipeline
     _finished = finished
     _last_is_shuffle = last_is_shuffle
     _last_is_key_by = last_is_key_by
+    _local_routing = local_routing
 
   fun is_finished(): Bool => _finished
 
@@ -128,18 +134,20 @@ class Pipeline[Out: Any val] is BasicPipeline
       end
       _dag_sink_ids.append(pipeline._dag_sink_ids)
       return Pipeline[(Out | MergeOut)](_stages, _dag_sink_ids,
-        _worker_source_configs
-        where last_is_shuffle = _last_is_shuffle,
+        _worker_source_configs where local_routing = _local_routing,
+        last_is_shuffle = _last_is_shuffle,
         last_is_key_by = _last_is_key_by)
     end
-    Pipeline[(Out | MergeOut)](_stages, _dag_sink_ids, _worker_source_configs)
+    Pipeline[(Out | MergeOut)](_stages, _dag_sink_ids, _worker_source_configs
+      where local_routing = _local_routing)
 
   fun ref to[Next: Any val](comp: Computation[Out, Next],
     parallelization: USize = 10): Pipeline[Next]
   =>
     let node_id = RoutingIdGenerator()
     if not _finished then
-      let runner_builder = comp.runner_builder(node_id, parallelization)
+      let runner_builder = comp.runner_builder(node_id, parallelization,
+        _local_routing)
       _stages.add_node(runner_builder, node_id)
       try
         for sink_id in _dag_sink_ids.values() do
@@ -148,10 +156,12 @@ class Pipeline[Out: Any val] is BasicPipeline
       else
         Fail()
       end
-      Pipeline[Next](_stages, [node_id], _worker_source_configs)
+      Pipeline[Next](_stages, [node_id], _worker_source_configs
+        where local_routing = _local_routing)
     else
       _try_add_to_finished_pipeline()
-      Pipeline[Next](_stages, _dag_sink_ids, _worker_source_configs)
+      Pipeline[Next](_stages, _dag_sink_ids, _worker_source_configs
+        where local_routing = _local_routing)
     end
 
   fun ref to_sink(sink_information: SinkConfig[Out]): Pipeline[Out] =>
@@ -166,10 +176,11 @@ class Pipeline[Out: Any val] is BasicPipeline
         Fail()
       end
       Pipeline[Out](_stages, [node_id], _worker_source_configs
-        where finished = true)
+        where local_routing = _local_routing, finished = true)
     else
       _try_add_to_finished_pipeline()
-      Pipeline[Out](_stages, _dag_sink_ids, _worker_source_configs)
+      Pipeline[Out](_stages, _dag_sink_ids, _worker_source_configs
+        where local_routing = _local_routing)
     end
 
   fun ref to_sinks(sink_configs: Array[SinkConfig[Out]] box): Pipeline[Out] =>
@@ -191,13 +202,16 @@ class Pipeline[Out: Any val] is BasicPipeline
         Fail()
       end
       Pipeline[Out](_stages, [node_id], _worker_source_configs
-        where finished = true)
+        where local_routing = _local_routing, finished = true)
     else
       _try_add_to_finished_pipeline()
-      Pipeline[Out](_stages, _dag_sink_ids, _worker_source_configs)
+      Pipeline[Out](_stages, _dag_sink_ids, _worker_source_configs
+        where local_routing = _local_routing)
     end
 
-  fun ref key_by(pf: KeyExtractor[Out]): Pipeline[Out] =>
+  fun ref key_by(pf: KeyExtractor[Out], local_routing: Bool = false):
+    Pipeline[Out]
+  =>
     if not _finished then
       let node_id = _stages.add_node(TypedKeyPartitionerBuilder[Out](pf))
       try
@@ -208,15 +222,23 @@ class Pipeline[Out: Any val] is BasicPipeline
         Fail()
       end
       Pipeline[Out](_stages, [node_id], _worker_source_configs
-        where last_is_key_by = true)
+        where local_routing = local_routing, last_is_key_by = true)
     else
       _try_add_to_finished_pipeline()
-      Pipeline[Out](_stages, _dag_sink_ids, _worker_source_configs)
+      Pipeline[Out](_stages, _dag_sink_ids, _worker_source_configs
+        where local_routing = local_routing)
     end
 
-  fun ref collect(): Pipeline[Out] =>
+  fun ref local_key_by(pf: KeyExtractor[Out]): Pipeline[Out] =>
+    key_by(pf where local_routing = true)
+
+  fun ref collect(local_routing: Bool = false): Pipeline[Out] =>
     let collect_key = CollectKeyGenerator()
-    key_by(CollectKeyExtractor[Out](collect_key))
+    key_by(CollectKeyExtractor[Out](collect_key)
+      where local_routing = local_routing)
+
+  fun ref local_collect(): Pipeline[Out] =>
+    collect(where local_routing = true)
 
   fun graph(): this->Dag[Stage] => _stages
 

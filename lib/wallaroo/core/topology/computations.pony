@@ -32,18 +32,18 @@ type ComputationResult[Out: Any val] is
 
 interface val Computation[In: Any val, Out: Any val]
   fun name(): String
-  fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
-    RunnerBuilder
+  fun val runner_builder(step_group_id: RoutingId, parallelization: USize,
+    local_routing: Bool): RunnerBuilder
 
 trait val StatelessComputation[In: Any val, Out: Any val] is
   Computation[In, Out]
   fun apply(input: In): ComputationResult[Out]
 
-  fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
-    RunnerBuilder
+  fun val runner_builder(step_group_id: RoutingId, parallelization: USize,
+    local_routing: Bool): RunnerBuilder
   =>
     StatelessComputationRunnerBuilder[In, Out](this, step_group_id,
-      parallelization)
+      parallelization, local_routing)
 
 trait val StateComputation[In: Any val, Out: Any val, S: State ref] is
   (Computation[In, Out] & StateInitializer[In, Out, S])
@@ -60,10 +60,11 @@ trait val StateComputation[In: Any val, Out: Any val, S: State ref] is
   ////////////////////////////
   // Not implemented by user
   ////////////////////////////
-  fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
-    RunnerBuilder
+  fun val runner_builder(step_group_id: RoutingId, parallelization: USize,
+    local_routing: Bool): RunnerBuilder
   =>
-    StateRunnerBuilder[In, Out, S](this, step_group_id, parallelization)
+    StateRunnerBuilder[In, Out, S](this, step_group_id, parallelization,
+      local_routing)
 
   fun val state_wrapper(key: Key, rand: Rand): StateWrapper[In, Out, S]
   =>
