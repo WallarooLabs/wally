@@ -25,8 +25,7 @@ trait WindowsPhase[In: Any val, Out: Any val, Acc: State ref]
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
     ((Out | Array[Out] val | None), U64)
 
-  fun ref attempt_to_trigger(input_watermark_ts: U64,
-    output_watermark_ts: U64, watermarks: StageWatermarks):
+  fun ref attempt_to_trigger(input_watermark_ts: U64, output_watermark_ts: U64):
     ((Out | Array[Out] val | None), U64)
 
   fun check_panes_increasing(): Bool =>
@@ -40,8 +39,7 @@ class EmptyWindowsPhase[In: Any val, Out: Any val, Acc: State ref] is
     Fail()
     (None, 0)
 
-  fun ref attempt_to_trigger(input_watermark_ts: U64,
-    output_watermark_ts: U64, watermarks: StageWatermarks):
+  fun ref attempt_to_trigger(input_watermark_ts: U64, output_watermark_ts: U64):
     ((Out | Array[Out] val | None), U64)
   =>
     Fail()
@@ -64,13 +62,12 @@ class InitialWindowsPhase[In: Any val, Out: Any val, Acc: State ref] is
     let wrapper = _windows_wrapper_builder(watermark_ts)
     _windows._initial_apply(input, event_ts, watermark_ts, wrapper)
 
-  fun ref attempt_to_trigger(input_watermark_ts: U64,
-    output_watermark_ts: U64, watermarks: StageWatermarks):
+  fun ref attempt_to_trigger(input_watermark_ts: U64, output_watermark_ts: U64):
     ((Out | Array[Out] val | None), U64)
   =>
     let wrapper = _windows_wrapper_builder(input_watermark_ts)
     _windows._initial_attempt_to_trigger(input_watermark_ts,
-      output_watermark_ts, wrapper, watermarks)
+      output_watermark_ts, wrapper)
 
 class ProcessingWindowsPhase[In: Any val, Out: Any val, Acc: State ref] is
   WindowsPhase[In, Out, Acc]
@@ -87,13 +84,12 @@ class ProcessingWindowsPhase[In: Any val, Out: Any val, Acc: State ref] is
     end
     _windows_wrapper.apply(input, event_ts, watermark_ts)
 
-  fun ref attempt_to_trigger(input_watermark_ts: U64,
-    output_watermark_ts: U64, watermarks: StageWatermarks):
+  fun ref attempt_to_trigger(input_watermark_ts: U64, output_watermark_ts: U64):
     (Array[Out] val, U64)
   =>
     if input_watermark_ts == U64.max_value() then
       try
-        _windows_wrapper.trigger_all(output_watermark_ts, watermarks)?
+        _windows_wrapper.trigger_all(output_watermark_ts)?
       else
         Fail()
         (recover Array[Out] end, 0)
