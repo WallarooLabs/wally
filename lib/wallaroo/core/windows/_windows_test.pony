@@ -54,6 +54,7 @@ class iso _TestTumblingWindowsTimeoutTrigger is UnitTest
       h.fail("boo")
     end
 
+
 class iso _TestOnTimeoutWatermarkTsIsJustBeforeNextWindowStart is UnitTest
   fun name(): String => "_TestOnTimeoutWatermarkTsIsJustBeforeNextWindowStart"
 
@@ -81,6 +82,80 @@ class iso _TestOnTimeoutWatermarkTsIsJustBeforeNextWindowStart is UnitTest
        In this case it's 4(?) windows ahead.
     */
     h.assert_eq[U64](res._2, Milliseconds(5150))
+
+class iso _Test0 is UnitTest  // !@
+  fun name(): String =>
+    "windows/_Test0"
+
+  fun apply(h: TestHelper) ? =>
+    // given
+    let range: U64 = Milliseconds(50)
+    let slide = range
+    let delay: U64 = 0
+    let tw = RangeWindows[USize, USize, _Total]("key", _NonZeroSum, range, slide,
+      delay)
+    tw(1, Milliseconds(5000), Milliseconds(5000))
+    tw(3, Milliseconds(5300), Milliseconds(5300))
+
+    // when
+    let res = tw(11, Milliseconds(6050), Milliseconds(6050))
+
+    // then
+    let res_array = ForceArray(res._1)?
+    h.assert_eq[USize](res_array.size(), 1)
+    h.assert_eq[USize](res_array(0)?, 3)
+    h.assert_eq[U64](res._2, Milliseconds(5350))
+
+
+primitive TumblingWindow
+  fun apply(range: U64, calculation: Aggregation[USize, USize, _Total]):
+    RangeWindows[USize, USize, _Total]
+  =>
+    let slide = range
+    let delay: U64 = 0
+    RangeWindows[USize, USize, _Total]("key", _NonZeroSum, range, slide, delay)
+
+class iso _Test1 is UnitTest  // !@
+  fun name(): String =>
+    "windows/_Test1"
+
+  fun apply(h: TestHelper) ? =>
+    // given
+    let tw = TumblingWindow(Milliseconds(50), _NonZeroSum)
+    tw(1, Milliseconds(5000), Milliseconds(5000))
+    tw(3, Milliseconds(5300), Milliseconds(5300))
+    tw(11, Milliseconds(6050), Milliseconds(6050))
+    tw(13, Milliseconds(6051), Milliseconds(6051))
+
+    // when
+    let res = tw.on_timeout(U64.max_value(), Milliseconds(5350))
+
+    // then
+    let res_array = ForceArray(res._1)?
+    h.assert_eq[USize](res_array.size(), 1)
+    h.assert_eq[USize](res_array(0)?, 24)
+    h.assert_eq[U64](res._2, Milliseconds(6250)) // on_timeout + 4 windows
+
+class iso _Test2 is UnitTest  // !@
+  fun name(): String =>
+    "windows/_Test2"
+
+  fun apply(h: TestHelper) ? =>
+    // given
+    let tw = TumblingWindow(Seconds(1), _NonZeroSum)
+    tw(1, Milliseconds(5050), Milliseconds(5050))
+    tw(3, Milliseconds(5350), Milliseconds(5350))
+    tw(24, Milliseconds(6250), Milliseconds(6250))
+
+    // when
+    let res = tw.on_timeout(U64.max_value(), Milliseconds(5350))
+
+    // then
+    let res_array = ForceArray(res._1)?
+    h.assert_eq[USize](res_array.size(), 1)
+    h.assert_eq[USize](res_array(0)?, 24)
+    h.assert_eq[U64](res._2, Milliseconds(9050)) // 4x1sec.
+
 
 
 class iso _TestOutputWatermarkTsIsJustBeforeNextWindowStart is UnitTest
