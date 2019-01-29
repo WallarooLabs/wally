@@ -44,17 +44,28 @@ integration-tests-testing-correctness-apps-multi_aggregation: build-testing-corr
 integration-tests-testing-correctness-apps-multi_aggregation: multi_aggregation_test
 
 multi_aggregation_test:
-	cd $(MULTI_AGGREGATION_PATH) && \
+	cd $(MULTI_AGGREGATION_PATH) &&\
 	integration_test \
+		--expected-file _expected.msg \
 		--newline-file-sender _events.msg \
 		--validation-cmp \
-		--expected-file _expected.msg \
+		--log-level error \
+		--command './multi_aggregation $(RUN_WITH_RESILIENCE)' \
+		--sink-expect 6 \
+		--sink-expect-allow-more \
+		--sinks 1 \
+		--sources 1 &&\
+	integration_test \
+		--expected-file _expected1.msg \
+		--newline-file-sender _events1.msg \
+		--validation-cmp \
 		--log-level error \
 		--command './multi_aggregation $(RUN_WITH_RESILIENCE)' \
 		--sink-expect 2 \
 		--sink-expect-allow-more \
 		--sinks 1 \
 		--sources 1
+
 
 # end of prevent rules from being evaluated/included multiple times
 endif
