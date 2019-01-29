@@ -35,15 +35,13 @@ class iso _TestTumblingWindowsTimeoutTrigger is UnitTest
     let delay: U64 = 0
     let upstream_id: U128 = 1000
     let now: U64 = 1000
-    let w = StageWatermarks
     let tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
       delay)
     let watermark: U64 = Seconds(111)
     tw(111, watermark, watermark)
-    w.receive_watermark(upstream_id, watermark, now)
 
     // when
-    let res = tw.on_timeout(U64.max_value(), w.output_watermark(), w)
+    let res = tw.on_timeout(U64.max_value(), watermark)
 
     // then
     match res
@@ -52,10 +50,118 @@ class iso _TestTumblingWindowsTimeoutTrigger is UnitTest
        h.assert_eq[USize](arr(0)?, 0)
        h.assert_eq[USize](arr(1)?, 111)
        h.assert_true(n != U64.max_value())
-       h.assert_true(w.output_watermark() != U64.max_value())
     else
       h.fail("boo")
     end
+
+class iso _TestOnTimeoutWatermarkTsIsJustBeforeNextWindowStart is UnitTest
+  fun name(): String => "_TestOnTimeoutWatermarkTsIsJustBeforeNextWindowStart"
+
+  fun apply(h: TestHelper) ? =>
+    // given
+    let range: U64 = Milliseconds(50)
+    let slide = range
+    let delay: U64 = 0
+    let tw = RangeWindows[USize, USize, _Total]("key", _NonZeroSum, range, slide,
+      delay)
+    tw(1, Milliseconds(5000), Milliseconds(5000))
+
+    // when
+    let no_output_watermark = U64(0)
+    let res = tw.on_timeout(U64.max_value(), no_output_watermark)
+
+    // then
+    let res_array = ForceArray(res._1)?
+    h.assert_eq[USize](res_array.size(), 1)
+    h.assert_eq[USize](res_array(0)?, 1)
+    /* The output watermark returned when we trigger all windows
+       (because we haven't heard from upstream for a 'while')
+       records the *highest* window end timestamp of all triggered
+       windows.
+       In this case it's 4(?) windows ahead.
+    */
+    h.assert_eq[U64](res._2, Milliseconds(5150))
+
+
+class iso _TestOutputWatermarkTsIsJustBeforeNextWindowStart is UnitTest
+  fun name(): String =>
+    "windows/_TestOutputWatermarkTsIsJustBeforeNextWindowStart"
+
+  fun apply(h: TestHelper) ? =>
+    // given
+    let range: U64 = Milliseconds(50)
+    let slide = range
+    let delay: U64 = 0
+    let upstream_id: U128 = 1000
+    let now: U64 = 1000
+    let tw = RangeWindows[USize, USize, _Total]("key", _NonZeroSum, range, slide,
+      delay)
+    tw(1, Milliseconds(5000), Milliseconds(5000))
+
+    // when
+    let res = tw(3, Milliseconds(5100), Milliseconds(5100))
+
+    // then
+    let res_array = ForceArray(res._1)?
+    h.assert_eq[USize](res_array.size(), 1)
+    h.assert_eq[USize](res_array(0)?, 1)
+    h.assert_eq[U64](res._2, Milliseconds(5050))
+
+
+class iso _TestMessageAssignmentToTumblingWindows is UnitTest
+  fun name(): String => "windows/_TestMessageAssignmentToTumblingWindows"
+
+  fun apply(h: TestHelper) ? =>
+    // given
+    let range: U64 = Milliseconds(50)
+    let slide = range
+    let delay: U64 = 0
+    let upstream_id: U128 = 1000
+    let now: U64 = 1000
+    let tw = RangeWindows[USize, USize, _Total]("key", _NonZeroSum, range, slide,
+      delay)
+
+    // when
+    let r1 = tw(1, Milliseconds(5000), Milliseconds(5000))
+    let r2 = tw(3, Milliseconds(5100), Milliseconds(5100))
+    let r3 = tw(5, Milliseconds(5200), Milliseconds(5200))
+    let r4 = tw(1, Milliseconds(5300), Milliseconds(5300))
+    let r5 = tw.on_timeout(U64.max_value(), r4._2)
+
+    // then
+    let r1_array = ForceArray(r1._1)?
+    h.assert_eq[USize](r1_array.size(), 0)
+    h.assert_eq[U64](r1._2, 0) // we expect 5050 (should be `5050)` )
+
+    let r2_array = ForceArray(r2._1)?
+    h.assert_eq[USize](r2_array.size(), 1)
+    h.assert_eq[USize](r2_array(0)?, 1)
+    h.assert_eq[U64](r2._2, Milliseconds(5050))
+
+    let r3_array = ForceArray(r3._1)?
+    h.assert_eq[USize](r3_array.size(), 1)
+    h.assert_eq[USize](r3_array(0)?, 3)
+    h.assert_eq[U64](r3._2, Milliseconds(5150))
+
+    let r4_array = ForceArray(r4._1)?
+    h.assert_eq[USize](r4_array.size(), 1)
+    h.assert_eq[USize](r4_array(0)?, 5)
+    h.assert_eq[U64](r4._2, Milliseconds(5250))
+
+    let r5_array = ForceArray(r5._1)?
+    h.assert_eq[USize](r5_array.size(), 1)
+    h.assert_eq[USize](r5_array(0)?, 1)
+    h.assert_eq[U64](r5._2, Milliseconds(5350))
+
+
+primitive ForceArray
+  fun apply(res: (USize | Array[USize] val | None)): Array[USize] val ? =>
+    match res
+    | let a: Array[USize] val => a
+    else error end
+
+primitive Clearfix
+  fun apply(): None ? => if U32(1) == 2 then error else None end
 
 
 class iso _TestTumblingWindows is UnitTest
@@ -771,7 +877,7 @@ class iso _TestSlidingWindowsStragglers is UnitTest
     cur_ts = Seconds(10_000_000)
     let input_w = watermarks.check_effective_input_watermark(cur_ts)
     let output_w = watermarks.output_watermark()
-    res = sw.on_timeout(input_w, output_w, watermarks)
+    res = sw.on_timeout(input_w, output_w)
     watermarks.update_output_watermark(res._2)
     h.assert_eq[USize](_array(res._1)?.size(), 502)
     for i in Range(0, 500) do
@@ -852,7 +958,7 @@ class iso _TestSlidingWindowsStragglersSequence is UnitTest
     cur_ts = Seconds(100_000_000)
     let input_w = watermarks.check_effective_input_watermark(cur_ts)
     let output_w = watermarks.output_watermark()
-    res = sw.on_timeout(input_w, output_w, watermarks)
+    res = sw.on_timeout(input_w, output_w)
     watermarks.update_output_watermark(res._2)
     h.assert_eq[USize](_array(res._1)?.size(), 502)
     // Check empty windows before our stragglers
@@ -1070,6 +1176,18 @@ class _Sum is Aggregation[USize, USize, _Total]
   fun output(key: Key, window_end_ts: U64, acc: _Total): (USize | None) =>
     acc.v
   fun name(): String => "_Sum"
+
+class _NonZeroSum is Aggregation[USize, USize, _Total]
+  fun initial_accumulator(): _Total => _Total
+  fun update(input: USize, acc: _Total) =>
+    acc.v = acc.v + input
+  fun combine(acc1: _Total, acc2: _Total): _Total =>
+    let new_t = _Total
+    new_t.v = acc1.v + acc2.v
+    new_t
+  fun output(key: Key, window_end_ts: U64, acc: _Total): (USize | None) =>
+    if acc.v > 0 then acc.v end
+  fun name(): String => "_NonZeroSum"
 
 primitive _Collect is Aggregation[USize, Array[USize] val, Collected]
   fun initial_accumulator(): Collected => Collected

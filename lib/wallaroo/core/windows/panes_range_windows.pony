@@ -92,6 +92,8 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       if not applied then
         (var new_earliest_ts, let new_end_ts) = _earliest_and_end_ts()?
         if (event_ts >= new_end_ts) then
+          // !TODO!: Think about constraining the extent to which we expand
+          // windows to prevent memory exhaustion.
           _expand_windows(event_ts, new_end_ts)?
           new_earliest_ts = _earliest_ts()?
         end
@@ -165,10 +167,10 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     end
     (consume outs, output_watermark_ts)
 
-  fun ref trigger_all(output_watermark_ts: U64, watermarks: StageWatermarks):
-    (Array[Out] val, U64) ?
+  fun ref trigger_all(output_watermark_ts: U64): (Array[Out] val, U64) ?
   =>
-    let last_input_watermark = watermarks.input_watermark()
+  @printf[I32]("sanity check: output wtrmkr %s\n".cstring(),
+               output_watermark_ts.string().cstring())
     var latest_output_watermark_ts = output_watermark_ts
 
     let earliest_ts = _panes_start_ts(_earliest_window_idx)?
@@ -181,12 +183,19 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     let outs: Array[Out] iso = recover Array[Out] end
     try
       while normalized_last_trigger_boundary >= latest_output_watermark_ts do
+        // !@
+        @printf[I32]("%s %s\n".cstring(),
+        normalized_last_trigger_boundary.string().cstring(),
+        latest_output_watermark_ts.string().cstring())
         let next_earliest_ts = _earliest_ts()?
-        let next_window_end_ts = earliest_ts + _range
+        let next_window_end_ts = next_earliest_ts + _range
         (let out, latest_output_watermark_ts) =
           _trigger_next(next_earliest_ts, next_window_end_ts, 0)?
         match out
-        | let o: Out => outs.push(o)
+        | let o: Out =>
+          // !@
+          @printf[I32]("Matched\n".cstring())
+          outs.push(o)
         end
       end
     else
@@ -231,13 +240,21 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
 
     var next_pane_idx = _earliest_window_idx
     for _ in Range(0, _panes_per_slide) do
+      /* Starting from the earliest window index,
+      /  go _panes_per_slide, because we only want to replace panes up to
+      /  the next window start. We want to go up only 1 slide from here.
+      */
       _panes(next_pane_idx)? = EmptyPane
+
+      // Keep track of where panes are in 'window-time-space'
       _panes_start_ts(next_pane_idx)? = next_start_ts
       next_pane_idx = (next_pane_idx + 1) % _panes.size()
       next_start_ts = next_start_ts + _pane_size
     end
+    // We should 
     _earliest_window_idx = next_pane_idx
-    (out, next_start_ts)
+    (out, window_end_ts)
+
 
   fun ref _expand_windows(event_ts: U64, end_ts: U64) ? =>
     let new_pane_count = _ExpandSlidingWindow.new_pane_count(event_ts,

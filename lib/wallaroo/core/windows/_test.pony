@@ -34,6 +34,9 @@ actor Main is TestList
   fun tag tests(test: PonyTest) =>
     // Windows
     test(_TestTumblingWindows)
+    test(_TestMessageAssignmentToTumblingWindows)
+    test(_TestOutputWatermarkTsIsJustBeforeNextWindowStart)
+    test(_TestOnTimeoutWatermarkTsIsJustBeforeNextWindowStart)
     test(_TestTumblingWindowsTimeoutTrigger)
     test(_TestSlidingWindows)
     test(_TestSlidingWindowsNoDelay)

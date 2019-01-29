@@ -335,8 +335,8 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
       let initial_output_watermark_ts = watermarks.output_watermark()
 
       (let out, let output_watermark_ts) =
-        sw.on_timeout(input_watermark_ts, initial_output_watermark_ts,
-          watermarks)
+        sw.on_timeout(input_watermark_ts, initial_output_watermark_ts)
+
       (let new_watermark_ts, let old_watermark_ts) =
         watermarks.update_output_watermark(output_watermark_ts)
 

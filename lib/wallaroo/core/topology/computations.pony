@@ -92,8 +92,8 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref] is
     let res = _comp(input, _state)
     (res, watermark_ts)
 
-  fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64,
-    watermarks: StageWatermarks): ((Out | Array[Out] val | None), U64)
+  fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64):
+    ((Out | Array[Out] val | None), U64)
   =>
     (None, input_watermark_ts)
 
