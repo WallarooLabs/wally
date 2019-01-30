@@ -40,6 +40,7 @@ actor Main is TestList
     test(_Test0) // !@
     test(_Test1) // !@
     test(_Test2) // !@
+    test(_TestTumblingWindowsEventTimes) // !@
     test(_TestTumblingWindowsTimeoutTrigger)
     test(_TestSlidingWindows)
     test(_TestSlidingWindowsNoDelay)

@@ -28,6 +28,9 @@ use "wallaroo/core/topology"
 use "wallaroo_labs/math"
 use "wallaroo_labs/mort"
 
+type WindowOutputs[Out: Any val] is
+  (Array[(Out, U64)] val, U64)
+
 primitive EmptyWindow
 primitive EmptyPane
 
@@ -73,10 +76,10 @@ class CountWindowsBuilder
 trait Windows[In: Any val, Out: Any val, Acc: State ref] is
   StateWrapper[In, Out, Acc]
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
-    ((Out | Array[Out] val | None), U64)
+    (ComputationResult[Out], U64)
 
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64):
-    ((Out | Array[Out] val | None), U64)
+    (ComputationResult[Out], U64)
 
   /////////
   // _initial_* methods for windows that behave differently the first time
@@ -84,13 +87,13 @@ trait Windows[In: Any val, Out: Any val, Acc: State ref] is
   /////////
   fun ref _initial_apply(input: In, event_ts: U64, watermark_ts: U64,
     windows_wrapper: WindowsWrapper[In, Out, Acc]):
-    ((Out | Array[Out] val | None), U64)
+    (ComputationResult[Out], U64)
   =>
     (None, 0)
 
   fun ref _initial_attempt_to_trigger(input_watermark_ts: U64,
     windows_wrapper: WindowsWrapper[In, Out, Acc]):
-    ((Out | Array[Out] val | None), U64)
+    (ComputationResult[Out], U64)
   =>
     (None, 0)
 
@@ -98,10 +101,9 @@ trait WindowsWrapperBuilder[In: Any val, Out: Any val, Acc: State ref]
   fun ref apply(watermark_ts: U64): WindowsWrapper[In, Out, Acc]
 
 trait WindowsWrapper[In: Any val, Out: Any val, Acc: State ref]
-  fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
-    (Array[Out] val, U64)
+  fun ref apply(input: In, event_ts: U64, watermark_ts: U64): WindowOutputs[Out]
 
-  fun ref attempt_to_trigger(watermark_ts: U64): (Array[Out] val, U64)
+  fun ref attempt_to_trigger(watermark_ts: U64): WindowOutputs[Out]
 
   fun check_panes_increasing(): Bool =>
     false
@@ -158,7 +160,7 @@ class GlobalWindow[In: Any val, Out: Any val, Acc: State ref] is
     _acc = agg.initial_accumulator()
 
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
-    ((Out | Array[Out] val | None), U64)
+    (ComputationResult[Out], U64)
   =>
     _agg.update(input, _acc)
     // We trigger a result per message
@@ -166,7 +168,7 @@ class GlobalWindow[In: Any val, Out: Any val, Acc: State ref] is
     (res, watermark_ts)
 
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64):
-    ((Out | Array[Out] val | None), U64)
+    (ComputationResult[Out], U64)
   =>
     // We trigger per message, so we do nothing on the timer
     (recover val Array[Out] end, input_watermark_ts)
@@ -253,19 +255,19 @@ class RangeWindows[In: Any val, Out: Any val, Acc: State ref] is
     _phase = InitialWindowsPhase[In, Out, Acc](this, wrapper_builder)
 
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
-    ((Out | Array[Out] val | None), U64)
+    (ComputationResult[Out], U64)
   =>
     _phase(input, event_ts, watermark_ts)
 
   fun ref _initial_apply(input: In, event_ts: U64, watermark_ts: U64,
     windows_wrapper: WindowsWrapper[In, Out, Acc]):
-    ((Out | Array[Out] val | None), U64)
+    (ComputationResult[Out], U64)
   =>
     _phase = ProcessingWindowsPhase[In, Out, Acc](windows_wrapper)
     _phase(input, event_ts, watermark_ts)
 
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64):
-    ((Out | Array[Out] val | None), U64)
+    (ComputationResult[Out], U64)
   =>
     _attempt_to_trigger(input_watermark_ts, output_watermark_ts)
 
@@ -280,13 +282,13 @@ class RangeWindows[In: Any val, Out: Any val, Acc: State ref] is
 
   fun ref _attempt_to_trigger(input_watermark_ts: U64,
     output_watermark_ts: U64):
-    ((Out | Array[Out] val | None), U64)
+    (ComputationResult[Out], U64)
   =>
     _phase.attempt_to_trigger(input_watermark_ts)
 
   fun ref _initial_attempt_to_trigger(input_watermark_ts: U64,
     windows_wrapper: WindowsWrapper[In, Out, Acc]):
-    ((Out | Array[Out] val | None), U64)
+    (ComputationResult[Out], U64)
   =>
     _phase = ProcessingWindowsPhase[In, Out, Acc](windows_wrapper)
     _phase.attempt_to_trigger(input_watermark_ts)
@@ -373,7 +375,7 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
     _acc = agg.initial_accumulator()
 
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
-    ((Out | None), U64)
+    (ComputationResult[Out], U64)
   =>
     var out: (Out | None) = None
     _agg.update(input, _acc)
@@ -386,7 +388,7 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
     (out, watermark_ts)
 
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64):
-    ((Out | None), U64)
+    (ComputationResult[Out], U64)
   =>
     var out: (Out | None) = None
     var new_output_watermark_ts = output_watermark_ts
