@@ -89,7 +89,7 @@ trait Windows[In: Any val, Out: Any val, Acc: State ref] is
     (None, 0)
 
   fun ref _initial_attempt_to_trigger(input_watermark_ts: U64,
-    output_watermark_ts: U64, windows_wrapper: WindowsWrapper[In, Out, Acc]):
+    windows_wrapper: WindowsWrapper[In, Out, Acc]):
     ((Out | Array[Out] val | None), U64)
   =>
     (None, 0)
@@ -102,8 +102,6 @@ trait WindowsWrapper[In: Any val, Out: Any val, Acc: State ref]
     (Array[Out] val, U64)
 
   fun ref attempt_to_trigger(watermark_ts: U64): (Array[Out] val, U64)
-
-  fun ref trigger_all(output_watermark_ts: U64): (Array[Out] val, U64) ?
 
   fun check_panes_increasing(): Bool =>
     false
@@ -284,15 +282,14 @@ class RangeWindows[In: Any val, Out: Any val, Acc: State ref] is
     output_watermark_ts: U64):
     ((Out | Array[Out] val | None), U64)
   =>
-    _phase.attempt_to_trigger(input_watermark_ts, output_watermark_ts)
+    _phase.attempt_to_trigger(input_watermark_ts)
 
   fun ref _initial_attempt_to_trigger(input_watermark_ts: U64,
-    output_watermark_ts: U64, windows_wrapper: WindowsWrapper[In, Out, Acc]):
+    windows_wrapper: WindowsWrapper[In, Out, Acc]):
     ((Out | Array[Out] val | None), U64)
   =>
     _phase = ProcessingWindowsPhase[In, Out, Acc](windows_wrapper)
-    _phase.attempt_to_trigger(input_watermark_ts, output_watermark_ts)
-
+    _phase.attempt_to_trigger(input_watermark_ts)
 
   fun check_panes_increasing(): Bool =>
     _phase.check_panes_increasing()
