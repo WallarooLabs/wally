@@ -32,11 +32,6 @@ actor Main is TestList
     None
 
   fun tag tests(test: PonyTest) =>
-    test(_Test0)
-    test(_Test1)
-    test(_Test2)
-
-  fun tag x_tests(test: PonyTest) =>
     // // Windows
     test(_TestTumblingWindows)
     test(_TestMessageAssignmentToTumblingWindows)

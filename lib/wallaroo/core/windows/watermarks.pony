@@ -80,7 +80,7 @@ class StageWatermarks
 
   fun ref check_effective_input_watermark(current_ts: U64): U64 =>
     var found_live_value = false
-    var new_min: U64 = U64.max_value()
+    var new_min: U64 = TimeoutWatermark()
 
     for (u, (next_w, last_heard)) in _upstreams.pairs() do
       if _still_relevant(last_heard, current_ts) then
@@ -124,7 +124,7 @@ class StageWatermarks
 
   fun ref update_output_watermark(w: U64): (U64, U64) =>
     let old = _output_watermark
-    if (w > _output_watermark) and (w < U64.max_value()) then
+    if (w > _output_watermark) and (w < TimeoutWatermark()) then
       _output_watermark = w
     end
     (_output_watermark, old)
@@ -140,6 +140,10 @@ class StageWatermarks
 
   fun _still_relevant(last_heard: U64, current_ts: U64): Bool =>
     (current_ts - last_heard) < _last_heard_threshold
+
+primitive TimeoutWatermark
+  fun apply(): U64 =>
+    U64.max_value()
 
 primitive StageWatermarksSerializer
   fun apply(w: StageWatermarks, auth: AmbientAuth): ByteSeq val =>
