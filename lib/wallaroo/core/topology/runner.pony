@@ -258,6 +258,11 @@ class StatelessComputationRunner[In: Any val, Out: Any val] is Runner
             key, event_ts, new_watermark_ts, old_watermark_ts, producer_id,
             producer, router, i_msg_uid, frac_ids, computation_end,
             new_metrics_id, worker_ingress_ts, metrics_reporter)
+        | let os: Array[(Out,U64)] val =>
+          OutputProcessor[Out](_next, metric_name, pipeline_time_spent, os,
+            key, event_ts, new_watermark_ts, old_watermark_ts, producer_id,
+            producer, router, i_msg_uid, frac_ids, computation_end,
+            new_metrics_id, worker_ingress_ts, metrics_reporter)
         end
 
       let latest_metrics_id = ifdef "detailed-metrics" then
@@ -361,6 +366,12 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
           os, key, output_watermark_ts, new_watermark_ts, old_watermark_ts,
           producer_id, producer, router, new_i_msg_uid, None, latest_ts,
           metrics_id, on_timeout_ts, metrics_reporter)
+      | let os: Array[(Out,U64)] val =>
+        OutputProcessor[Out](
+          _next_runner, metrics_name, pipeline_time_spent,
+          os, key, output_watermark_ts, new_watermark_ts, old_watermark_ts,
+          producer_id, producer, router, new_i_msg_uid, None, latest_ts,
+          metrics_id, on_timeout_ts, metrics_reporter)
       end
     end
     match _step_timeout_trigger
@@ -440,6 +451,12 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
             frac_ids, computation_end, new_metrics_id, worker_ingress_ts,
             metrics_reporter)
         | let os: Array[Out] val =>
+          OutputProcessor[Out](_next_runner, metric_name,
+            pipeline_time_spent, os, key, event_ts, new_watermark_ts,
+            old_watermark_ts, producer_id, producer, router, i_msg_uid,
+            frac_ids, computation_end, new_metrics_id, worker_ingress_ts,
+            metrics_reporter)
+        | let os: Array[(Out,U64)] val =>
           OutputProcessor[Out](_next_runner, metric_name,
             pipeline_time_spent, os, key, event_ts, new_watermark_ts,
             old_watermark_ts, producer_id, producer, router, i_msg_uid,

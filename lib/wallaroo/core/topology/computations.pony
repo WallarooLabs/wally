@@ -26,6 +26,8 @@ use "wallaroo/core/routing"
 use "wallaroo/core/state"
 use "wallaroo/core/windows"
 
+type ComputationResult[Out: Any val] is
+  (Out | Array[Out] val | Array[(Out, U64)] val | None)
 
 interface val Computation[In: Any val, Out: Any val]
   fun name(): String
@@ -34,7 +36,7 @@ interface val Computation[In: Any val, Out: Any val]
 
 trait val StatelessComputation[In: Any val, Out: Any val] is
   Computation[In, Out]
-  fun apply(input: In): (Out | Array[Out] val | None)
+  fun apply(input: In): ComputationResult[Out]
 
   fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
     RunnerBuilder
@@ -47,7 +49,7 @@ trait val StateComputation[In: Any val, Out: Any val, S: State ref] is
   // Return a tuple containing the result of the computation (which is None
   // if there is no value to forward) and a StateChange if there was one (or
   // None to indicate no state change).
-  fun apply(input: In, state: S): (Out | Array[Out] val | None)
+  fun apply(input: In, state: S): ComputationResult[Out]
 
   fun initial_state(): S
 
@@ -87,13 +89,13 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref] is
     _state = state
 
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
-    ((Out | Array[Out] val | None), U64)
+    (ComputationResult[Out], U64)
   =>
     let res = _comp(input, _state)
     (res, watermark_ts)
 
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64):
-    ((Out | Array[Out] val | None), U64)
+    (ComputationResult[Out], U64)
   =>
     (None, input_watermark_ts)
 

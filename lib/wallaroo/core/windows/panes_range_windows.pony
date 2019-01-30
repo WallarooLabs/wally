@@ -30,6 +30,7 @@ use "wallaroo_labs/math"
 use "wallaroo_labs/mort"
 
 
+
 class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   WindowsWrapper[In, Out, Acc]
   """
@@ -76,8 +77,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       pane_start = pane_start + _pane_size
     end
 
-  fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
-    (Array[Out] val, U64)
+  fun ref apply(input: In, event_ts: U64, watermark_ts: U64): WindowOutputs[Out]
   =>
     _highest_seen_event_ts = _highest_seen_event_ts.max(event_ts)
     try
@@ -105,7 +105,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       (outs, output_watermark_ts)
     else
       Fail()
-      (recover Array[Out] end, 0)
+      (recover Array[(Out, U64)] end, 0)
     end
 
   fun ref _apply_input(input: In, event_ts: U64, earliest_ts: U64) =>
@@ -138,9 +138,9 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       end
     end
 
-  fun ref attempt_to_trigger(input_watermark_ts: U64): (Array[Out] val, U64)
+  fun ref attempt_to_trigger(input_watermark_ts: U64): (Array[(Out, U64)] val, U64)
   =>
-    let outs = recover iso Array[Out] end
+    let outs = recover iso Array[(Out, U64)] end
     var output_watermark_ts: U64 = 0
     let trigger_range = _range + _delay
 
@@ -165,14 +165,12 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
 
       var stopped = false
       while not stopped do
-        (let next_out, let next_output_watermark_ts, stopped) =
+        (let next_out, let out_event_ts, stopped) =
           _check_first_window(effective_watermark_ts, trigger_diff)
-        if next_output_watermark_ts > output_watermark_ts then
-          output_watermark_ts = next_output_watermark_ts
-        end
+        output_watermark_ts = output_watermark_ts.max(out_event_ts)
         match next_out
         | let out: Out =>
-          outs.push(out)
+          outs.push((out, out_event_ts))
         end
       end
     else
@@ -185,6 +183,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   =>
     try
       let earliest_ts = _earliest_ts()?
+//      let window_end_ts = earliest_ts + (_range - 1) TODO uncomment me
       let window_end_ts = earliest_ts + _range
       if _should_trigger(earliest_ts, watermark_ts) then
         (let out, let output_watermark_ts) = _trigger_next(earliest_ts,
