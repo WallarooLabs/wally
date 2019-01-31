@@ -81,6 +81,8 @@ trait Windows[In: Any val, Out: Any val, Acc: State ref] is
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64):
     (ComputationResult[Out], U64)
 
+  fun window_count(): USize
+
   /////////
   // _initial_* methods for windows that behave differently the first time
   // they encounter a watermark
@@ -104,6 +106,10 @@ trait WindowsWrapper[In: Any val, Out: Any val, Acc: State ref]
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64): WindowOutputs[Out]
 
   fun ref attempt_to_trigger(watermark_ts: U64): WindowOutputs[Out]
+
+  fun window_count(): USize
+
+  fun earliest_start_ts(): U64
 
   fun check_panes_increasing(): Bool =>
     false
@@ -172,6 +178,8 @@ class GlobalWindow[In: Any val, Out: Any val, Acc: State ref] is
   =>
     // We trigger per message, so we do nothing on the timer
     (recover val Array[Out] end, input_watermark_ts)
+
+  fun window_count(): USize => 1
 
   fun ref encode(auth: AmbientAuth): ByteSeq =>
     try
@@ -270,6 +278,12 @@ class RangeWindows[In: Any val, Out: Any val, Acc: State ref] is
     (ComputationResult[Out], U64)
   =>
     _attempt_to_trigger(input_watermark_ts, output_watermark_ts)
+
+  fun window_count(): USize =>
+    _phase.window_count()
+
+  fun earliest_start_ts(): U64 =>
+    _phase.earliest_start_ts()
 
   fun ref encode(auth: AmbientAuth): ByteSeq =>
     try
@@ -397,6 +411,8 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
       new_output_watermark_ts = input_watermark_ts
     end
     (out, new_output_watermark_ts)
+
+  fun window_count(): USize => 1
 
   fun ref _trigger(output_watermark_ts: U64): (Out | None) =>
     var out: (Out | None) = None

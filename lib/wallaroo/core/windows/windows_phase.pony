@@ -28,6 +28,10 @@ trait WindowsPhase[In: Any val, Out: Any val, Acc: State ref]
   fun ref attempt_to_trigger(input_watermark_ts: U64):
     (ComputationResult[Out], U64)
 
+  fun window_count(): USize => 0
+
+  fun earliest_start_ts(): U64 => 0
+
   fun check_panes_increasing(): Bool =>
     false
 
@@ -75,7 +79,8 @@ class ProcessingWindowsPhase[In: Any val, Out: Any val, Acc: State ref] is
   new create(ww: WindowsWrapper[In, Out, Acc]) =>
     _windows_wrapper = ww
 
-  fun ref apply(input: In, event_ts: U64, watermark_ts: U64): WindowOutputs[Out]
+  fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
+    WindowOutputs[Out]
   =>
     ifdef debug then
       Invariant(watermark_ts < U64.max_value())
@@ -84,6 +89,12 @@ class ProcessingWindowsPhase[In: Any val, Out: Any val, Acc: State ref] is
 
   fun ref attempt_to_trigger(input_watermark_ts: U64): WindowOutputs[Out] =>
     _windows_wrapper.attempt_to_trigger(input_watermark_ts)
+
+  fun window_count(): USize =>
+    _windows_wrapper.window_count()
+
+  fun earliest_start_ts(): U64 =>
+    _windows_wrapper.earliest_start_ts()
 
   fun check_panes_increasing(): Bool =>
     _windows_wrapper.check_panes_increasing()

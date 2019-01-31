@@ -25,7 +25,6 @@ use "wallaroo/core/topology"
 use "wallaroo_labs/math"
 use "wallaroo_labs/time"
 
-
 class iso _TestExpandSlidingWindow is UnitTest
   fun name(): String => "windows/_TestExpandSlidingWindow"
 
@@ -45,51 +44,60 @@ class iso _TestExpandSlidingWindow is UnitTest
     h.assert_eq[USize](panes_per_slide, 1)
 
     event_ts = Milliseconds(100_000)
-    end_ts = Seconds(100)
+    end_ts = Seconds(100)-1
     var v = _ExpandSlidingWindow.new_pane_count(event_ts, end_ts,
       init_pane_count, pane_size, panes_per_slide)
     h.assert_eq[USize](v - init_pane_count, 1)
 
     event_ts = Milliseconds(101_999)
-    end_ts = Seconds(100)
+    end_ts = Seconds(100)-1
     v = _ExpandSlidingWindow.new_pane_count(event_ts, end_ts,
       init_pane_count, pane_size, panes_per_slide)
     h.assert_eq[USize](v - init_pane_count, 1)
 
     event_ts = Milliseconds(102_000)
-    end_ts = Seconds(100)
+    end_ts = Seconds(100)-1
     v = _ExpandSlidingWindow.new_pane_count(event_ts, end_ts,
       init_pane_count, pane_size, panes_per_slide)
     h.assert_eq[USize](v - init_pane_count, 2)
 
     event_ts = Milliseconds(103_000)
-    end_ts = Seconds(100)
+    end_ts = Seconds(100)-1
     v = _ExpandSlidingWindow.new_pane_count(event_ts, end_ts,
       init_pane_count, pane_size, panes_per_slide)
     h.assert_eq[USize](v - init_pane_count, 2)
 
     event_ts = Milliseconds(108_999)
-    end_ts = Seconds(100)
+    end_ts = Seconds(100)-1
     v = _ExpandSlidingWindow.new_pane_count(event_ts, end_ts,
       init_pane_count, pane_size, panes_per_slide)
     h.assert_eq[USize](v - init_pane_count, 5)
 
     event_ts = Milliseconds(115_000)
-    end_ts = Seconds(100)
+    end_ts = Seconds(100)-1
     v = _ExpandSlidingWindow.new_pane_count(event_ts, end_ts,
       init_pane_count, pane_size, panes_per_slide)
     h.assert_eq[USize](v - init_pane_count, 8)
 
     event_ts = Milliseconds(199_999)
-    end_ts = Seconds(100)
+    end_ts = Seconds(100)-1
     v = _ExpandSlidingWindow.new_pane_count(event_ts, end_ts,
       init_pane_count, pane_size, panes_per_slide)
     h.assert_eq[USize](v - init_pane_count, 50)
 
     event_ts = Milliseconds(1_010_000)
-    end_ts = Seconds(100)
+    end_ts = Seconds(100)-1
     v = _ExpandSlidingWindow.new_pane_count(event_ts, end_ts,
       init_pane_count, pane_size, panes_per_slide)
     h.assert_eq[USize](v - init_pane_count, 456)
 
-    true
+class iso _TestExpandSlidingWindowPrimitive is UnitTest
+  fun name(): String => "windows/_TestExpandSlidingWindowPrimitive"
+  fun apply(h: TestHelper) =>
+    var v = _ExpandSlidingWindow.new_pane_count(where
+      event_ts=2, end_ts=1, cur_pane_count=1, pane_size=1, panes_per_slide=1)
+    h.assert_eq[USize](2, v)
+
+    v = _ExpandSlidingWindow.new_pane_count(where
+      event_ts=3, end_ts=1, cur_pane_count=2, pane_size=1, panes_per_slide=2)
+    h.assert_eq[USize](4, v)
