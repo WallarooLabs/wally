@@ -33,7 +33,6 @@ actor Main is TestList
 
   fun tag tests(test: PonyTest) =>
     // Windows
-/*
     test(_TestTumblingWindows)
     test(_TestOutputWatermarkTsIsJustBeforeNextWindowStart)
     test(_TestOnTimeoutWatermarkTsIsJustBeforeNextWindowStart)
@@ -43,11 +42,9 @@ actor Main is TestList
     test(_TestTumblingWindowsOutputEventTimes)
     test(_TestSlidingWindowsOutputEventTimes)
     test(_TestTumblingWindowsTimeoutTrigger)
-    test(_TestSlidingWindows) // broken
-    test(_TestSlidingWindowsNoDelay) // broken
-    */
+    test(_TestSlidingWindows)
+    test(_TestSlidingWindowsNoDelay)
     test(_TestSlidingWindowsOutOfOrder)
-    /*
     test(_TestSlidingWindowsGCD)
     test(_TestSlidingWindowsLateData)
     test(_TestSlidingWindowsEarlyData)
@@ -55,7 +52,6 @@ actor Main is TestList
     test(_TestSlidingWindowsStragglersSequence)
     test(_TestSlidingWindowsSequence)
     test(_TestCountWindows)
-
     // Expand Windows
     test(_TestExpandSlidingWindow)
     test(_TestExpandSlidingWindowPrimitive)
@@ -63,4 +59,4 @@ actor Main is TestList
     // // Watermarks
     test(_TestTimeoutTriggerWatermark)
     test(_TestStageWatermarks)
-*/
+

@@ -51,7 +51,7 @@ multi_aggregation_test:
 		--validation-cmp \
 		--log-level error \
 		--command './multi_aggregation $(RUN_WITH_RESILIENCE)' \
-		--sink-expect 6 \
+		--sink-expect 1 \
 		--sink-expect-allow-more \
 		--sinks 1 \
 		--sources 1 &&\
