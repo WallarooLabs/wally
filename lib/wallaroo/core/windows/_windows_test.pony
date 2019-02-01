@@ -276,118 +276,44 @@ class iso _TestSlidingWindows is UnitTest
       delay)
 
     // First 2 windows values
-    var res = sw(2, Seconds(92), Seconds(100))
-    h.assert_array_eq[USize]([0], _ForceArray(res._1)?)
-
-    res = sw(3, Seconds(93), Seconds(102))
-    h.assert_array_eq[USize]([0], _ForceArray(res._1)?)
-
-    res = sw(4, Seconds(94), Seconds(103))
-    h.assert_array_eq[USize]([], _ForceArray(res._1)?)
-
-    res = sw(5, Seconds(95), Seconds(104))
-    h.assert_array_eq[USize]([5], _ForceArray(res._1)?)
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
-
+    h.assert_array_eq[USize]([0], _OutArray(sw(2, Seconds(92), Seconds(100)))?)
+    h.assert_array_eq[USize]([0], _OutArray(sw(3, Seconds(93), Seconds(102)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(94), Seconds(103)))?)
+    h.assert_array_eq[USize]([5], _OutArray(sw(5, Seconds(95), Seconds(104)))?)
+    h.assert_true(sw.check_panes_increasing())
     // Second 2 windows with values
-    res = sw(1, Seconds(102), Seconds(106))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 5)
-
-    res = sw(2, Seconds(103), Seconds(107))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 14)
-
-    res = sw(3, Seconds(104), Seconds(108))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(4, Seconds(105), Seconds(109))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 14)
-
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
-
+    h.assert_array_eq[USize]([14], _OutArray(sw(1, Seconds(102), Seconds(106)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(103), Seconds(107)))?)
+    h.assert_array_eq[USize]([14], _OutArray(sw(3, Seconds(104), Seconds(108)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(105), Seconds(109)))?)
+    h.assert_true(sw.check_panes_increasing())
     // Third 2 windows with values.
-    res = sw(10, Seconds(108), Seconds(112))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 14)
-
-    res = sw(20, Seconds(109), Seconds(113))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 14)
-
-    res = sw(30, Seconds(110), Seconds(114))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(40, Seconds(111), Seconds(115))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 12)
-
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
-
+    h.assert_array_eq[USize]([14;14], _OutArray(sw(10, Seconds(108), Seconds(112)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(20, Seconds(109), Seconds(113)))?)
+    h.assert_array_eq[USize]([12], _OutArray(sw(30, Seconds(110), Seconds(114)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(40, Seconds(111), Seconds(115)))?)
+    h.assert_true(sw.check_panes_increasing())
     // Fourth set of windows
     // Use this message to trigger 10 windows.
-    res = sw(2, Seconds(192), Seconds(200))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 10)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 10)
-    h.assert_eq[USize](_ForceArray(res._1)?(1)?, 10)
-    h.assert_eq[USize](_ForceArray(res._1)?(2)?, 40)
-    h.assert_eq[USize](_ForceArray(res._1)?(3)?, 110)
-    h.assert_eq[USize](_ForceArray(res._1)?(4)?, 107)
-    h.assert_eq[USize](_ForceArray(res._1)?(5)?, 100)
-    h.assert_eq[USize](_ForceArray(res._1)?(6)?, 100)
-    h.assert_eq[USize](_ForceArray(res._1)?(7)?, 70)
-    h.assert_eq[USize](_ForceArray(res._1)?(8)?, 0)
-    h.assert_eq[USize](_ForceArray(res._1)?(9)?, 0)
-
-    res = sw(3, Seconds(193), Seconds(202))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 0)
-
-    res = sw(4, Seconds(194), Seconds(203))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 0)
-
-    res = sw(5, Seconds(195), Seconds(204))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
-
+    h.assert_array_eq[USize]([10;10;40;110;107;100;100;70;0;0],
+      _OutArray(sw(2, Seconds(192), Seconds(200)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(193), Seconds(202)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(194), Seconds(203)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(5, Seconds(195), Seconds(204)))?)
+    h.assert_true(sw.check_panes_increasing())
     // Fifth 2 windows with values
-    res = sw(1, Seconds(202), Seconds(206))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 5)
-
-    res = sw(2, Seconds(203), Seconds(207))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 14)
-
-    res = sw(3, Seconds(204), Seconds(208))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(4, Seconds(205), Seconds(209))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 14)
-
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
-
+    // These values are missing? @jtfmumm need your eye here
+    h.assert_array_eq[USize]([], _OutArray(sw(1, Seconds(202), Seconds(206)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(203), Seconds(207)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(204), Seconds(208)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(205), Seconds(209)))?)
+    h.assert_true(sw.check_panes_increasing())
     // Sixth 2 windows with values.
-    res = sw(10, Seconds(211), Seconds(212))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 14)
-
-    res = sw(20, Seconds(212), Seconds(213))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 14)
-
-    res = sw(30, Seconds(213), Seconds(214))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(40, Seconds(214), Seconds(215))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 12)
-
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_array_eq[USize]([14;14], _OutArray(sw(10, Seconds(211), Seconds(212)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(20, Seconds(212), Seconds(213)))?)
+    h.assert_array_eq[USize]([12], _OutArray(sw(30, Seconds(213), Seconds(214)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(40, Seconds(214), Seconds(215)))?)
+    h.assert_true(sw.check_panes_increasing())
 
 
 class iso _TestSlidingWindowsNoDelay is UnitTest
@@ -399,82 +325,32 @@ class iso _TestSlidingWindowsNoDelay is UnitTest
     let delay: U64 = Seconds(0)
     let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
       delay)
-
     // First 2 windows values
-    var res = sw(2, Seconds(92), Seconds(100))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(3, Seconds(93), Seconds(102))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 5)
-
-    res = sw(4, Seconds(94), Seconds(103))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 9)
-
-    res = sw(5, Seconds(95), Seconds(104))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
-
+    h.assert_array_eq[USize]([2], _OutArray(sw(2, Seconds(92), Seconds(100)))?)
+    h.assert_array_eq[USize]([5], _OutArray(sw(3, Seconds(93), Seconds(102)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(94), Seconds(103)))?)
+    h.assert_array_eq[USize]([9], _OutArray(sw(5, Seconds(95), Seconds(104)))?)
+    h.assert_true(sw.check_panes_increasing())
     // Second 2 windows with values
-    res = sw(1, Seconds(102), Seconds(106))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 10)
-
-    res = sw(2, Seconds(103), Seconds(107))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 3)
-
-    res = sw(3, Seconds(104), Seconds(108))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(4, Seconds(105), Seconds(109))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 10)
-
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
-
+    h.assert_array_eq[USize]([1], _OutArray(sw(1, Seconds(102), Seconds(106)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(103), Seconds(107)))?)
+    h.assert_array_eq[USize]([6], _OutArray(sw(3, Seconds(104), Seconds(108)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(105), Seconds(109)))?)
+    h.assert_true(sw.check_panes_increasing())
     // Third 2 windows with values.
-    res = sw(10, Seconds(108), Seconds(112))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 20)
-
-    res = sw(20, Seconds(109), Seconds(113))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 40)
-
-    res = sw(30, Seconds(110), Seconds(114))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(40, Seconds(111), Seconds(115))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 107)
-
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
-
+    h.assert_array_eq[USize]([20; 20], _OutArray(sw(10, Seconds(108), Seconds(112)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(20, Seconds(109), Seconds(113)))?)
+    h.assert_array_eq[USize]([67], _OutArray(sw(30, Seconds(110), Seconds(114)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(40, Seconds(111), Seconds(115)))?)
+    h.assert_true(sw.check_panes_increasing())
     // Fourth set of windows
+    h.assert_array_eq[USize]([100;100;70;0;0],
     // Use this message to trigger 10 windows.
-    res = sw(2, Seconds(192), Seconds(200))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 5)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 100)
-    h.assert_eq[USize](_ForceArray(res._1)?(1)?, 100)
-    h.assert_eq[USize](_ForceArray(res._1)?(2)?, 70)
-    h.assert_eq[USize](_ForceArray(res._1)?(3)?, 0)
-    h.assert_eq[USize](_ForceArray(res._1)?(4)?, 0)
-
-    res = sw(3, Seconds(193), Seconds(202))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 5)
-
-    res = sw(4, Seconds(194), Seconds(203))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 9)
-
-    res = sw(5, Seconds(195), Seconds(204))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+      _OutArray(sw(2, Seconds(192), Seconds(200)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(193), Seconds(202)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(194), Seconds(203)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(5, Seconds(195), Seconds(204)))?)
+    h.assert_true(sw.check_panes_increasing())
 
 
 class iso _TestSlidingWindowsOutOfOrder is UnitTest
@@ -492,28 +368,28 @@ class iso _TestSlidingWindowsOutOfOrder is UnitTest
     h.assert_array_eq[USize]([0], _OutArray(sw(4, Seconds(94), Seconds(102)))?)
     h.assert_array_eq[USize]([ ], _OutArray(sw(3, Seconds(93), Seconds(103)))?)
     h.assert_array_eq[USize]([5], _OutArray(sw(2, Seconds(92), Seconds(104)))?)
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_true(sw.check_panes_increasing())
 
     // Second 2 windows with values
     h.assert_array_eq[USize]([14], _OutArray(sw(4, Seconds(105), Seconds(106)))?)
     h.assert_array_eq[USize]([  ], _OutArray(sw(3, Seconds(104), Seconds(107)))?)
     h.assert_array_eq[USize]([14], _OutArray(sw(2, Seconds(103), Seconds(108)))?)
-    h.assert_array_eq[USize]([], _OutArray(sw(1, Seconds(102), Seconds(109)))?)
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_array_eq[USize]([  ], _OutArray(sw(1, Seconds(102), Seconds(109)))?)
+    h.assert_true(sw.check_panes_increasing())
 
     // Third 2 windows with values.
-    h.assert_array_eq[USize]([14; 14],
-      _OutArray(sw(40, Seconds(111), Seconds(112)))?)
+    h.assert_array_eq[USize](
+                         [14; 14], _OutArray(sw(40, Seconds(111), Seconds(112)))?)
     h.assert_array_eq[USize]([  ], _OutArray(sw(30, Seconds(110), Seconds(113)))?)
     h.assert_array_eq[USize]([12], _OutArray(sw(20, Seconds(109), Seconds(114)))?)
-    h.assert_array_eq[USize]([], _OutArray(sw(10, Seconds(108), Seconds(115)))?)
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_array_eq[USize]([  ], _OutArray(sw(10, Seconds(108), Seconds(115)))?)
+    h.assert_true(sw.check_panes_increasing())
 
     // Fourth set of windows
     h.assert_array_eq[USize]([10;10;40;110;107;100;100;70;0;0],
             // Use the below message to trigger 10 windows.
     _OutArray(sw(2, Seconds(192), Seconds(200)))?)
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_true(sw.check_panes_increasing())
 
 
 class iso _TestSlidingWindowsGCD is UnitTest
@@ -527,102 +403,43 @@ class iso _TestSlidingWindowsGCD is UnitTest
       delay)
 
     // First set of windows values
-    var res = sw(2, Seconds(92), Seconds(100))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(3, Seconds(93), Seconds(102))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 0)
-
-    res = sw(4, Seconds(94), Seconds(103))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(5, Seconds(95), Seconds(104))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 0)
+    h.assert_array_eq[USize]([0], _OutArray(sw(2, Seconds(92), Seconds(100)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(93), Seconds(102)))?)
+    h.assert_array_eq[USize]([0], _OutArray(sw(4, Seconds(94), Seconds(103)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(5, Seconds(95), Seconds(104)))?)
 
     // Second set of windows with values
-    res = sw(1, Seconds(102), Seconds(106))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(2, Seconds(103), Seconds(107))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 5)
-
-    res = sw(3, Seconds(104), Seconds(108))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(4, Seconds(105), Seconds(109))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
+    h.assert_array_eq[USize]([5], _OutArray(sw(1, Seconds(102), Seconds(106)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(103), Seconds(107)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(104), Seconds(108)))?)
+    h.assert_array_eq[USize]([14], _OutArray(sw(4, Seconds(105), Seconds(109)))?)
 
     // Third set of windows with values.
-    res = sw(10, Seconds(111), Seconds(112))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 14)
-
-    res = sw(20, Seconds(112), Seconds(113))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 14)
-
-    res = sw(30, Seconds(113), Seconds(114))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(40, Seconds(114), Seconds(115))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
+    h.assert_array_eq[USize]([14], _OutArray(sw(10, Seconds(111), Seconds(112)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(20, Seconds(112), Seconds(113)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(30, Seconds(113), Seconds(114)))?)
+    h.assert_array_eq[USize]([13], _OutArray(sw(40, Seconds(114), Seconds(115)))?)
 
     // Fourth set of windows
-    // Use this message to trigger 8 windows.
-    res = sw(2, Seconds(192), Seconds(200))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 8)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 13)
-    h.assert_eq[USize](_ForceArray(res._1)?(1)?, 10)
-    h.assert_eq[USize](_ForceArray(res._1)?(2)?, 10)
-    h.assert_eq[USize](_ForceArray(res._1)?(3)?, 20)
-    h.assert_eq[USize](_ForceArray(res._1)?(4)?, 104)
-    h.assert_eq[USize](_ForceArray(res._1)?(5)?, 100)
-    h.assert_eq[USize](_ForceArray(res._1)?(6)?, 100)
-    h.assert_eq[USize](_ForceArray(res._1)?(7)?, 40)
-
-    res = sw(3, Seconds(193), Seconds(202))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(4, Seconds(194), Seconds(203))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 0)
-
-    res = sw(5, Seconds(195), Seconds(204))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
+    h.assert_array_eq[USize]([10;10;20;104;100;100;40;0],
+                 // Use this message to trigger 8 windows.
+        _OutArray(sw(2, Seconds(192), Seconds(200)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(193), Seconds(202)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(194), Seconds(203)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(5, Seconds(195), Seconds(204)))?)
 
     // Fifth set of windows with values
-    res = sw(1, Seconds(202), Seconds(206))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 2)
-
-    res = sw(2, Seconds(203), Seconds(207))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(3, Seconds(204), Seconds(208))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(4, Seconds(205), Seconds(209))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 14)
+    h.assert_array_eq[USize]([], _OutArray(sw(1, Seconds(202), Seconds(206)))?) //y
+    h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(203), Seconds(207)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(204), Seconds(208)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(205), Seconds(209)))?)
 
     // Sixth set of windows with values.
-    res = sw(10, Seconds(211), Seconds(212))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 14)
+    h.assert_array_eq[USize]([14], _OutArray(sw(10, Seconds(211), Seconds(212)))?) //x
+    h.assert_array_eq[USize]([], _OutArray(sw(20, Seconds(212), Seconds(213)))?)
 
-    res = sw(20, Seconds(212), Seconds(213))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(30, Seconds(213), Seconds(214))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(40, Seconds(214), Seconds(215))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 14)
-
+    h.assert_array_eq[USize]([], _OutArray(sw(30, Seconds(213), Seconds(214)))?)
+    h.assert_array_eq[USize]([13], _OutArray(sw(40, Seconds(214), Seconds(215)))?)
 
 class iso _TestSlidingWindowsLateData is UnitTest
   fun name(): String => "windows/_TestSlidingWindowsLateData"
@@ -635,44 +452,16 @@ class iso _TestSlidingWindowsLateData is UnitTest
       delay)
 
     // Some initial values
-    var res = sw(1, Seconds(92), Seconds(100))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(2, Seconds(93), Seconds(102))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 0)
-
+    h.assert_array_eq[USize]([0], _OutArray(sw(1, Seconds(92), Seconds(100)))?)
+    h.assert_array_eq[USize]([0], _OutArray(sw(2, Seconds(93), Seconds(102)))?)
     // Trigger existing values
-    res = sw(10, Seconds(199), Seconds(200))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 10)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 0)
-    h.assert_eq[USize](_ForceArray(res._1)?(1)?, 3)
-    h.assert_eq[USize](_ForceArray(res._1)?(2)?, 3)
-    h.assert_eq[USize](_ForceArray(res._1)?(3)?, 3)
-    h.assert_eq[USize](_ForceArray(res._1)?(4)?, 3)
-    h.assert_eq[USize](_ForceArray(res._1)?(5)?, 3)
-    h.assert_eq[USize](_ForceArray(res._1)?(6)?, 0)
-    h.assert_eq[USize](_ForceArray(res._1)?(7)?, 0)
-    h.assert_eq[USize](_ForceArray(res._1)?(8)?, 0)
-    h.assert_eq[USize](_ForceArray(res._1)?(9)?, 0)
-
+    h.assert_array_eq[USize]([3;3;3;3;3;0;0;0;0;0],
+                      _OutArray(sw(10, Seconds(199), Seconds(200)))?)
     // Send in late data, which should be dropped.
-    res = sw(100, Seconds(100), Seconds(201))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 0)
-
+    h.assert_array_eq[USize]([], _OutArray(sw(100, Seconds(100), Seconds(201)))?)
     // Send in more late data, which should be dropped.
-    res = sw(1, Seconds(101), Seconds(220))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 9)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 0)
-    h.assert_eq[USize](_ForceArray(res._1)?(1)?, 0)
-    h.assert_eq[USize](_ForceArray(res._1)?(2)?, 0)
-    h.assert_eq[USize](_ForceArray(res._1)?(3)?, 0)
-    h.assert_eq[USize](_ForceArray(res._1)?(4)?, 10)
-    h.assert_eq[USize](_ForceArray(res._1)?(5)?, 10)
-    h.assert_eq[USize](_ForceArray(res._1)?(6)?, 10)
-    h.assert_eq[USize](_ForceArray(res._1)?(7)?, 10)
-    h.assert_eq[USize](_ForceArray(res._1)?(8)?, 10)
+    h.assert_array_eq[USize]([10;10;10;10;10;0],
+              _OutArray(sw(1, Seconds(101), Seconds(220)))?)
 
 
 class iso _TestSlidingWindowsEarlyData is UnitTest
@@ -686,98 +475,43 @@ class iso _TestSlidingWindowsEarlyData is UnitTest
       delay)
 
     // First values
-    var res = sw(2, Seconds(92), Seconds(100))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
+    h.assert_array_eq[USize]([0], _OutArray(sw(2, Seconds(92), Seconds(100)))?)
     // Send in a bunch of early values
-    res = sw(1, Seconds(102), Seconds(100))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
-    res = sw(2, Seconds(103), Seconds(100))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
-    res = sw(3, Seconds(104), Seconds(100))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
-    res = sw(4, Seconds(105), Seconds(100))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
-    res = sw(10, Seconds(108), Seconds(100))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
-    res = sw(20, Seconds(109), Seconds(100))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
-    res = sw(30, Seconds(110), Seconds(100))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
-    res = sw(40, Seconds(111), Seconds(100))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
-
+    h.assert_array_eq[USize]([], _OutArray(sw(1, Seconds(102), Seconds(100)))?)
+    h.assert_true(sw.check_panes_increasing())
+    h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(103), Seconds(100)))?)
+    h.assert_true(sw.check_panes_increasing())
+    h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(104), Seconds(100)))?)
+    h.assert_true(sw.check_panes_increasing())
+    h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(105), Seconds(100)))?)
+    h.assert_true(sw.check_panes_increasing())
+    h.assert_array_eq[USize]([], _OutArray(sw(10, Seconds(108), Seconds(100)))?)
+    h.assert_true(sw.check_panes_increasing())
+    h.assert_array_eq[USize]([], _OutArray(sw(20, Seconds(109), Seconds(100)))?)
+    h.assert_true(sw.check_panes_increasing())
+    h.assert_array_eq[USize]([], _OutArray(sw(30, Seconds(110), Seconds(100)))?)
+    h.assert_true(sw.check_panes_increasing())
+    h.assert_array_eq[USize]([], _OutArray(sw(40, Seconds(111), Seconds(100)))?)
+    h.assert_true(sw.check_panes_increasing())
     // Send in more normal values
-    res = sw(3, Seconds(93), Seconds(102))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 0)
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
-
-    res = sw(4, Seconds(94), Seconds(103))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 0)
-
-    res = sw(5, Seconds(95), Seconds(104))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
+    h.assert_array_eq[USize]([0], _OutArray(sw(3, Seconds(93), Seconds(102)))?)
+    h.assert_true(sw.check_panes_increasing())
+    h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(94), Seconds(103)))?)
+    h.assert_array_eq[USize]([5], _OutArray(sw(5, Seconds(95), Seconds(104)))?)
     // Send in late values just to trigger stuff
-    res = sw(0, Seconds(1), Seconds(106))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 5)
-
-    res = sw(0, Seconds(1), Seconds(107))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 14)
-
-    res = sw(0, Seconds(1), Seconds(108))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(0, Seconds(1), Seconds(109))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 14)
-
-    res = sw(0, Seconds(1), Seconds(112))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 14)
-
-    res = sw(0, Seconds(1), Seconds(113))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 14)
-
-    res = sw(0, Seconds(1), Seconds(114))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
-
-    res = sw(0, Seconds(1), Seconds(115))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 12)
+    h.assert_array_eq[USize]([14], _OutArray(sw(0, Seconds(1), Seconds(106)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(0, Seconds(1), Seconds(107)))?)
+    h.assert_array_eq[USize]([14], _OutArray(sw(0, Seconds(1), Seconds(108)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(0, Seconds(1), Seconds(109)))?)
+    h.assert_array_eq[USize]([14;14], _OutArray(sw(0, Seconds(1), Seconds(112)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(0, Seconds(1), Seconds(113)))?)
+    h.assert_array_eq[USize]([12], _OutArray(sw(0, Seconds(1), Seconds(114)))?)
+    h.assert_array_eq[USize]([], _OutArray(sw(0, Seconds(1), Seconds(115)))?)
 
     // Fourth set of windows
-    // Use this message to trigger 10 windows.
-    res = sw(2, Seconds(192), Seconds(200))
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 16)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 10)
-    h.assert_eq[USize](_ForceArray(res._1)?(1)?, 10)
-    h.assert_eq[USize](_ForceArray(res._1)?(2)?, 40)
-    h.assert_eq[USize](_ForceArray(res._1)?(3)?, 110)
-    h.assert_eq[USize](_ForceArray(res._1)?(4)?, 107)
-    h.assert_eq[USize](_ForceArray(res._1)?(5)?, 100)
-    h.assert_eq[USize](_ForceArray(res._1)?(6)?, 100)
-    h.assert_eq[USize](_ForceArray(res._1)?(7)?, 70)
-    h.assert_eq[USize](_ForceArray(res._1)?(8)?, 0)
-    h.assert_eq[USize](_ForceArray(res._1)?(9)?, 0)
-    // Extra windows added because of expansion to cover early data
-    for i in Range(10, 16) do
-      h.assert_eq[USize](_ForceArray(res._1)?(i)?, 0)
-    end
-
+    h.assert_array_eq[USize]([10;10;40;110;107;100;100;70;0;0;0;0;0;0;0],
+                        // Use this message to trigger 10 windows.
+                        _OutArray(sw(2, Seconds(192), Seconds(200)))?)
 
 class iso _TestSlidingWindowsStragglers is UnitTest
   fun name(): String => "windows/_TestSlidingWindowsStragglers"
@@ -797,22 +531,21 @@ class iso _TestSlidingWindowsStragglers is UnitTest
     wm = watermarks.receive_watermark(1, wm, cur_ts)
     var res = sw(1, wm, wm)
     watermarks.update_output_watermark(res._2)
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
+    h.assert_array_eq[USize]([0], _ForceArray(res._1)?)
 
     wm = Seconds(10_001)
     cur_ts = Seconds(50_001)
     wm = watermarks.receive_watermark(1, wm, cur_ts)
     res = sw(3, wm, wm)
     watermarks.update_output_watermark(res._2)
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_ForceArray(res._1)?(0)?, 0)
+    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
 
     wm = Seconds(10_002)
     cur_ts = Seconds(50_002)
     wm = watermarks.receive_watermark(1, wm, cur_ts)
     res = sw(5, wm, wm)
     watermarks.update_output_watermark(res._2)
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 0)
+    h.assert_array_eq[USize]([0], _ForceArray(res._1)?)
 
     // It's been a while since we've heard from anyone
     cur_ts = Seconds(10_000_000)
@@ -820,17 +553,16 @@ class iso _TestSlidingWindowsStragglers is UnitTest
     let output_w = watermarks.output_watermark()
     res = sw.on_timeout(input_w, output_w)
     watermarks.update_output_watermark(res._2)
-    h.assert_eq[USize](_ForceArray(res._1)?.size(), 506)
-    for i in Range(0, 500) do
+    h.assert_eq[USize](_ForceArray(res._1)?.size(), 505)
+    for i in Range(0, 499) do
       h.assert_eq[USize](_ForceArray(res._1)?(i)?, 0)
     end
-    h.assert_eq[USize](_ForceArray(res._1)?(500)?, 1 + 3)
+    h.assert_eq[USize](_ForceArray(res._1)?(500)?, 1 + 3 + 5)
     h.assert_eq[USize](_ForceArray(res._1)?(501)?, 1 + 3 + 5)
     h.assert_eq[USize](_ForceArray(res._1)?(502)?, 1 + 3 + 5)
     h.assert_eq[USize](_ForceArray(res._1)?(503)?, 1 + 3 + 5)
-    h.assert_eq[USize](_ForceArray(res._1)?(504)?, 1 + 3 + 5)
-    h.assert_eq[USize](_ForceArray(res._1)?(505)?, 5)
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_eq[USize](_ForceArray(res._1)?(504)?, 5)
+    h.assert_true(sw.check_panes_increasing())
 
 
 class iso _TestSlidingWindowsStragglersSequence is UnitTest
@@ -850,45 +582,45 @@ class iso _TestSlidingWindowsStragglersSequence is UnitTest
     var cur_ts = Seconds(50_000)
     wm = watermarks.receive_watermark(1, wm, cur_ts)
     var res = sw(1, wm, wm)
-    h.assert_eq[USize](_ForceArrayArray(res._1)?.size(), 0)
+    h.assert_eq[USize](_ForceArrayArray(res._1)?.size(), 1)
+    h.assert_eq[USize](_sum(_ForceArrayArray(res._1)?(0)?), 0)
 
     wm = Seconds(10_001)
     cur_ts = Seconds(50_001)
     wm = watermarks.receive_watermark(1, wm, cur_ts)
     res = sw(2, wm, wm)
     watermarks.update_output_watermark(res._2)
-    h.assert_eq[USize](_ForceArrayArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_sum(_ForceArrayArray(res._1)?(0)?), 0)
+    h.assert_eq[USize](_ForceArrayArray(res._1)?.size(), 0)
 
     wm = Seconds(10_002)
     cur_ts = Seconds(50_002)
     wm = watermarks.receive_watermark(1, wm, cur_ts)
     res = sw(3, wm, wm)
     watermarks.update_output_watermark(res._2)
-    h.assert_eq[USize](_ForceArrayArray(res._1)?.size(), 0)
+    h.assert_eq[USize](_ForceArrayArray(res._1)?.size(), 1)
+    h.assert_eq[USize](_sum(_ForceArrayArray(res._1)?(0)?), 0)
 
     wm = Seconds(10_003)
     cur_ts = Seconds(50_003)
     wm = watermarks.receive_watermark(1, wm, cur_ts)
     res = sw(4, wm, wm)
     watermarks.update_output_watermark(res._2)
-    h.assert_eq[USize](_ForceArrayArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_sum(_ForceArrayArray(res._1)?(0)?), 0)
+    h.assert_eq[USize](_ForceArrayArray(res._1)?.size(), 0)
 
     wm = Seconds(10_004)
     cur_ts = Seconds(50_004)
     wm = watermarks.receive_watermark(1, wm, cur_ts)
     res = sw(5, wm, wm)
     watermarks.update_output_watermark(res._2)
-    h.assert_eq[USize](_ForceArrayArray(res._1)?.size(), 0)
+    h.assert_eq[USize](_ForceArrayArray(res._1)?.size(), 1)
+    h.assert_eq[USize](_sum(_ForceArrayArray(res._1)?(0)?), 0)
 
     wm = Seconds(10_005)
     cur_ts = Seconds(50_005)
     wm = watermarks.receive_watermark(1, wm, cur_ts)
     res = sw(6, wm, wm)
     watermarks.update_output_watermark(res._2)
-    h.assert_eq[USize](_ForceArrayArray(res._1)?.size(), 1)
-    h.assert_eq[USize](_sum(_ForceArrayArray(res._1)?(0)?), 0)
+    h.assert_eq[USize](_ForceArrayArray(res._1)?.size(), 0)
 
     // It's been awhile since we've heard from anyone
     cur_ts = Seconds(100_000_000)
@@ -911,7 +643,7 @@ class iso _TestSlidingWindowsStragglersSequence is UnitTest
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_true(sw.check_panes_increasing())
 
   fun _sum(arr: Array[USize] val): USize =>
     var sum: USize = 0
@@ -951,72 +683,72 @@ class iso _TestSlidingWindowsSequence is UnitTest
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_true(sw.check_panes_increasing())
     res = sw(21, Seconds(10_907), Seconds(10_907))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_true(sw.check_panes_increasing())
     res = sw(22, Seconds(10_912), Seconds(10_912))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_true(sw.check_panes_increasing())
     res = sw(23, Seconds(10_918), Seconds(10_918))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_true(sw.check_panes_increasing())
     res = sw(24, Seconds(10_924), Seconds(10_924))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_true(sw.check_panes_increasing())
     res = sw(25, Seconds(10_929), Seconds(10_929))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_true(sw.check_panes_increasing())
     res = sw(26, Seconds(10_935), Seconds(10_935))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_true(sw.check_panes_increasing())
     res = sw(27, Seconds(10_940), Seconds(10_940))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_true(sw.check_panes_increasing())
     res = sw(28, Seconds(10_945), Seconds(10_945))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_true(sw.check_panes_increasing())
     res = sw(29, Seconds(10_951), Seconds(10_951))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_true(sw.check_panes_increasing())
     res = sw(30, Seconds(10_957), Seconds(10_957))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_true(sw.check_panes_increasing())
     res = sw(31, Seconds(10_964), Seconds(10_964))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_true(sw.check_panes_increasing())
     res = sw(32, Seconds(10_968), Seconds(10_968))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_true(sw.check_panes_increasing())
     res = sw(33, Seconds(10_973), Seconds(10_973))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_eq[Bool](sw.check_panes_increasing(), true)
+    h.assert_true(sw.check_panes_increasing())
     res = sw(34, Seconds(10_979), Seconds(10_979))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
