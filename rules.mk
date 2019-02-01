@@ -200,7 +200,7 @@ ifeq ($(shell uname -s),Linux)
   extra_xargs_arg := -r
   docker_user_arg := -u `id -u`:`id -g`
   host_ip_src = $(shell ifconfig `route -n | grep '^0.0.0.0' | awk '{print $$8}'` | egrep -o 'inet addr:[^ ]+' | awk -F: '{print $$2}')
-  system_cpus := $(shell which cset > /dev/null && sudo cset set -l -r | grep '/system' | awk '{print $$2}')
+  system_cpus := $(shell which cset > /dev/null 2>&1 && sudo cset set -l -r | grep '/system' | awk '{print $$2}')
   ifneq (,$(system_cpus))
     docker_cpu_arg := --cpuset-cpus $(system_cpus)
   endif
