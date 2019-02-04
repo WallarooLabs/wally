@@ -41,5 +41,7 @@ interface val SourceListenerBuilderBuilder
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, target_router: Router = EmptyRouter):
+    recovering: Bool,
+    worker_source_config: WorkerSourceConfig,
+    target_router: Router = EmptyRouter):
     SourceListenerBuilder

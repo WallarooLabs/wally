@@ -16,13 +16,16 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
+use "collections"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/options"
 use "wallaroo/core/spike"
 
 class StartupOptions
   var m_arg: (Array[String] | None) = None
-  var input_addrs: Array[Array[String]] val = recover Array[Array[String]] end
+  var input_addrs: Map[String, (String, String)] val =
+    recover input_addrs.create() end
+  // var input_addrs: Array[Array[String]] val = recover Array[Array[String]] end
   var c_addr: Array[String] = [""; "0"]
   var c_host: String = ""
   var c_service: String = "0"
@@ -71,7 +74,7 @@ primitive WallarooConfig
     so
 
   fun _parse(args: Array[String] val, handle_help: Bool,
-    include_input_addrs: Bool = false): (StartupOptions, Array[String] val) ?
+    include_input_addrs: Bool = true): (StartupOptions, Array[String] val) ?
   =>
     let so: StartupOptions ref = StartupOptions
 
@@ -127,11 +130,14 @@ primitive WallarooConfig
       | ("metrics", let arg: String) =>
         so.m_arg = arg.split(":")
       | ("in", let arg: String) =>
-        let i_addrs_write = recover trn Array[Array[String]] end
-        for addr in arg.split(",").values() do
-          i_addrs_write.push(addr.split(":"))
+        let input_addrs_trn = recover trn Map[String, (String, String)] end
+        for input_address in arg.split(",").values() do
+          let source_and_address = input_address.split("@")
+          let address_data = source_and_address(1)?.split(":")
+          input_addrs_trn.update(source_and_address(0)?,
+            (address_data(0)?, address_data(1)?))
         end
-        so.input_addrs = consume i_addrs_write
+        so.input_addrs = consume input_addrs_trn
       | ("control", let arg: String) =>
         so.c_addr = arg.split(":")
         so.c_host = so.c_addr(0)?
