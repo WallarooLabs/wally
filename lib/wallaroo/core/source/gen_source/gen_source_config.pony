@@ -21,6 +21,8 @@ use "wallaroo"
 use "wallaroo/core/partitioning"
 use "wallaroo/core/source"
 
+primitive WorkerGenSourceConfig is WorkerSourceConfig
+
 class val GenSourceConfig[In: Any val]
   let _gen: GenSourceGeneratorBuilder[In]
 
@@ -32,3 +34,7 @@ class val GenSourceConfig[In: Any val]
 
   fun default_partitioner_builder(): PartitionerBuilder =>
     RandomPartitionerBuilder
+
+  fun worker_source_config(): WorkerSourceConfig =>
+    WorkerGenSourceConfig
+

@@ -351,7 +351,8 @@ actor Startup
           recovery_reconnecter, checkpoint_initiator, barrier_initiator,
           _local_topology_file, _data_channel_file, _worker_names_file,
           local_keys_filepath,
-          _the_journal as SimpleJournal, _startup_options.do_local_file_io)
+          _the_journal as SimpleJournal, _startup_options.do_local_file_io,
+          _pipeline.worker_source_configs())
 
       if (_external_host != "") or (_external_service != "") then
         let external_channel_notifier =
@@ -579,8 +580,8 @@ actor Startup
           event_log, recovery, recovery_reconnecter, checkpoint_initiator,
           barrier_initiator, _local_topology_file, _data_channel_file,
           _worker_names_file, local_keys_filepath,
-          _the_journal as SimpleJournal, _startup_options.do_local_file_io
-          where is_joining = true)
+          _the_journal as SimpleJournal, _startup_options.do_local_file_io,
+          _pipeline.worker_source_configs() where is_joining = true)
 
       if (_external_host != "") or (_external_service != "") then
         let external_channel_notifier =

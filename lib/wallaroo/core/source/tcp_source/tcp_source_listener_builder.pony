@@ -27,6 +27,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
+use "wallaroo_labs/mort"
 
 class val TCPSourceListenerBuilder[In: Any val] is SourceListenerBuilder
   let _worker_name: WorkerName
@@ -55,9 +56,9 @@ class val TCPSourceListenerBuilder[In: Any val] is SourceListenerBuilder
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, target_router: Router = EmptyRouter, parallelism: USize,
-    handler: FramedSourceHandler[In] val,
-    host: String = "", service: String = "0")
+    recovering: Bool, target_router: Router = EmptyRouter,
+    parallelism: USize, handler: FramedSourceHandler[In] val,
+    host: String, service: String)
   =>
     _worker_name = worker_name
     _pipeline_name = pipeline_name
@@ -87,18 +88,11 @@ class val TCPSourceListenerBuilder[In: Any val] is SourceListenerBuilder
 
 class val TCPSourceListenerBuilderBuilder[In: Any val] is
   SourceListenerBuilderBuilder
-  let _host: String
-  let _service: String
-  let _parallelism: USize
-  let _handler: FramedSourceHandler[In] val
+  let _source_config: TCPSourceConfig[In]
 
-  new val create(host: String, service: String, parallelism: USize,
-    handler: FramedSourceHandler[In] val)
+  new val create(source_config: TCPSourceConfig[In])
   =>
-    _host = host
-    _service = service
-    _parallelism = parallelism
-    _handler = handler
+    _source_config = source_config
 
   fun apply(worker_name: String, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
@@ -107,11 +101,25 @@ class val TCPSourceListenerBuilderBuilder[In: Any val] is
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, target_router: Router = EmptyRouter):
+    recovering: Bool,
+    worker_source_config: WorkerSourceConfig,
+    target_router: Router = EmptyRouter):
     TCPSourceListenerBuilder[In]
   =>
-    TCPSourceListenerBuilder[In](worker_name, pipeline_name, runner_builder,
-      partitioner_builder, router, metrics_conn, consume metrics_reporter,
-      router_registry, outgoing_boundary_builders, event_log, auth,
-      layout_initializer, recovering, target_router, _parallelism, _handler,
-      _host, _service)
+    match worker_source_config
+    | let config: WorkerTCPSourceConfig =>
+      TCPSourceListenerBuilder[In](worker_name, pipeline_name, runner_builder,
+        partitioner_builder, router, metrics_conn, consume metrics_reporter,
+        router_registry, outgoing_boundary_builders, event_log, auth,
+        layout_initializer, recovering, target_router,
+        _source_config.parallelism, _source_config.handler,
+        config.host, config.service)
+    else
+      Unreachable()
+      TCPSourceListenerBuilder[In](worker_name, pipeline_name, runner_builder,
+        partitioner_builder, router, metrics_conn, consume metrics_reporter,
+        router_registry, outgoing_boundary_builders, event_log, auth,
+        layout_initializer, recovering, target_router,
+        _source_config.parallelism, _source_config.handler,
+        "0", "0")
+    end
