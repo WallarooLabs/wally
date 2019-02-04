@@ -206,8 +206,8 @@ class iso _TestOutputWatermarkTsIsJustBeforeNextWindowStart is UnitTest
     let delay: U64 = 0
     let upstream_id: U128 = 1000
     let now: U64 = 1000
-    let tw = RangeWindows[USize, USize, _Total]("key", _NonZeroSum, range, slide,
-      delay)
+    let tw = RangeWindows[USize, USize, _Total]("key", _NonZeroSum, range,
+      slide, delay)
     tw(1, Milliseconds(5000), Milliseconds(5000))
 
     // when
@@ -282,16 +282,22 @@ class iso _TestSlidingWindows is UnitTest
     h.assert_array_eq[USize]([5], _OutArray(sw(5, Seconds(95), Seconds(104)))?)
     h.assert_true(sw.check_panes_increasing())
     // Second 2 windows with values
-    h.assert_array_eq[USize]([14], _OutArray(sw(1, Seconds(102), Seconds(106)))?)
+    h.assert_array_eq[USize]([14],
+      _OutArray(sw(1, Seconds(102), Seconds(106)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(103), Seconds(107)))?)
-    h.assert_array_eq[USize]([14], _OutArray(sw(3, Seconds(104), Seconds(108)))?)
+    h.assert_array_eq[USize]([14],
+      _OutArray(sw(3, Seconds(104), Seconds(108)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(105), Seconds(109)))?)
     h.assert_true(sw.check_panes_increasing())
     // Third 2 windows with values.
-    h.assert_array_eq[USize]([14;14], _OutArray(sw(10, Seconds(108), Seconds(112)))?)
-    h.assert_array_eq[USize]([], _OutArray(sw(20, Seconds(109), Seconds(113)))?)
-    h.assert_array_eq[USize]([12], _OutArray(sw(30, Seconds(110), Seconds(114)))?)
-    h.assert_array_eq[USize]([], _OutArray(sw(40, Seconds(111), Seconds(115)))?)
+    h.assert_array_eq[USize]([14;14],
+      _OutArray(sw(10, Seconds(108), Seconds(112)))?)
+    h.assert_array_eq[USize]([],
+      _OutArray(sw(20, Seconds(109), Seconds(113)))?)
+    h.assert_array_eq[USize]([12],
+      _OutArray(sw(30, Seconds(110), Seconds(114)))?)
+    h.assert_array_eq[USize]([],
+      _OutArray(sw(40, Seconds(111), Seconds(115)))?)
     h.assert_true(sw.check_panes_increasing())
     // Fourth set of windows
     // Use this message to trigger 10 windows.
@@ -309,10 +315,14 @@ class iso _TestSlidingWindows is UnitTest
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(205), Seconds(209)))?)
     h.assert_true(sw.check_panes_increasing())
     // Sixth 2 windows with values.
-    h.assert_array_eq[USize]([14;14], _OutArray(sw(10, Seconds(211), Seconds(212)))?)
-    h.assert_array_eq[USize]([], _OutArray(sw(20, Seconds(212), Seconds(213)))?)
-    h.assert_array_eq[USize]([12], _OutArray(sw(30, Seconds(213), Seconds(214)))?)
-    h.assert_array_eq[USize]([], _OutArray(sw(40, Seconds(214), Seconds(215)))?)
+    h.assert_array_eq[USize]([14;14],
+      _OutArray(sw(10, Seconds(211), Seconds(212)))?)
+    h.assert_array_eq[USize]([],
+      _OutArray(sw(20, Seconds(212), Seconds(213)))?)
+    h.assert_array_eq[USize]([12],
+      _OutArray(sw(30, Seconds(213), Seconds(214)))?)
+    h.assert_array_eq[USize]([],
+      _OutArray(sw(40, Seconds(214), Seconds(215)))?)
     h.assert_true(sw.check_panes_increasing())
 
 
@@ -332,16 +342,22 @@ class iso _TestSlidingWindowsNoDelay is UnitTest
     h.assert_array_eq[USize]([9], _OutArray(sw(5, Seconds(95), Seconds(104)))?)
     h.assert_true(sw.check_panes_increasing())
     // Second 2 windows with values
-    h.assert_array_eq[USize]([1], _OutArray(sw(1, Seconds(102), Seconds(106)))?)
+    h.assert_array_eq[USize]([1],
+      _OutArray(sw(1, Seconds(102), Seconds(106)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(103), Seconds(107)))?)
-    h.assert_array_eq[USize]([6], _OutArray(sw(3, Seconds(104), Seconds(108)))?)
+    h.assert_array_eq[USize]([6],
+      _OutArray(sw(3, Seconds(104), Seconds(108)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(105), Seconds(109)))?)
     h.assert_true(sw.check_panes_increasing())
     // Third 2 windows with values.
-    h.assert_array_eq[USize]([20; 20], _OutArray(sw(10, Seconds(108), Seconds(112)))?)
-    h.assert_array_eq[USize]([], _OutArray(sw(20, Seconds(109), Seconds(113)))?)
-    h.assert_array_eq[USize]([67], _OutArray(sw(30, Seconds(110), Seconds(114)))?)
-    h.assert_array_eq[USize]([], _OutArray(sw(40, Seconds(111), Seconds(115)))?)
+    h.assert_array_eq[USize]([20; 20],
+      _OutArray(sw(10, Seconds(108), Seconds(112)))?)
+    h.assert_array_eq[USize]([],
+      _OutArray(sw(20, Seconds(109), Seconds(113)))?)
+    h.assert_array_eq[USize]([67],
+      _OutArray(sw(30, Seconds(110), Seconds(114)))?)
+    h.assert_array_eq[USize]([],
+      _OutArray(sw(40, Seconds(111), Seconds(115)))?)
     h.assert_true(sw.check_panes_increasing())
     // Fourth set of windows
     h.assert_array_eq[USize]([100;100;70;0;0],
@@ -371,24 +387,31 @@ class iso _TestSlidingWindowsOutOfOrder is UnitTest
     h.assert_true(sw.check_panes_increasing())
 
     // Second 2 windows with values
-    h.assert_array_eq[USize]([14], _OutArray(sw(4, Seconds(105), Seconds(106)))?)
-    h.assert_array_eq[USize]([  ], _OutArray(sw(3, Seconds(104), Seconds(107)))?)
-    h.assert_array_eq[USize]([14], _OutArray(sw(2, Seconds(103), Seconds(108)))?)
-    h.assert_array_eq[USize]([  ], _OutArray(sw(1, Seconds(102), Seconds(109)))?)
+    h.assert_array_eq[USize]([14],
+      _OutArray(sw(4, Seconds(105), Seconds(106)))?)
+    h.assert_array_eq[USize]([  ],
+      _OutArray(sw(3, Seconds(104), Seconds(107)))?)
+    h.assert_array_eq[USize]([14],
+      _OutArray(sw(2, Seconds(103), Seconds(108)))?)
+    h.assert_array_eq[USize]([  ],
+      _OutArray(sw(1, Seconds(102), Seconds(109)))?)
     h.assert_true(sw.check_panes_increasing())
 
     // Third 2 windows with values.
-    h.assert_array_eq[USize](
-                         [14; 14], _OutArray(sw(40, Seconds(111), Seconds(112)))?)
-    h.assert_array_eq[USize]([  ], _OutArray(sw(30, Seconds(110), Seconds(113)))?)
-    h.assert_array_eq[USize]([12], _OutArray(sw(20, Seconds(109), Seconds(114)))?)
-    h.assert_array_eq[USize]([  ], _OutArray(sw(10, Seconds(108), Seconds(115)))?)
+    h.assert_array_eq[USize]([14; 14],
+      _OutArray(sw(40, Seconds(111), Seconds(112)))?)
+    h.assert_array_eq[USize]([  ],
+      _OutArray(sw(30, Seconds(110), Seconds(113)))?)
+    h.assert_array_eq[USize]([12],
+      _OutArray(sw(20, Seconds(109), Seconds(114)))?)
+    h.assert_array_eq[USize]([  ],
+      _OutArray(sw(10, Seconds(108), Seconds(115)))?)
     h.assert_true(sw.check_panes_increasing())
 
     // Fourth set of windows
     h.assert_array_eq[USize]([10;10;40;110;107;100;100;70;0;0],
-            // Use the below message to trigger 10 windows.
-    _OutArray(sw(2, Seconds(192), Seconds(200)))?)
+      // Use the below message to trigger 10 windows.
+      _OutArray(sw(2, Seconds(192), Seconds(200)))?)
     h.assert_true(sw.check_panes_increasing())
 
 
@@ -409,36 +432,45 @@ class iso _TestSlidingWindowsGCD is UnitTest
     h.assert_array_eq[USize]([], _OutArray(sw(5, Seconds(95), Seconds(104)))?)
 
     // Second set of windows with values
-    h.assert_array_eq[USize]([5], _OutArray(sw(1, Seconds(102), Seconds(106)))?)
+    h.assert_array_eq[USize]([5],
+      _OutArray(sw(1, Seconds(102), Seconds(106)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(103), Seconds(107)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(104), Seconds(108)))?)
-    h.assert_array_eq[USize]([14], _OutArray(sw(4, Seconds(105), Seconds(109)))?)
+    h.assert_array_eq[USize]([14],
+      _OutArray(sw(4, Seconds(105), Seconds(109)))?)
 
     // Third set of windows with values.
-    h.assert_array_eq[USize]([14], _OutArray(sw(10, Seconds(111), Seconds(112)))?)
-    h.assert_array_eq[USize]([], _OutArray(sw(20, Seconds(112), Seconds(113)))?)
-    h.assert_array_eq[USize]([], _OutArray(sw(30, Seconds(113), Seconds(114)))?)
-    h.assert_array_eq[USize]([13], _OutArray(sw(40, Seconds(114), Seconds(115)))?)
+    h.assert_array_eq[USize]([14],
+      _OutArray(sw(10, Seconds(111), Seconds(112)))?)
+    h.assert_array_eq[USize]([],
+      _OutArray(sw(20, Seconds(112), Seconds(113)))?)
+    h.assert_array_eq[USize]([],
+      _OutArray(sw(30, Seconds(113), Seconds(114)))?)
+    h.assert_array_eq[USize]([13],
+      _OutArray(sw(40, Seconds(114), Seconds(115)))?)
 
     // Fourth set of windows
     h.assert_array_eq[USize]([10;10;20;104;100;100;40;0],
-                 // Use this message to trigger 8 windows.
-        _OutArray(sw(2, Seconds(192), Seconds(200)))?)
+      _OutArray(sw(2, Seconds(192), Seconds(200)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(193), Seconds(202)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(194), Seconds(203)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(5, Seconds(195), Seconds(204)))?)
 
     // Fifth set of windows with values
-    h.assert_array_eq[USize]([], _OutArray(sw(1, Seconds(202), Seconds(206)))?) //y
+    h.assert_array_eq[USize]([],
+      _OutArray(sw(1, Seconds(202), Seconds(206)))?) //y
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(203), Seconds(207)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(204), Seconds(208)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(205), Seconds(209)))?)
 
     // Sixth set of windows with values.
-    h.assert_array_eq[USize]([14], _OutArray(sw(10, Seconds(211), Seconds(212)))?) //x
-    h.assert_array_eq[USize]([], _OutArray(sw(20, Seconds(212), Seconds(213)))?)
+    h.assert_array_eq[USize]([14],
+      _OutArray(sw(10, Seconds(211), Seconds(212)))?) //x
+    h.assert_array_eq[USize]([],
+      _OutArray(sw(20, Seconds(212), Seconds(213)))?)
 
-    h.assert_array_eq[USize]([], _OutArray(sw(30, Seconds(213), Seconds(214)))?)
+    h.assert_array_eq[USize]([],
+      _OutArray(sw(30, Seconds(213), Seconds(214)))?)
     h.assert_array_eq[USize]([13], _OutArray(sw(40, Seconds(214), Seconds(215)))?)
 
 class iso _TestSlidingWindowsLateData is UnitTest
@@ -456,12 +488,13 @@ class iso _TestSlidingWindowsLateData is UnitTest
     h.assert_array_eq[USize]([0], _OutArray(sw(2, Seconds(93), Seconds(102)))?)
     // Trigger existing values
     h.assert_array_eq[USize]([3;3;3;3;3;0;0;0;0;0],
-                      _OutArray(sw(10, Seconds(199), Seconds(200)))?)
+                    _OutArray(sw(10, Seconds(199), Seconds(200)))?)
     // Send in late data, which should be dropped.
-    h.assert_array_eq[USize]([], _OutArray(sw(100, Seconds(100), Seconds(201)))?)
+    h.assert_array_eq[USize]([],
+      _OutArray(sw(100, Seconds(100), Seconds(201)))?)
     // Send in more late data, which should be dropped.
     h.assert_array_eq[USize]([10;10;10;10;10;0],
-              _OutArray(sw(1, Seconds(101), Seconds(220)))?)
+      _OutArray(sw(1, Seconds(101), Seconds(220)))?)
 
 
 class iso _TestSlidingWindowsEarlyData is UnitTest
@@ -485,13 +518,17 @@ class iso _TestSlidingWindowsEarlyData is UnitTest
     h.assert_true(sw.check_panes_increasing())
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(105), Seconds(100)))?)
     h.assert_true(sw.check_panes_increasing())
-    h.assert_array_eq[USize]([], _OutArray(sw(10, Seconds(108), Seconds(100)))?)
+    h.assert_array_eq[USize]([],
+      _OutArray(sw(10, Seconds(108), Seconds(100)))?)
     h.assert_true(sw.check_panes_increasing())
-    h.assert_array_eq[USize]([], _OutArray(sw(20, Seconds(109), Seconds(100)))?)
+    h.assert_array_eq[USize]([],
+      _OutArray(sw(20, Seconds(109), Seconds(100)))?)
     h.assert_true(sw.check_panes_increasing())
-    h.assert_array_eq[USize]([], _OutArray(sw(30, Seconds(110), Seconds(100)))?)
+    h.assert_array_eq[USize]([],
+      _OutArray(sw(30, Seconds(110), Seconds(100)))?)
     h.assert_true(sw.check_panes_increasing())
-    h.assert_array_eq[USize]([], _OutArray(sw(40, Seconds(111), Seconds(100)))?)
+    h.assert_array_eq[USize]([],
+      _OutArray(sw(40, Seconds(111), Seconds(100)))?)
     h.assert_true(sw.check_panes_increasing())
     // Send in more normal values
     h.assert_array_eq[USize]([0], _OutArray(sw(3, Seconds(93), Seconds(102)))?)
@@ -503,15 +540,15 @@ class iso _TestSlidingWindowsEarlyData is UnitTest
     h.assert_array_eq[USize]([], _OutArray(sw(0, Seconds(1), Seconds(107)))?)
     h.assert_array_eq[USize]([14], _OutArray(sw(0, Seconds(1), Seconds(108)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(0, Seconds(1), Seconds(109)))?)
-    h.assert_array_eq[USize]([14;14], _OutArray(sw(0, Seconds(1), Seconds(112)))?)
+    h.assert_array_eq[USize]([14;14],
+      _OutArray(sw(0, Seconds(1), Seconds(112)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(0, Seconds(1), Seconds(113)))?)
     h.assert_array_eq[USize]([12], _OutArray(sw(0, Seconds(1), Seconds(114)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(0, Seconds(1), Seconds(115)))?)
 
     // Fourth set of windows
     h.assert_array_eq[USize]([10;10;40;110;107;100;100;70;0;0;0;0;0;0;0],
-                        // Use this message to trigger 10 windows.
-                        _OutArray(sw(2, Seconds(192), Seconds(200)))?)
+      _OutArray(sw(2, Seconds(192), Seconds(200)))?)
 
 class iso _TestSlidingWindowsStragglers is UnitTest
   fun name(): String => "windows/_TestSlidingWindowsStragglers"
@@ -635,9 +672,12 @@ class iso _TestSlidingWindowsStragglersSequence is UnitTest
     end
     h.assert_eq[USize](_sum(_ForceArrayArray(res._1)?(498)?), 1 + 2)
     h.assert_eq[USize](_sum(_ForceArrayArray(res._1)?(499)?), 1 + 2 + 3 + 4)
-    h.assert_eq[USize](_sum(_ForceArrayArray(res._1)?(500)?), 1 + 2 + 3 + 4 + 5 + 6)
-    h.assert_eq[USize](_sum(_ForceArrayArray(res._1)?(501)?), 1 + 2 + 3 + 4 + 5 + 6)
-    h.assert_eq[USize](_sum(_ForceArrayArray(res._1)?(502)?), 1 + 2 + 3 + 4 + 5 + 6)
+    h.assert_eq[USize](
+      _sum(_ForceArrayArray(res._1)?(500)?), 1 + 2 + 3 + 4 + 5 + 6)
+    h.assert_eq[USize](
+      _sum(_ForceArrayArray(res._1)?(501)?), 1 + 2 + 3 + 4 + 5 + 6)
+    h.assert_eq[USize](
+      _sum(_ForceArrayArray(res._1)?(502)?), 1 + 2 + 3 + 4 + 5 + 6)
     h.assert_eq[USize](_sum(_ForceArrayArray(res._1)?(503)?), 3 + 4 + 5 + 6)
     h.assert_eq[USize](_sum(_ForceArrayArray(res._1)?(504)?), 5 + 6)
     for c in _ForceArrayArray(res._1)?.values() do
@@ -894,13 +934,11 @@ primitive CheckAnyDecreaseOrIncreaseByOne
     true
 
 primitive _OutArray
-  fun apply(outs_ts: ((USize | Array[USize] val | Array[(USize,U64)] val | None)
-                      , U64)): Array[USize] val ? =>
+  fun apply(outs_ts: (ComputationResult[USize], U64)): Array[USize] val ? =>
     _ForceArray(outs_ts._1)?
 
 primitive _ForceArray
-  fun apply(res: (USize | Array[USize] val | Array[(USize,U64)] val | None)):
-    Array[USize] val ? =>
+  fun apply(res: ComputationResult[USize]): Array[USize] val ? =>
     match res
     | let a: Array[(USize, U64)] val =>
       // !@ return the tuple itself after all tests pass
@@ -912,17 +950,14 @@ primitive _ForceArray
     else error end
 
 primitive _ForceArrayWithEventTimes
-  fun apply(res: (USize | Array[USize] val | Array[(USize,U64)] val | None)):
-    Array[(USize,U64)] val ? =>
+  fun apply(res: ComputationResult[USize]): Array[(USize,U64)] val ? =>
     match res
     | let a: Array[(USize, U64)] val => a
     else error end
 
 primitive _ForceArrayArray
-  fun apply(res: (Array[USize] val
-                  | Array[Array[USize] val] val
-                  | Array[(Array[USize] val, U64)] val
-                  | None)): Array[Array[USize] val] val ?
+  fun apply(res: ComputationResult[Array[USize] val]):
+    Array[Array[USize] val] val ?
   =>
     match res
     | let a: Array[(Array[USize] val, U64)] val =>
