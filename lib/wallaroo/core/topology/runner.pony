@@ -332,7 +332,6 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     router: Router, metrics_reporter: MetricsReporter ref,
     watermarks: StageWatermarks)
   =>
-    //@printf[I32]("!@ on_timeout called on StateRunner\n".cstring())
     let on_timeout_ts = WallClock.nanoseconds()
     for (key, sw) in _state_map.pairs() do
       let input_watermark_ts = watermarks.check_effective_input_watermark(

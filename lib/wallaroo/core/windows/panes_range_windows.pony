@@ -30,7 +30,6 @@ use "wallaroo_labs/math"
 use "wallaroo_labs/mort"
 
 
-
 class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   WindowsWrapper[In, Out, Acc]
   """
@@ -70,7 +69,8 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     _panes = Array[(Acc | EmptyPane)](pane_count)
     _panes_start_ts = Array[U64](pane_count)
     _earliest_window_idx = 0
-    var pane_start: U64 = (watermark_ts - (_delay + _range))
+    var pane_start: U64 = watermark_ts - _delay
+
     for i in Range(0, pane_count) do
       _panes.push(EmptyPane)
       _panes_start_ts.push(pane_start)
@@ -338,7 +338,6 @@ primitive _ExpandSlidingWindow
   fun new_pane_count(event_ts: U64, end_ts: U64, cur_pane_count: USize,
     pane_size: U64, panes_per_slide: USize): USize
   =>
-
     let min_new_panes =
       ((event_ts - (end_ts+1)).f64() / pane_size.f64()).usize() + 1
     let new_count = Math.lcm(min_new_panes, panes_per_slide)
