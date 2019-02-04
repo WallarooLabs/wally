@@ -27,6 +27,7 @@ use "buffered"
 use "collections"
 use "../building_blocks"
 use "wallaroo_labs/bytes"
+use "wallaroo_labs/time"
 use "wallaroo/core/source"
 use "wallaroo/core/source/tcp_source"
 
