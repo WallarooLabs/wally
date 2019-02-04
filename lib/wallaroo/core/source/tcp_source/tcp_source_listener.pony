@@ -87,9 +87,9 @@ actor TCPSourceListener[In: Any val] is SourceListener
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, target_router: Router = EmptyRouter, parallelism: USize,
-    handler: FramedSourceHandler[In] val,
-    host: String = "", service: String = "0",
+    recovering: Bool, target_router: Router = EmptyRouter,
+    parallelism: USize, handler: FramedSourceHandler[In] val,
+    host: String, service: String,
     init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -116,8 +116,8 @@ actor TCPSourceListener[In: Any val] is SourceListener
     _service = service
 
     _event = @pony_os_listen_tcp[AsioEventID](this,
-      host.cstring(), service.cstring())
-    _limit = parallelism
+      _host.cstring(), _service.cstring())
+    _limit = _parallelism
     _init_size = init_size
     _max_size = max_size
     _fd = @pony_asio_event_fd(_event)
@@ -132,7 +132,8 @@ actor TCPSourceListener[In: Any val] is SourceListener
     end
 
     @printf[I32]((pipeline_name + " source attempting to listen on "
-      + host + ":" + service + "\n").cstring())
+      + _host + ":" + _service +
+      "\n").cstring())
     _notify_listening()
 
     for i in Range(0, _limit) do
