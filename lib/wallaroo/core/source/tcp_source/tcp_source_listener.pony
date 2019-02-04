@@ -87,9 +87,9 @@ actor TCPSourceListener[In: Any val] is SourceListener
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, target_router: Router = EmptyRouter, parallelism: USize,
-    handler: FramedSourceHandler[In] val,
-    host: String = "", service: String = "0",
+    recovering: Bool, target_router: Router = EmptyRouter,
+    parallelism: USize, handler: FramedSourceHandler[In] val,
+    host: String, service: String,
     init_size: USize = 64, max_size: USize = 16384)
   =>
     """
