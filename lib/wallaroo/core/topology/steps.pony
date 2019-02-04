@@ -164,6 +164,9 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   fun ref metrics_reporter(): MetricsReporter =>
     _metrics_reporter
 
+  fun routing_id(): RoutingId =>
+    _id
+
   be update_router(router': Router) =>
     _update_router(router')
 
@@ -474,8 +477,9 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   =>
     if _inputs.contains(step_id) then
       ifdef "checkpoint_trace" then
-        @printf[I32]("Receive Barrier %s at Step %s\n".cstring(),
-          barrier_token.string().cstring(), _id.string().cstring())
+        @printf[I32]("Process Barrier %s at Step %s from %s\n".cstring(),
+          barrier_token.string().cstring(), _id.string().cstring(),
+          step_id.string().cstring())
       end
       match barrier_token
       | let crt: CheckpointRollbackBarrierToken =>

@@ -34,7 +34,7 @@ actor Main
       let pipeline = recover val
         Wallaroo.source[U64]("Filter Test",
             TCPSourceConfig[(U64 | None)].from_options(OddFilterDecoder,
-              TCPSourceConfigCLIParser(env.args)?(0)?))
+              TCPSourceConfigCLIParser(env.args)?("Filter Test")?))
           // .to(PassThrough)
           .to_sink(TCPSinkConfig[U64].from_options(FramedU64Encoder,
             TCPSinkConfigCLIParser(env.args)?(0)?))

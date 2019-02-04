@@ -65,6 +65,14 @@ interface GenSourceGenerator[V: Any val]
   fun ref initial_value(): (V | None)
   fun ref apply(v: V): (V | None)
 
+primitive EmptyGenSourceGeneratorBuilder[V: Any val]
+  fun apply(): GenSourceGenerator[V] =>
+    EmptyGenSource[V]
+
+class ref EmptyGenSource[V: Any val]
+  fun initial_value(): None => None
+  fun ref apply(v: V): None => None
+
 actor GenSource[V: Any val] is Source
   """
   # GenSource
@@ -109,7 +117,7 @@ actor GenSource[V: Any val] is Source
   var _next_checkpoint_id: CheckpointId = 1
 
   let _pipeline_name: String
-  let _source_name: String
+  let _source_name: SourceName
   let _runner: Runner
   let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
 

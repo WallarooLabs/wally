@@ -27,6 +27,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
+use "wallaroo_labs/mort"
 
 
 class val GenSourceListenerBuilder[In: Any val]
@@ -79,10 +80,6 @@ class val GenSourceListenerBuilder[In: Any val]
       _layout_initializer, _recovering, _target_router, _generator)
 
 class val GenSourceListenerBuilderBuilder[In: Any val]
-  let _generator: GenSourceGeneratorBuilder[In]
-
-  new val create(generator: GenSourceGeneratorBuilder[In]) =>
-    _generator = generator
 
   fun apply(worker_name: String, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
@@ -91,10 +88,22 @@ class val GenSourceListenerBuilderBuilder[In: Any val]
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, target_router: Router = EmptyRouter):
+    recovering: Bool,
+    worker_source_config: WorkerSourceConfig,
+    target_router: Router = EmptyRouter):
     GenSourceListenerBuilder[In]
   =>
-    GenSourceListenerBuilder[In](worker_name, pipeline_name, runner_builder,
-      partitioner_builder, router, metrics_conn, consume metrics_reporter,
-      router_registry, outgoing_boundary_builders, event_log, auth,
-      layout_initializer, recovering, target_router, _generator)
+    match worker_source_config
+    | let config: WorkerGenSourceConfig[In] =>
+      GenSourceListenerBuilder[In](worker_name, pipeline_name, runner_builder,
+        partitioner_builder, router, metrics_conn, consume metrics_reporter,
+        router_registry, outgoing_boundary_builders, event_log, auth,
+        layout_initializer, recovering, target_router, config.generator)
+    else
+      Unreachable()
+      GenSourceListenerBuilder[In](worker_name, pipeline_name, runner_builder,
+        partitioner_builder, router, metrics_conn, consume metrics_reporter,
+        router_registry, outgoing_boundary_builders, event_log, auth,
+        layout_initializer, recovering, target_router,
+        EmptyGenSourceGeneratorBuilder[In])
+    end

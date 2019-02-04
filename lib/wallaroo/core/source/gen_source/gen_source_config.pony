@@ -22,13 +22,22 @@ use "wallaroo/core/partitioning"
 use "wallaroo/core/source"
 
 class val GenSourceConfig[In: Any val]
-  let _gen: GenSourceGeneratorBuilder[In]
+  let _worker_source_config: WorkerGenSourceConfig[In]
 
   new val create(gen: GenSourceGeneratorBuilder[In]) =>
-    _gen = gen
+    _worker_source_config = WorkerGenSourceConfig[In](gen)
 
   fun source_listener_builder_builder(): GenSourceListenerBuilderBuilder[In] =>
-    GenSourceListenerBuilderBuilder[In](_gen)
+    GenSourceListenerBuilderBuilder[In]
 
   fun default_partitioner_builder(): PartitionerBuilder =>
     RandomPartitionerBuilder
+
+  fun worker_source_config(): WorkerSourceConfig =>
+    _worker_source_config
+
+class val WorkerGenSourceConfig[In: Any val] is WorkerSourceConfig
+  let generator: GenSourceGeneratorBuilder[In]
+
+  new val create(generator': GenSourceGeneratorBuilder[In]) =>
+    generator = generator'

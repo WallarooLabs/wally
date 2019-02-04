@@ -253,7 +253,7 @@ class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
       local_routing)
 
   fun timeout_interval(): U64 =>
-    // !@ !TODO!: Decide if we should set a minimum to this interval to
+    // !TODO!: Decide if we should set a minimum to this interval to
     // avoid extremely frequent timer messages.
     (_range + _delay) * 2
 

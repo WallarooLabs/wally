@@ -29,10 +29,12 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
+type SourceName is String
 
 interface val SourceConfig
   fun default_partitioner_builder(): PartitionerBuilder
-  fun source_listener_builder_builder(): SourceListenerBuilderBuilder
+  fun val source_listener_builder_builder(): SourceListenerBuilderBuilder
+  fun worker_source_config(): WorkerSourceConfig
 
 interface val TypedSourceConfig[In: Any val] is SourceConfig
 
@@ -46,6 +48,8 @@ class val SourceConfigWrapper
 
   fun name(): String => _name
   fun source_config(): SourceConfig => _source_config
+
+trait val WorkerSourceConfig
 
 trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
   StatusReporter)

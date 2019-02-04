@@ -16,13 +16,13 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
+use "collections"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/options"
 use "wallaroo/core/spike"
 
 class StartupOptions
   var m_arg: (Array[String] | None) = None
-  var input_addrs: Array[Array[String]] val = recover Array[Array[String]] end
   var c_addr: Array[String] = [""; "0"]
   var c_host: String = ""
   var c_service: String = "0"
@@ -63,15 +63,7 @@ primitive WallarooConfig
     (let so, let z) = _parse(args where handle_help = true)?
     so
 
-  fun wactor_args(args: Array[String] val): StartupOptions ? =>
-    // The wactor system expects to get input addresses from this function,
-    // Wallaroo expects applications to parse this information themselves.
-    (let so, let z) = _parse(args where handle_help = true,
-      include_input_addrs = true)?
-    so
-
-  fun _parse(args: Array[String] val, handle_help: Bool,
-    include_input_addrs: Bool = false): (StartupOptions, Array[String] val) ?
+  fun _parse(args: Array[String] val, handle_help: Bool): (StartupOptions, Array[String] val) ?
   =>
     let so: StartupOptions ref = StartupOptions
 
@@ -116,22 +108,12 @@ primitive WallarooConfig
       options.add("help", "h", None)
     end
 
-    if include_input_addrs then
-      options.add("in", "i", StringArgument)
-    end
-
     for option in options do
       match option
       | ("help", let arg: None) =>
         StartupHelp()
       | ("metrics", let arg: String) =>
         so.m_arg = arg.split(":")
-      | ("in", let arg: String) =>
-        let i_addrs_write = recover trn Array[Array[String]] end
-        for addr in arg.split(",").values() do
-          i_addrs_write.push(addr.split(":"))
-        end
-        so.input_addrs = consume i_addrs_write
       | ("control", let arg: String) =>
         so.c_addr = arg.split(":")
         so.c_host = so.c_addr(0)?
