@@ -25,5 +25,4 @@ interface FramedSourceHandler[In: Any val]
   fun header_length(): USize
   fun payload_length(data: Array[U8] iso): USize ?
   fun decode(data: Array[U8] val): In ?
-  fun event_time_ns(event: In) : U64 =>
-    WallClock.nanoseconds()
+  fun event_time_ns(event: In) : U64 => WallClock.nanoseconds()

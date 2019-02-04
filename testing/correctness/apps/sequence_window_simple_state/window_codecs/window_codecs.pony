@@ -25,6 +25,7 @@ so that it may be unit tested separately from the main application.
 use "buffered"
 use "collections"
 use "wallaroo_labs/bytes"
+use "wallaroo_labs/time"
 use "wallaroo/core/source"
 use "wallaroo/core/source/tcp_source"
 
