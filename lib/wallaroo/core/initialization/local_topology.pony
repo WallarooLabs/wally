@@ -242,6 +242,10 @@ actor LocalTopologyInitializer is LayoutInitializer
   let _is_joining: Bool
 
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
+  // (String, String) -> WorkerSourceConfig
+  // WorkerSourceConfig
+  // let _input_source_addr_map: Map[String, WorkerSourceConfig] val
+  let _worker_source_configs: Map[String, WorkerSourceConfig] val
 
   // Accumulate all SourceListenerBuilders so we can build them
   // once EventLog signals we're ready
@@ -271,6 +275,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     local_topology_file: String, data_channel_file: String,
     worker_names_file: String, local_keys_filepath: FilePath,
     the_journal: SimpleJournal, do_local_file_io: Bool,
+    worker_source_configs: Map[String, WorkerSourceConfig] val,
     cluster_manager: (ClusterManager | None) = None,
     is_joining: Bool = false)
   =>
@@ -297,6 +302,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _do_local_file_io = do_local_file_io
     _cluster_manager = cluster_manager
     _is_joining = is_joining
+    _worker_source_configs = worker_source_configs
     _router_registry.register_local_topology_initializer(this)
     _phase.set_initializable(_checkpoint_initiator)
     _phase.set_initializable(_barrier_initiator)
@@ -515,17 +521,10 @@ actor LocalTopologyInitializer is LayoutInitializer
           let next_node = frontier.shift()?
           for i_node in next_node.ins() do
             if not nodes_to_initialize.contains(i_node) then
-              let should_add =
-                match i_node.value
-                // Currently only the initializer handles sources
-                | let sd: SourceData => _is_initializer
-                else true end
-              if should_add then
-                @printf[I32](("Adding %s node to nodes to initialize\n")
-                  .cstring(), i_node.value.name().cstring())
-                nodes_to_initialize.push(i_node)
-                frontier.push(i_node)
-              end
+              @printf[I32](("Adding %s node to nodes to initialize\n")
+                .cstring(), i_node.value.name().cstring())
+              nodes_to_initialize.push(i_node)
+              frontier.push(i_node)
             end
           end
         end
@@ -832,20 +831,26 @@ actor LocalTopologyInitializer is LayoutInitializer
                 _metrics_conn)
 
               let listen_auth = TCPListenAuth(_auth)
-              @printf[I32](("----Creating source " + source_name +
-                " with " + source_data.computations_name() + "----\n").cstring())
-
-              // Set up SourceListener builders
-              let source_runner_builder = source_data.runner_builder()
-              let partitioner_builder = source_data.partitioner_builder()
-              let sl_builder_builder =
-                source_data.source_listener_builder_builder()
-              let sl_builder = sl_builder_builder(_worker_name,
-                source_name, source_runner_builder, partitioner_builder,
-                out_router, _metrics_conn, consume source_reporter,
-                _router_registry, _outgoing_boundary_builders, _event_log,
-                _auth, this, _recovering)
-              sl_builders.push(sl_builder)
+              try
+                @printf[I32](("----Creating source " + source_name +
+                " with " + source_data.computations_name() + "----\n")
+                    .cstring())
+                let worker_source_config =
+                  _worker_source_configs(source_name)?
+                // Set up SourceListener builders
+                let source_runner_builder = source_data.runner_builder()
+                let partitioner_builder = source_data.partitioner_builder()
+                let sl_builder_builder =
+                  source_data.source_listener_builder_builder()
+                let sl_builder = sl_builder_builder(_worker_name,
+                  source_name, source_runner_builder, partitioner_builder,
+                  out_router, _metrics_conn, consume source_reporter,
+                  _router_registry, _outgoing_boundary_builders, _event_log,
+                  _auth, this, _recovering, worker_source_config)
+                sl_builders.push(sl_builder)
+              else
+                Fail()
+              end
 
               // Nothing connects to a source via an in edge locally,
               // so this just marks that we've built this one
