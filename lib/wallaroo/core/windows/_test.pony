@@ -25,38 +25,9 @@ use "wallaroo/core/topology"
 use "wallaroo_labs/time"
 
 actor Main is TestList
-  new create(env: Env) =>
-    PonyTest(env, this)
-
-  new make() =>
-    None
-
+  new create(env: Env) => PonyTest(env, this)
+  new make() => None
   fun tag tests(test: PonyTest) =>
-    // Windows
-    test(_TestTumblingWindows)
-    test(_TestOutputWatermarkTsIsJustBeforeNextWindowStart)
-    test(_TestOnTimeoutWatermarkTsIsJustBeforeNextWindowStart)
-    test(_TestEventInNewWindowCausesPreviousToFlush)
-    test(_TestTimeoutAfterEndOfWindowCausesFlush)
-    test(_TestTumblingWindowCountIsCorrectAfterFlush)
-    test(_TestTumblingWindowsOutputEventTimes)
-    test(_TestSlidingWindowsOutputEventTimes)
-    test(_TestTumblingWindowsTimeoutTrigger)
-    test(_TestSlidingWindows)
-    test(_TestSlidingWindowsNoDelay)
-    test(_TestSlidingWindowsOutOfOrder)
-    test(_TestSlidingWindowsGCD)
-    test(_TestSlidingWindowsLateData)
-    test(_TestSlidingWindowsEarlyData)
-    test(_TestSlidingWindowsStragglers)
-    test(_TestSlidingWindowsStragglersSequence)
-    test(_TestSlidingWindowsSequence)
-    test(_TestCountWindows)
-    // Expand Windows
-    test(_TestExpandSlidingWindow)
-    test(_TestExpandSlidingWindowPrimitive)
-
-    // // Watermarks
-    test(_TestTimeoutTriggerWatermark)
-    test(_TestStageWatermarks)
-
+    _WindowTests.make().tests(test)
+    _ExpandSlidingWindowTests.make().tests(test)
+    _WatermarkTests.make().tests(test)

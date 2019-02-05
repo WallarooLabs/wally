@@ -86,15 +86,14 @@ RESILIENCE_SEQS = [
 
 # Generate resilience test functions for each api, for each of the op seqs
 for api, group in APIS.items():
-    for app in group:
-        for ops in RESILIENCE_SEQS:
-            TC.create(RESILIENCE_TEST_NAME_FMT,
-                      '{}_{}'.format(api, app['app']),
-                      app['cmd'], ops,
-                      validation_cmd = app['validation_cmd'],
-                      sources=0)
-
-
+    if api == "python3":
+        for app in group:
+            for ops in RESILIENCE_SEQS:
+                TC.create(RESILIENCE_TEST_NAME_FMT,
+                          '{}_{}'.format(api, app['app']),
+                          app['cmd'], ops,
+                          validation_cmd = app['validation_cmd'],
+                          sources=0)
 
 
 #############

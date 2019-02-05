@@ -26,6 +26,32 @@ use "wallaroo/core/state"
 use "wallaroo/core/topology"
 use "wallaroo_labs/time"
 
+actor _WindowTests is TestList
+  new create(env: Env) => PonyTest(env, this)
+  new make() => None
+  fun tag tests(test: PonyTest) =>
+    test(_TestTumblingWindows)
+    test(_TestOutputWatermarkTsIsJustBeforeNextWindowStart)
+    test(_TestOnTimeoutWatermarkTsIsJustBeforeNextWindowStart)
+    test(_TestEventInNewWindowCausesPreviousToFlush)
+    test(_TestTimeoutAfterEndOfWindowCausesFlush)
+    test(_TestTumblingWindowCountIsCorrectAfterFlush)
+    test(_TestTumblingWindowsOutputEventTimes)
+    test(_TestSlidingWindowsOutputEventTimes)
+    test(_TestTumblingWindowsTimeoutTrigger)
+    test(_TestSlidingWindows)
+    test(_TestSlidingWindowsNoDelay)
+    test(_TestSlidingWindowsOutOfOrder)
+    test(_TestSlidingWindowsGCD)
+    test(_TestSlidingWindowsLateData)
+    test(_TestSlidingWindowsEarlyData)
+    test(_TestSlidingWindowsStragglers)
+    test(_TestSlidingWindowsStragglersSequence)
+    test(_TestSlidingWindowsSequence)
+    test(_TestCountWindows)
+    test(_TestPanesDontHaveGaps)
+
+
 class iso _TestTumblingWindowsTimeoutTrigger is UnitTest
   fun name(): String => "windows/_TestTumblingWindowsTimeoutTrigger"
 
@@ -263,7 +289,7 @@ class iso _TestTumblingWindows is UnitTest
     h.assert_array_eq[USize]([20;90], _ForceArray(res._1)?)
 
 class iso _TestSlidingWindows is UnitTest
-  fun name(): String => "windows/_TestSlidingWindows"
+  fun name(): String => "windows/_TestSlidingWindows0"
 
   fun apply(h: TestHelper) ? =>
     let range: U64 = Seconds(10)
@@ -296,17 +322,26 @@ class iso _TestSlidingWindows is UnitTest
     h.assert_true(sw.check_panes_increasing())
     // Fourth set of windows
     // Use this message to trigger 10 windows.
+
     h.assert_array_eq[USize]([10;10;40;110;107;100;100;70;0;0],
       _OutArray(sw(2, Seconds(192), Seconds(200)))?)
+    /// first pane should start at 182s
+    h.assert_array_eq[U64]([], sw.pane_start_times())
+
     h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(193), Seconds(202)))?)
+
+    h.assert_array_eq[U64]([], sw.pane_start_times())
+
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(194), Seconds(203)))?)
-    h.assert_array_eq[USize]([], _OutArray(sw(5, Seconds(195), Seconds(204)))?)
+    h.assert_array_eq[USize]([5], _OutArray(sw(5, Seconds(195), Seconds(204)))?)
+
+    h.assert_array_eq[U64]([], sw.pane_start_times())
     h.assert_true(sw.check_panes_increasing())
     // Fifth 2 windows with values
     // These values are missing? @jtfmumm need your eye here
-    h.assert_array_eq[USize]([], _OutArray(sw(1, Seconds(202), Seconds(206)))?)
+    h.assert_array_eq[USize]([14], _OutArray(sw(1, Seconds(202), Seconds(206)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(203), Seconds(207)))?)
-    h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(204), Seconds(208)))?)
+    h.assert_array_eq[USize]([14], _OutArray(sw(3, Seconds(204), Seconds(208)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(205), Seconds(209)))?)
     h.assert_true(sw.check_panes_increasing())
     // Sixth 2 windows with values.
@@ -319,6 +354,22 @@ class iso _TestSlidingWindows is UnitTest
     h.assert_array_eq[USize]([],
       _OutArray(sw(40, Seconds(214), Seconds(215)))?)
     h.assert_true(sw.check_panes_increasing())
+
+class iso _TestPanesDontHaveGaps is UnitTest
+  fun name(): String => "windows/_TestPanesDontHaveGaps"
+  fun apply(h: TestHelper) =>
+    // given
+    let sw = RangeWindows[USize, USize, _Total]("key",
+      _Sum where range=Seconds(10), slide=Seconds(2), delay=0)
+      .>apply(2, Seconds(92), Seconds(100))
+      .>apply(108, Seconds(108), Seconds(112))
+    // when
+    sw(108, Seconds(110), Seconds(113))
+    //then
+    h.assert_array_eq[U64](
+      [Seconds(110); Seconds(112); Seconds(104); Seconds(106); Seconds(108)],
+      sw.pane_start_times())
+
 
 class iso _TestSlidingWindowsNoDelay is UnitTest
   fun name(): String => "windows/_TestSlidingWindowsNoDelay"

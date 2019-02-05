@@ -42,6 +42,10 @@ while True:
 sequences = {}
 for k in windows.keys():
     for w in sorted(windows[k].keys()):
+        if not (windows[k][w] == sorted(windows[k][w])):
+            print(windows[k][w],sorted(windows[k][w]))
+            print(k,w)
+            assert(False)
         sequences.setdefault(k, []).extend(windows[k][w])
 
 if args.window_type == 'sliding':
@@ -61,7 +65,7 @@ if args.window_type == 'sliding':
         assert(len(processed) == size), "Expect: sorted unique window elements form a subsegement of the natural sequence but for key {}".format(k)
     for k in sorted(windows.keys(), key=lambda k: int(k.replace('key_',''))):
         # Check that for each window, there are at most 2 duplicates per item
-        # e.g. the duplicates are plausibly caused by the sub window overlap,
+        # i.e. the duplicates are plausibly caused by the sub window overlap,
         # rather than by output duplications due to other factors
         subwindows = sorted(windows[k].keys())
         for i in range(len(subwindows)-1):
@@ -70,7 +74,14 @@ if args.window_type == 'sliding':
             most_common = counter.most_common(3)
             assert(len(most_common) > 0)
             for key, count in most_common:
-                assert(count in (1,2))
+            # [ ] [2] [ ] [2 ] [ ]
+            # |     |
+            #     |     |
+            #         |     |
+            #             |      |
+            # '2' can appear 4 times given slide/range = 0.5
+                assert(count in (1,2,3,4))
+
 
 # Regardless of window type, check sequentialty:
 # 1. increments are always at +1 size
@@ -83,6 +94,7 @@ for key in sequences:
         if not ((v == old + 1) or (v <= old)):
             print("!@ Old for key " + key + ": " + str(old))
             print("!@ Cur for key " + key + ": " + str(v))
+            print(sequences[key])
 
         assert((v == old + 1) or (v <= old))
         old = v

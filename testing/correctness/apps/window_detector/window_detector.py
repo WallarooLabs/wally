@@ -145,6 +145,9 @@ class Collect(wallaroo.Aggregation):
     def output(self, key, accumulator):
         keys = set(m.key for m in accumulator)
         values = tuple(m.value for m in accumulator)
+        if (values != tuple(sorted(values))):
+            print("^^^^^^^^^^^OUTPUT", values, accumulator)
+            assert(False)
         ts = time.time()
         print("Collect.output", ts, key, [str(m) for m in accumulator])
         assert(len(keys) <= 1)
@@ -158,7 +161,12 @@ class Collect(wallaroo.Aggregation):
 @wallaroo.computation_multi(name="Split Accumulated")
 def split_accumulated(data):
     key, values, ts = data
-    return [(key, v, ts) for v in values]
+    if (values != tuple(sorted(values))):
+        print(values)
+        assert(False)
+    res = [(key, v, ts) for v in values]
+    assert(res == sorted(res))
+    return res
 
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
