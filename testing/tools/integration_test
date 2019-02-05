@@ -31,25 +31,21 @@ Run an integration test as a CLI
 class CSVGenAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         """
-        Permit three cases: 1, 2, and 3 values.
-        1 value: Take {0} as iter, use source 0, and header format '>I'
+        Permit two cases: 2, and 3 values.
         2 values: Take {0} as iter, use source {1}, and header format '>I'
         3 values: Take {0} as iter, use source {1}, and header format {2}
         """
-        if len(values) == 1:
+        if len(values) == 2:
             gen = iter_generator(values[0].split(','))
-            source = 0
-        elif len(values) == 2:
-            gen = iter_generator(values[0].split(','))
-            source = int(values[1])
+            source = values[1]
         elif len(values) == 3:
             gen = iter_generator(values[0].split(','),
                                  header_fmt=values[2])
-            source = int(values[1])
+            source = values[1]
         else:
-            msg = ('Argument "{f}" requires 1, 2, or 3 arguments specifying '
-                   'comma-separated-list [, source-index [, header format]].\n'
-                   "When unspecified, source-index is 0, and header format is "
+            msg = ('Argument "{f}" requires 2, or 3 arguments specifying '
+                   'comma-separated-list, source-name [, header format].\n'
+                   "When unspecified, header format is "
                    "'>I'".format(f=self.dest))
             raise argparse.ArgumentTypeError(msg)
 
@@ -67,8 +63,7 @@ class CSVGenAction(argparse.Action):
 class SeqGenAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         """
-        Permit four cases: 1, 2, 3, and 4 values
-        1 value: range = {0}, source = 0, header format = '>I'
+        Permit four cases: 2, 3, and 4 values
         2 values: range = {0}, source = {1}, header format = '>I'
         3 values: range = {0}, source = {1}, header format = {2}
         4 values: range = {0}, source = {1}, header format = {2}, partition = {3}
@@ -78,30 +73,26 @@ class SeqGenAction(argparse.Action):
         E.g. (0, 1000] will produce 1, 2, 3, ..., 1000. And [0, 1000) will
         produce 0, 1, 2, ..., 999.
         """
-        if len(values) == 1:
+        if len(values) == 2:
             start, stop = self.__range_parse__(values[0])
-            source = 0
-            gen = sequence_generator(stop, start)
-        elif len(values) == 2:
-            start, stop = self.__range_parse__(values[0])
-            source = int(values[1])
+            source = values[1]
             gen = sequence_generator(stop, start)
         elif len(values) == 3:
             start, stop = self.__range_parse__(values[0])
-            source = int(values[1])
+            source = values[1]
             header_fmt = values[2]
             gen = sequence_generator(stop, start, header_fmt)
         elif len(values) == 4:
             start, stop = self.__range_parse__(values[0])
-            source = int(values[1])
+            source = values[1]
             header_fmt = values[2]
             partition = values[3]
             gen = sequence_generator(stop, start, header_fmt, partition)
         else:
-            msg = ('Argument "{f}" requires 1, 2, 3, or 4 arguments specifying '
-                   '(start, stop] [, source-index [, header format '
-                   '[, partition]]].\n'
-                   "When unspecified, source-index is 0, header format is "
+            msg = ('Argument "{f}" requires 2, 3, or 4 arguments specifying '
+                   '(start, stop], source-index [, header format '
+                   '[, partition]].\n'
+                   "When unspecified, header format is "
                    "'>I', and partition is empty".format(f=self.dest))
             raise argparse.ArgumentTypeError(msg)
 
@@ -138,26 +129,22 @@ class SeqGenAction(argparse.Action):
 class NewlineGenAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         """
-        Permit three cases: 1, 2, and 3 values
-        1 value: paths = {0}, source = 0, header format = '>I'
+        Permit three cases: 2, and 3 values
         2 values: paths = {0}, source = {1}, header format = '>I'
         3 values: paths = {0}, source = {1}, header format = {2}
         """
         paths = values[0].split(',')
-        if len(values) == 1:
-            source = 0
-            gen = files_generator(paths, mode='newlines')
-        elif len(values) == 2:
-            source = int(values[1])
+        if len(values) == 2:
+            source = values[1]
             gen = files_generator(paths, mode='newlines')
         elif len(values) == 3:
-            source = int(values[1])
+            source = values[1]
             gen = files_generator(paths, mode='newlines',
                                   header_fmt = values[2])
         else:
-            msg = ('Argument "{f}" requires 1, 2, or 3 arguments specifying '
-                   'paths [, source-index [, header format]].\n'
-                   "When unspecified, source-index is 0, and header format is "
+            msg = ('Argument "{f}" requires 2, or 3 arguments specifying '
+                   'paths, source-name [, header format].\n'
+                   "When unspecified, header format is "
                    "'>I'".format(f=self.dest))
             raise argparse.ArgumentTypeError(msg)
 
@@ -175,26 +162,22 @@ class NewlineGenAction(argparse.Action):
 class FramedGenAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         """
-        Permit three cases: 1, 2, and 3 values
-        1 value: paths = {0}, source = 0, header format = '>I'
+        Permit three cases: 2, and 3 values
         2 values: paths = {0}, source = {1}, header format = '>I'
         3 values: paths = {0}, source = {1}, header format = {2}
         """
         paths = values[0].split(',')
-        if len(values) == 1:
-            source = 0
-            gen = files_generator(paths, mode='framed')
-        elif len(values) == 2:
-            source = int(values[1])
+        if len(values) == 2:
+            source = values[1]
             gen = files_generator(paths, mode='framed')
         elif len(values) == 3:
-            source = int(values[1])
+            source = values[1]
             gen = files_generator(paths, mode='framed',
                                   header_fmt = values[2])
         else:
-            msg = ('Argument "{f}" requires 1, 2, or 3 arguments specifying '
-                   'paths [, source-index [, header format]].\n'
-                   "When unspecified, source-index is 0, and header format is "
+            msg = ('Argument "{f}" requires 2, or 3 arguments specifying '
+                   'paths, source-name [, header format].\n'
+                   "When unspecified, header format is "
                    "'>I'".format(f=self.dest))
             raise argparse.ArgumentTypeError(msg)
 
@@ -364,25 +347,25 @@ def CLI():
           (https://docs.python.org/2/library/struct.html#format-characters).
           Default: '>I'
         ''')
-    gens.add_argument('--framed-file-sender', dest='generators',
+    gens.add_argument('--framed-file-sender', dest='sources', default=[],
                       action=FramedGenAction, nargs='+',
-                      metavar=('filepaths', 'source_index', 'header_format'),
+                      metavar=('filepaths', 'source_name', 'header_format'),
                       help=("Send values from a comma-separated list of "
                            "files."))
-    gens.add_argument('--newline-file-sender', dest='generators',
+    gens.add_argument('--newline-file-sender', dest='sources', default=[],
                       action=NewlineGenAction, nargs='+',
-                      metavar=('filepaths', 'source_index', 'header_format'),
+                      metavar=('filepaths', 'source_name', 'header_format'),
                       help=("Send values form a comma-separated list of "
                             "files that use newlines to separate records."))
-    gens.add_argument('--sequence-sender', dest='generators',
+    gens.add_argument('--sequence-sender', dest='sources', default=[],
                       action=SeqGenAction, nargs='+',
-                      metavar=('range', 'source_index', 'header_format',
+                      metavar=('range', 'source_name', 'header_format',
                                'partition'),
                       help=("Send values from the set of integers "
                             "(start,stop]"))
-    gens.add_argument('--csv-sender', dest='generators', action=CSVGenAction,
-                      nargs='+',
-                      metavar=('item1,item2,...', 'source_index', 'header_format'),
+    gens.add_argument('--csv-sender', dest='sources', default=[],
+                      action=CSVGenAction, nargs='+',
+                      metavar=('item1,item2,...', 'source_name', 'header_format'),
                       help="Send values from a comma delimited string")
 
     # Network parameters
@@ -431,8 +414,6 @@ def CLI():
     # Detail for the specific run
     parser.add_argument('--workers', type=int, default=1,
                         help="Number of workers to use in the test.")
-    parser.add_argument('--sources', type=int, default=1,
-                        help="Number of sources the application listens on.")
     parser.add_argument('--sinks', type=int, default=1,
                         help="Number of sinks the application outputs to.")
     parser.add_argument('--sink-mode', default='framed',
@@ -538,11 +519,10 @@ def CLI():
                 for k, v in args._get_kwargs():
                     logging.debug('%s: %r' % (k, v))
                 pipeline_test(
-                    generator = args.generators,
                     expected = args.expected_val,
                     command = args.command,
                     workers = args.workers,
-                    sources = args.sources,
+                    sources = args.sources, # list of (generator, source_name) tuples
                     sinks = args.sinks,
                     mode = args.sink_mode,
                     batch_size = args.batch_size,
