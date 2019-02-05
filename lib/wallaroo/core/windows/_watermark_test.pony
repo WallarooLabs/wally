@@ -24,6 +24,12 @@ use "wallaroo/core/state"
 use "wallaroo/core/topology"
 use "wallaroo_labs/time"
 
+actor _WatermarkTests is TestList
+  new create(env: Env) => PonyTest(env, this)
+  new make() => None
+  fun tag tests(test: PonyTest) =>
+    test(_TestTimeoutTriggerWatermark)
+    test(_TestStageWatermarks)
 
 class iso _TestTimeoutTriggerWatermark is UnitTest
   fun name(): String => "watermarks/_TestTimeoutTriggerWatermark"

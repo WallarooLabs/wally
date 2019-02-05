@@ -25,6 +25,13 @@ use "wallaroo/core/topology"
 use "wallaroo_labs/math"
 use "wallaroo_labs/time"
 
+actor _ExpandSlidingWindowTests is TestList
+  new create(env: Env) => PonyTest(env, this)
+  new make() => None
+  fun tag tests(test: PonyTest) =>
+    test(_TestExpandSlidingWindow)
+    test(_TestExpandSlidingWindowPrimitive)
+
 class iso _TestExpandSlidingWindow is UnitTest
   fun name(): String => "windows/_TestExpandSlidingWindow"
 
