@@ -49,7 +49,7 @@ FROM_TAIL = int(os.environ.get("FROM_TAIL", 10))
 VERSION = '0.0.1'
 COOKIE = 'cookie'
 
-def pipeline_test(generator, expected, command, workers=1, sources=1,
+def pipeline_test(sources, expected, command, workers=1,
                   mode='framed', sinks=1, decoder=None, pre_processor=None,
                   batch_size=1, sender_interval=0.001,
                   sink_expect=None, sink_expect_allow_more=False,
@@ -68,8 +68,9 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
     yourself. This only works for 1-source, 1-sink topologies.
 
     Parameters:
-    - `generator`: either a single data generator to use in a Sender's Reader,
-        or a list of tuples of (generator, source_index) for use with
+    - `sources`: either a single (generator, source_name) tuple
+        to use in a Sender's Reader,
+        or a list of tuples of (generator, source_name) for use with
         multi-source applications. In the latter case, the senders are run
         sequentially, and the index is 0-based against the input addresses.
         the values in this set should be either strings or stringable. If they
@@ -82,7 +83,6 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         `--cluster-initializer`, and `--ponynoblock`.
         These will be applied by the test setup utility.
     - `workers`: the number of workers to use in the test. Default: 1.
-    - `sources`: the number of sources in the application. Default: 1.
     - `mode`: the decoding mode to use in the sink. Can be `'framed'` or
         `'newlines'`. Default: `'framed'`
     - `sinks`: the number of sinks to set up for the application. Default: 1.
@@ -154,8 +154,11 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             if len(sink_await) != sinks:
                 sink_await = [sink_await[:] for x in range(sinks)]
 
+        # figure out source count based on source names
+        source_names = list(set([src[1] for src in sources]))
+
         # Start cluster
-        with Cluster(command=command, host=host, sources=sources,
+        with Cluster(command=command, host=host, sources=source_names,
                      workers=workers, sinks=sinks, sink_mode=mode,
                      worker_join_timeout=runner_join_timeout,
                      is_ready_timeout = ready_timeout,
@@ -163,24 +166,44 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                      persistent_data=persistent_data) as cluster:
 
             # Create senders
-            if generator:
-                if not isinstance(generator, list):
-                    generator = [(generator, 0)]
-                for i, (gen, idx) in enumerate(generator):
-                    if isinstance(gen, BaseSource):
-                        # AtLeastOnce Sender: ALOSender
-                        sender = ALOSender(gen,
-                                           VERSION,
-                                           COOKIE,
-                                           command,
-                                           'instance_{}'.format(i),
-                                           cluster.source_addrs[idx])
-                    else:
+            # if generator:
+                # if not isinstance(generator, list):
+                    # generator = [(generator, 0)]
+                # for i, (gen, idx) in enumerate(generator):
+                    # if isinstance(gen, BaseSource):
+                    #     # AtLeastOnce Sender: ALOSender
+                    #     sender = ALOSender(gen,
+                    #                        VERSION,
+                    #                        COOKIE,
+                    #                        command,
+                    #                        'instance_{}'.format(i),
+                    #                        cluster.source_addrs[idx])
+                    # else:
                         # plain old TCP sender
-                        reader = Reader(gen)
-                        sender = Sender(cluster.source_addrs[idx], reader,
-                                        batch_size=batch_size,
-                                        interval=sender_interval)
+                        # reader = Reader(gen)
+                        # sender = Sender(cluster.source_addrs[idx], reader,
+                        #                 batch_size=batch_size,
+                        #                 interval=sender_interval)
+            if sources:
+                if not isinstance(sources, list):
+                    sources = [sources]
+                    for i, (gen, src_name) in sources:
+                        if isinstance(gen, BaseSource):
+                            # AtLeastOnce Sender: ALOSender
+                            sender = ALOSender(gen,
+                                               VERSION,
+                                               COOKIE,
+                                               command,
+                                               'instance_{}'.format(i),
+                                               cluster.source_addrs[0][src_name])
+                        else:
+                            # plain old TCP sender
+                            reader = Reader(gen)
+                            # TODO [NH]: figure out how to support sending to workers
+                            # other than initializer via command parameters
+                            sender = Sender(cluster.source_addrs[0][src_name], reader,
+                                            batch_size=batch_size,
+                                            interval=sender_interval)
                     cluster.add_sender(sender)
 
             # start each sender and await its completion before starting the next
