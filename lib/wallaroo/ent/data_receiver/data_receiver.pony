@@ -90,6 +90,7 @@ actor DataReceiver is Producer
     else
       _phase = _NormalDataReceiverPhase(this)
     end
+    @printf[I32]("YYY create: %s 0x%lx\n".cstring(), __loc.type_name().cstring(), this)
 
   fun ref metrics_reporter(): MetricsReporter =>
     _metrics_reporter
