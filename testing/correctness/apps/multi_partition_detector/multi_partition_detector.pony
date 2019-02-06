@@ -58,12 +58,14 @@ actor Main
       var depth: USize = 1
       var gen_source: Bool = false
       var partition_count: USize = 40
+      var cluster_initializer: Bool = false
 
       let options = Options(env.args, false)
 
       options.add("depth", "", I64Argument)
       options.add("gen-source", "", None)
       options.add("partitions", "", I64Argument)
+      options.add("cluster-initializer", "", None)
 
       for option in options do
         match option
@@ -73,7 +75,12 @@ actor Main
           gen_source = true
         | ("partitions", let arg: I64) =>
           partition_count = arg.usize()
+        | ("cluster-initializer", None) =>
+          cluster_initializer = true
         end
+      end
+      if not cluster_initializer then
+        partition_count = 0
       end
 
       let pipeline = recover val
@@ -119,36 +126,44 @@ class MultiPartitionGenerator
   new create(partitions: USize) =>
     _partitions = partitions
 
-  fun initial_value(): t.Message =>
-    t.Message("0", 1)
-
-  fun ref apply(v: t.Message): t.Message =>
-    try
-      let last_key = v.key().usize()?
-      let last_value = v.value()
-      let next_value =
-        if (last_key + 1) == _partitions then
-          last_value + 1
-        else
-          last_value
-        end
-      let next_key = (last_key + 1) % _partitions
-
-      let m = t.Message(next_key.string(), next_value)
-
-      // Print a timestamp
-      ifdef debug then
-          (let sec', let ns') = Time.now()
-          let us' = ns' / 1000
-          let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." + us'.string())
-        @printf[I32]("%s Source decoded: %s\n".cstring(), ts'.cstring(),
-          m.string().cstring())
-      end
-
-      consume m
-    else
-      Fail()
+  fun initial_value(): (t.Message | None) =>
+    if _partitions > 0 then
       t.Message("0", 1)
+    else
+      None
+    end
+
+  fun ref apply(v: t.Message): (t.Message | None) =>
+    if _partitions > 0 then
+      try
+        let last_key = v.key().usize()?
+        let last_value = v.value()
+        let next_value =
+          if (last_key + 1) == _partitions then
+            last_value + 1
+          else
+            last_value
+          end
+        let next_key = (last_key + 1) % _partitions
+
+        let m = t.Message(next_key.string(), next_value)
+
+        // Print a timestamp
+        ifdef debug then
+            (let sec', let ns') = Time.now()
+            let us' = ns' / 1000
+            let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." + us'.string())
+          @printf[I32]("%s Source decoded: %s\n".cstring(), ts'.cstring(),
+            m.string().cstring())
+        end
+
+        consume m
+      else
+        Fail()
+        t.Message("0", 1)
+      end
+    else
+      None
     end
 
 class WindowState is State
