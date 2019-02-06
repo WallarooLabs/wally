@@ -139,6 +139,7 @@ class BarrierStepMessageProcessor is StepMessageProcessor
     for q in _queued.values() do
       qd.push(q)
     end
+    @printf[I32]("QQQ queued() by %s \n".cstring(), __loc.type_name().cstring())
     qd
 
 class DisposedStepMessageProcessor is StepMessageProcessor
