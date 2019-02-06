@@ -83,6 +83,7 @@ class BarrierStepForwarder
     let inputs = _step.inputs()
     if inputs.contains(step_id) then
       _inputs_blocking(step_id) = producer
+      @printf[I32]("QQQ: %s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
       check_completion(inputs)
     else
       if not _removed_inputs.contains(step_id) then
@@ -106,12 +107,29 @@ class BarrierStepForwarder
     end
     _removed_inputs.set(input_id)
     if _inputs_blocking.contains(input_id) then
+      try @printf[I32]("QQQ remove_input: removing key %s val 0x%lx\n".cstring(), input_id.string().cstring(), _inputs_blocking(input_id)?) else Unreachable() end
       try _inputs_blocking.remove(input_id)? else Unreachable() end
+    else
+      @printf[I32]("QQQ remove_input: key %s NOT FOUND\n".cstring(), input_id.string().cstring())
     end
+    @printf[I32]("QQQ: %s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     check_completion(_step.inputs())
 
   fun ref check_completion(inputs: Map[RoutingId, Producer] box) =>
     @printf[I32]("QQQ check_completion: inputs.size %d _inputs_blocking.size() %d @ step id %s\n".cstring(), inputs.size(), _inputs_blocking.size(), _step_id.string().cstring())
+    if (inputs.size() - _inputs_blocking.size()) == 1 then
+      for (kk, xx) in inputs.pairs() do
+        var found: Bool = false
+        for yy in _inputs_blocking.values() do
+          if yy is xx then found = true end
+        end
+        if not found then
+          @printf[I32]("QQQ YYY check_completion: one remains: 0x%lx\n".cstring(), xx)
+          @printf[I32]("QQQ YYY check_completion: one remains: 0x%lx RoutingId %llu\n".cstring(), xx, kk)
+          @printf[I32]("QQQ YYY check_completion: one remains: 0x%lx RoutingId %s at _step_id %s\n".cstring(), xx, kk.string().cstring(), _step_id.string().cstring())
+        end
+      end
+    end
     if inputs.size() == _inputs_blocking.size()
     then
       for (o_id, o) in _step.outputs().pairs() do
