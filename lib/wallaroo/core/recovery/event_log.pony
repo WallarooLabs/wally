@@ -229,6 +229,7 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
     _phase = _CheckpointEventLogPhase(this, checkpoint_id, promise,
       _resilients)
     if pending_checkpoint_states.size() == 0 then
+      @printf[I32]("QQQ: %s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
       _phase.check_completion()
     else
       for p in pending_checkpoint_states.values() do
