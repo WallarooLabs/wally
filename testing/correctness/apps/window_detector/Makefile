@@ -94,7 +94,7 @@ window_detector_tumbling_alo_source_test_python:
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
-		--workers 5 \
+		--workers 1 \
 		--sink-expect 200
 
 window_detector_sliding_alo_source_test_python:

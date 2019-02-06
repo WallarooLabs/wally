@@ -70,6 +70,7 @@ class NormalStepMessageProcessor is StepMessageProcessor
     frac_ids: FractionalMessageId, i_seq_id: SeqId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64)
   =>
+    @printf[I32]("QQQ step proc %s\n".cstring(), __loc.type_name().cstring())
     step.process_message[D](metric_name, pipeline_time_spent, data, key,
       event_ts, watermark_ts, i_producer_id, i_producer, msg_uid, frac_ids,
       i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
@@ -104,11 +105,13 @@ class BarrierStepMessageProcessor is StepMessageProcessor
     metrics_id: U16, worker_ingress_ts: U64)
   =>
     if _barrier_forwarder.input_blocking(i_producer_id) then
+      @printf[I32]("QQQ step proc %s, queued\n".cstring(), __loc.type_name().cstring())
       let msg = TypedQueuedMessage[D](metric_name, pipeline_time_spent,
         data, key, event_ts, watermark_ts, i_producer_id, i_producer, msg_uid,
         frac_ids, i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
       _queued.push(msg)
     else
+      @printf[I32]("QQQ step proc %s \n".cstring(), __loc.type_name().cstring())
       step.process_message[D](metric_name, pipeline_time_spent, data, key,
         event_ts, watermark_ts, i_producer_id, i_producer, msg_uid, frac_ids,
         i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
@@ -145,6 +148,7 @@ class DisposedStepMessageProcessor is StepMessageProcessor
     frac_ids: FractionalMessageId, i_seq_id: SeqId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64)
   =>
+    @printf[I32]("QQQ step proc %s\n".cstring(), __loc.type_name().cstring())
     None
 
   fun barrier_in_progress(): Bool =>
