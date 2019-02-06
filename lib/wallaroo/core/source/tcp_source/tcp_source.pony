@@ -428,23 +428,21 @@ actor TCPSource[In: Any val] is Source
     end
 
   fun ref _initiate_barrier(token: BarrierToken) =>
-    if not _disposed then
-      match token
-      | let srt: CheckpointRollbackBarrierToken =>
-        _prepare_for_rollback()
-      end
+    match token
+    | let srt: CheckpointRollbackBarrierToken =>
+      _prepare_for_rollback()
+    end
 
-      match token
-      | let sbt: CheckpointBarrierToken =>
-        checkpoint_state(sbt.id)
-      end
-      for (o_id, o) in _outputs.pairs() do
-        match o
-        | let ob: OutgoingBoundary =>
-          ob.forward_barrier(o_id, _source_id, token)
-        else
-          o.receive_barrier(_source_id, this, token)
-        end
+    match token
+    | let sbt: CheckpointBarrierToken =>
+      checkpoint_state(sbt.id)
+    end
+    for (o_id, o) in _outputs.pairs() do
+      match o
+      | let ob: OutgoingBoundary =>
+        ob.forward_barrier(o_id, _source_id, token)
+      else
+        o.receive_barrier(_source_id, this, token)
       end
     end
 

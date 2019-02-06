@@ -58,8 +58,8 @@ window_detector_tests: window_detector_tests_python
 
 # Python
 # TODO: uncomment these:
-#window_detector_tests_python: window_detector_tumbling_test_python
-#window_detector_tests_python: window_detector_counting_test_python
+window_detector_tests_python: window_detector_tumbling_test_python
+window_detector_tests_python: window_detector_counting_test_python
 #window_detector_tests_python: window_detector_sliding_test_python
 #window_detector_tests_python: window_detector_tumbling_gensource_test_python
 #window_detector_tests_python: window_detector_counting_gensource_test_python
