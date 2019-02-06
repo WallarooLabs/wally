@@ -177,6 +177,7 @@ actor ConnectorSource[In: Any val] is Source
     ifdef "resilience" then
       _mute_local()
     end
+    @printf[I32]("YYY create: %s 0x%lx source_id = %s\n".cstring(), __loc.type_name().cstring(), this, _source_id.string().cstring())
 
   be accept(fd: U32, init_size: USize = 64, max_size: USize = 16384) =>
     """
@@ -593,6 +594,9 @@ actor ConnectorSource[In: Any val] is Source
           .cstring(), token.string().cstring())
       end
       _initiate_barrier(token)
+    else
+      @printf[I32]("ConnectorSource received initiate_barrier %s NOT IS_PENDING AND NOT DISPOSED\n"
+          .cstring(), token.string().cstring())
     end
 
   fun ref _initiate_barrier(token: BarrierToken) =>
@@ -610,11 +614,15 @@ actor ConnectorSource[In: Any val] is Source
       for (o_id, o) in _outputs.pairs() do
         match o
         | let ob: OutgoingBoundary =>
+          @printf[I32]("QQQ: %s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
           ob.forward_barrier(o_id, _source_id, token)
         else
+          @printf[I32]("QQQ: %s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
           o.receive_barrier(_source_id, this, token)
         end
       end
+    else
+      @printf[I32]("QQQ: %s %d NOT DISPOSED AND NOT SHUTDOWN %s %s\n".cstring(), __loc.method_name().cstring(), __loc.line(), _disposed.string().cstring(), _shutdown.string().cstring())
     end
 
   be barrier_complete(token: BarrierToken) =>

@@ -511,7 +511,7 @@ class ConnectorSourceNotify[In: Any val]
     source.expect(_header_size)
 
   fun ref closed(source: ConnectorSource[In] ref) =>
-    @printf[I32]("ConnectorSource connection closed\n".cstring())
+    @printf[I32]("ConnectorSource connection closed 0x%lx\n".cstring(), source)
     _session_active = false
     _fsm_state = _ProtoFsmDisconnected
     _clear_stream_map()
