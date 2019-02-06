@@ -65,6 +65,14 @@ interface GenSourceGenerator[V: Any val]
   fun initial_value(): (V | None)
   fun ref apply(v: V): (V | None)
 
+primitive EmptyGenSourceGeneratorBuilder[V: Any val]
+  fun apply(): GenSourceGenerator[V] =>
+    EmptyGenSource[V]
+
+class ref EmptyGenSource[V: Any val]
+  fun initial_value(): None => None
+  fun ref apply(v: V): None => None
+
 actor GenSource[V: Any val] is Source
   """
   # GenSource
