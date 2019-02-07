@@ -75,7 +75,7 @@ data_receiver --listen 127.0.0.1:7002 --no-write \
 Start the application
 
 ```bash
-./alphabet --in 127.0.0.1:7010 --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
+./alphabet --in "Alphabet Votes"@127.0.0.1:7010 --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:12500 --data 127.0.0.1:12501 --external 127.0.0.1:5050 \
   --cluster-initializer --ponynoblock --ponythreads=1
 ```

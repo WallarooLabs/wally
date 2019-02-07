@@ -45,14 +45,13 @@ integration-tests-testing-correctness-apps-multi_sink: multi_sink_test
 multi_sink_test:
 	cd $(MULTI_SINK_PATH) && \
 	integration_test \
-		--framed-file-sender _test.msg 0 \
+		--framed-file-sender _test.msg '"Celsius Conversion"' \
 		--validation-cmp \
 	  --expected-file _expected.msg \
 		--log-level error \
 		--command './multi_sink $(RUN_WITH_RESILIENCE)' \
 		--sink-expect 100 \
-		--sinks 2 \
-		--sources 1
+		--sinks 2
 
 # end of prevent rules from being evaluated/included multiple times
 endif

@@ -45,7 +45,7 @@ integration-tests-examples-pony-alphabet: alphabet_pony_test
 alphabet_pony_test:
 	cd $(ALPHABET_PONY_PATH) && \
 	python _test/gen.py && \
-	integration_test --framed-file-sender _test.txt \
+	integration_test --framed-file-sender _test.txt '"Alphabet Votes"' \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 10 \
