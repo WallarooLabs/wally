@@ -29,7 +29,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
-class val ConnectorSourceListenerBuilder[In: Any val]
+class val ConnectorSource2ListenerBuilder[In: Any val]
   let _worker_name: WorkerName
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
@@ -87,14 +87,14 @@ class val ConnectorSourceListenerBuilder[In: Any val]
     _refill_credits = refill_credits
 
   fun apply(env: Env): SourceListener =>
-    ConnectorSourceListener[In](env, _worker_name, _pipeline_name,
+    ConnectorSource2Listener[In](env, _worker_name, _pipeline_name,
       _runner_builder, _partitioner_builder,
       _router, _metrics_conn, _metrics_reporter.clone(), _router_registry,
       _outgoing_boundary_builders, _event_log, _auth, _layout_initializer,
       _recovering, _target_router, _parallelism, _handler, _host, _service,
       _cookie, _max_credits, _refill_credits)
 
-class val ConnectorSourceListenerBuilderBuilder[In: Any val]
+class val ConnectorSource2ListenerBuilderBuilder[In: Any val]
   let _host: String
   let _service: String
   let _parallelism: USize
@@ -123,9 +123,9 @@ class val ConnectorSourceListenerBuilderBuilder[In: Any val]
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     recovering: Bool, target_router: Router = EmptyRouter):
-    ConnectorSourceListenerBuilder[In]
+    ConnectorSource2ListenerBuilder[In]
   =>
-    ConnectorSourceListenerBuilder[In](worker_name, pipeline_name,
+    ConnectorSource2ListenerBuilder[In](worker_name, pipeline_name,
       runner_builder, partitioner_builder, router, metrics_conn,
       consume metrics_reporter, router_registry, outgoing_boundary_builders,
       event_log, auth, layout_initializer, recovering, target_router,

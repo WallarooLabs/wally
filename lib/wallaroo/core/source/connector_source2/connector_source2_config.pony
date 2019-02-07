@@ -21,8 +21,8 @@ use "wallaroo"
 use "wallaroo/core/partitioning"
 use "wallaroo/core/source"
 
-primitive ConnectorSourceConfigCLIParser
-  fun apply(args: Array[String] val): Array[ConnectorSourceConfigOptions] val ? =>
+primitive ConnectorSource2ConfigCLIParser
+  fun apply(args: Array[String] val): Array[ConnectorSource2ConfigOptions] val ? =>
     let in_arg = "in"
     let short_in_arg = "i"
 
@@ -42,18 +42,18 @@ primitive ConnectorSourceConfigCLIParser
 
     error
 
-  fun _from_input_string(inputs: String): Array[ConnectorSourceConfigOptions] val ? =>
-    let opts = recover trn Array[ConnectorSourceConfigOptions] end
+  fun _from_input_string(inputs: String): Array[ConnectorSource2ConfigOptions] val ? =>
+    let opts = recover trn Array[ConnectorSource2ConfigOptions] end
 
     for input in inputs.split(",").values() do
       let i = input.split(":")
-      opts.push(ConnectorSourceConfigOptions(i(0)?, i(1)?, i(2)?,
+      opts.push(ConnectorSource2ConfigOptions(i(0)?, i(1)?, i(2)?,
         i(3)?.u32()?, i(4)?.u32()?))
     end
 
     consume opts
 
-class val ConnectorSourceConfigOptions
+class val ConnectorSource2ConfigOptions
   let host: String
   let service: String
   let connector_cookie: String
@@ -71,7 +71,7 @@ class val ConnectorSourceConfigOptions
     connector_max_credits = connector_max_credits'
     connector_refill_credits = connector_refill_credits'
 
-class val ConnectorSourceConfig[In: Any val]
+class val ConnectorSource2Config[In: Any val]
   let _handler: FramedSourceHandler[In] val
   let _host: String
   let _service: String
@@ -97,7 +97,7 @@ class val ConnectorSourceConfig[In: Any val]
     _connector_refill_credits = connector_refill_credits'
 
   new val from_options(foo: Bool, handler': FramedSourceHandler[In] val,
-    opts: ConnectorSourceConfigOptions, parallelism': USize = 10)
+    opts: ConnectorSource2ConfigOptions, parallelism': USize = 10)
   =>
     _handler = handler'
     _host = opts.host
@@ -107,8 +107,8 @@ class val ConnectorSourceConfig[In: Any val]
     _connector_max_credits = opts.connector_max_credits
     _connector_refill_credits = opts.connector_refill_credits
 
-  fun source_listener_builder_builder(): ConnectorSourceListenerBuilderBuilder[In] =>
-    ConnectorSourceListenerBuilderBuilder[In](_host, _service, _parallelism,
+  fun source_listener_builder_builder(): ConnectorSource2ListenerBuilderBuilder[In] =>
+    ConnectorSource2ListenerBuilderBuilder[In](_host, _service, _parallelism,
       _handler, _connector_cookie,
       _connector_max_credits, _connector_refill_credits)
 

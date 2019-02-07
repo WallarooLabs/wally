@@ -52,6 +52,7 @@ use "wallaroo_labs/queue"
 use "wallaroo_labs/string_set"
 
 use "wallaroo/core/source/connector_source"
+use "wallaroo/core/source/connector_source2"
 
 class val LocalTopology
   let _app_name: String
