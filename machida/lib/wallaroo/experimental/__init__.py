@@ -61,7 +61,7 @@ def stream_message_encoder(func):
     return C()
 
 
-class SourceConnectorConfig(object):
+class SourceConnector2Config(object):
     def __init__(self, name, encoder, decoder, port, cookie,
                  max_credits, refill_credits, host='127.0.0.1'):
         self._name = name
@@ -75,7 +75,7 @@ class SourceConnectorConfig(object):
         print("QQQ: name {} encoder {} decoder {} max_credits {}".format(name, encoder, decoder, max_credits))
 
     def to_tuple(self):
-        return ("source_connector", self._name, self._host, str(self._port), self._encoder, self._decoder, self._cookie, self._max_credits, self._refill_credits)
+        return ("source_connector2", self._name, self._host, str(self._port), self._encoder, self._decoder, self._cookie, self._max_credits, self._refill_credits)
 
 
 class SinkConnectorConfig(object):
