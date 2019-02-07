@@ -75,9 +75,9 @@ window_detector_tests_python3: window_detector_counting_test_python3
 #machida has no --in arg: window_detector_tests_python3: window_detector_tumbling_gensource_test_python3
 #machida has no --in arg: window_detector_tests_python3: window_detector_counting_gensource_test_python3
 #machida has no --in arg: window_detector_tests_python3: window_detector_sliding_gensource_test_python3
-#window_detector_tests_python3: window_detector_tumbling_alo_source_test_python3
-#window_detector_tests_python3: window_detector_sliding_alo_source_test_python3
-#window_detector_tests_python3: window_detector_counting_alo_source_test_python3
+window_detector_tests_python3: window_detector_tumbling_alo_source_test_python3
+window_detector_tests_python3: window_detector_counting_alo_source_test_python3
+#sink gets TOO MANY items (e.g. 344 instead of 200): window_detector_tests_python3: window_detector_sliding_alo_source_test_python3
 
 # Individual test definitions below
 #
