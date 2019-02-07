@@ -751,7 +751,8 @@ class val StatePartitionRouter is Router
     else
       Fail()
     end
-    let steps_to_migrate = Array[(String, OutgoingBoundary, Key, RoutingId, Step)]
+    let steps_to_migrate =
+      Array[(String, OutgoingBoundary, Key, RoutingId, Step)]
     for (w, ks) in keys_to_move_by_worker.pairs() do
       for k in ks.values() do
         try

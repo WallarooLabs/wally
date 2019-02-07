@@ -221,6 +221,12 @@ class Pipeline[Out: Any val] is BasicPipeline
         where local_routing = local_routing)
     end
 
+  // local_key_by indicates that all messages will be routed to steps on the
+  // same worker. This will apply to all stages following a local_key_by that
+  // come before a subsequent key_by() or collect(). Worker local routing
+  // allows applications to reduce network traffic by performing local
+  // pre-aggregations before sending the results of these pre-aggregations
+  // downstream to a final aggregation.
   fun ref local_key_by(pf: KeyExtractor[Out]): Pipeline[Out] =>
     key_by(pf where local_routing = true)
 
@@ -243,7 +249,9 @@ class Pipeline[Out: Any val] is BasicPipeline
     FatalUserError("You can't merge with a terminated pipeline!")
 
   fun _only_one_is_shuffle() =>
-    FatalUserError("A pipeline ending with shuffle can only be merged with another!")
+    FatalUserError(
+      "A pipeline ending with shuffle can only be merged with another!")
 
   fun _only_one_is_key_by() =>
-    FatalUserError("A pipeline ending with key_by can only be merged with another!")
+    FatalUserError(
+      "A pipeline ending with key_by can only be merged with another!")
