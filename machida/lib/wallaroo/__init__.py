@@ -583,6 +583,8 @@ def tcp_parse_input_addrs(args):
     parser = argparse.ArgumentParser(prog="wallaroo")
     parser.add_argument('-i', '--in', dest="input_addrs")
     input_addrs = parser.parse_known_args(args)[0].input_addrs
+    if input_addrs is None:
+        raise 'AAAAAH NO --in in args = {}'.format(args)
     # split H1:P1,H2:P2... into [(H1, P1), (H2, P2), ...]
     return [tuple(x.split(':')) for x in input_addrs.split(',')]
 
