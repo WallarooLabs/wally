@@ -244,10 +244,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   let _is_joining: Bool
 
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
-  // (String, String) -> WorkerSourceConfig
-  // WorkerSourceConfig
-  // let _input_source_addr_map: Map[String, WorkerSourceConfig] val
-  let _worker_source_configs: Map[String, WorkerSourceConfig] val
+  let _worker_source_configs: Map[SourceName, WorkerSourceConfig] val
 
   // Accumulate all SourceListenerBuilders so we can build them
   // once EventLog signals we're ready
@@ -279,7 +276,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     local_topology_file: String, data_channel_file: String,
     worker_names_file: String, local_keys_filepath: FilePath,
     the_journal: SimpleJournal, do_local_file_io: Bool,
-    worker_source_configs: Map[String, WorkerSourceConfig] val,
+    worker_source_configs: Map[SourceName, WorkerSourceConfig] val,
     cluster_manager: (ClusterManager | None) = None,
     is_joining: Bool = false)
   =>
