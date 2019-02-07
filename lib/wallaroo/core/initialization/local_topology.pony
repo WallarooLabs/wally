@@ -277,7 +277,8 @@ actor LocalTopologyInitializer is LayoutInitializer
     is_initializer: Bool, data_receivers: DataReceivers,
     event_log: EventLog, recovery: Recovery,
     recovery_replayer: RecoveryReconnecter,
-    checkpoint_initiator: CheckpointInitiator, barrier_coordinator: BarrierCoordinator,
+    checkpoint_initiator: CheckpointInitiator,
+    barrier_coordinator: BarrierCoordinator,
     local_topology_file: String, data_channel_file: String,
     worker_names_file: String, local_keys_filepath: FilePath,
     the_journal: SimpleJournal, do_local_file_io: Bool,
@@ -540,7 +541,8 @@ actor LocalTopologyInitializer is LayoutInitializer
         // 2. Loop: Get next node from nodes to initialize queue, and check if
         //          all its outputs have been created yet.
         //       if no, send to that node to end of nodes to initialize queue.
-        //       if yes, build the actor (connecting it to its output actors, //         which have already been built)
+        //       if yes, build the actor (connecting it to its output actors,
+        //         which have already been built)
         // If there are no cycles (as per our assumption), this will terminate
         while nodes_to_initialize.size() > 0 do
           let next_node =
@@ -1266,7 +1268,8 @@ actor LocalTopologyInitializer is LayoutInitializer
         @printf[I32](("Saving worker names to file: " + _worker_names_file +
           "\n").cstring())
         let worker_names_filepath = FilePath(_auth, _worker_names_file)?
-        let file = AsyncJournalledFile(worker_names_filepath, _the_journal, _auth, _do_local_file_io)
+        let file = AsyncJournalledFile(worker_names_filepath, _the_journal,
+          _auth, _do_local_file_io)
         // Clear file
         file.set_length(0)
         for worker_name in t.worker_names.values() do
@@ -1276,7 +1279,8 @@ actor LocalTopologyInitializer is LayoutInitializer
         end
         file.sync()
         file.dispose()
-        // TODO: AsyncJournalledFile does not provide implicit sync semantics here
+        // TODO: AsyncJournalledFile does not provide implicit sync semantics
+        // here
       else
         Fail()
       end
@@ -1316,7 +1320,8 @@ actor LocalTopologyInitializer is LayoutInitializer
         file.writev(recover val wb.done() end)
         file.sync()
         file.dispose()
-        // TODO: AsyncJournalledFile does not provide implicit sync semantics here
+        // TODO: AsyncJournalledFile does not provide implicit sync semantics
+        // here
       else
         @printf[I32]("Error saving topology!\n".cstring())
         Fail()

@@ -335,7 +335,8 @@ actor ApplicationDistributor is Distributor
       let initializer_graph = interm_graph.clone()?
 
       ifdef debug then
-        @printf[I32]("Initializer Graph:\n%s\n".cstring(), initializer_graph.string().cstring())
+        @printf[I32]("Initializer Graph:\n%s\n".cstring(),
+          initializer_graph.string().cstring())
       end
 
       let worker_graph = interm_graph.clone()?
