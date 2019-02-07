@@ -66,7 +66,7 @@ window_detector_tests_python: window_detector_sliding_test_python
 #machida has no --in arg: window_detector_tests_python: window_detector_sliding_gensource_test_python
 window_detector_tests_python: window_detector_tumbling_alo_source_test_python
 window_detector_tests_python: window_detector_counting_alo_source_test_python
-#window_detector_tests_python: window_detector_sliding_alo_source_test_python
+window_detector_tests_python: window_detector_sliding_alo_source_test_python
 
 
 # Python3
