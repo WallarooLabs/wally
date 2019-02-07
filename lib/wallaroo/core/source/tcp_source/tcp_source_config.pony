@@ -67,9 +67,9 @@ primitive TCPSourceConfigCLIParser
 class val TCPSourceConfigOptions
   let host: String
   let service: String
-  let source_name: String
+  let source_name: SourceName
 
-  new val create(host': String, service': String, source_name': String) =>
+  new val create(host': String, service': String, source_name': SourceName) =>
     host = host'
     service = service'
     source_name = source_name'
@@ -80,7 +80,7 @@ class val TCPSourceConfig[In: Any val]
   let _worker_source_config: WorkerTCPSourceConfig
 
   new val create(handler': FramedSourceHandler[In] val, host': String,
-    service': String, source_name': String, parallelism': USize = 10)
+    service': String, source_name': SourceName, parallelism': USize = 10)
   =>
     handler = handler'
     parallelism = parallelism'
@@ -106,9 +106,9 @@ class val TCPSourceConfig[In: Any val]
 class val WorkerTCPSourceConfig is WorkerSourceConfig
   let host: String
   let service: String
-  let source_name: String
+  let source_name: SourceName
 
-  new val create(source_name': String, host': String, service': String) =>
+  new val create(source_name': SourceName, host': String, service': String) =>
     host = host'
     service = service'
     source_name = source_name'

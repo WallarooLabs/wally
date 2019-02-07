@@ -29,6 +29,8 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
+type SourceName is String
+
 interface val SourceConfig
   fun default_partitioner_builder(): PartitionerBuilder
   fun val source_listener_builder_builder(): SourceListenerBuilderBuilder
