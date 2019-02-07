@@ -47,7 +47,7 @@ integration-tests-testing-correctness-apps-decoder_filter: testing_decoder_filte
 testing_decoder_filter_test:
 	cd $(TESTING_DECODER_FILTER_PATH) && \
 	integration_test \
-		--sequence-sender '(0,1000]' \
+		--sequence-sender '(0,1000]' '"Filter Test"' \
 		--validation-cmd './validator/validator -e 500' \
 		--log-level error \
 		--batch-size 10 \

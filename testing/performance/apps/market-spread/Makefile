@@ -45,8 +45,8 @@ integration-tests-testing-performance-apps-market-spread: market-spread_pony_tes
 market-spread_pony_test:
 	cd $(MARKET_SPREAD_PONY_PATH) && \
 	python _test/gen.py && \
-	integration_test --framed-file-sender _market.txt 1 \
-	  --framed-file-sender _orders.txt 0 \
+	integration_test --framed-file-sender _market.txt '"Nbbo"' \
+	  --framed-file-sender _orders.txt '"Orders"' \
 	  --log-level error \
 	  --command './market-spread $(RUN_WITH_RESILIENCE)' \
 	  --validation-cmd 'python _test/validate.py --expected $(MARKET_SPREAD_PONY_PATH)/_expected.txt --output' \
