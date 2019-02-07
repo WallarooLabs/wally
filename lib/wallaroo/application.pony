@@ -61,7 +61,7 @@ trait BasicPipeline
   fun graph(): this->Dag[Stage]
   fun is_finished(): Bool
   fun size(): USize
-  fun worker_source_configs(): this->Map[String, WorkerSourceConfig]
+  fun worker_source_configs(): this->Map[SourceName, WorkerSourceConfig]
 
 type Stage is (RunnerBuilder | SinkBuilder | Array[SinkBuilder] val |
   SourceConfigWrapper | RandomPartitionerBuilder | KeyPartitionerBuilder)
@@ -70,7 +70,7 @@ class Pipeline[Out: Any val] is BasicPipeline
   let _stages: Dag[Stage]
   let _dag_sink_ids: Array[RoutingId]
   // map from source name to worker specific source config
-  var _worker_source_configs: Map[String, WorkerSourceConfig] =
+  var _worker_source_configs: Map[SourceName, WorkerSourceConfig] =
     _worker_source_configs.create()
   var _finished: Bool
 
@@ -92,7 +92,7 @@ class Pipeline[Out: Any val] is BasicPipeline
 
   new create(stages: Dag[Stage] = Dag[Stage],
     dag_sink_ids: Array[RoutingId] = Array[RoutingId],
-    worker_source_configs': Map[String, WorkerSourceConfig],
+    worker_source_configs': Map[SourceName, WorkerSourceConfig],
     finished: Bool = false,
     last_is_shuffle: Bool = false,
     last_is_key_by: Bool = false)
@@ -222,7 +222,7 @@ class Pipeline[Out: Any val] is BasicPipeline
 
   fun graph(): this->Dag[Stage] => _stages
 
-  fun worker_source_configs(): this->Map[String, WorkerSourceConfig] =>
+  fun worker_source_configs(): this->Map[SourceName, WorkerSourceConfig] =>
     _worker_source_configs
 
   fun size(): USize => _stages.size()
