@@ -592,7 +592,7 @@ class DefaultKafkaSinkCLIParser(object):
 
 def tcp_parse_input_addrs(args):
     parser = argparse.ArgumentParser(prog="wallaroo")
-    parser.add_argument('-i', '--in', dest="input_addrs")
+    parser.add_argument('-i', '--in', dest="input_addrs", required=True)
     input_addrs = parser.parse_known_args(args)[0].input_addrs
     # split N1@H1:P1,N2@H2:P2... into [(N1, H1, P1), (N2, H2, P2), ...]
     return [tuple(x.replace('@',':').split(':'))
@@ -601,7 +601,7 @@ def tcp_parse_input_addrs(args):
 
 def tcp_parse_output_addrs(args):
     parser = argparse.ArgumentParser(prog="wallaroo")
-    parser.add_argument('-o', '--out', dest="output_addrs")
+    parser.add_argument('-o', '--out', dest="output_addrs", required=True)
     output_addrs = parser.parse_known_args(args)[0].output_addrs
     # split H1:P1,H2:P2... into [(H1, P1), (H2, P2), ...]
     return [tuple(x.split(':')) for x in output_addrs.split(',')]
