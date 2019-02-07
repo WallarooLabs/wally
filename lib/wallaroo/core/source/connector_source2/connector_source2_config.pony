@@ -66,7 +66,7 @@ primitive ConnectorSourceConfigCLIParser
 
     consume opts
 
-class val ConnectorSourceConfigOptions
+class val ConnectorSource2ConfigOptions
   let host: String
   let service: String
   let source_name: SourceName
@@ -94,7 +94,7 @@ class val ConnectorSourceConfig[In: Any val] is SourceConfig
       _service)
 
   new val from_options(foo: Bool, handler': FramedSourceHandler[In] val,
-    opts: ConnectorSourceConfigOptions, parallelism': USize = 10)
+    opts: ConnectorSource2ConfigOptions, parallelism': USize = 10)
   =>
     handler = handler'
     parallelism = parallelism'
