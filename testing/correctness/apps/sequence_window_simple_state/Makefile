@@ -50,7 +50,7 @@ integration-tests-testing-correctness-apps-sequence_window_simple_state: sequenc
 
 sequence_window_simple_state_test:
 	cd $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH) && \
-	integration_test --sequence-sender '(0,10000]' \
+	integration_test --sequence-sender '(0,10000]' '"Sequence Window"' \
 	  --log-level error \
 		--command './sequence_window_simple_state $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'validator -e 10000 -a -i' \

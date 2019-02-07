@@ -29,12 +29,12 @@ nc -l 127.0.0.1 5001 >> /dev/null
 350 Symbols
 
 3a) market spread app (1 worker):
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -t --ponythreads=4 --ponynoblock
+./market-spread -i Orders@127.0.0.1:7000,Nbbo@127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -t --ponythreads=4 --ponynoblock
 
 3b) market spread app (2 workers):
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name --ponythreads=4 --ponynoblock -t -w 2
+./market-spread -i Orders@127.0.0.1:7000,Nbbo@127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name --ponythreads=4 --ponynoblock -t -w 2
 
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -n worker2 --ponythreads=4 --ponynoblock
+./market-spread -i Orders@127.0.0.1:7010,Nbbo@127.0.0.1:7011 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -n worker2 --ponythreads=4 --ponynoblock
 
 4) initial nbbo (must be sent in or all orders will be rejected):
 giles/sender/sender -h 127.0.0.1:7001 -m 350 -s 300 -i 2_500_000 -f testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
@@ -48,12 +48,12 @@ giles/sender/sender -h 127.0.0.1:7001 -m 10000000000 -s 300 -i 1_250_000 -f test
 R3K or other Symbol Set (700, 1400, 2100)
 
 3a) market spread app (1 worker):
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -t -s ../../../data/market_spread/symbols/r3k-legal-symbols.msg --ponythreads=4 --ponynoblock
+./market-spread -i Orders@127.0.0.1:7000,Nbbo@127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -t -s ../../../data/market_spread/symbols/r3k-legal-symbols.msg --ponythreads=4 --ponynoblock
 
 3b) market spread app (2 workers):
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -s ../../../data/market_spread/symbols/r3k-legal-symbols.msg --ponythreads=4 --ponynoblock -t -w 2
+./market-spread -i Orders@127.0.0.1:7000,Nbbo@127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -s ../../../data/market_spread/symbols/r3k-legal-symbols.msg --ponythreads=4 --ponynoblock -t -w 2
 
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -n worker2 --ponythreads=4 --ponynoblock
+./market-spread -i Orders@127.0.0.1:7010,Nbbo@127.0.0.1:7011 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -n worker2 --ponythreads=4 --ponynoblock
 
 4) initial nbbo (must be sent in or all orders will be rejected):
 giles/sender/sender -h 127.0.0.1:7001 -m 2926 -s 300 -i 2_500_000 -f testing/data/market_spread/nbbo/r3k-symbols_initial-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
@@ -93,12 +93,12 @@ actor Main
       let pipeline = recover val
         let orders = Wallaroo.source[FixOrderMessage val]("Orders",
             TCPSourceConfig[FixOrderMessage val].from_options(FixOrderFrameHandler,
-              TCPSourceConfigCLIParser(env.args)?(0)?))
+              TCPSourceConfigCLIParser(env.args)?("Orders")?))
           .key_by(OrderSymbolExtractor)
 
         let nbbos = Wallaroo.source[FixNbboMessage val]("Nbbo",
             TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
-              TCPSourceConfigCLIParser(env.args)?(1)?))
+              TCPSourceConfigCLIParser(env.args)?("Nbbo")?))
           .key_by(NbboSymbolExtractor)
 
         orders.merge[FixNbboMessage val](nbbos)

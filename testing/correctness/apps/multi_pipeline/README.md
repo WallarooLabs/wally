@@ -16,36 +16,42 @@ nc -l 127.0.0.1 7003 > multi_pipeline_2.out
 2. Single Worker: Start the application
 
 ```bash
-./multi_pipeline --in 127.0.0.1:7010,127.0.0.1:7011 --out \
-  127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
+./multi_pipeline \
+  --in "Celsius Conversion0"@127.0.0.1:7010,"Celsius Conversion1"@127.0.0.1:7011 \
+  --out 127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:12500 --data 127.0.0.1:12501 --cluster-initializer
 ```
 
 3. Two Workers: Start the application
 
 ```bash
-./multi_pipeline --in 127.0.0.1:7010,127.0.0.1:7011 --out \
-  127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
+./multi_pipeline \
+  --in "Celsius Conversion0"@127.0.0.1:7010,"Celsius Conversion1"@127.0.0.1:7011 \
+  --out 127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:12500 --data 127.0.0.1:12501 -w 2 --cluster-initializer
 
-./multi_pipeline --in 127.0.0.1:7010,127.0.0.1:7011 --out \
-  127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
+./multi_pipeline \
+  --in "Celsius Conversion0"@127.0.0.1:7020,"Celsius Conversion1"@127.0.0.1:7021 \
+  --out 127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:12500 --name worker2
 ```
 
 4. Three Workers: Start the application
 
 ```bash
-./multi_pipeline --in 127.0.0.1:7010,127.0.0.1:7011 --out \
-  127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
+./multi_pipeline \
+  --in "Celsius Conversion0"@127.0.0.1:7010,"Celsius Conversion1"@127.0.0.1:7011 \
+  --out 127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:12500 --data 127.0.0.1:12501 -w 3 --cluster-initializer
 
-./multi_pipeline --in 127.0.0.1:7010,127.0.0.1:7011 --out \
-  127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
+./multi_pipeline \
+  --in "Celsius Conversion0"@127.0.0.1:7020,"Celsius Conversion1"@127.0.0.1:7021 \
+  --out 127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:12500 --name worker2
 
-./multi_pipeline --in 127.0.0.1:7010,127.0.0.1:7011 --out \
-  127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
+./multi_pipeline \
+  --in "Celsius Conversion0"@127.0.0.1:7030,"Celsius Conversion1"@127.0.0.1:7031 \
+  --out 127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:12500 --name worker3
 ```
 
