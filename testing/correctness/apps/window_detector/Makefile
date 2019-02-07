@@ -204,7 +204,7 @@ window_detector_tumbling_alo_source_test_python3:
 		--alo-sequence-sender key_0 100 \
 		--alo-sequence-sender key_1 100 \
 		--log-level $(LOGLEVEL) \
-		--command 'machida2 --application-module window_detector --source alo --window-type tumbling $(RUN_WITH_RESILIENCE)' \
+		--command 'machida3 --application-module window_detector --source alo --window-type tumbling $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
