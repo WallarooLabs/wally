@@ -46,15 +46,14 @@ integration-tests-testing-correctness-apps-multi_pipeline: multi_pipeline_test
 multi_pipeline_test:
 	cd $(MULTI_PIPELINE_PATH) && \
 	integration_test \
-		--framed-file-sender _test.msg 0 \
-		--framed-file-sender _test.msg 1 \
+		--framed-file-sender _test.msg '"Celsius Conversion0"' \
+		--framed-file-sender _test.msg '"Celsius Conversion1"' \
 		--validation-cmp \
 	  --expected-file _expected.msg \
 		--log-level error \
 		--command './multi_pipeline $(RUN_WITH_RESILIENCE)' \
 		--sink-expect 200 \
-		--sinks 1 \
-		--sources 2
+		--sinks 1
 
 # end of prevent rules from being evaluated/included multiple times
 endif

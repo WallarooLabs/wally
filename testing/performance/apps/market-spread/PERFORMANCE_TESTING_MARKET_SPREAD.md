@@ -173,7 +173,7 @@ SSH into `wallaroo-leader-1`
 Start the Market Spread application with the following command:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1-16,17 chrt -f 80 ~/wallaroo/testing/performance/apps/market-spread/market-spread -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 --ponynoblock --ponythreads=16 --ponypinasio --ponyminthreads=999
+sudo cset proc -s user -e numactl -- -C 1-16,17 chrt -f 80 ~/wallaroo/testing/performance/apps/market-spread/market-spread -i Orders@wallaroo-leader-1:7000,Nbbo@wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 --ponynoblock --ponythreads=16 --ponypinasio --ponyminthreads=999
 
 ```
 
@@ -351,7 +351,7 @@ SSH into `wallaroo-leader-1`
 Start the Market Spread application's Initializer with the following command:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1-16,17 chrt -f 80 ~/wallaroo/testing/performance/apps/market-spread/market-spread  -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050  -w 2 --ponynoblock --ponythreads=16 --ponypinasio --ponyminthreads=999
+sudo cset proc -s user -e numactl -- -C 1-16,17 chrt -f 80 ~/wallaroo/testing/performance/apps/market-spread/market-spread  -i Orders@wallaroo-leader-1:7000,Nbbo@wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050  -w 2 --ponynoblock --ponythreads=16 --ponypinasio --ponyminthreads=999
 ```
 
 SSH into `wallaroo-follower-3`
@@ -359,7 +359,7 @@ SSH into `wallaroo-follower-3`
 Start the Market Spread application's 2nd Worker with the following command:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1-8,17 chrt -f 80 ~/wallaroo/testing/performance/apps/market-spread/market-spread  -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -x wallaroo-follower-3:12500 -y wallaroo-follower-3:12501 -n worker2 --ponythreads=8 --ponypinasio --ponynoblock --ponyminthreads=999
+sudo cset proc -s user -e numactl -- -C 1-8,17 chrt -f 80 ~/wallaroo/testing/performance/apps/market-spread/market-spread  -i Orders@wallaroo-follower-3:7000,Nbbo@wallaroo-follower-3:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -x wallaroo-follower-3:12500 -y wallaroo-follower-3:12501 -n worker2 --ponythreads=8 --ponypinasio --ponynoblock --ponyminthreads=999
 
 ```
 

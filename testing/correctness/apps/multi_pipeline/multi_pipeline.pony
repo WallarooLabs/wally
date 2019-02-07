@@ -30,16 +30,16 @@ actor Main
   new create(env: Env) =>
     try
       let pipeline = recover val
-        let inputs1 = Wallaroo.source[F32]("Celsius Conversion",
+        let inputs1 = Wallaroo.source[F32]("Celsius Conversion0",
             TCPSourceConfig[F32].from_options(CelsiusDecoder,
-              TCPSourceConfigCLIParser(env.args)?(0)?))
+              TCPSourceConfigCLIParser(env.args)?("Celsius Conversion0")?))
             .collect()
             .to[F32](Multiply)
             .to[F32](Add)
 
-        let inputs2 = Wallaroo.source[F32]("Celsius Conversion",
+        let inputs2 = Wallaroo.source[F32]("Celsius Conversion1",
             TCPSourceConfig[F32].from_options(CelsiusDecoder,
-              TCPSourceConfigCLIParser(env.args)?(1)?))
+              TCPSourceConfigCLIParser(env.args)?("Celsius Conversion1")?))
             .collect()
             .to[F32](Multiply)
             .to[F32](Add)
