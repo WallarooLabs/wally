@@ -940,6 +940,12 @@ primitive _SourceConfig
         PyFramedSourceHandler(d)?
       end
 
+      if name == "source_connector" then
+        @printf[I32]("source_connector config: host %s port %s\n".cstring(),
+          host.cstring(), port.cstring())
+        return ConnectorSourceConfig[(PyData val | None)](decoder, host, port)
+      end
+
       let cookie = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 6)))
       end
@@ -952,17 +958,12 @@ primitive _SourceConfig
         U32.from[I64](@PyInt_AsLong(@PyTuple_GetItem(source_config_tuple, 8)))
       end
 
-      @printf[I32](("source_connector* config: host %s port %s cookie %s " +
+      @printf[I32](("source_connector2 config: host %s port %s cookie %s " +
         "max_credits %u refill_credits %u\n").cstring(),
         host.cstring(), port.cstring(), cookie.cstring(),
         max_credits, refill_credits)
-      if name == "source_connector" then
-        // TODO: Return the proper type, once it source becomes available again
-        TCPSourceConfig[(PyData val | None)](decoder, host, port, 6)
-      else
-        ConnectorSource2Config[(PyData val | None)](decoder, host, port,
-          cookie, max_credits, refill_credits)
-      end
+      ConnectorSource2Config[(PyData val | None)](decoder, host, port,
+        cookie, max_credits, refill_credits)
     else
       error
     end
