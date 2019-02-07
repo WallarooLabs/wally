@@ -31,6 +31,7 @@ use "wallaroo/core/sink/kafka_sink"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
 use "wallaroo/core/source/connector_source"
+use "wallaroo/core/source/connector_source2"
 use "wallaroo/core/source/kafka_source"
 use "wallaroo/core/source/gen_source"
 use "wallaroo/core/source/tcp_source"
@@ -872,15 +873,14 @@ primitive _SourceConfig
       String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 0)))
     end
 
-    match name
-    | "gen" =>
+    if name == "gen" then
       let gen = recover val
         let g = @PyTuple_GetItem(source_config_tuple, 1)
         Machida.inc_ref(g)
         PyGenSourceHandlerBuilder(g)
       end
       GenSourceConfig[PyData val](gen)
-    | "tcp" =>
+    elseif name == "tcp" then
       let host = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
       end
@@ -900,7 +900,7 @@ primitive _SourceConfig
       end
 
       TCPSourceConfig[(PyData val | None)](decoder, host, port, parallelism)
-    | "kafka-internal" =>
+    elseif name == "kafka-internal" then
       let kafka_source_name = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
       end
@@ -915,7 +915,7 @@ primitive _SourceConfig
       end
 
       KafkaSourceConfig[(PyData val | None)](consume ksco, (env.root as TCPConnectionAuth), decoder)
-    | "kafka" =>
+    elseif name == "kafka" then
       let ksco = _kafka_config_options(source_config_tuple)
 
       let decoder = recover val
@@ -925,7 +925,7 @@ primitive _SourceConfig
       end
 
       KafkaSourceConfig[(PyData val | None)](consume ksco, (env.root as TCPConnectionAuth), decoder)
-    | "source_connector" =>
+    elseif (name == "source_connector") or (name == "source_connector2") then
       let host = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 2)))
       end
@@ -952,12 +952,17 @@ primitive _SourceConfig
         U32.from[I64](@PyInt_AsLong(@PyTuple_GetItem(source_config_tuple, 8)))
       end
 
-      @printf[I32](("source_connector config: host %s port %s cookie %s " +
+      @printf[I32](("source_connector* config: host %s port %s cookie %s " +
         "max_credits %u refill_credits %u\n").cstring(),
         host.cstring(), port.cstring(), cookie.cstring(),
         max_credits, refill_credits)
-      ConnectorSourceConfig[(PyData val | None)](decoder, host, port,
-        cookie, max_credits, refill_credits)
+      if name == "source_connector" then
+        // TODO: Return the proper type, once it source becomes available again
+        TCPSourceConfig[(PyData val | None)](decoder, host, port, 6)
+      else
+        ConnectorSource2Config[(PyData val | None)](decoder, host, port,
+          cookie, max_credits, refill_credits)
+      end
     else
       error
     end
