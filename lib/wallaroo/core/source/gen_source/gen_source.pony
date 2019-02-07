@@ -116,7 +116,7 @@ actor GenSource[V: Any val] is Source
   var _next_checkpoint_id: CheckpointId = 1
 
   let _pipeline_name: String
-  let _source_name: String
+  let _source_name: SourceName
   let _runner: Runner
   let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
 
