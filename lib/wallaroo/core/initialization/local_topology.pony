@@ -668,7 +668,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                 let next_router = StatePartitionRouter(step_group,
                   _worker_name, router_state_steps, router_state_step_ids,
                   consume proxies, hash_partitions,
-                  t.step_group_routing_ids(step_group)?)
+                  t.step_group_routing_ids(step_group)?,
+                  builder.local_routing())
 
                 state_partition_routers(step_group) = next_router
                 built_routers(node_id) = next_router
