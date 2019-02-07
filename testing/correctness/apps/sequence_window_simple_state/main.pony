@@ -36,13 +36,15 @@ To run, use the following commands:
 ```
 2. Initializer worker
 ```bash
-./sequence_window_simple_state -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
+./sequence_window_simple_state -i "Sequence Window"@127.0.0.1:7000 \
+-o 127.0.0.1:5555 -m 127.0.0.1:5001 \
 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 \
 -d 127.0.0.1:12501 -r res-data -w 2 -n worker1 -t
 ```
 3. Second worker
 ```bash
-./sequence_window_simple_state -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
+./sequence_window_simple_state -i "Sequence Window"@127.0.0.1:7000 \
+-o 127.0.0.1:5555 -m 127.0.0.1:5001 \
 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 \
 -r res-data -n worker2
 ```
@@ -96,7 +98,7 @@ actor Main
       let pipeline = recover val
         Wallaroo.source[U64]("Sequence Window",
             TCPSourceConfig[U64].from_options(U64FramedHandler,
-              TCPSourceConfigCLIParser(env.args)?(0)?))
+              TCPSourceConfigCLIParser(env.args)?("Sequence Window")?))
           .key_by(ExtractWindow)
           .to[String val](ObserveNewValue)
           .to_sink(TCPSinkConfig[String val].from_options(WindowEncoder,
