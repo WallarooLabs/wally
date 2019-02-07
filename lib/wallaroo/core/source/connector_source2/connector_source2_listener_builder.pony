@@ -30,7 +30,7 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
-class val ConnectorSourceListenerBuilder[In: Any val]
+class val ConnectorSource2ListenerBuilder[In: Any val]
   let _worker_name: WorkerName
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
@@ -88,7 +88,7 @@ class val ConnectorSourceListenerBuilder[In: Any val]
     _refill_credits = refill_credits
 
   fun apply(env: Env): SourceListener =>
-    ConnectorSourceListener[In](env, _worker_name, _pipeline_name,
+    ConnectorSource2Listener[In](env, _worker_name, _pipeline_name,
       _runner_builder, _partitioner_builder,
       _router, _metrics_conn, _metrics_reporter.clone(), _router_registry,
       _outgoing_boundary_builders, _event_log, _auth, _layout_initializer,
