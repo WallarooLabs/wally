@@ -57,7 +57,7 @@ def application_setup(args):
     elif pargs.source == 'alo':
         print("Using at-least-once source")
         in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
-        source = wallaroo.experimental.SourceConnectorConfig(
+        source = wallaroo.experimental.SourceConnector2Config(
             "window_detector_feed",
             encoder=encode_feed,
             decoder=decode_feed,
