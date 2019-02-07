@@ -489,6 +489,9 @@ class val StatePartitionRouter is Router
   // These routing ids are used to route messages to this step group on
   // another worker.
   let _worker_routing_ids: Map[WorkerName, RoutingId] val
+  // If this router is in the scope of a local_key_by, then it will only
+  // route messages to local Steps on this worker.
+  let _local_routing: Bool
 
   new val create(step_group': RoutingId,
     worker_name: WorkerName,
@@ -496,7 +499,8 @@ class val StatePartitionRouter is Router
     step_ids: Map[RoutingId, Step] val,
     hashed_node_routes: Map[WorkerName, HashedProxyRouter] val,
     hash_partitions': HashPartitions,
-    worker_routing_ids: Map[WorkerName, RoutingId] val)
+    worker_routing_ids: Map[WorkerName, RoutingId] val,
+    local_routing: Bool)
   =>
     _step_group = step_group'
     _worker_name = worker_name
@@ -510,6 +514,7 @@ class val StatePartitionRouter is Router
       consumer_ids(v) = k
     end
     _consumer_ids = consume consumer_ids
+    _local_routing = local_routing
 
   fun local_size(): USize =>
     _state_steps.size()
@@ -617,7 +622,7 @@ class val StatePartitionRouter is Router
 
     StatePartitionRouter(_step_group, _worker_name,
       _state_steps, _step_ids, consume new_hashed_node_routes,
-      _hash_partitions, _worker_routing_ids)
+      _hash_partitions, _worker_routing_ids, _local_routing)
 
   fun receive_key_state(key: Key, state: ByteSeq val) =>
     let idx = (HashKey(key) % _state_steps.size().u128()).usize()
@@ -628,10 +633,15 @@ class val StatePartitionRouter is Router
       Fail()
     end
 
-  fun recalculate_hash_partitions_for_join(auth: AmbientAuth,
+  fun val recalculate_hash_partitions_for_join(auth: AmbientAuth,
     joining_workers: Array[String] val,
     outgoing_boundaries: Map[String, OutgoingBoundary]): StatePartitionRouter
   =>
+    // If we're using local routing, then a join is irrelevant.
+    if _local_routing then
+      return this
+    end
+
     let new_hash_partitions =
       try
         _hash_partitions.add_claimants(joining_workers)?
@@ -654,11 +664,16 @@ class val StatePartitionRouter is Router
 
     StatePartitionRouter(_step_group, _worker_name,
       _state_steps, _step_ids, consume new_hashed_node_routes,
-      new_hash_partitions, _worker_routing_ids)
+      new_hash_partitions, _worker_routing_ids, _local_routing)
 
-  fun recalculate_hash_partitions_for_shrink(
+  fun val recalculate_hash_partitions_for_shrink(
     leaving_workers: Array[String] val): StatePartitionRouter
   =>
+    // If we're using local routing, then a shrink is irrelevant.
+    if _local_routing then
+      return this
+    end
+
     let new_hash_partitions =
       try
         _hash_partitions.remove_claimants(leaving_workers)?
@@ -675,7 +690,7 @@ class val StatePartitionRouter is Router
 
     StatePartitionRouter(_step_group, _worker_name,
       _state_steps, _step_ids, consume new_hashed_node_routes,
-      new_hash_partitions, _worker_routing_ids)
+      new_hash_partitions, _worker_routing_ids, _local_routing)
 
   fun hash_partitions(): HashPartitions =>
     _hash_partitions
@@ -683,9 +698,9 @@ class val StatePartitionRouter is Router
   fun update_hash_partitions(hp: HashPartitions): StatePartitionRouter =>
     StatePartitionRouter(_step_group, _worker_name,
       _state_steps, _step_ids, _hashed_node_routes, hp,
-      _worker_routing_ids)
+      _worker_routing_ids, _local_routing)
 
-  fun rebalance_steps_grow(auth: AmbientAuth,
+  fun val rebalance_steps_grow(auth: AmbientAuth,
     target_workers: Array[(String, OutgoingBoundary)] val,
     router_registry: RouterRegistry ref,
     local_keys: StringSet,
@@ -696,6 +711,11 @@ class val StatePartitionRouter is Router
     must be routed. Return the new router and a Bool indicating whether
     we migrated any steps.
     """
+    // If we're using local routing, then there is nothing to migrate.
+    if _local_routing then
+      return (this, false)
+    end
+
     let new_workers_trn = recover trn Array[String] end
     let new_boundaries = Map[String, OutgoingBoundary]
     let keys_to_move = Array[Key]
@@ -762,16 +782,21 @@ class val StatePartitionRouter is Router
 
     let new_router = StatePartitionRouter(_step_group,
       _worker_name, _state_steps, _step_ids, consume new_hashed_node_routes,
-      new_hash_partitions, _worker_routing_ids)
+      new_hash_partitions, _worker_routing_ids, _local_routing)
     (new_router, had_keys_to_migrate)
 
-  fun rebalance_steps_shrink(
+  fun val rebalance_steps_shrink(
     target_workers: Array[(String, OutgoingBoundary)] val,
     leaving_workers: Array[String] val,
     router_registry: RouterRegistry ref,
     local_keys: StringSet,
     checkpoint_id: CheckpointId): Bool
   =>
+    // If we're using local routing, then there is nothing to migrate.
+    if _local_routing then
+      return false
+    end
+
     let remaining_workers_trn = recover trn Array[String] end
     let remaining_boundaries = Map[String, OutgoingBoundary]
     let keys_to_move = Map[String, Array[Key]]
@@ -857,7 +882,7 @@ class val StatePartitionRouter is Router
     new_worker_routing_ids(worker) = routing_id
     StatePartitionRouter(_step_group, _worker_name, _state_steps,
       _step_ids, _hashed_node_routes, _hash_partitions,
-      consume new_worker_routing_ids)
+      consume new_worker_routing_ids, _local_routing)
 
   fun distribution_digest(): Map[WorkerName, Array[String] val] val =>
     // Return a map of form {worker_name: routing_ids_as_strings}
