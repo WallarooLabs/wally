@@ -167,7 +167,6 @@ actor GenSource[V: Any val] is Source
     ifdef "resilience" then
       _mute_local()
     end
-    @printf[I32]("YYY create: %s 0x%lx\n".cstring(), __loc.type_name().cstring(), this)
 
   fun ref metrics_reporter(): MetricsReporter =>
     _metrics_reporter

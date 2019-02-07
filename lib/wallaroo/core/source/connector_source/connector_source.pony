@@ -57,9 +57,9 @@ use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 use @pony_asio_event_set_writeable[None](event: AsioEventID, writeable: Bool)
 
-actor ConnectorSource[In: Any val] is Source
+actor ConnectorSource2[In: Any val] is Source
   """
-  # ConnectorSource
+  # ConnectorSource2
 
   ## Future work
   * Switch to requesting credits via promise
@@ -83,8 +83,8 @@ actor ConnectorSource[In: Any val] is Source
   let _pending_barriers: Array[BarrierToken] = _pending_barriers.create()
 
   // Connector
-  let _listen: ConnectorSourceListener[In]
-  let _notify: ConnectorSourceNotify[In]
+  let _listen: ConnectorSource2Listener[In]
+  let _notify: ConnectorSource2Notify[In]
   var _next_size: USize = 0
   var _max_size: USize = 0
   var _connect_count: U32 = 0
@@ -129,10 +129,10 @@ actor ConnectorSource[In: Any val] is Source
   var _next_checkpoint_id: CheckpointId = 1
 
   // Active Stream Registry
-  let _active_stream_registry: ConnectorSourceListener[In]
+  let _active_stream_registry: ConnectorSource2Listener[In]
 
   new create(source_id: RoutingId, auth: AmbientAuth,
-    listen: ConnectorSourceListener[In], notify: ConnectorSourceNotify[In] iso,
+    listen: ConnectorSource2Listener[In], notify: ConnectorSource2Notify[In] iso,
     event_log: EventLog, router': Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
@@ -142,9 +142,6 @@ actor ConnectorSource[In: Any val] is Source
     A new connection accepted on a server.
     """
     _source_id = source_id
-                @printf[I32]("^*^* %s.%s my source_id = %s\n".cstring(),
-                  __loc.type_name().cstring(), __loc.method_name().cstring(),
-                  _source_id.string().cstring())
     _auth = auth
     _event_log = event_log
     _metrics_reporter = consume metrics_reporter'
@@ -177,7 +174,6 @@ actor ConnectorSource[In: Any val] is Source
     ifdef "resilience" then
       _mute_local()
     end
-    @printf[I32]("YYY create: %s 0x%lx source_id = %s\n".cstring(), __loc.type_name().cstring(), this, _source_id.string().cstring())
 
   be accept(fd: U32, init_size: USize = 64, max_size: USize = 16384) =>
     """
@@ -474,7 +470,7 @@ actor ConnectorSource[In: Any val] is Source
   =>
     """
     Build a new boundary for each builder that corresponds to a worker we
-    don't yet have a boundary to. Each ConnectorSource has its own
+    don't yet have a boundary to. Each ConnectorSource2 has its own
     OutgoingBoundary to each worker to allow for higher throughput.
     """
     for (target_worker_name, builder) in boundary_builders.pairs() do
@@ -510,7 +506,7 @@ actor ConnectorSource[In: Any val] is Source
       _outgoing_boundaries.remove(worker)?
     else
       ifdef debug then
-        @printf[I32]("ConnectorSource couldn't find boundary to %s to disconnect\n"
+        @printf[I32]("ConnectorSource2 couldn't find boundary to %s to disconnect\n"
           .cstring(), worker.cstring())
       end
     end
@@ -543,7 +539,7 @@ actor ConnectorSource[In: Any val] is Source
       _router_registry.unregister_source(this, _source_id)
       _event_log.unregister_resilient(_source_id, this)
       _unregister_all_outputs()
-      @printf[I32]("Shutting down ConnectorSource\n".cstring())
+      @printf[I32]("Shutting down ConnectorSource2\n".cstring())
       for b in _outgoing_boundaries.values() do
         b.dispose()
       end
@@ -570,7 +566,7 @@ actor ConnectorSource[In: Any val] is Source
         | let ob: OutgoingBoundary => b_count = b_count + 1
         end
       end
-      @printf[I32]("ConnectorSource %s has %s boundaries.\n".cstring(),
+      @printf[I32]("ConnectorSource2 %s has %s boundaries.\n".cstring(),
         _source_id.string().cstring(), b_count.string().cstring())
     end
 
@@ -590,12 +586,12 @@ actor ConnectorSource[In: Any val] is Source
   be initiate_barrier(token: BarrierToken) =>
     if not _is_pending and not _disposed then
       ifdef "checkpoint_trace" then
-        @printf[I32]("ConnectorSource received initiate_barrier %s\n"
+        @printf[I32]("ConnectorSource2 received initiate_barrier %s\n"
           .cstring(), token.string().cstring())
       end
       _initiate_barrier(token)
     else
-      @printf[I32]("ConnectorSource received initiate_barrier %s NOT IS_PENDING AND NOT DISPOSED\n"
+      @printf[I32]("ConnectorSource2 received initiate_barrier %s NOT IS_PENDING AND NOT DISPOSED\n"
           .cstring(), token.string().cstring())
     end
 
@@ -613,24 +609,22 @@ actor ConnectorSource[In: Any val] is Source
     for (o_id, o) in _outputs.pairs() do
       match o
       | let ob: OutgoingBoundary =>
-        @printf[I32]("QQQ: %s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
         ob.forward_barrier(o_id, _source_id, token)
       else
-        @printf[I32]("QQQ: %s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
         o.receive_barrier(_source_id, this, token)
       end
     end
 
   be barrier_complete(token: BarrierToken) =>
     ifdef "checkpoint_trace" then
-      @printf[I32]("barrier_complete at ConnectorSource %s\n".cstring(),
+      @printf[I32]("barrier_complete at ConnectorSource2 %s\n".cstring(),
         _source_id.string().cstring())
     end
     match token
     | let sbt: CheckpointBarrierToken =>
       _notify.barrier_complete(sbt.id)
     else
-      @printf[I32]("^*^* %s.%s when %s\n".cstring(),
+      @printf[I32]("DEBUG %s.%s when %s\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring(),
         token.string().cstring())
       Fail() // TODO does this happen in practice?
@@ -663,9 +657,11 @@ actor ConnectorSource[In: Any val] is Source
         p.push(c)
       end
     end
-    @printf[I32]("^*^* %s.%s my source_id = %s, payload.size = %d\n".cstring(),
-      __loc.type_name().cstring(), __loc.method_name().cstring(),
-      _source_id.string().cstring(), p.size())
+    ifdef "trace" then
+      @printf[I32]("TRACE: %s.%s my source_id = %s, payload.size = %d\n".cstring(),
+        __loc.type_name().cstring(), __loc.method_name().cstring(),
+        _source_id.string().cstring(), p.size())
+    end
 
     _notify.rollback(checkpoint_id, payload)
     _next_checkpoint_id = checkpoint_id + 1
@@ -961,13 +957,13 @@ actor ConnectorSource[In: Any val] is Source
 
   fun ref _mute() =>
     ifdef debug then
-      @printf[I32]("Muting ConnectorSource\n".cstring())
+      @printf[I32]("Muting ConnectorSource2\n".cstring())
     end
     _muted = true
 
   fun ref _unmute() =>
     ifdef debug then
-      @printf[I32]("Unmuting ConnectorSource\n".cstring())
+      @printf[I32]("Unmuting ConnectorSource2\n".cstring())
     end
     _muted = false
     if not _reading then
@@ -1009,18 +1005,22 @@ actor ConnectorSource[In: Any val] is Source
 
   be stream_notify_result(session_tag: USize, success: Bool,
     stream_id: U64, point_of_reference: U64, last_message_id: U64) =>
-    @printf[I32]("^*^* %s.%s(%s, %lu, %lu, %lu)\n".cstring(),
-      __loc.type_name().cstring(), __loc.method_name().cstring(),
-      success.string().cstring(), stream_id, point_of_reference,
-      last_message_id)
+    ifdef "trace" then
+      @printf[I32]("TRACE: %s.%s(%s, %lu, %lu, %lu)\n".cstring(),
+        __loc.type_name().cstring(), __loc.method_name().cstring(),
+        success.string().cstring(), stream_id, point_of_reference,
+        last_message_id)
+    end
     _notify.stream_notify_result(session_tag, success,
       stream_id, point_of_reference, last_message_id)
 
   be get_all_streams_result(session_tag: USize,
     data: Array[(U64,String,U64)] val)
   =>
-    @printf[I32]("^*^* %s.%s(%lu, ...%d...)\n".cstring(),
-      __loc.type_name().cstring(), __loc.method_name().cstring(),
-      session_tag, data.size())
+    ifdef "trace" then
+      @printf[I32]("TRACE: %s.%s(%lu, ...%d...)\n".cstring(),
+        __loc.type_name().cstring(), __loc.method_name().cstring(),
+        session_tag, data.size())
+    end
     _notify.get_all_streams_result(session_tag, data)
 

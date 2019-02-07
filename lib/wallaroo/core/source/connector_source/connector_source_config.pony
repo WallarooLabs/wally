@@ -25,7 +25,7 @@ use "wallaroo_labs/mort"
 
 primitive ConnectorSourceConfigCLIParser
   fun apply(args: Array[String] val):
-    Map[SourceName, ConnectorSourceConfigOptions] val ?
+    Map[SourceName, ConnectorSource2ConfigOptions] val ?
   =>
     let in_arg = "in"
     let short_in_arg = "i"
@@ -47,17 +47,24 @@ primitive ConnectorSourceConfigCLIParser
     error
 
   fun _from_input_string(inputs: String):
-    Map[SourceName, ConnectorSourceConfigOptions] val
+    Map[SourceName, ConnectorSource2ConfigOptions] val
   =>
-    let opts = recover trn Map[SourceName, ConnectorSourceConfigOptions] end
+    let opts = recover trn Map[SourceName, ConnectorSource2ConfigOptions] end
 
     for input in inputs.split(",").values() do
       try
         let source_name_and_address = input.split("@")
+        let source_name' = source_name_and_address(0)?
         let address_data = source_name_and_address(1)?.split(":")
+        let host = address_data(0)?
+        let service = address_data(1)?
+        let cookie = address_data(2)?
+        let max_credits = address_data(3)?.u32()?
+        let refill_credits = address_data(4)?.u32()?
+
         opts.update(source_name_and_address(0)?,
-          ConnectorSourceConfigOptions(address_data(0)?, address_data(1)?,
-          source_name_and_address(0)?))
+          ConnectorSource2ConfigOptions(source_name', host, service, cookie,
+            max_credits, refill_credits))
       else
         FatalUserError("Inputs must be in the `source_name@host:service`" +
           " format!")
@@ -66,42 +73,47 @@ primitive ConnectorSourceConfigCLIParser
 
     consume opts
 
-class val ConnectorSourceConfigOptions
+// TODO: Refactor. Why is this identical to WorkerConnectorSourceConfig?
+class val ConnectorSource2ConfigOptions
   let host: String
   let service: String
   let source_name: SourceName
+  let cookie :String
+  let max_credits: U32
+  let refill_credits: U32
 
-  new val create(source_name': SourceName, host': String, service': String) =>
+  new val create(source_name': SourceName, host': String, service': String,
+    cookie': String, max_credits': U32, refill_credits': U32)
+  =>
     host = host'
     service = service'
     source_name = source_name'
+    cookie = cookie'
+    max_credits = max_credits'
+    refill_credits = refill_credits'
 
 class val ConnectorSourceConfig[In: Any val] is SourceConfig
   let handler: FramedSourceHandler[In] val
   let parallelism: USize
-  let _host: String
-  let _service: String
   let _worker_source_config: WorkerConnectorSourceConfig
 
   new val create(source_name: SourceName, handler': FramedSourceHandler[In] val,
-    host': String, service': String, parallelism': USize = 10)
+    host: String, service: String, cookie: String,
+    max_credits: U32, refill_credits: U32, parallelism': USize = 10)
   =>
     handler = handler'
     parallelism = parallelism'
-    _host = host'
-    _service = service'
-    _worker_source_config = WorkerConnectorSourceConfig(source_name, _host,
-      _service)
+    _worker_source_config = WorkerConnectorSourceConfig(source_name, host,
+      service, cookie, max_credits, refill_credits)
 
   new val from_options(foo: Bool, handler': FramedSourceHandler[In] val,
-    opts: ConnectorSourceConfigOptions, parallelism': USize = 10)
+    opts: ConnectorSource2ConfigOptions, parallelism': USize = 10)
   =>
     handler = handler'
     parallelism = parallelism'
-    _host = opts.host
-    _service = opts.service
-    _worker_source_config = WorkerConnectorSourceConfig(opts.source_name, _host,
-      _service)
+    _worker_source_config = WorkerConnectorSourceConfig(opts.source_name,
+      opts.host, opts.service, opts.cookie, opts.max_credits,
+      opts.refill_credits)
 
   fun val source_listener_builder_builder():
     ConnectorSourceListenerBuilderBuilder[In]
@@ -118,8 +130,16 @@ class val WorkerConnectorSourceConfig is WorkerSourceConfig
   let host: String
   let service: String
   let source_name: SourceName
+  let cookie: String
+  let max_credits: U32
+  let refill_credits: U32
 
-  new val create(source_name': SourceName, host': String, service': String) =>
+  new val create(source_name': SourceName, host': String, service': String,
+    cookie': String, max_credits': U32, refill_credits': U32)
+  =>
     host = host'
     service = service'
     source_name = source_name'
+    cookie = cookie'
+    max_credits = max_credits'
+    refill_credits = refill_credits'

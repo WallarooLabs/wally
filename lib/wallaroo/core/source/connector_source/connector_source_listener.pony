@@ -31,22 +31,23 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 use "collections"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
-use "wallaroo/core/partitioning"
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/data_receiver"
-use "wallaroo/core/recovery"
-use "wallaroo/core/router_registry"
-use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/metrics"
+use "wallaroo/core/partitioning"
+use "wallaroo/core/recovery"
+use "wallaroo/core/router_registry"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
+use "wallaroo_labs/mort"
 
-actor ConnectorSourceListener[In: Any val] is SourceListener
+actor ConnectorSource2Listener[In: Any val] is SourceListener
   """
-  # ConnectorSourceListener
+  # ConnectorSource2Listener
   """
   var _hack_counter: U128 = 65
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
@@ -81,8 +82,8 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   var _init_size: USize
   var _max_size: USize
 
-  let _connected_sources: SetIs[ConnectorSource[In]] = _connected_sources.create()
-  let _available_sources: Array[ConnectorSource[In]] = _available_sources.create()
+  let _connected_sources: SetIs[ConnectorSource2[In]] = _connected_sources.create()
+  let _available_sources: Array[ConnectorSource2[In]] = _available_sources.create()
 
   // Active Stream Registry
   let _active_streams: Map[U64, (String,Any tag,U64,U64)] =
@@ -146,11 +147,11 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     for i in Range(0, _limit) do
       let source_id = _hack_counter
       _hack_counter = _hack_counter + 1
-      let notify = ConnectorSourceNotify[In](source_id, _pipeline_name,
+      let notify = ConnectorSource2Notify[In](source_id, _pipeline_name,
         _env, _auth, _handler, _runner_builder, _partitioner_builder, _router,
         _metrics_reporter.clone(), _event_log, _target_router, _cookie,
         _max_credits, _refill_credits)
-      let source = ConnectorSource[In](source_id, _auth, this,
+      let source = ConnectorSource2[In](source_id, _auth, this,
         consume notify, _event_log, _router,
         _outgoing_boundary_builders, _layout_initializer,
         _metrics_reporter.clone(), _router_registry)
@@ -228,7 +229,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     _outgoing_boundary_builders = consume new_boundary_builders
 
   be dispose() =>
-    @printf[I32]("Shutting down ConnectorSourceListener\n".cstring())
+    @printf[I32]("Shutting down ConnectorSource2Listener\n".cstring())
     _close()
 
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
@@ -248,7 +249,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       _event = AsioEvent.none()
     end
 
-  be _conn_closed(s: ConnectorSource[In]) =>
+  be _conn_closed(s: ConnectorSource2[In]) =>
     """
     An accepted connection has closed. If we have dropped below the limit, try
     to accept new connections.
@@ -276,7 +277,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     if _closed then
       return
     elseif _count >= _limit then
-      @printf[I32]("ConnectorSourceListener: Already reached connection limit\n"
+      @printf[I32]("ConnectorSource2Listener: Already reached connection limit\n"
         .cstring())
       return
     end
@@ -347,7 +348,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   // Active Stream Registry
 
   be get_all_streams(session_tag: USize,
-    connector_source: ConnectorSource[In] tag)
+    connector_source: ConnectorSource2[In] tag)
   =>
     let data: Array[(U64,String,U64)] trn = recover data.create() end
 
@@ -359,18 +360,22 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
 
   be stream_notify(session_tag: USize,
     stream_id: U64, stream_name: String, point_of_reference: U64,
-    connector_source: ConnectorSource[In] tag)
+    connector_source: ConnectorSource2[In] tag)
   =>
-    @printf[I32]("^*^* %s.%s(%lu, %lu, ...)\n".cstring(),
-      __loc.type_name().cstring(), __loc.method_name().cstring(),
-      stream_id, point_of_reference)
+    ifdef "trace" then
+      @printf[I32]("TRACE: %s.%s(%lu, %lu, ...)\n".cstring(),
+        __loc.type_name().cstring(), __loc.method_name().cstring(),
+        stream_id, point_of_reference)
+    end
     if _active_streams.contains(stream_id) then
       try
         (let stream_name': String, let tag_or_none: Any tag,
           let p_o_r, let last_message_id) = _active_streams(stream_id)?
-        @printf[I32]("^*^* %s.%s existing stream_id %lu @ p-o-r %lu l-msgid %lu in-use %s\n".cstring(),
-          __loc.type_name().cstring(), __loc.method_name().cstring(),
-          stream_id, p_o_r, last_message_id, (not (tag_or_none is None)).string().cstring())
+        ifdef "trace" then
+          @printf[I32]("TRACE: %s.%s existing stream_id %lu @ p-o-r %lu l-msgid %lu in-use %s\n".cstring(),
+            __loc.type_name().cstring(), __loc.method_name().cstring(),
+            stream_id, p_o_r, last_message_id, (not (tag_or_none is None)).string().cstring())
+        end
         if stream_name' != stream_name then
           Fail()
         end
@@ -388,23 +393,29 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
             (stream_name, connector_source, p_o_r, last_message_id)
           connector_source.stream_notify_result(session_tag, true,
             stream_id, p_o_r, last_message_id)
-          @printf[I32]("^*^* %s.%s existing stream_id %lu is ok\n".cstring(),
-            __loc.type_name().cstring(), __loc.method_name().cstring(),
-            stream_id)
+          ifdef "trace" then
+            @printf[I32]("TRACE: %s.%s existing stream_id %lu is ok\n".cstring(),
+              __loc.type_name().cstring(), __loc.method_name().cstring(),
+              stream_id)
+          end
         else
           connector_source.stream_notify_result(session_tag, false,
             0, 0, 0) // TODO args
-          @printf[I32]("^*^* %s.%s existing stream_id %lu is rejected\n".cstring(),
-            __loc.type_name().cstring(), __loc.method_name().cstring(),
-            stream_id)
+          ifdef "trace" then
+            @printf[I32]("TRACE: %s.%s existing stream_id %lu is rejected\n".cstring(),
+              __loc.type_name().cstring(), __loc.method_name().cstring(),
+              stream_id)
+          end
         end
       else
         Fail()
       end
     else
-      @printf[I32]("^*^* %s.%s new stream_id %lu @ p-o-r %lu\n".cstring(),
-        __loc.type_name().cstring(), __loc.method_name().cstring(),
-        stream_id, point_of_reference)
+      ifdef "trace" then
+        @printf[I32]("TRACE: %s.%s new stream_id %lu @ p-o-r %lu\n".cstring(),
+          __loc.type_name().cstring(), __loc.method_name().cstring(),
+          stream_id, point_of_reference)
+      end
       _active_streams(stream_id) =
         (stream_name, connector_source, point_of_reference, point_of_reference)
       connector_source.stream_notify_result(session_tag, true,
@@ -413,7 +424,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
 
   be stream_update(stream_id: U64, checkpoint_id: CheckpointId,
     point_of_reference: U64, last_message_id: U64,
-    connector_source: (ConnectorSource[In] tag|None))
+    connector_source: (ConnectorSource2[In] tag|None))
   =>
     let update = if connector_source is None then
         true
@@ -429,7 +440,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
         end
       end
     ifdef "trace" then
-      @printf[I32]("^*^* %s.%s(stmid %lu, chkp %lu, p-o-r %lu, l-msgid %lu, conn %s) update %s\n".cstring(),
+      @printf[I32]("TRACE: %s.%s(stmid %lu, chkp %lu, p-o-r %lu, l-msgid %lu, conn %s) update %s\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring(),
         stream_id, checkpoint_id, point_of_reference, last_message_id,
         (if connector_source is None then

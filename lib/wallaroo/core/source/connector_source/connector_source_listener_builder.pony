@@ -30,7 +30,7 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
-class val ConnectorSourceListenerBuilder[In: Any val]
+class val ConnectorSource2ListenerBuilder[In: Any val]
   let _worker_name: WorkerName
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
@@ -88,7 +88,7 @@ class val ConnectorSourceListenerBuilder[In: Any val]
     _refill_credits = refill_credits
 
   fun apply(env: Env): SourceListener =>
-    ConnectorSourceListener[In](env, _worker_name, _pipeline_name,
+    ConnectorSource2Listener[In](env, _worker_name, _pipeline_name,
       _runner_builder, _partitioner_builder,
       _router, _metrics_conn, _metrics_reporter.clone(), _router_registry,
       _outgoing_boundary_builders, _event_log, _auth, _layout_initializer,
@@ -117,22 +117,23 @@ class val ConnectorSourceListenerBuilderBuilder[In: Any val] is SourceListenerBu
     recovering: Bool,
     worker_source_config: WorkerSourceConfig,
     target_router: Router = EmptyRouter):
-    ConnectorSourceListenerBuilder[In]
+    ConnectorSource2ListenerBuilder[In]
   =>
     match worker_source_config
     | let config: WorkerConnectorSourceConfig =>
-      ConnectorSourceListenerBuilder[In](worker_name, pipeline_name,
+      ConnectorSource2ListenerBuilder[In](worker_name, pipeline_name,
         runner_builder, partitioner_builder, router, metrics_conn,
         consume metrics_reporter, router_registry, outgoing_boundary_builders,
         event_log, auth, layout_initializer, recovering, target_router,
         _source_config.parallelism, _source_config.handler,
-        config.host, config.service)
+        config.host, config.service, config.cookie, config.max_credits,
+        config.refill_credits)
     else
       Unreachable()
-      ConnectorSourceListenerBuilder[In](worker_name, pipeline_name,
+      ConnectorSource2ListenerBuilder[In](worker_name, pipeline_name,
         runner_builder, partitioner_builder, router, metrics_conn,
         consume metrics_reporter, router_registry, outgoing_boundary_builders,
         event_log, auth, layout_initializer, recovering, target_router,
         _source_config.parallelism, _source_config.handler,
-        "0", "0")
+        "0", "0", "0", 0, 0)
     end

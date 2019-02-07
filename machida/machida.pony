@@ -966,7 +966,20 @@ primitive _SourceConfig
         PyFramedSourceHandler(d)?
       end
 
-      ConnectorSourceConfig[(PyData val | None)](source_name, decoder, host, port)
+      let cookie = recover val
+        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 6)))
+      end
+
+      let max_credits = recover val
+        U32.from[I64](@PyInt_AsLong(@PyTuple_GetItem(source_config_tuple, 7)))
+      end
+
+      let refill_credits = recover val
+        U32.from[I64](@PyInt_AsLong(@PyTuple_GetItem(source_config_tuple, 8)))
+      end
+
+      ConnectorSourceConfig[(PyData val | None)](source_name, decoder, host,
+        port, cookie, max_credits, refill_credits)
     else
       error
     end
