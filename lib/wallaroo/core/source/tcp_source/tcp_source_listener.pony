@@ -116,61 +116,56 @@ actor TCPSourceListener[In: Any val] is SourceListener
     _host = host
     _service = service
     _valid = valid
+    _limit = parallelism
+    _init_size = init_size
+    _max_size = max_size
 
-    if _valid then
-      _event = @pony_os_listen_tcp[AsioEventID](this,
-        _host.cstring(), _service.cstring())
-      _limit = _parallelism
-      _init_size = init_size
-      _max_size = max_size
-      _fd = @pony_asio_event_fd(_event)
+    match router
+    | let pr: StatePartitionRouter =>
+      _router_registry.register_partition_router_subscriber(pr.step_group(),
+        this)
+    | let spr: StatelessPartitionRouter =>
+      _router_registry.register_stateless_partition_router_subscriber(
+        spr.partition_routing_id(), this)
+    end
 
-      match router
+    @printf[I32]((pipeline_name + " source will listen (but not yet) on "
+          + host + ":" + service + "\n").cstring())
+
+    for i in Range(0, _limit) do
+      let source_id = _routing_id_gen()
+      let notify = TCPSourceNotify[In](source_id, _pipeline_name, _env,
+        _auth, _handler, _runner_builder, _partitioner_builder, _router,
+        _metrics_reporter.clone(), _event_log, _target_router)
+      let source = TCPSource[In](source_id, _auth, this,
+        consume notify, _event_log, _router,
+        _outgoing_boundary_builders, _layout_initializer,
+        _metrics_reporter.clone(), _router_registry)
+      source.mute(this)
+
+      _router_registry.register_source(source, source_id)
+      match _router
       | let pr: StatePartitionRouter =>
-        _router_registry.register_partition_router_subscriber(pr.step_group(),
-          this)
+        _router_registry.register_partition_router_subscriber(
+          pr.step_group(), source)
       | let spr: StatelessPartitionRouter =>
         _router_registry.register_stateless_partition_router_subscriber(
-          spr.partition_routing_id(), this)
+          spr.partition_routing_id(), source)
       end
 
-      @printf[I32]((pipeline_name + " source attempting to listen on "
-        + _host + ":" + _service +
-        "\n").cstring())
-
-      for i in Range(0, _limit) do
-        let source_id = _routing_id_gen()
-        let notify = TCPSourceNotify[In](source_id, _pipeline_name, _env,
-          _auth, _handler, _runner_builder, _partitioner_builder, _router,
-          _metrics_reporter.clone(), _event_log, _target_router)
-        let source = TCPSource[In](source_id, _auth, this,
-          consume notify, _event_log, _router,
-          _outgoing_boundary_builders, _layout_initializer,
-          _metrics_reporter.clone(), _router_registry)
-        source.mute(this)
-
-        _router_registry.register_source(source, source_id)
-        match _router
-        | let pr: StatePartitionRouter =>
-          _router_registry.register_partition_router_subscriber(
-            pr.step_group(), source)
-        | let spr: StatelessPartitionRouter =>
-          _router_registry.register_stateless_partition_router_subscriber(
-            spr.partition_routing_id(), source)
-        end
-
-        _available_sources.push(source)
-      end
+      _available_sources.push(source)
     end
 
   be start_listening() =>
-    _event = @pony_os_listen_tcp[AsioEventID](this,
-      _host.cstring(), _service.cstring())
-    _fd = @pony_asio_event_fd(_event)
-    _notify_listening()
-    ifdef debug then
-      @printf[I32]("Socket for %s now listening on %s:%s\n".cstring(),
-        _pipeline_name.cstring(), _host.cstring(), _service.cstring())
+    if _valid then
+      _event = @pony_os_listen_tcp[AsioEventID](this,
+        _host.cstring(), _service.cstring())
+      _fd = @pony_asio_event_fd(_event)
+      _notify_listening()
+      ifdef debug then
+        @printf[I32]("Socket for %s now listening on %s:%s\n".cstring(),
+          _pipeline_name.cstring(), _host.cstring(), _service.cstring())
+      end
     end
 
   be recovery_protocol_complete() =>

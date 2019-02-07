@@ -156,7 +156,6 @@ actor TCPSource[In: Any val] is Source
     ifdef "resilience" then
       _mute_local()
     end
-    @printf[I32]("YYY create: %s 0x%lx\n".cstring(), __loc.type_name().cstring(), this)
 
   be accept(fd: U32, init_size: USize = 64, max_size: USize = 16384) =>
     """

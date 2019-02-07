@@ -18,6 +18,7 @@ import asyncore
 from collections import namedtuple
 from datetime import datetime
 import inspect
+import logging
 from select import select
 import socket
 import struct
@@ -72,7 +73,8 @@ class SourceConnectorConfig(object):
         self._max_credits = max_credits
         self._refill_credits = refill_credits
         self._host = host
-        print("QQQ: name {} encoder {} decoder {} max_credits {}".format(name, encoder, decoder, max_credits))
+        logging.debug("{}: name {} encoder {} decoder {} max_credits {}"
+            .format(self,name, encoder, decoder, max_credits))
 
     def to_tuple(self):
         return ("source_connector", self._name, self._host, str(self._port), self._encoder, self._decoder, self._cookie, self._max_credits, self._refill_credits)
@@ -110,6 +112,7 @@ class BaseConnector(object):
         self._cookie = cookie
         self._max_credits = max_credits
         self._refill_credits = refill_credits
+
 
 class SourceConnector(BaseConnector):
     def __init__(self, args=None, required_params=['host', 'port'],
@@ -324,12 +327,11 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         else:
             # shouldn't get an ack for a stream we never notified
             # but it's not strictly an error, so don't crash
-            print("WARNING: received a NotifyAck for a stream that wasn't"
-                  " notified: {}".format(msg))
+            logging.warning("received a NotifyAck for a stream that wasn't"
+                " notified: {}".format(msg))
 
     def _handle_ack(self, msg):
         self.credits += msg.credits
-        print("_handle_ack got {}".format(msg))
         for (stream_id, point_of_ref) in msg.acks:
             # Try to get old stream data
             old = self._streams.get(stream_id, None)
@@ -340,7 +342,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                     self._streams[stream_id] = new
                 else:
                     new = old
-                print("stream_acked B")
                 self.stream_acked(new)
 
     ##########################
@@ -483,7 +484,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             return False
 
     def error(self, message):
-        print("WARNING: Sending error message: {}".format(message))
+        logging.warning("Sending error message: {}".format(message))
         self.shutdown(error=message)
 
     def notify(self, stream_id, stream_name=None, point_of_ref=None):
@@ -554,7 +555,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             event_time = ts,
             key = en_key,
             message = None)
-        print("INFO: Sending End of Stream {}".format(msg))
+        logging.info("Sending End of Stream {}".format(msg))
         self.write(msg)
         self._pending_eos[stream_id] = point_of_ref
 
@@ -575,12 +576,12 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             self.notify(stream.id, stream.name, stream.point_of_ref)
 
     def handle_invalid_message(self, msg):
-        print("WARNING: {}".format(ProtocolError(
-            "Received an unrecognized message: {}".format(msg))))
+        logging.warning(ProtocolError(
+            "Received an unrecognized message: {}".format(msg)))
 
     def handle_restart(self):
-        print("WARNING: Received RESTART message. Closing streams and "
-              "reinitiating handshake.")
+        logging.warning("Received RESTART message. Closing streams and "
+            "reinitiating handshake.")
         # reset credits
         self.credits = 0
         # close connection
@@ -615,7 +616,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         """
         _type, _value, _traceback = sys.exc_info()
         traceback.print_exception(_type, _value, _traceback)
-        print("ERROR: Closing the connection after encountering an error")
+        logging.error("Closing the connection after encountering an error")
         self.error = _value
         self.close()
 
@@ -661,7 +662,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
 
 
 class SinkConnector(object):
-
     def __init__(self, args=None, required_params=[], optional_params=[]):
         params = parse_connector_args(args or sys.argv, required_params, optional_params)
         wallaroo_mod = __import__(params.application)

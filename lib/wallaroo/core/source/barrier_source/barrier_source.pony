@@ -82,7 +82,6 @@ actor BarrierSource is Source
     _event_log = event_log
     _metrics_reporter = consume metrics_reporter'
     _router_registry.register_producer(this)
-    @printf[I32]("YYY create: %s 0x%lx\n".cstring(), __loc.type_name().cstring(), this)
 
   be first_checkpoint_complete() =>
     None

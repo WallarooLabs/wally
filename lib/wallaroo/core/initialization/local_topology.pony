@@ -50,7 +50,6 @@ use "wallaroo_labs/messages"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/queue"
 use "wallaroo_labs/string_set"
-
 use "wallaroo/core/source/connector_source"
 
 class val LocalTopology
@@ -864,7 +863,6 @@ actor LocalTopologyInitializer is LayoutInitializer
           end
         end
         for b in sl_builders.values() do
-          @printf[I32]("^*#^*#^*# sl_builders starting early\n".cstring())
           let ba = b.apply(_env)
           sl_actors.push(ba)
         end

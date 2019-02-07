@@ -654,13 +654,14 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
     if `data` is a list, data generated is appended to it in order
     as (position, value) tuples.
     """
-    def __init__(self, partition, stop=1000):
-        self.partition = partition
-        self.name = partition.encode()
-        self.key = partition.encode()
+    def __init__(self, key, stop=1000, start=0):
+        self.key = key
+        self.name = key.encode()
+        self.key = key.encode()
         self.closed = False
-        self.position = 0
+        self.position = start
         self.stop = stop
+        self.start = start
         self.data = []
 
     def __str__(self):
@@ -670,9 +671,9 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
     def point_of_ref(self):
         return self.position
 
-    def reset(self, pos=0):
-        #print("INFO: resetting {} from {} to position {}"
-        #      .format(self.__str__(), self.point_of_ref(), pos))
+    def reset(self, pos=None):
+        if pos is None:
+            pos = self.start
         self.position = pos
 
     def __next__(self):
@@ -706,7 +707,7 @@ class ALOSender(StoppableThread):
             host, port)
         self.name = "ALOSender_{}".format(source.name.decode())
         self.source = source
-        print("ALO: source = {}".format(source))
+        logging.debug("ALO: source = {}".format(source))
         self.data = source.data
         self.host = host
         self.port = port
@@ -714,13 +715,9 @@ class ALOSender(StoppableThread):
 
     def run(self):
         self.start_time = datetime.datetime.now()
-        logging.debug("ALOSender step A")
         self.client.connect()
-        logging.debug("ALOSender step B")
         self.client.add_source(self.source)
-        logging.debug("ALOSender step C")
         self.client.join()
-        logging.debug("ALOSender step D")
 
     def stop(self, error=None):
         logging.debug("ALOSender stop")
