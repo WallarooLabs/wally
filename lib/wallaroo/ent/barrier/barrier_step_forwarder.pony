@@ -74,8 +74,8 @@ class BarrierStepForwarder
 
     if barrier_token != _barrier_token then
       @printf[I32]("Received %s when still processing %s at step %s\n"
-        .cstring(), _barrier_token.string().cstring(),
-        barrier_token.string().cstring(), _step_id.string().cstring())
+        .cstring(), barrier_token.string().cstring(),
+        _barrier_token.string().cstring(), _step_id.string().cstring())
       Fail()
     end
 
