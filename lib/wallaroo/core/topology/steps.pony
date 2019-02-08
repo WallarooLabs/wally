@@ -161,6 +161,9 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   fun ref metrics_reporter(): MetricsReporter =>
     _metrics_reporter
 
+  fun routing_id(): RoutingId =>
+    _id
+
   be update_router(router': Router) =>
     _update_router(router')
 

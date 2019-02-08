@@ -69,9 +69,6 @@ actor DataReceiver is Producer
   let _step_group_producers: Map[RoutingId, SetIs[RoutingId]] =
     _step_group_producers.create()
 
-  // Checkpoint
-  var _next_checkpoint_id: CheckpointId = 1
-
   var _phase: _DataReceiverPhase = _DataReceiverNotProcessingPhase
 
   new create(auth: AmbientAuth, id: RoutingId, worker_name: String,
@@ -342,10 +339,6 @@ actor DataReceiver is Producer
     if seq_id > _last_id_seen then
       _ack_counter = _ack_counter + 1
       _last_id_seen = seq_id
-      match barrier_token
-      | let sbt: CheckpointBarrierToken =>
-        checkpoint_state(sbt.id)
-      end
       _router.forward_barrier(target_step_id, origin_step_id, this,
         barrier_token)
     end
@@ -365,7 +358,7 @@ actor DataReceiver is Producer
     """
     DataReceivers don't currently write out any data as part of the checkpoint.
     """
-    _next_checkpoint_id = checkpoint_id + 1
+    None
 
   be prepare_for_rollback() =>
     """
@@ -379,7 +372,6 @@ actor DataReceiver is Producer
     """
     There is nothing for a DataReceiver to rollback to.
     """
-    _next_checkpoint_id = checkpoint_id + 1
     event_log.ack_rollback(_id)
 
   ///////////////
