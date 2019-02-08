@@ -32,9 +32,6 @@ trait WindowsPhase[In: Any val, Out: Any val, Acc: State ref]
 
   fun earliest_start_ts(): U64 => 0
 
-  fun pane_start_times(): Array[U64] val =>
-    []
-
   fun check_panes_increasing(): Bool =>
     false
 
@@ -98,9 +95,6 @@ class ProcessingWindowsPhase[In: Any val, Out: Any val, Acc: State ref] is
 
   fun earliest_start_ts(): U64 =>
     _windows_wrapper.earliest_start_ts()
-
-  fun pane_start_times(): Array[U64] val =>
-    _windows_wrapper.pane_start_times()
 
   fun check_panes_increasing(): Bool =>
     _windows_wrapper.check_panes_increasing()

@@ -49,7 +49,6 @@ actor _WindowTests is TestList
     test(_TestSlidingWindowsStragglersSequence)
     test(_TestSlidingWindowsSequence)
     test(_TestCountWindows)
-    test(_TestPanesDontHaveGaps)
 
 class iso _TestTumblingWindowsTimeoutTrigger is UnitTest
   fun name(): String => "windows/_TestTumblingWindowsTimeoutTrigger"
@@ -345,21 +344,6 @@ class iso _TestSlidingWindows is UnitTest
     h.assert_array_eq[USize]([],
       _OutArray(sw(40, Seconds(214), Seconds(215)))?)
     h.assert_true(sw.check_panes_increasing())
-
-class iso _TestPanesDontHaveGaps is UnitTest
-  fun name(): String => "windows/_TestPanesDontHaveGaps"
-  fun apply(h: TestHelper) =>
-    // given
-    let sw = RangeWindows[USize, USize, _Total]("key",
-      _Sum where range=Seconds(10), slide=Seconds(2), delay=0)
-      .>apply(2, Seconds(92), Seconds(100))
-      .>apply(108, Seconds(108), Seconds(112))
-    // when
-    sw(108, Seconds(110), Seconds(113))
-    //then
-    h.assert_array_eq[U64](
-      [Seconds(110); Seconds(112); Seconds(104); Seconds(106); Seconds(108)],
-      sw.pane_start_times())
 
 
 class iso _TestSlidingWindowsNoDelay is UnitTest

@@ -74,14 +74,7 @@ if args.window_type == 'sliding':
             most_common = counter.most_common(3)
             assert(len(most_common) > 0)
             for key, count in most_common:
-            # [ ] [2] [ ] [2 ] [ ]
-            # |     |
-            #     |     |
-            #         |     |
-            #             |      |
-            # '2' can appear 4 times given slide/range = 0.5
-                assert(count in (1,2,3,4))
-
+                assert(count in (1,2))
 
 # Regardless of window type, check sequentialty:
 # 1. increments are always at +1 size
@@ -94,7 +87,5 @@ for key in sequences:
         if not ((v == old + 1) or (v <= old)):
             print("!@ Old for key " + key + ": " + str(old))
             print("!@ Cur for key " + key + ": " + str(v))
-            print(sequences[key])
-
         assert((v == old + 1) or (v <= old))
         old = v
