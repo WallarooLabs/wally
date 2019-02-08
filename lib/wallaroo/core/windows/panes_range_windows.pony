@@ -133,11 +133,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       let pane_idx = _pane_idx_for_event_ts(event_ts, earliest_ts)
       try
         ifdef debug then
-          if (not event_ts >= _panes_start_ts(pane_idx)?) then
-            @printf[I32]("event ts: %s pane idx: %s\n".cstring(), event_ts.string().cstring(), pane_idx.string().cstring())
-            for x in pane_start_times().values() do @printf[I32]("%s ".cstring(), x.string().cstring()) end ; @printf[I32]("\n".cstring())
-            Invariant(event_ts >= _panes_start_ts(pane_idx)?)
-          end
+          Invariant(event_ts >= _panes_start_ts(pane_idx)?)
         end
         match _panes(pane_idx)?
         | let acc: Acc =>
@@ -314,14 +310,6 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       Fail()
       false
     end
-
-  fun pane_start_times(): Array[U64] val =>
-    var res = recover trn Array[U64].create() end
-    try
-      for p_idx in Range(0, _panes.size()) do
-        res.push(_panes_start_ts(p_idx)?) end
-    end
-    consume res
 
   fun check_panes_increasing(): Bool =>
     try

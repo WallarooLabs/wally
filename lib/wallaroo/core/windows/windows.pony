@@ -111,9 +111,6 @@ trait WindowsWrapper[In: Any val, Out: Any val, Acc: State ref]
 
   fun earliest_start_ts(): U64
 
-  fun pane_start_times(): Array[U64] val =>
-    []
-
   fun check_panes_increasing(): Bool =>
     false
 
@@ -310,9 +307,6 @@ class RangeWindows[In: Any val, Out: Any val, Acc: State ref] is
   =>
     _phase = ProcessingWindowsPhase[In, Out, Acc](windows_wrapper)
     _phase.attempt_to_trigger(input_watermark_ts)
-
-  fun pane_start_times(): Array[U64] val =>
-    _phase.pane_start_times()
 
   fun check_panes_increasing(): Bool =>
     _phase.check_panes_increasing()
