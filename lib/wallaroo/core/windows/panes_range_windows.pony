@@ -91,7 +91,8 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       0
     end
 
-  fun ref apply(input: In, event_ts: U64, watermark_ts: U64): WindowOutputs[Out]
+  fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
+    WindowOutputs[Out]
   =>
     _highest_seen_event_ts = _highest_seen_event_ts.max(event_ts)
     try
@@ -172,17 +173,19 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       end
     try
       (let earliest_ts, let end_ts) = _earliest_and_end_ts()?
-      let first_new_disconnected_window_start_ts =
-        _panes_start_ts(_panes_start_ts.size()-1)? + _range
+      let last_pane_idx =
+        (_earliest_window_idx + (_panes_start_ts.size() - 1)) %
+          _panes_start_ts.size()
+      let last_pane_start_ts = _panes_start_ts(last_pane_idx)?
       let lowest_possible_new_start_ts =
         (effective_watermark_ts - _range - _delay)
       let trigger_diff =
-        if lowest_possible_new_start_ts > first_new_disconnected_window_start_ts
-        then
-          lowest_possible_new_start_ts - first_new_disconnected_window_start_ts
+        if lowest_possible_new_start_ts > last_pane_start_ts then
+          lowest_possible_new_start_ts - last_pane_start_ts
         else
           0
         end
+
       var stopped = false
       while not stopped do
         (let next_out, let out_event_ts, stopped) =
@@ -192,6 +195,9 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
         | let out: Out =>
           outs.push((out, out_event_ts))
         end
+      end
+      ifdef debug then
+        Invariant(_panes_are_contiguous())
       end
     else
       Fail()
@@ -241,7 +247,6 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     _earliest_window_idx = next_pane_idx
     (out, window_end_ts)
 
-
   fun ref _expand_windows(event_ts: U64, end_ts: U64) ? =>
     let new_pane_count = _ExpandSlidingWindow.new_pane_count(event_ts,
       end_ts, _panes.size(), _pane_size, _panes_per_slide)
@@ -290,6 +295,25 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
 
   fun _should_trigger(window_start_ts: U64, watermark_ts: U64): Bool =>
     (window_start_ts + (_range - 1)) < (watermark_ts - _delay)
+
+  fun _panes_are_contiguous(): Bool =>
+    try
+      var panes_are_contiguous = true
+      var idx = _earliest_window_idx
+      var last_start_ts = _panes_start_ts(idx)?
+      for _ in Range(1, _panes_start_ts.size()) do
+        idx = (idx + 1) % _panes_start_ts.size()
+        let next_start_ts = _panes_start_ts(idx)?
+        if (next_start_ts - last_start_ts) != _pane_size then
+          panes_are_contiguous = false
+        end
+        last_start_ts = next_start_ts
+      end
+      panes_are_contiguous
+    else
+      Fail()
+      false
+    end
 
   fun pane_start_times(): Array[U64] val =>
     var res = recover trn Array[U64].create() end
