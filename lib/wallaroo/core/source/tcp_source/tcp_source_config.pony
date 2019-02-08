@@ -24,7 +24,7 @@ use "wallaroo/core/source"
 use "wallaroo_labs/mort"
 
 primitive TCPSourceConfigCLIParser
-  fun apply(args: Array[String] val): Map[String, TCPSourceConfigOptions] val ? =>
+  fun apply(args: Array[String] val): Map[SourceName, TCPSourceConfigOptions] val ? =>
     let in_arg = "in"
     let short_in_arg = "i"
 
@@ -45,9 +45,9 @@ primitive TCPSourceConfigCLIParser
     error
 
   fun _from_input_string(inputs: String):
-    Map[String, TCPSourceConfigOptions] val
+    Map[SourceName, TCPSourceConfigOptions] val
   =>
-    let opts = recover trn Map[String, TCPSourceConfigOptions] end
+    let opts = recover trn Map[SourceName, TCPSourceConfigOptions] end
 
     for input in inputs.split(",").values() do
       try

@@ -69,11 +69,9 @@ type Stage is (RunnerBuilder | SinkBuilder | Array[SinkBuilder] val |
 class Pipeline[Out: Any val] is BasicPipeline
   let _stages: Dag[Stage]
   let _dag_sink_ids: Array[RoutingId]
-  // map from source name to worker specific source config
   var _worker_source_configs: Map[SourceName, WorkerSourceConfig] =
     _worker_source_configs.create()
   var _finished: Bool
-
 
   var _last_is_shuffle: Bool
   var _last_is_key_by: Bool
