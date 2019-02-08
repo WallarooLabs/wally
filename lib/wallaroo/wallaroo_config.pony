@@ -23,9 +23,6 @@ use "wallaroo/ent/spike"
 
 class StartupOptions
   var m_arg: (Array[String] | None) = None
-  var input_addrs: Map[String, (String, String)] val =
-    recover input_addrs.create() end
-  // var input_addrs: Array[Array[String]] val = recover Array[Array[String]] end
   var c_addr: Array[String] = [""; "0"]
   var c_host: String = ""
   var c_service: String = "0"
@@ -66,15 +63,7 @@ primitive WallarooConfig
     (let so, let z) = _parse(args where handle_help = true)?
     so
 
-  fun wactor_args(args: Array[String] val): StartupOptions ? =>
-    // The wactor system expects to get input addresses from this function,
-    // Wallaroo expects applications to parse this information themselves.
-    (let so, let z) = _parse(args where handle_help = true,
-      include_input_addrs = true)?
-    so
-
-  fun _parse(args: Array[String] val, handle_help: Bool,
-    include_input_addrs: Bool = true): (StartupOptions, Array[String] val) ?
+  fun _parse(args: Array[String] val, handle_help: Bool): (StartupOptions, Array[String] val) ?
   =>
     let so: StartupOptions ref = StartupOptions
 
@@ -119,25 +108,12 @@ primitive WallarooConfig
       options.add("help", "h", None)
     end
 
-    if include_input_addrs then
-      options.add("in", "i", StringArgument)
-    end
-
     for option in options do
       match option
       | ("help", let arg: None) =>
         StartupHelp()
       | ("metrics", let arg: String) =>
         so.m_arg = arg.split(":")
-      | ("in", let arg: String) =>
-        let input_addrs_trn = recover trn Map[String, (String, String)] end
-        for input_address in arg.split(",").values() do
-          let source_and_address = input_address.split("@")
-          let address_data = source_and_address(1)?.split(":")
-          input_addrs_trn.update(source_and_address(0)?,
-            (address_data(0)?, address_data(1)?))
-        end
-        so.input_addrs = consume input_addrs_trn
       | ("control", let arg: String) =>
         so.c_addr = arg.split(":")
         so.c_host = so.c_addr(0)?

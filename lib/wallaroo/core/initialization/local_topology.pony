@@ -244,6 +244,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   let _is_joining: Bool
 
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
+  // Map from the source name to the WorkerSourceConfig
   let _worker_source_configs: Map[SourceName, WorkerSourceConfig] val
 
   // Accumulate all SourceListenerBuilders so we can build them
