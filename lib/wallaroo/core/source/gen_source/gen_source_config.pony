@@ -22,12 +22,10 @@ use "wallaroo/core/partitioning"
 use "wallaroo/core/source"
 
 class val GenSourceConfig[In: Any val]
-  let _gen: GenSourceGeneratorBuilder[In]
   let _worker_source_config: WorkerGenSourceConfig[In]
 
   new val create(gen: GenSourceGeneratorBuilder[In]) =>
-    _gen = gen
-    _worker_source_config = WorkerGenSourceConfig[In](_gen)
+    _worker_source_config = WorkerGenSourceConfig[In](gen)
 
   fun source_listener_builder_builder(): GenSourceListenerBuilderBuilder[In] =>
     GenSourceListenerBuilderBuilder[In]
