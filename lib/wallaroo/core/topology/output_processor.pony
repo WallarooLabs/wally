@@ -87,7 +87,7 @@ primitive OutputProcessor
         this_last_ts = ts
       end
       (this_is_finished, this_last_ts)
-    // !@ !TODO! !! ONLY HERE UNTIL FRACTIONALIDs ARE REMOVED
+    // !TODO!: ONLY HERE UNTIL FRACTIONALIDs ARE REMOVED
     | let os: Array[(Out,U64)] val =>
       var this_is_finished = true
       var this_last_ts = computation_end
