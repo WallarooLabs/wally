@@ -116,7 +116,7 @@ actor GenSourceListener[In: Any val] is SourceListener
     _create_source()
 
   fun ref _create_source() =>
-    let name = _pipeline_name + " source"
+    let name = _worker_name + ":" + _pipeline_name + " source"
     let temp_id = MD5(name)
     let rb = Reader
     rb.append(temp_id)
