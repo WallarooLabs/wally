@@ -77,9 +77,6 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       pane_start = pane_start + _pane_size
     end
 
-  fun _is_past_end_ts(event_ts: U64, end_ts: U64) : Bool =>
-    event_ts > end_ts
-
   fun window_count(): USize =>
     ((_panes.size() - _panes_per_slide) / _panes_per_slide) + 1
 
@@ -284,6 +281,9 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
 
   fun _all_pane_range(): U64 =>
     _panes.size().u64() * _pane_size
+
+  fun _is_past_end_ts(event_ts: U64, end_ts: U64) : Bool =>
+    event_ts > end_ts
 
   fun _pane_idx_for_event_ts(event_ts: U64, earliest_ts: U64): USize =>
     let pane_idx_offset = ((event_ts - earliest_ts) / _pane_size).usize()

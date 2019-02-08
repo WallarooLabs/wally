@@ -28,8 +28,7 @@ use "wallaroo/core/topology"
 use "wallaroo_labs/math"
 use "wallaroo_labs/mort"
 
-type WindowOutputs[Out: Any val] is
-  (Array[(Out, U64)] val, U64)
+type WindowOutputs[Out: Any val] is (Array[(Out, U64)] val, U64)
 
 primitive EmptyWindow
 primitive EmptyPane
