@@ -46,7 +46,8 @@ class ConnectorSourceNotify[In: Any val]
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
 
-  // Watermark !@ How do we handle this respecting per-connector-type policies
+  // Watermark !TODO! How do we handle this respecting per-connector-type
+  // policies
   var _watermark_ts: U64 = 0
 
   new iso create(source_id: RoutingId, pipeline_name: String, env: Env,
