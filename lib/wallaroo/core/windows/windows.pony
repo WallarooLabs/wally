@@ -216,7 +216,7 @@ class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
     StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelization)
 
   fun timeout_interval(): U64 =>
-    // !@ !TODO!: Decide if we should set a minimum to this interval to
+    // !TODO!: Decide if we should set a minimum to this interval to
     // avoid extremely frequent timer messages.
     let range_delay_based = (_range + _delay) * 2
     // if range_delay_based > Seconds(1) then
