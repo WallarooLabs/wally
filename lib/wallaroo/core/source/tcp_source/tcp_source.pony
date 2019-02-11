@@ -434,8 +434,8 @@ actor TCPSource[In: Any val] is Source
     end
 
     match token
-    | let sbt: CheckpointBarrierToken =>
-      checkpoint_state(sbt.id)
+    | let cpbt: CheckpointBarrierToken =>
+      checkpoint_state(cpbt.id)
     end
     for (o_id, o) in _outputs.pairs() do
       match o
