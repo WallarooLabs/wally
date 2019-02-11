@@ -68,6 +68,10 @@ trait ref StateWrapper[In: Any val, Out: Any val, S: State ref]
     (ComputationResult[Out], U64)
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64):
     (ComputationResult[Out], U64)
+  fun ref flush_windows(input_watermark_ts: U64,
+    output_watermark_ts: U64): (ComputationResult[Out], U64)
+  =>
+    (None, input_watermark_ts)
   fun ref encode(auth: AmbientAuth): ByteSeq
 
 class EmptyState is State

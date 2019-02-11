@@ -92,6 +92,9 @@ trait Windows[In: Any val, Out: Any val, Acc: State ref] is
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64):
     (ComputationResult[Out], U64)
 
+  fun ref flush_windows(input_watermark_ts: U64,
+    output_watermark_ts: U64): (ComputationResult[Out], U64)
+
   fun window_count(): USize
 
   /////////
@@ -114,7 +117,8 @@ trait WindowsWrapperBuilder[In: Any val, Out: Any val, Acc: State ref]
   fun ref apply(watermark_ts: U64): WindowsWrapper[In, Out, Acc]
 
 trait WindowsWrapper[In: Any val, Out: Any val, Acc: State ref]
-  fun ref apply(input: In, event_ts: U64, watermark_ts: U64): WindowOutputs[Out]
+  fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
+    WindowOutputs[Out]
 
   fun ref attempt_to_trigger(watermark_ts: U64): WindowOutputs[Out]
 
@@ -191,6 +195,12 @@ class GlobalWindow[In: Any val, Out: Any val, Acc: State ref] is
   =>
     // We trigger per message, so we do nothing on the timer
     (recover val Array[Out] end, input_watermark_ts)
+
+  fun ref flush_windows(input_watermark_ts: U64,
+    output_watermark_ts: U64): (ComputationResult[Out], U64)
+  =>
+    // We trigger per message, so there is nothing to flush
+    (recover val Array[Out] end, output_watermark_ts)
 
   fun window_count(): USize => 1
 
@@ -291,7 +301,12 @@ class RangeWindows[In: Any val, Out: Any val, Acc: State ref] is
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64):
     (ComputationResult[Out], U64)
   =>
-    _attempt_to_trigger(input_watermark_ts, output_watermark_ts)
+    _attempt_to_trigger(input_watermark_ts)
+
+  fun ref flush_windows(input_watermark_ts: U64,
+    output_watermark_ts: U64): (ComputationResult[Out], U64)
+  =>
+    _attempt_to_trigger(TimeoutWatermark())
 
   fun window_count(): USize =>
     _phase.window_count()
@@ -308,8 +323,7 @@ class RangeWindows[In: Any val, Out: Any val, Acc: State ref] is
       recover Array[U8] end
     end
 
-  fun ref _attempt_to_trigger(input_watermark_ts: U64,
-    output_watermark_ts: U64):
+  fun ref _attempt_to_trigger(input_watermark_ts: U64):
     (ComputationResult[Out], U64)
   =>
     _phase.attempt_to_trigger(input_watermark_ts)
@@ -420,6 +434,17 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
 
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64):
     (ComputationResult[Out], U64)
+  =>
+    var out: (Out | None) = None
+    var new_output_watermark_ts = output_watermark_ts
+    if _current_count > 0 then
+      out = _trigger(new_output_watermark_ts)
+      new_output_watermark_ts = input_watermark_ts
+    end
+    (out, new_output_watermark_ts)
+
+  fun ref flush_windows(input_watermark_ts: U64,
+    output_watermark_ts: U64): (ComputationResult[Out], U64)
   =>
     var out: (Out | None) = None
     var new_output_watermark_ts = output_watermark_ts

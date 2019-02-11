@@ -77,7 +77,7 @@ class val StepBuilder
   =>
     let runner = _runner_builder(where event_log = event_log, auth = auth,
       router = router, partitioner_builder = _partitioner_builder)
-    let step = Step(auth, consume runner,
+    let step = Step(auth, worker_name, consume runner,
       MetricsReporter(_app_name, worker_name, metrics_conn), routing_id,
       event_log, recovery_replayer,
       outgoing_boundaries, router_registry, router)
