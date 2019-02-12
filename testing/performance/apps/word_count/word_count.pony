@@ -42,7 +42,7 @@ actor Main
       let pipeline = recover val
         let lines = Wallaroo.source[String]("Word Count",
           TCPSourceConfig[String].from_options(StringFrameHandler,
-                TCPSourceConfigCLIParser(env.args)?(0)?, 1))
+                TCPSourceConfigCLIParser("Word Count", env.args)?, 1))
 
         lines
           .to[String](Split)

@@ -98,7 +98,7 @@ actor Main
       let pipeline = recover val
         Wallaroo.source[U64]("Sequence Window",
             TCPSourceConfig[U64].from_options(U64FramedHandler,
-              TCPSourceConfigCLIParser(env.args)?("Sequence Window")?))
+              TCPSourceConfigCLIParser("Sequence Window", env.args)?))
           .key_by(ExtractWindow)
           .to[String val](ObserveNewValue)
           .to_sink(TCPSinkConfig[String val].from_options(WindowEncoder,

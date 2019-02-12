@@ -70,14 +70,14 @@ actor Main
           | Ping =>
             Wallaroo.source[U8]("Ping",
               TCPSourceConfig[U8].from_options(PongDecoder,
-                TCPSourceConfigCLIParser(env.args)?("Ping")?))
+                TCPSourceConfigCLIParser("Ping", env.args)?))
               .to[U8](Pingify)
               .to_sink(TCPSinkConfig[U8].from_options(PingPongEncoder,
                 TCPSinkConfigCLIParser(env.args)?(0)?))
           | Pong =>
             Wallaroo.source[U8]("Pong",
               TCPSourceConfig[U8].from_options(PingDecoder,
-                TCPSourceConfigCLIParser(env.args)?("Pong")?))
+                TCPSourceConfigCLIParser("Pong", env.args)?))
               .to[U8](Pongify)
               .to_sink(TCPSinkConfig[U8].from_options(PingPongEncoder,
                 TCPSinkConfigCLIParser(env.args)?(0)?))
