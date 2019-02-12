@@ -24,7 +24,9 @@ use "wallaroo/core/source"
 use "wallaroo_labs/mort"
 
 primitive TCPSourceConfigCLIParser
-  fun apply(args: Array[String] val): Map[SourceName, TCPSourceConfigOptions] val ? =>
+  fun apply(source_name: SourceName, args: Array[String] val):
+    TCPSourceConfigOptions val ?
+  =>
     let in_arg = "in"
     let short_in_arg = "i"
 
@@ -38,41 +40,46 @@ primitive TCPSourceConfigCLIParser
       | ("help", let arg: None) =>
         StartupHelp()
       | (in_arg, let input: String) =>
-        return _from_input_string(input)
+        return _from_input_string(input, source_name)?
       end
     end
+    TCPSourceConfigOptions("0", "0", source_name, false)
 
-    error
-
-  fun _from_input_string(inputs: String):
-    Map[SourceName, TCPSourceConfigOptions] val
+  fun _from_input_string(inputs: String, source_name: SourceName):
+    TCPSourceConfigOptions val ?
   =>
     let opts = recover trn Map[SourceName, TCPSourceConfigOptions] end
 
     for input in inputs.split(",").values() do
       try
         let source_name_and_address = input.split("@")
+        let source_name_data = source_name_and_address(0)?
         let address_data = source_name_and_address(1)?.split(":")
-        opts.update(source_name_and_address(0)?,
+        opts.update(source_name_data,
           TCPSourceConfigOptions(address_data(0)?, address_data(1)?,
-          source_name_and_address(0)?))
+          source_name_data))
       else
         FatalUserError("Inputs must be in the `source_name@host:service`" +
           " format!")
       end
     end
 
-    consume opts
+  opts(source_name)?
 
 class val TCPSourceConfigOptions
   let host: String
   let service: String
   let source_name: SourceName
+  let valid: Bool
 
-  new val create(host': String, service': String, source_name': SourceName) =>
+  new val create(host': String, service': String,
+    source_name': SourceName, valid': Bool = true)
+  =>
     host = host'
     service = service'
     source_name = source_name'
+    valid = valid'
+
 
 class val TCPSourceConfig[In: Any val]
   let handler: FramedSourceHandler[In] val
@@ -80,11 +87,13 @@ class val TCPSourceConfig[In: Any val]
   let _worker_source_config: WorkerTCPSourceConfig
 
   new val create(handler': FramedSourceHandler[In] val, host': String,
-    service': String, source_name': SourceName, parallelism': USize = 10)
+    service': String, source_name': SourceName, valid': Bool,
+    parallelism': USize = 10)
   =>
     handler = handler'
     parallelism = parallelism'
-    _worker_source_config = WorkerTCPSourceConfig(source_name', host', service')
+    _worker_source_config = WorkerTCPSourceConfig(source_name', host',
+      service', valid')
 
   new val from_options(handler': FramedSourceHandler[In] val,
     opts: TCPSourceConfigOptions, parallelism': USize = 10)
@@ -92,7 +101,7 @@ class val TCPSourceConfig[In: Any val]
     handler = handler'
     parallelism = parallelism'
     _worker_source_config = WorkerTCPSourceConfig(opts.source_name, opts.host,
-      opts.service)
+      opts.service, opts.valid)
 
   fun val source_listener_builder_builder(): TCPSourceListenerBuilderBuilder[In] =>
     TCPSourceListenerBuilderBuilder[In](this)
@@ -107,9 +116,12 @@ class val WorkerTCPSourceConfig is WorkerSourceConfig
   let host: String
   let service: String
   let source_name: SourceName
+  let valid: Bool
 
-  new val create(source_name': SourceName, host': String, service': String) =>
+  new val create(source_name': SourceName, host': String,
+    service': String, valid': Bool)
+  =>
     host = host'
     service = service'
     source_name = source_name'
-
+    valid = valid'
