@@ -92,7 +92,7 @@ actor Main
           Wallaroo.source[t.Message]("Detector",
             TCPSourceConfig[t.Message]
               .from_options(PartitionedU64FramedHandler,
-                TCPSourceConfigCLIParser(env.args)?("Detector")?))
+                TCPSourceConfigCLIParser("Detector", env.args)?))
         end
         // Add as many layers of depth as specified in the `--depth` option
         for x in Range[USize](1, depth + 1) do

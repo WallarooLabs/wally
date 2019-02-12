@@ -93,12 +93,12 @@ actor Main
       let pipeline = recover val
         let orders = Wallaroo.source[FixOrderMessage val]("Orders",
             TCPSourceConfig[FixOrderMessage val].from_options(FixOrderFrameHandler,
-              TCPSourceConfigCLIParser(env.args)?("Orders")?))
+              TCPSourceConfigCLIParser("Orders", env.args)?))
           .key_by(OrderSymbolExtractor)
 
         let nbbos = Wallaroo.source[FixNbboMessage val]("Nbbo",
-            TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
-              TCPSourceConfigCLIParser(env.args)?("Nbbo")?))
+            TCPSourceConmarketfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
+              TCPSourceConfigCLIParser("Nbbo", env.args)?))
           .key_by(NbboSymbolExtractor)
 
         orders.merge[FixNbboMessage val](nbbos)

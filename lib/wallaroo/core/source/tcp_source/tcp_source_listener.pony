@@ -68,14 +68,15 @@ actor TCPSourceListener[In: Any val] is SourceListener
   let _handler: FramedSourceHandler[In] val
   let _host: String
   let _service: String
+  let _valid: Bool
 
-  var _fd: U32
+  var _fd: U32 = 0
   var _event: AsioEventID = AsioEvent.none()
-  let _limit: USize
+  var _limit: USize = 0
   var _count: USize = 0
   var _closed: Bool = false
-  var _init_size: USize
-  var _max_size: USize
+  var _init_size: USize = 0
+  var _max_size: USize = 0
 
   let _connected_sources: SetIs[TCPSource[In]] = _connected_sources.create()
   let _available_sources: Array[TCPSource[In]] = _available_sources.create()
@@ -89,7 +90,7 @@ actor TCPSourceListener[In: Any val] is SourceListener
     layout_initializer: LayoutInitializer,
     recovering: Bool, target_router: Router = EmptyRouter,
     parallelism: USize, handler: FramedSourceHandler[In] val,
-    host: String, service: String,
+    host: String, service: String, valid: Bool,
     init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -114,50 +115,53 @@ actor TCPSourceListener[In: Any val] is SourceListener
     _handler = handler
     _host = host
     _service = service
+    _valid = valid
 
-    _event = @pony_os_listen_tcp[AsioEventID](this,
-      _host.cstring(), _service.cstring())
-    _limit = _parallelism
-    _init_size = init_size
-    _max_size = max_size
-    _fd = @pony_asio_event_fd(_event)
+    if _valid then
+      _event = @pony_os_listen_tcp[AsioEventID](this,
+        _host.cstring(), _service.cstring())
+      _limit = _parallelism
+      _init_size = init_size
+      _max_size = max_size
+      _fd = @pony_asio_event_fd(_event)
 
-    match router
-    | let pr: StatePartitionRouter =>
-      _router_registry.register_partition_router_subscriber(pr.step_group(),
-        this)
-    | let spr: StatelessPartitionRouter =>
-      _router_registry.register_stateless_partition_router_subscriber(
-        spr.partition_routing_id(), this)
-    end
-
-    @printf[I32]((pipeline_name + " source attempting to listen on "
-      + _host + ":" + _service +
-      "\n").cstring())
-    _notify_listening()
-
-    for i in Range(0, _limit) do
-      let source_id = _routing_id_gen()
-      let notify = TCPSourceNotify[In](source_id, _pipeline_name, _env,
-        _auth, _handler, _runner_builder, _partitioner_builder, _router,
-        _metrics_reporter.clone(), _event_log, _target_router)
-      let source = TCPSource[In](source_id, _auth, this,
-        consume notify, _event_log, _router,
-        _outgoing_boundary_builders, _layout_initializer,
-        _metrics_reporter.clone(), _router_registry)
-      source.mute(this)
-
-      _router_registry.register_source(source, source_id)
-      match _router
+      match router
       | let pr: StatePartitionRouter =>
-        _router_registry.register_partition_router_subscriber(
-          pr.step_group(), source)
+        _router_registry.register_partition_router_subscriber(pr.step_group(),
+          this)
       | let spr: StatelessPartitionRouter =>
         _router_registry.register_stateless_partition_router_subscriber(
-          spr.partition_routing_id(), source)
+          spr.partition_routing_id(), this)
       end
 
-      _available_sources.push(source)
+      @printf[I32]((pipeline_name + " source attempting to listen on "
+        + _host + ":" + _service +
+        "\n").cstring())
+      _notify_listening()
+
+      for i in Range(0, _limit) do
+        let source_id = _routing_id_gen()
+        let notify = TCPSourceNotify[In](source_id, _pipeline_name, _env,
+          _auth, _handler, _runner_builder, _partitioner_builder, _router,
+          _metrics_reporter.clone(), _event_log, _target_router)
+        let source = TCPSource[In](source_id, _auth, this,
+          consume notify, _event_log, _router,
+          _outgoing_boundary_builders, _layout_initializer,
+          _metrics_reporter.clone(), _router_registry)
+        source.mute(this)
+
+        _router_registry.register_source(source, source_id)
+        match _router
+        | let pr: StatePartitionRouter =>
+          _router_registry.register_partition_router_subscriber(
+            pr.step_group(), source)
+        | let spr: StatelessPartitionRouter =>
+          _router_registry.register_stateless_partition_router_subscriber(
+            spr.partition_routing_id(), source)
+        end
+
+        _available_sources.push(source)
+      end
     end
 
   be recovery_protocol_complete() =>

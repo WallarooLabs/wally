@@ -97,7 +97,7 @@ actor Main
       let pipeline = recover val
         let inputs = Wallaroo.source[U64]("Sequence Window",
             TCPSourceConfig[U64 val].from_options(U64FramedHandler,
-              TCPSourceConfigCLIParser(env.args)?("Sequence Window")?))
+              TCPSourceConfigCLIParser("Sequence Window", env.args)?))
 
         inputs
           .collect()

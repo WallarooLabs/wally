@@ -48,6 +48,7 @@ class val TCPSourceListenerBuilder[In: Any val] is SourceListenerBuilder
   let _handler: FramedSourceHandler[In] val
   let _host: String
   let _service: String
+  let _valid: Bool
 
   new val create(worker_name: WorkerName, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
@@ -58,7 +59,7 @@ class val TCPSourceListenerBuilder[In: Any val] is SourceListenerBuilder
     layout_initializer: LayoutInitializer,
     recovering: Bool, target_router: Router = EmptyRouter,
     parallelism: USize, handler: FramedSourceHandler[In] val,
-    host: String, service: String)
+    host: String, service: String, valid: Bool)
   =>
     _worker_name = worker_name
     _pipeline_name = pipeline_name
@@ -78,13 +79,15 @@ class val TCPSourceListenerBuilder[In: Any val] is SourceListenerBuilder
     _handler = handler
     _host = host
     _service = service
+    _valid = valid
 
   fun apply(env: Env): SourceListener =>
     TCPSourceListener[In](env, _worker_name, _pipeline_name, _runner_builder,
       _partitioner_builder, _router, _metrics_conn, _metrics_reporter.clone(),
       _router_registry,
       _outgoing_boundary_builders, _event_log, _auth, _layout_initializer,
-      _recovering, _target_router, _parallelism, _handler, _host, _service)
+      _recovering, _target_router, _parallelism, _handler, _host, _service,
+      _valid)
 
 class val TCPSourceListenerBuilderBuilder[In: Any val] is
   SourceListenerBuilderBuilder
@@ -113,7 +116,7 @@ class val TCPSourceListenerBuilderBuilder[In: Any val] is
         router_registry, outgoing_boundary_builders, event_log, auth,
         layout_initializer, recovering, target_router,
         _source_config.parallelism, _source_config.handler,
-        config.host, config.service)
+        config.host, config.service, config.valid)
     else
       Unreachable()
       TCPSourceListenerBuilder[In](worker_name, pipeline_name, runner_builder,
@@ -121,5 +124,5 @@ class val TCPSourceListenerBuilderBuilder[In: Any val] is
         router_registry, outgoing_boundary_builders, event_log, auth,
         layout_initializer, recovering, target_router,
         _source_config.parallelism, _source_config.handler,
-        "0", "0")
+        "0", "0", false)
     end

@@ -36,7 +36,7 @@ actor Main
       let pipeline = recover val
           let votes = Wallaroo.source[Votes]("Alphabet Votes",
                 TCPSourceConfig[Votes].from_options(VotesDecoder,
-                  TCPSourceConfigCLIParser(env.args)?("Alphabet Votes")?))
+                  TCPSourceConfigCLIParser("Alphabet Votes", env.args)?))
 
           votes
             .key_by(ExtractFirstLetter)
