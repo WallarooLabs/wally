@@ -32,7 +32,7 @@ actor Main
       let pipeline = recover val
         let values = Wallaroo.source[F32]("Celsius Conversion",
               TCPSourceConfig[F32].from_options(CelsiusDecoder,
-                TCPSourceConfigCLIParser(env.args)?("Celsius Conversion")?))
+                TCPSourceConfigCLIParser("Celsius Conversion", env.args)?))
 
         values
           .collect()
