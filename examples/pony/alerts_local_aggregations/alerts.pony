@@ -38,12 +38,7 @@ actor Main
             TransactionsGeneratorBuilder(where amount_limit = 100)))
 
         transactions
-          // .to[Transaction](_Identity[Transaction])
-          // .key_by(ExtractUser)
           .local_key_by(ExtractUser)
-          // .to[TransactionGroup](Wallaroo.range_windows(Seconds(1))
-          //       .over[Transaction, TransactionGroup, TransactionTotal](
-          //         TotalAggregation))
           .to[TransactionGroup](LocalCheckTransactionTotal)
           .key_by(ExtractUser)
           .to[RunningTotal](CheckTransactionTotal)
@@ -102,7 +97,6 @@ primitive LocalCheckTransactionTotal is
     TransactionGroup
   =>
     total.total = total.total + transaction.amount
-    @printf[I32]("!@ %s local total: %s\n".cstring(), transaction.user().cstring(), total.total.string().cstring())
     TransactionGroup(transaction.user(), transaction.amount)
 
   fun initial_state(): TransactionTotal =>
@@ -144,7 +138,9 @@ primitive TotalAggregation is
     new_t.total = t1.total + t2.total
     new_t
 
-  fun output(user: String, t: TransactionTotal): TransactionGroup =>
+  fun output(user: String, window_end_ts: U64, t: TransactionTotal):
+    TransactionGroup
+  =>
     TransactionGroup(user, t.total)
 
   fun name(): String => "Total Aggregation"
