@@ -99,7 +99,7 @@ class iso _TestSlidingWindowsOutputEventTimes is UnitTest
     let slide: U64 = Seconds(5)
     let delay: U64 = Seconds(10)
     let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay)
+      delay, _Zeros)
              .>apply(1, Seconds(111), Seconds(111))
              .>apply(2, Seconds(121), Seconds(121))
 
@@ -231,7 +231,7 @@ class iso _TestOutputWatermarkTsIsJustBeforeNextWindowStart is UnitTest
     let upstream_id: U128 = 1000
     let now: U64 = 1000
     let tw = RangeWindows[USize, USize, _Total]("key", _NonZeroSum, range,
-      slide, delay)
+      slide, delay, _Zeros)
     tw(1, Milliseconds(5000), Milliseconds(5000))
 
     // when
@@ -991,7 +991,8 @@ primitive _TumblingWindow
   =>
     let slide = range
     let delay: U64 = 0
-    RangeWindows[USize, USize, _Total]("key", _NonZeroSum, range, slide, delay)
+    RangeWindows[USize, USize, _Total]("key",
+      _NonZeroSum, range, slide, delay, _Zeros)
 
 class _Zeros is Random
   new ref create(x: U64 val = 0, y: U64 val = 0) => None
