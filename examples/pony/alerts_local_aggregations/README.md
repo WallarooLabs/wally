@@ -1,24 +1,15 @@
-# Alerts (stateless)
+# Alerts (local aggregations)
 
 ## About The Application
 
-This is an example of a stateless application that takes a transaction
-and sends an alert if its value is above or below a threshold.
+This is an example of a stateful application that builds up worker
+local aggregations before sending the results downstream where they
+are tallied across workers.
 
 ### Input
 
 For simplicity, we use a generator source that creates a stream of transaction
 objects.
-
-### Processing
-
-We examine each transaction at a stateless computation. If the amount is higher
-than a certain positive threshold, we create a deposit alert. If it's lower than a certain negative threshold, we create a withdrawal alert.
-
-### Output
-
-Alerts will output messages that are string representations of triggered
-alerts. 
 
 ## Running Alerts
 
@@ -65,7 +56,7 @@ data_receiver --ponythreads=1 --ponynoblock --listen 127.0.0.1:7002
 Run the application:
 
 ```bash
-alerts_stateless --out 127.0.0.1:7002 \
+alerts_local_aggregations --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --name worker-name --external 127.0.0.1:5050 --cluster-initializer \
   --ponynoblock

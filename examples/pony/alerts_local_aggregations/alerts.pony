@@ -144,7 +144,9 @@ primitive TotalAggregation is
     new_t.total = t1.total + t2.total
     new_t
 
-  fun output(user: String, t: TransactionTotal): TransactionGroup =>
+  fun output(user: String, window_end_ts: U64, t: TransactionTotal):
+    TransactionGroup
+  =>
     TransactionGroup(user, t.total)
 
   fun name(): String => "Total Aggregation"
