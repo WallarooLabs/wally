@@ -23,7 +23,8 @@ import wallaroo
 def application_setup(args):
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
-    gen_source = wallaroo.GenSourceConfig(TransactionsGenerator())
+    gen_source = wallaroo.GenSourceConfig("Alerts (stateful)",
+                                          TransactionsGenerator())
 
     transactions = wallaroo.source("Alerts (stateful)", gen_source)
     pipeline = (transactions

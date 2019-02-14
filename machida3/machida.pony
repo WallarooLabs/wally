@@ -896,44 +896,44 @@ primitive _SourceConfig
   fun from_tuple(source_config_tuple: Pointer[U8] val, env: Env):
     SourceConfig ?
   =>
-    let name = recover val
+    let type_name = recover val
       Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 0))
     end
+    let source_name = recover val
+      Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 1))
+    end
 
-    match name
+    match type_name
     | "gen" =>
       let gen = recover val
-        let g = @PyTuple_GetItem(source_config_tuple, 1)
+        let g = @PyTuple_GetItem(source_config_tuple, 2)
         Machida.inc_ref(g)
         PyGenSourceHandlerBuilder(g)
       end
       GenSourceConfig[PyData val](gen)
     | "tcp" =>
       let host = recover val
-        Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 1))
-      end
-
-      let port = recover val
         Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 2))
       end
 
+      let port = recover val
+        Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 3))
+      end
+
       let decoder = recover val
-        let d = @PyTuple_GetItem(source_config_tuple, 3)
+        let d = @PyTuple_GetItem(source_config_tuple, 4)
         Machida.inc_ref(d)
         PyFramedSourceHandler(d)?
       end
 
       let parallelism = recover val
-        USize.from[I64](@PyLong_AsLong(@PyTuple_GetItem(source_config_tuple, 4)))
+        USize.from[I64](@PyLong_AsLong(@PyTuple_GetItem(source_config_tuple, 5)))
       end
 
-      TCPSourceConfig[(PyData val | None)](decoder, host, port, parallelism)
+      TCPSourceConfig[(PyData val | None)](decoder, host, port, source_name,
+        parallelism)
     | "kafka-internal" =>
-      let kafka_source_name = recover val
-        Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 1))
-      end
-
-      let ksclip = KafkaSourceConfigCLIParser(env.out, kafka_source_name)
+      let ksclip = KafkaSourceConfigCLIParser(env.out, source_name)
       let ksco = ksclip.parse_options(env.args)?
 
       let decoder = recover val
@@ -942,17 +942,18 @@ primitive _SourceConfig
         PySourceHandler(d)
       end
 
-      KafkaSourceConfig[(PyData val | None)](consume ksco, (env.root as TCPConnectionAuth), decoder)
+      KafkaSourceConfig[(PyData val | None)](consume ksco, source_name,
+        (env.root as TCPConnectionAuth), decoder)
     | "kafka" =>
       let ksco = _kafka_config_options(source_config_tuple)
 
       let decoder = recover val
-        let d = @PyTuple_GetItem(source_config_tuple, 4)
+        let d = @PyTuple_GetItem(source_config_tuple, 5)
         Machida.inc_ref(d)
         PySourceHandler(d)
       end
-
-      KafkaSourceConfig[(PyData val | None)](consume ksco, (env.root as TCPConnectionAuth), decoder)
+      KafkaSourceConfig[(PyData val | None)](consume ksco, source_name,
+        (env.root as TCPConnectionAuth), decoder)
     | "source_connector" =>
       let host = recover val
         Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 2))
@@ -968,7 +969,7 @@ primitive _SourceConfig
         PyFramedSourceHandler(d)?
       end
 
-      ConnectorSourceConfig[(PyData val | None)](decoder, host, port)
+      ConnectorSourceConfig[(PyData val | None)](decoder, host, port, source_name)
     else
       error
     end
@@ -978,7 +979,7 @@ primitive _SourceConfig
       Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 1))
     end
 
-    let brokers_list = @PyTuple_GetItem(source_config_tuple, 2)
+    let brokers_list = @PyTuple_GetItem(source_config_tuple, 3)
 
     let brokers = recover val
       let num_brokers = @PyList_Size(brokers_list)
@@ -1000,7 +1001,7 @@ primitive _SourceConfig
     end
 
     let log_level = recover val
-      Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 3))
+      Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 4))
     end
 
     KafkaConfigOptions("Wallaroo Kafka Source", KafkaConsumeOnly, topic, brokers, log_level)
@@ -1009,21 +1010,24 @@ primitive _SinkConfig
   fun from_tuple(sink_config_tuple: Pointer[U8] val, env: Env):
     SinkConfig[PyData val] ?
   =>
-    let name = recover val
+    let type_name = recover val
       Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(sink_config_tuple, 0))
     end
+    let sink_name = recover val
+      Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(sink_config_tuple, 1))
+    end
 
-    match name
+    match type_name
     | "tcp" =>
       let host = recover val
-        Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(sink_config_tuple, 1))
-      end
-
-      let port = recover val
         Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(sink_config_tuple, 2))
       end
 
-      let encoderp = @PyTuple_GetItem(sink_config_tuple, 3)
+      let port = recover val
+        Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(sink_config_tuple, 3))
+      end
+
+      let encoderp = @PyTuple_GetItem(sink_config_tuple, 4)
       Machida.inc_ref(encoderp)
       let encoder = recover val
         PyTCPEncoder(encoderp)
@@ -1032,10 +1036,10 @@ primitive _SinkConfig
       TCPSinkConfig[PyData val](encoder, host, port)
     | "kafka-internal" =>
       let kafka_sink_name = recover val
-        Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(sink_config_tuple, 1))
+        Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(sink_config_tuple, 2))
       end
 
-      let encoderp = @PyTuple_GetItem(sink_config_tuple, 2)
+      let encoderp = @PyTuple_GetItem(sink_config_tuple, 3)
       Machida.inc_ref(encoderp)
       let encoder = recover val
         PyKafkaEncoder(encoderp)
@@ -1048,7 +1052,7 @@ primitive _SinkConfig
     | "kafka" =>
       let ksco = _kafka_config_options(sink_config_tuple)
 
-      let encoderp = @PyTuple_GetItem(sink_config_tuple, 6)
+      let encoderp = @PyTuple_GetItem(sink_config_tuple, 7)
       Machida.inc_ref(encoderp)
       let encoder = recover val
         PyKafkaEncoder(encoderp)
@@ -1057,14 +1061,14 @@ primitive _SinkConfig
       KafkaSinkConfig[PyData val](encoder, consume ksco, (env.root as TCPConnectionAuth))
     | "sink_connector" =>
       let host = recover val
-        Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(sink_config_tuple, 2))
-      end
-
-      let port = recover val
         Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(sink_config_tuple, 3))
       end
 
-      let encoderp = @PyTuple_GetItem(sink_config_tuple, 4)
+      let port = recover val
+        Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(sink_config_tuple, 4))
+      end
+
+      let encoderp = @PyTuple_GetItem(sink_config_tuple, 5)
       Machida.inc_ref(encoderp)
       let encoder = recover val
         PyConnectorEncoder(encoderp)
@@ -1077,10 +1081,10 @@ primitive _SinkConfig
 
   fun _kafka_config_options(source_config_tuple: Pointer[U8] val): KafkaConfigOptions iso^ =>
     let topic = recover val
-      Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 1))
+      Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 2))
     end
 
-    let brokers_list = @PyTuple_GetItem(source_config_tuple, 2)
+    let brokers_list = @PyTuple_GetItem(source_config_tuple, 3)
 
     let brokers = recover val
       let num_brokers = @PyList_Size(brokers_list)
@@ -1102,12 +1106,12 @@ primitive _SinkConfig
     end
 
     let log_level = recover val
-      Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 3))
+      Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 4))
     end
 
-    let max_produce_buffer_ms = @PyLong_AsLong(@PyTuple_GetItem(source_config_tuple, 4)).u64()
+    let max_produce_buffer_ms = @PyLong_AsLong(@PyTuple_GetItem(source_config_tuple, 5)).u64()
 
-    let max_message_size = @PyLong_AsLong(@PyTuple_GetItem(source_config_tuple, 5)).i32()
+    let max_message_size = @PyLong_AsLong(@PyTuple_GetItem(source_config_tuple, 6)).i32()
 
     KafkaConfigOptions("Wallaroo Kafka Sink", KafkaProduceOnly, topic, brokers, log_level, max_produce_buffer_ms, max_message_size)
 

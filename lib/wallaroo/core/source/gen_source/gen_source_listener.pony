@@ -117,6 +117,9 @@ actor GenSourceListener[In: Any val] is SourceListener
 
   fun ref _create_source() =>
     let name = _worker_name + ":" + _pipeline_name + " source"
+    ifdef debug then
+      @printf[I32]("Created GenSource: %s\n".cstring(), name.cstring())
+    end
     let temp_id = MD5(name)
     let rb = Reader
     rb.append(temp_id)

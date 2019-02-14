@@ -41,15 +41,16 @@ WORD_COUNT_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(rules_mk_path)
 
 build-examples-python-word_count: build-machida
-# build-examples-python-word_count: build-machida3
+build-examples-python-word_count: build-machida3
 integration-tests-examples-python-word_count: build-examples-python-word_count
 integration-tests-examples-python-word_count: word_count_py_test
-# integration-tests-examples-python-word_count: word_count_py3_test
+integration-tests-examples-python-word_count: word_count_py3_test
 clean-examples-python-alphabet: word_count_py_clean
 
 word_count_py_test:
 	cd $(WORD_COUNT_PY_PATH) && \
-	integration_test --newline-file-sender count_this.txt \
+	integration_test \
+		--newline-file-sender count_this.txt "'Split and Count'" \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 1 \
@@ -58,7 +59,8 @@ word_count_py_test:
 		--sink-mode newlines \
 		--sink-expect 482
 	cd $(WORD_COUNT_PY_PATH) && \
-	integration_test --newline-file-sender count_this.txt \
+	integration_test \
+	  --newline-file-sender count_this.txt "'Split and Count'" \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 1 \
@@ -68,7 +70,8 @@ word_count_py_test:
 		--sink-expect 482 \
 		--workers 2
 	cd $(WORD_COUNT_PY_PATH) && \
-	integration_test --newline-file-sender count_this.txt \
+	integration_test \
+		--newline-file-sender count_this.txt "'Split and Count'" \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 1 \
@@ -80,7 +83,8 @@ word_count_py_test:
 
 word_count_py3_test:
 	cd $(WORD_COUNT_PY_PATH) && \
-	integration_test --newline-file-sender count_this.txt \
+	integration_test \
+		--newline-file-sender count_this.txt "'Split and Count'" \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 1 \
@@ -89,7 +93,8 @@ word_count_py3_test:
 		--sink-mode newlines \
 		--sink-expect 482
 	cd $(WORD_COUNT_PY_PATH) && \
-	integration_test --newline-file-sender count_this.txt \
+	integration_test \
+		--newline-file-sender count_this.txt "'Split and Count'" \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 1 \
@@ -99,7 +104,8 @@ word_count_py3_test:
 		--sink-expect 482 \
 		--workers 2
 	cd $(WORD_COUNT_PY_PATH) && \
-	integration_test --newline-file-sender count_this.txt \
+	integration_test \
+		--newline-file-sender count_this.txt "'Split and Count'" \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 1 \

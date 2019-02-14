@@ -16,6 +16,7 @@
 
 
 import argparse
+import datetime
 import json
 import time
 import struct
@@ -42,15 +43,17 @@ def application_setup(args):
                     help="Number of partitions for use with internal source")
     pargs, _ = parser.parse_known_args(args)
 
+    source_name = "{} window".format(pargs.window_type)
     if pargs.gen_source:
         print("Using internal source generator")
-        source = wallaroo.GenSourceConfig(MultiPartitionGenerator(pargs.partitions))
+        source = wallaroo.GenSourceConfig(source_name,
+            MultiPartitionGenerator(pargs.partitions))
     else:
         print("Using TCP Source")
-        in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
-        source = wallaroo.TCPSourceConfig(in_host, in_port, decoder)
+        in_name, in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+        source = wallaroo.TCPSourceConfig(in_host, in_port, in_name, decoder)
 
-    p = wallaroo.source("{} window".format(pargs.window_type), source)
+    p = wallaroo.source(source_name, source)
     p = p.key_by(extract_key)
     p = p.to(trace_id)
     p = p.key_by(extract_key)
@@ -97,7 +100,9 @@ class MultiPartitionGenerator(object):
             next_value = last_value
         next_key = (last_key + 1) % self.partitions
 
-        return self.format_message(next_key, next_value)
+        m = self.format_message(next_key, next_value)
+        print("{} source decoded: {}".format(datetime.datetime.now(), m))
+        return m
 
     def format_message(self, key, val):
         m = Message("{}".format(key), val)

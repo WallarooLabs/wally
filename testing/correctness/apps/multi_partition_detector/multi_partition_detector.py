@@ -16,6 +16,7 @@
 
 
 import argparse
+import datetime
 import struct
 
 import wallaroo
@@ -36,11 +37,12 @@ def application_setup(args):
 
     if pargs.gen_source:
         print("Using internal source generator")
-        source = wallaroo.GenSourceConfig(MultiPartitionGenerator(pargs.partitions))
+        source = wallaroo.GenSourceConfig("Detector",
+            MultiPartitionGenerator(pargs.partitions))
     else:
         print("Using TCP Source")
-        in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
-        source = wallaroo.TCPSourceConfig(in_host, in_port, decoder)
+        in_name, in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+        source = wallaroo.TCPSourceConfig(in_host, in_port, in_name, decoder)
 
     p = wallaroo.source("Detector", source)
     for x in range(pargs.depth):
@@ -73,7 +75,11 @@ class MultiPartitionGenerator(object):
             next_value = last_value
         next_key = (last_key + 1) % self.partitions
 
-        return self.format_message(next_key, next_value)
+        m = self.format_message(next_key, next_value)
+
+        print("{} source decoded: {}".format(datetime.datetime.now(), m))
+
+        return m
 
     def format_message(self, key, val):
         m = Message("{}".format(key), val)
