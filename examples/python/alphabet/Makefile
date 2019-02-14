@@ -50,7 +50,8 @@ integration-tests-examples-python-alphabet: alphabet_py3_test
 alphabet_py_test:
 	cd $(ALPHABET_PY_PATH) && \
 	python _test/gen.py && \
-	integration_test --framed-file-sender _test.txt \
+	integration_test \
+		--framed-file-sender _test.txt alphabet \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 10 \
@@ -62,7 +63,8 @@ alphabet_py_test:
 alphabet_py3_test:
 	cd $(ALPHABET_PY_PATH) && \
 	python _test/gen.py && \
-	integration_test --framed-file-sender _test.txt \
+	integration_test \
+		--framed-file-sender _test.txt alphabet \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 10 \

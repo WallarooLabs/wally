@@ -52,7 +52,7 @@ integration-tests-testing-correctness-apps-sequence_window_python: sequence_wind
 
 sequence_window_python_test:
 	cd $(SEQUENCE_WINDOW_PYTHON_PATH) && \
-	integration_test --sequence-sender '(0,1000]' \
+	integration_test --sequence-sender '(0,1000]' "'Sequence Window'" \
 	  --log-level error \
 		--command 'machida --application-module sequence_window $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'validator -e 1000 -a -i' \
@@ -63,7 +63,7 @@ sequence_window_python_test:
 
 sequence_window_python3_test:
 	cd $(SEQUENCE_WINDOW_PYTHON_PATH) && \
-	integration_test --sequence-sender '(0,1000]' \
+	integration_test --sequence-sender '(0,1000]' "'Sequence Window'" \
 	  --log-level error \
 		--command 'machida3 --application-module sequence_window $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'validator -e 1000 -a -i' \

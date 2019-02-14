@@ -27,6 +27,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
+use "wallaroo_labs/mort"
 
 class val ConnectorSourceListenerBuilder[In: Any val]
   let _worker_name: WorkerName
@@ -85,32 +86,44 @@ class val ConnectorSourceListenerBuilder[In: Any val]
       _outgoing_boundary_builders, _event_log, _auth, _layout_initializer,
       _recovering, _target_router, _parallelism, _handler, _host, _service)
 
-class val ConnectorSourceListenerBuilderBuilder[In: Any val]
-  let _host: String
-  let _service: String
-  let _parallelism: USize
-  let _handler: FramedSourceHandler[In] val
+class val ConnectorSourceListenerBuilderBuilder[In: Any val] is SourceListenerBuilderBuilder
+  let _source_config: ConnectorSourceConfig[In]
 
-  new val create(host: String, service: String, parallelism: USize,
-    handler: FramedSourceHandler[In] val)
+  new val create(source_config: ConnectorSourceConfig[In])
   =>
-    _host = host
-    _service = service
-    _parallelism = parallelism
-    _handler = handler
+    _source_config = source_config
 
-  fun apply(worker_name: String, pipeline_name: String,
-    runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
-    router: Router, metrics_conn: MetricsSink,
-    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
+  fun apply(worker_name: String,
+    pipeline_name: String,
+    runner_builder: RunnerBuilder,
+    partitioner_builder: PartitionerBuilder,
+    router: Router,
+    metrics_conn: MetricsSink,
+    metrics_reporter: MetricsReporter iso,
+    router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
-    event_log: EventLog, auth: AmbientAuth,
+    event_log: EventLog,
+    auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, target_router: Router = EmptyRouter):
+    recovering: Bool,
+    worker_source_config: WorkerSourceConfig,
+    target_router: Router = EmptyRouter):
     ConnectorSourceListenerBuilder[In]
   =>
-    ConnectorSourceListenerBuilder[In](worker_name, pipeline_name,
-      runner_builder, partitioner_builder, router, metrics_conn,
-      consume metrics_reporter, router_registry, outgoing_boundary_builders,
-      event_log, auth, layout_initializer, recovering, target_router,
-      _parallelism, _handler, _host, _service)
+    match worker_source_config
+    | let config: WorkerConnectorSourceConfig =>
+      ConnectorSourceListenerBuilder[In](worker_name, pipeline_name,
+        runner_builder, partitioner_builder, router, metrics_conn,
+        consume metrics_reporter, router_registry, outgoing_boundary_builders,
+        event_log, auth, layout_initializer, recovering, target_router,
+        _source_config.parallelism, _source_config.handler,
+        config.host, config.service)
+    else
+      Unreachable()
+      ConnectorSourceListenerBuilder[In](worker_name, pipeline_name,
+        runner_builder, partitioner_builder, router, metrics_conn,
+        consume metrics_reporter, router_registry, outgoing_boundary_builders,
+        event_log, auth, layout_initializer, recovering, target_router,
+        _source_config.parallelism, _source_config.handler,
+        "0", "0")
+    end
