@@ -20,11 +20,11 @@ Let's dive in and take a look at our application setup:
 
 ```python
 def application_setup(args):
-    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+    in_name, in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
     lines = wallaroo.source("Split and Count",
-                        wallaroo.TCPSourceConfig(in_host, in_port, 
+                        wallaroo.TCPSourceConfig(in_name, in_host, in_port,
                             decode_lines))
     pipeline = lines\
         .to(split)\
@@ -39,7 +39,7 @@ By now, hopefully, most of this looks somewhat familiar. We're building on conce
 
 ```python
 lines = wallaroo.source("Split and Count",
-                    wallaroo.TCPSourceConfig(in_host, in_port, 
+                    wallaroo.TCPSourceConfig(in_name, in_host, in_port,
                         decode_line))
 ```
 

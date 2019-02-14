@@ -41,7 +41,7 @@ Initializer:
 ```bash
 export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida/lib"
 export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
-machida --application-module sequence_window --in 127.0.0.1:7010 \
+machida --application-module sequence_window --in 'Sequence Window'@127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
   --data 127.0.0.1:6001 --external 127.0.0.1:5050 --worker-count 2 \
   --cluster-initializer --ponythreads=1
@@ -52,7 +52,7 @@ Worker:
 ```bash
 export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida/lib"
 export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
-machida --application-module sequence_window --in 127.0.0.1:7010 \
+machida --application-module sequence_window --in 'Sequence Window'@127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
   --external 127.0.0.1:5051 --name worker-2 --ponythreads=1
 ```

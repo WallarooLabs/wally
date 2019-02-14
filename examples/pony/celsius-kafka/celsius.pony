@@ -43,8 +43,9 @@ actor Main
     try
       let pipeline = recover val
         let inputs = Wallaroo.source[F32]("Celsius Conversion",
-          KafkaSourceConfig[F32](ksource_clip.parse_options(env.args)?,
-          env.root as AmbientAuth, CelsiusKafkaDecoder))
+          KafkaSourceConfig[F32]("Celsius Conversion",
+            ksource_clip.parse_options(env.args)?,
+            env.root as AmbientAuth, CelsiusKafkaDecoder))
 
         inputs
           .to[F32](Multiply)

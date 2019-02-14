@@ -71,7 +71,7 @@ class val ConnectorSourceConfigOptions
   let service: String
   let source_name: SourceName
 
-  new val create(host': String, service': String, source_name': SourceName) =>
+  new val create(source_name': SourceName, host': String, service': String) =>
     host = host'
     service = service'
     source_name = source_name'
@@ -83,15 +83,15 @@ class val ConnectorSourceConfig[In: Any val] is SourceConfig
   let _service: String
   let _worker_source_config: WorkerConnectorSourceConfig
 
-  new val create(handler': FramedSourceHandler[In] val, host': String,
-    service': String, source_name: SourceName, parallelism': USize = 10)
+  new val create(source_name: SourceName, handler': FramedSourceHandler[In] val,
+    host': String, service': String, parallelism': USize = 10)
   =>
     handler = handler'
     parallelism = parallelism'
     _host = host'
     _service = service'
-    _worker_source_config = WorkerConnectorSourceConfig(_host, _service,
-      source_name)
+    _worker_source_config = WorkerConnectorSourceConfig(source_name, _host,
+      _service)
 
   new val from_options(handler': FramedSourceHandler[In] val,
     opts: ConnectorSourceConfigOptions, parallelism': USize = 10)
@@ -100,8 +100,8 @@ class val ConnectorSourceConfig[In: Any val] is SourceConfig
     parallelism = parallelism'
     _host = opts.host
     _service = opts.service
-    _worker_source_config = WorkerConnectorSourceConfig(_host, _service,
-      opts.source_name)
+    _worker_source_config = WorkerConnectorSourceConfig(opts.source_name, _host,
+      _service)
 
   fun val source_listener_builder_builder():
     ConnectorSourceListenerBuilderBuilder[In]
@@ -119,7 +119,7 @@ class val WorkerConnectorSourceConfig is WorkerSourceConfig
   let service: String
   let source_name: SourceName
 
-  new val create(host': String, service': String, source_name': SourceName) =>
+  new val create(source_name': SourceName, host': String, service': String) =>
     host = host'
     service = service'
     source_name = source_name'

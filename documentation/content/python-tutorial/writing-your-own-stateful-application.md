@@ -8,7 +8,7 @@ toc: true
 ---
 In this section, we will go over how to write a stateful application with the Wallaroo Python API. If you haven't reviewed the simple stateless Alerts application example yet, you can find it [here](/python-tutorial/writing-your-own-application/).
 
-## A Stateful Application - Alphabet
+## A Stateful Application - Alerts
 
 Our stateful application is going to add state to the Alerts example. Again, it receives as its inputs messages representing transactions. But now instead of statelessly checking individual transactions to see if they pass certain thresholds, it will add each transaction amount to a running total. It will then check that total to see if an alert should be emitted.
 
@@ -82,7 +82,7 @@ Finally, let's set up our application topology:
 def application_setup(args):
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
-    gen_source = wallaroo.GenSourceConfig(TransactionsGenerator())
+    gen_source = wallaroo.GenSourceConfig("Alerts (stateful)", TransactionsGenerator())
 
     transactions = wallaroo.source("Alerts (stateful)", gen_source)
     pipeline = (transactions

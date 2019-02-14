@@ -54,7 +54,7 @@ def application_setup(args):
     else:
         print("Using TCP Source")
         in_name, in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
-        source = wallaroo.TCPSourceConfig(in_host, in_port, in_name, decoder)
+        source = wallaroo.TCPSourceConfig(in_name, in_host, in_port, decoder)
 
     p = wallaroo.source(source_name, source)
     p = p.key_by(extract_key)

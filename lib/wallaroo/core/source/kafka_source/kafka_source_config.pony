@@ -33,13 +33,13 @@ class val KafkaSourceConfig[In: Any val] is SourceConfig
   let handler: SourceHandler[In] val
   let _worker_source_config: WorkerKafkaSourceConfig
 
-  new val create(ksco: KafkaConfigOptions iso, source_name: SourceName,
+  new val create(source_name: SourceName, ksco: KafkaConfigOptions iso,
     auth': TCPConnectionAuth, handler': SourceHandler[In] val)
   =>
     ksco.client_name = "Wallaroo Kafka Source " + ksco.topic
     handler = handler'
     auth = auth'
-    _worker_source_config = WorkerKafkaSourceConfig(consume ksco, source_name)
+    _worker_source_config = WorkerKafkaSourceConfig(source_name, consume ksco)
 
   fun val source_listener_builder_builder(): KafkaSourceListenerBuilderBuilder[In]
   =>
@@ -55,6 +55,6 @@ class val WorkerKafkaSourceConfig is WorkerSourceConfig
   let ksco: KafkaConfigOptions val
   let source_name: SourceName
 
-  new val create(ksco': KafkaConfigOptions val, source_name': SourceName) =>
+  new val create(source_name': SourceName, ksco': KafkaConfigOptions val) =>
     ksco = ksco'
     source_name = source_name'
