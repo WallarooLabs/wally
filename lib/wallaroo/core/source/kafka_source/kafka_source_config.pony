@@ -29,21 +29,32 @@ primitive KafkaSourceConfigCLIParser
     KafkaConfigCLIParser(out, KafkaConsumeOnly where prefix = prefix)
 
 class val KafkaSourceConfig[In: Any val] is SourceConfig
-  let _ksco: KafkaConfigOptions val
-  let _auth: TCPConnectionAuth
-  let _handler: SourceHandler[In] val
+  let auth: TCPConnectionAuth
+  let handler: SourceHandler[In] val
+  let _worker_source_config: WorkerKafkaSourceConfig
 
-  new val create(ksco: KafkaConfigOptions iso, auth: TCPConnectionAuth,
-    handler: SourceHandler[In] val)
+  new val create(ksco: KafkaConfigOptions iso, source_name: SourceName,
+    auth': TCPConnectionAuth, handler': SourceHandler[In] val)
   =>
     ksco.client_name = "Wallaroo Kafka Source " + ksco.topic
-    _handler = handler
-    _auth = auth
-    _ksco = consume ksco
+    handler = handler'
+    auth = auth'
+    _worker_source_config = WorkerKafkaSourceConfig(consume ksco, source_name)
 
-  fun source_listener_builder_builder(): KafkaSourceListenerBuilderBuilder[In]
+  fun val source_listener_builder_builder(): KafkaSourceListenerBuilderBuilder[In]
   =>
-    KafkaSourceListenerBuilderBuilder[In](_ksco, _handler, _auth)
+    KafkaSourceListenerBuilderBuilder[In](this)
 
   fun default_partitioner_builder(): PartitionerBuilder =>
     PassthroughPartitionerBuilder
+
+  fun worker_source_config(): WorkerSourceConfig =>
+    _worker_source_config
+
+class val WorkerKafkaSourceConfig is WorkerSourceConfig
+  let ksco: KafkaConfigOptions val
+  let source_name: SourceName
+
+  new val create(ksco': KafkaConfigOptions val, source_name': SourceName) =>
+    ksco = ksco'
+    source_name = source_name'

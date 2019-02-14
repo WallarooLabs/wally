@@ -20,11 +20,11 @@ import wallaroo
 
 
 def application_setup(args):
-    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+    in_name, in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
     inputs = wallaroo.source("Sequence Window",
-                    wallaroo.TCPSourceConfig(in_host, in_port, decoder))
+                    wallaroo.TCPSourceConfig(in_host, in_port, in_name, decoder))
 
     pipeline = (inputs
         .collect()

@@ -33,7 +33,7 @@ def increments_test(values):
         diff = cur - prev
         if diff == 0:
             if prev != 0:
-                return false
+                return False
             prev = cur
         elif diff != 1:
             return False

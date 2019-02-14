@@ -35,34 +35,39 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 
-ALERTS_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+ALERTS_STATELESS_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # standard rules generation makefile
 include $(rules_mk_path)
 
 
-build-examples-python-alerts-stateless: build-machida
-build-examples-python-alerts-stateless: build-machida3
-integration-tests-examples-python-alerts-stateless: build-examples-python-alerts-stateless
-
-integration-tests-examples-python-alerts-stateless: alerts_stateless_py_test
-integration-tests-examples-python-alerts-stateless: alerts_stateless_py3_test
+build-examples-python-alerts_stateless: build-machida
+build-examples-python-alerts_stateless: build-machida3
+integration-tests-examples-python-alerts_stateless: build-examples-python-alerts_stateless
+integration-tests-examples-python-alerts_stateless: alerts_stateless_py_test
+integration-tests-examples-python-alerts_stateless: alerts_stateless_py3_test
 
 alerts_stateless_py_test:
-	cd $(ALERTS_PY_PATH) && \
-	integration_test --framed-file-sender \
-	  _test.txt --validation-cmp \
-	  --expected-file _expected.txt \
+	cd $(ALERTS_STATELESS_PY_PATH) && \
+	integration_test \
 		--log-level error \
-		--command 'machida --application-module alerts $(RUN_WITH_RESILIENCE)'
-#		--sink-mode newlines
+		--command 'machida --application-module alerts $(RUN_WITH_RESILIENCE)' \
+		--validation-cmd 'python _validate.py --output' \
+		--output received.txt \
+		--sink-mode newlines \
+		--sink-expect 5 \
+		--sink-expect-allow-more \
+		--workers 2
 
 alerts_stateless_py3_test:
-	cd $(ALERTS_PY_PATH) && \
-	integration_test --framed-file-sender \
-	  _test.txt --validation-cmp \
-	  --expected-file _expected.txt \
+	cd $(ALERTS_STATELESS_PY_PATH) && \
+	integration_test \
 		--log-level error \
-		--command 'machida3 --application-module alerts $(RUN_WITH_RESILIENCE)'
-#		--sink-mode newlines
+		--command 'machida3 --application-module alerts $(RUN_WITH_RESILIENCE)' \
+		--validation-cmd 'python _validate.py --output' \
+		--output received.txt \
+		--sink-mode newlines \
+		--sink-expect 5 \
+		--sink-expect-allow-more \
+		--workers 2
 endif
