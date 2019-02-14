@@ -30,11 +30,12 @@ PID=None
 def application_setup(args):
     global PID
     PID=str(os.getpid())
-    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+    in_name, in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
     inputs = wallaroo.source("App",
-                    wallaroo.TCPSourceConfig(in_host, in_port, decode))
+                    wallaroo.TCPSourceConfig(in_host, in_port, in_name,
+                                             decode))
 
     pipeline = (inputs
       .to(classify)

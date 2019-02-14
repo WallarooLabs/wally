@@ -16,13 +16,17 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
+use "collections"
 use "options"
 use "wallaroo"
 use "wallaroo/core/partitioning"
 use "wallaroo/core/source"
+use "wallaroo_labs/mort"
 
 primitive ConnectorSourceConfigCLIParser
-  fun apply(args: Array[String] val): Array[ConnectorSourceConfigOptions] val ? =>
+  fun apply(args: Array[String] val):
+    Map[SourceName, ConnectorSourceConfigOptions] val ?
+  =>
     let in_arg = "in"
     let short_in_arg = "i"
 
@@ -36,18 +40,28 @@ primitive ConnectorSourceConfigCLIParser
       | ("help", let arg: None) =>
         StartupHelp()
       | (in_arg, let input: String) =>
-        return _from_input_string(input)?
+        return _from_input_string(input)
       end
     end
 
     error
 
-  fun _from_input_string(inputs: String): Array[ConnectorSourceConfigOptions] val ? =>
-    let opts = recover trn Array[ConnectorSourceConfigOptions] end
+  fun _from_input_string(inputs: String):
+    Map[SourceName, ConnectorSourceConfigOptions] val
+  =>
+    let opts = recover trn Map[SourceName, ConnectorSourceConfigOptions] end
 
     for input in inputs.split(",").values() do
-      let i = input.split(":")
-      opts.push(ConnectorSourceConfigOptions(i(0)?, i(1)?))
+      try
+        let source_name_and_address = input.split("@")
+        let address_data = source_name_and_address(1)?.split(":")
+        opts.update(source_name_and_address(0)?,
+          ConnectorSourceConfigOptions(address_data(0)?, address_data(1)?,
+          source_name_and_address(0)?))
+      else
+        FatalUserError("Inputs must be in the `source_name@host:service`" +
+          " format!")
+      end
     end
 
     consume opts
@@ -55,36 +69,57 @@ primitive ConnectorSourceConfigCLIParser
 class val ConnectorSourceConfigOptions
   let host: String
   let service: String
+  let source_name: SourceName
 
-  new val create(host': String, service': String) =>
+  new val create(host': String, service': String, source_name': SourceName) =>
     host = host'
     service = service'
+    source_name = source_name'
 
-class val ConnectorSourceConfig[In: Any val]
-  let _handler: FramedSourceHandler[In] val
+class val ConnectorSourceConfig[In: Any val] is SourceConfig
+  let handler: FramedSourceHandler[In] val
+  let parallelism: USize
   let _host: String
   let _service: String
-  let _parallelism: USize
+  let _worker_source_config: WorkerConnectorSourceConfig
 
   new val create(handler': FramedSourceHandler[In] val, host': String,
-    service': String, parallelism': USize = 10)
+    service': String, source_name: SourceName, parallelism': USize = 10)
   =>
-    _handler = handler'
+    handler = handler'
+    parallelism = parallelism'
     _host = host'
     _service = service'
-    _parallelism = parallelism'
+    _worker_source_config = WorkerConnectorSourceConfig(_host, _service,
+      source_name)
 
   new val from_options(handler': FramedSourceHandler[In] val,
     opts: ConnectorSourceConfigOptions, parallelism': USize = 10)
   =>
-    _handler = handler'
+    handler = handler'
+    parallelism = parallelism'
     _host = opts.host
     _service = opts.service
-    _parallelism = parallelism'
+    _worker_source_config = WorkerConnectorSourceConfig(_host, _service,
+      opts.source_name)
 
-  fun source_listener_builder_builder(): ConnectorSourceListenerBuilderBuilder[In] =>
-    ConnectorSourceListenerBuilderBuilder[In](_host, _service, _parallelism,
-      _handler)
+  fun val source_listener_builder_builder():
+    ConnectorSourceListenerBuilderBuilder[In]
+  =>
+    ConnectorSourceListenerBuilderBuilder[In](this)
 
   fun default_partitioner_builder(): PartitionerBuilder =>
     PassthroughPartitionerBuilder
+
+  fun worker_source_config(): WorkerSourceConfig =>
+    _worker_source_config
+
+class val WorkerConnectorSourceConfig is WorkerSourceConfig
+  let host: String
+  let service: String
+  let source_name: SourceName
+
+  new val create(host': String, service': String, source_name': SourceName) =>
+    host = host'
+    service = service'
+    source_name = source_name'

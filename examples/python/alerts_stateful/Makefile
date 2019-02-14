@@ -35,34 +35,40 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 
-ALERTS_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+ALERTS_STATEFUL_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # standard rules generation makefile
 include $(rules_mk_path)
 
 
-build-examples-python-alerts-stateful: build-machida
-build-examples-python-alerts-stateful: build-machida3
-integration-tests-examples-python-alerts-stateful: build-examples-python-alerts-stateful
+build-examples-python-alerts_stateful: build-machida
+build-examples-python-alerts_stateful: build-machida3
+integration-tests-examples-python-alerts_stateful: build-examples-python-alerts_stateful
 
-integration-tests-examples-python-alerts-stateful: alerts_stateful_py_test
-integration-tests-examples-python-alerts-stateful: alerts_stateful_py3_test
+integration-tests-examples-python-alerts_stateful: alerts_stateful_py_test
+integration-tests-examples-python-alerts_stateful: alerts_stateful_py3_test
 
 alerts_stateful_py_test:
-	cd $(ALERTS_PY_PATH) && \
-	integration_test --framed-file-sender \
-	  _test.txt --validation-cmp \
-	  --expected-file _expected.txt \
+	cd $(ALERTS_STATEFUL_PY_PATH) && \
+	integration_test \
 		--log-level error \
 		--command 'machida --application-module alerts $(RUN_WITH_RESILIENCE)' \
-		--sink-mode newlines
+		--validation-cmd 'python _validate.py --output' \
+		--output received.txt \
+		--sink-mode newlines \
+		--sink-expect 5 \
+		--sink-expect-allow-more \
+		--workers 2
 
 alerts_stateful_py3_test:
-	cd $(ALERTS_PY_PATH) && \
-	integration_test --framed-file-sender \
-	  _test.txt --validation-cmp \
-	  --expected-file _expected.txt \
+	cd $(ALERTS_STATEFUL_PY_PATH) && \
+	integration_test \
 		--log-level error \
 		--command 'machida3 --application-module alerts $(RUN_WITH_RESILIENCE)' \
-		--sink-mode newlines
+		--validation-cmd 'python _validate.py --output' \
+		--output received.txt \
+		--sink-mode newlines \
+		--sink-expect 5 \
+		--sink-expect-allow-more \
+		--workers 2
 endif
