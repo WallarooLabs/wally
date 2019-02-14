@@ -21,10 +21,11 @@ import wallaroo
 
 def application_setup(args):
     parse_delay(args)
-    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+    in_name, in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
-    nonce_source = wallaroo.TCPSourceConfig(in_host, in_port, nonce_decoder)
+    nonce_source = wallaroo.TCPSourceConfig(in_name, in_host, in_port,
+        nonce_decoder)
     ok_sink = wallaroo.TCPSinkConfig(out_host, out_port, ok_encoder)
 
     inputs = wallaroo.source("Counting Sheep", nonce_source)

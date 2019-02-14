@@ -22,7 +22,7 @@ For example, if we were running the bundled Python example [word_count](https://
 
     ```bash
     machida-resilience --application-module word_count \
-      --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
+      --in 'Split and Count'@127.0.0.1:7010 --out 127.0.0.1:7002 \
       --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
       --my-data 127.0.0.1:6003 --my-control 127.0.0.1:6002 \
       --external 127.0.0.1:5051 \
@@ -88,7 +88,7 @@ cd examples/python/word_count
 4. Shell 2: Start initializer (remember to use `machida3-resilience` if using Python 3)
     ```bash
     machida-resilience --application-module word_count \
-      --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
+      --in 'Split and Count'@127.0.0.1:7010 --out 127.0.0.1:7002 \
       --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
       --data 127.0.0.1:6001 --external 127.0.0.1:5050 \
       --name initializer --cluster-initializer --worker-count 2 \
@@ -101,7 +101,7 @@ cd examples/python/word_count
 
     ```bash
     machida-resilience --application-module word_count \
-      --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
+      --in 'Split and Count'@127.0.0.1:7010 --out 127.0.0.1:7002 \
       --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
       --my-data 127.0.0.1:6003 --my-control 127.0.0.1:6002 \
       --external 127.0.0.1:5051 \
@@ -137,7 +137,7 @@ cd examples/python/word_count
 
     ```bash
     machida-resilience --application-module word_count \
-      --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
+      --in 'Split and Count'@127.0.0.1:7010 --out 127.0.0.1:7002 \
       --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
       --my-data 127.0.0.1:6003 --my-control 127.0.0.1:6002 \
       --external 127.0.0.1:5051 \
