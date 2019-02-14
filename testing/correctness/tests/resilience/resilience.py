@@ -408,14 +408,19 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
     msg = MultiSequenceGenerator(base_parts=workers * partition_multiplier - 1)
 
     # Start cluster
+    source_names = ["source{}".format(x) for x in range(1, sources+1)]
     logging.debug("Creating cluster")
-    with Cluster(command=command, host=host, sources=sources,
+    with Cluster(command=command, host=host, sources=source_names,
                  workers=workers, sinks=sinks, sink_mode=sink_mode,
                  persistent_data=persistent_data) as cluster:
 
         # start senders
-        for s in range(sources):
-            sender = Sender(cluster.source_addrs[0],
+        # [NH]: is it even possible to run this with more than 1 source right now?
+        # the reliance on `msg` makes things problematic for rollback
+        for src in source_names:
+            # TODO [NH]: figure out how to support sending to workers
+            # other than initializer
+            sender = Sender(cluster.source_addrs[0][src],
                             Reader(msg),
                             batch_size=batch_size,
                             interval=sender_interval,

@@ -40,19 +40,23 @@ PARALLEL_CLASSIFIER_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
-build-testing-correctness-apps-python-parallel_classifier: build-machida
-integration-tests-testing-correctness-apps-python-parallel_classifier: build-testing-correctness-apps-python-parallel_classifier
-integration-tests-testing-correctness-apps-python-parallel_classifier: parallel_classifier_py_test
-clean-testing-correctness-apps-python-alphabet: parallel_classifier_py_clean
+build-testing-correctness-apps-parallel_classifier: build-machida
+integration-tests-testing-correctness-apps-parallel_classifier: build-testing-correctness-apps-parallel_classifier
+integration-tests-testing-correctness-apps-parallel_classifier: generate_inputs
+integration-tests-testing-correctness-apps-parallel_classifier: parallel_classifier_py_test
+clean-testing-correctness-apps-parallel_classifier: parallel_classifier_py_clean
 
 INPUT_ITEMS:=2500
 .PHONY: generate_inputs
 generate_inputs:
+	cd $(PARALLEL_CLASSIFIER_PY_PATH) && \
 	seq 1 $(INPUT_ITEMS) > inputs.txt
 
-parallel_classifier_py_test: generate_inputs
+
+parallel_classifier_py_test:
 	cd $(PARALLEL_CLASSIFIER_PY_PATH) && \
-	 integration_test --newline-file-sender inputs.txt \
+	integration_test \
+	 	--newline-file-sender inputs.txt App \
 	 	--validation-cmd 'validate.py 1 $(INPUT_ITEMS)' \
 	 	--output 'received.txt' \
 	 	--batch-size 100 \
@@ -62,7 +66,8 @@ parallel_classifier_py_test: generate_inputs
 	 	--sink-stop-timeout 10 \
 	 	--sink-expect $(INPUT_ITEMS)
 	cd $(PARALLEL_CLASSIFIER_PY_PATH) && \
-	integration_test --newline-file-sender inputs.txt \
+	integration_test \
+		--newline-file-sender inputs.txt App \
 		--validation-cmd './validate.py 2 $(INPUT_ITEMS)' \
 		--output 'received.txt' \
 		--log-level error \
@@ -73,7 +78,8 @@ parallel_classifier_py_test: generate_inputs
 		--sink-stop-timeout 20 \
 		--workers 2
 	cd $(PARALLEL_CLASSIFIER_PY_PATH) && \
-	integration_test --newline-file-sender inputs.txt \
+	integration_test \
+		--newline-file-sender inputs.txt App \
 		--validation-cmd './validate.py 15 $(INPUT_ITEMS)' \
 		--output 'received.txt' \
 		--log-level error \

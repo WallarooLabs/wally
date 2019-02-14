@@ -67,8 +67,8 @@ def application_setup(args):
     pipe_name = "topology test pipeline"
 
     print("Using TCP Source")
-    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
-    source = wallaroo.TCPSourceConfig(in_host, in_port, decoder)
+    in_name, in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+    source = wallaroo.TCPSourceConfig(in_host, in_port, in_name, decoder)
     inputs = wallaroo.source(pipe_name, source)
 
     # programmatically add computations

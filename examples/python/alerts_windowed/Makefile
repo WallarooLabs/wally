@@ -35,7 +35,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 
-ALERTS_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+ALERTS_WINDOWED_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # standard rules generation makefile
 include $(rules_mk_path)
@@ -49,9 +49,8 @@ integration-tests-examples-python-alerts_windowed: alerts_windowed_py_test
 integration-tests-examples-python-alerts_windowed: alerts_windowed_py3_test
 
 alerts_windowed_py_test:
-	cd $(ALERTS_PY_PATH) && \
+	cd $(ALERTS_WINDOWED_PY_PATH) && \
 	integration_test \
-		--sources 0 \
 		--validation-cmd 'python _validate.py --output' \
 		--output received.txt \
 		--log-level error \
@@ -62,9 +61,8 @@ alerts_windowed_py_test:
 		--workers 2
 
 alerts_windowed_py3_test:
-	cd $(ALERTS_PY_PATH) && \
+	cd $(ALERTS_WINDOWED_PY_PATH) && \
 	integration_test \
-		--sources 0 \
 		--validation-cmd 'python _validate.py --output' \
 		--output received.txt \
 		--log-level error \

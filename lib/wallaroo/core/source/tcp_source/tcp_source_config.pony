@@ -81,7 +81,7 @@ class val TCPSourceConfigOptions
     valid = valid'
 
 
-class val TCPSourceConfig[In: Any val]
+class val TCPSourceConfig[In: Any val] is SourceConfig
   let handler: FramedSourceHandler[In] val
   let parallelism: USize
   let _worker_source_config: WorkerTCPSourceConfig

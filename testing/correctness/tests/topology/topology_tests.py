@@ -113,19 +113,20 @@ def run_test(api, cmd, validation_cmd, topology, workers=1):
                 logging.debug("Running integration test with the following"
                               " options:")
 
-                gens = [(sequence_generator(send, 0, '>I', 'key_0'), 0),
-                        (sequence_generator(send, 0, '>I', 'key_1'), 0)]
+                sources = [(sequence_generator(send, 0, '>I', 'key_0'),
+                            "'topology test pipeline'"),
+                           (sequence_generator(send, 0, '>I', 'key_1'),
+                            "'topology test pipeline'")]
 
                 pipeline_test(
-                    generator = gens,
+                    sources = sources,
                     expected = None,
                     command = cmd_val,
                     workers = workers,
-                    sources = 1,
                     sinks = 1,
                     mode = 'framed',
                     batch_size = 1,
-                    sink_expect = expect * len(gens),
+                    sink_expect = expect * len(sources),
                     sink_stop_timeout = 5,
                     validate_file = output,
                     persistent_data = persistent_data,
