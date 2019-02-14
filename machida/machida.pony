@@ -916,7 +916,7 @@ primitive _SourceConfig
         USize.from[I64](@PyInt_AsLong(@PyTuple_GetItem(source_config_tuple, 5)))
       end
 
-      TCPSourceConfig[(PyData val | None)](decoder, host, port, source_name,
+      TCPSourceConfig[(PyData val | None)](source_name, decoder, host, port,
         parallelism)
     | "kafka-internal" =>
       let ksclip = KafkaSourceConfigCLIParser(env.out, source_name)
@@ -928,7 +928,7 @@ primitive _SourceConfig
         PySourceHandler(d)
       end
 
-      KafkaSourceConfig[(PyData val | None)](consume ksco, source_name,
+      KafkaSourceConfig[(PyData val | None)](source_name, consume ksco,
         (env.root as TCPConnectionAuth), decoder)
     | "kafka" =>
       let ksco = _kafka_config_options(source_config_tuple)
@@ -939,7 +939,7 @@ primitive _SourceConfig
         PySourceHandler(d)
       end
 
-      KafkaSourceConfig[(PyData val | None)](consume ksco, source_name,
+      KafkaSourceConfig[(PyData val | None)](source_name, consume ksco,
         (env.root as TCPConnectionAuth), decoder)
     | "source_connector" =>
       let host = recover val
@@ -956,7 +956,7 @@ primitive _SourceConfig
         PyFramedSourceHandler(d)?
       end
 
-      ConnectorSourceConfig[(PyData val | None)](decoder, host, port, source_name)
+      ConnectorSourceConfig[(PyData val | None)](source_name, decoder, host, port)
     else
       error
     end
@@ -1020,17 +1020,13 @@ primitive _SinkConfig
 
       TCPSinkConfig[PyData val](encoder, host, port)
     | "kafka-internal" =>
-      let kafka_sink_name = recover val
-        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 2)))
-      end
-
-      let encoderp = @PyTuple_GetItem(sink_config_tuple, 3)
+      let encoderp = @PyTuple_GetItem(sink_config_tuple, 2)
       Machida.inc_ref(encoderp)
       let encoder = recover val
         PyKafkaEncoder(encoderp)
       end
 
-      let ksclip = KafkaSinkConfigCLIParser(env.out, kafka_sink_name)
+      let ksclip = KafkaSinkConfigCLIParser(env.out, sink_name)
       let ksco = ksclip.parse_options(env.args)?
 
       KafkaSinkConfig[PyData val](encoder, consume ksco, (env.root as TCPConnectionAuth))

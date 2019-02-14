@@ -30,7 +30,7 @@ def application_setup(args):
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
     votes = wallaroo.source("alphabet",
-                       wallaroo.TCPSourceConfig(in_host, in_port, in_name,
+                       wallaroo.TCPSourceConfig(in_name, in_host, in_port,
                                                 decode_votes))
 
     pipeline = (votes

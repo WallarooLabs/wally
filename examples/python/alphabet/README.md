@@ -75,7 +75,7 @@ Set `PATH` to refer to the directory that contains the `machida` executable. Set
 Run `machida` with `--application-module alphabet`:
 
 ```bash
-machida --application-module alphabet --in 127.0.0.1:7010 \
+machida --application-module alphabet --in alphabet@127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
   --external 127.0.0.1:5050 --cluster-initializer --data 127.0.0.1:6001 \
   --name worker-name --ponythreads=1 --ponynoblock
