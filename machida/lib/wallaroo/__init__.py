@@ -467,23 +467,25 @@ def encoder(func):
 
 
 class TCPSourceConfig(object):
-    def __init__(self, host, port, decoder, parallelism=10):
+    def __init__(self, host, port, name, decoder, parallelism=10):
         self._host = host
         self._port = port
+        self._name = name
         self._decoder = decoder
         self._parallelism = parallelism
 
     def to_tuple(self):
-        return ("tcp", self._host, self._port, self._decoder, self._parallelism)
-
+        return ("tcp", self._name, self._host, self._port, self._decoder,
+                self._parallelism)
 
 
 class GenSourceConfig(object):
-    def __init__(self, gen_instance):
+    def __init__(self, name, gen_instance):
         self._gen = gen_instance
+        self._name = name
 
     def to_tuple(self):
-        return ("gen", self._gen)
+        return ("gen", self._name, self._gen)
 
 
 class TCPSinkConfig(object):
@@ -491,28 +493,31 @@ class TCPSinkConfig(object):
         self._host = host
         self._port = port
         self._encoder = encoder
+        self._name = "" # dummy var
 
     def to_tuple(self):
-        return ("tcp", self._host, self._port, self._encoder)
+        return ("tcp", self._name, self._host, self._port, self._encoder)
 
 
 class CustomKafkaSourceCLIParser(object):
     def __init__(self, args, decoder):
-        (in_topic, in_brokers, in_log_level) = kafka_parse_source_options(args)
+        (in_topic, in_brokers, in_log_level, in_name) = kafka_parse_source_options(args)
 
         self.topic = in_topic
         self.brokers = in_brokers
         self.log_level = in_log_level
+        self._name = in_name
         self.decoder = decoder
 
     def to_tuple(self):
-        return ("kafka", self.topic, self.brokers, self.log_level,
+        return ("kafka", self._name, self.topic, self.brokers, self.log_level,
                 self.decoder)
 
 
 class CustomKafkaSinkCLIParser(object):
     def __init__(self, args, encoder):
-        (out_topic, out_brokers, out_log_level, out_max_produce_buffer_ms,
+        (out_name, out_topic, out_brokers, out_log_level,
+         out_max_produce_buffer_ms,
          out_max_message_size) = kafka_parse_sink_options(args)
 
         self.topic = out_topic
@@ -521,9 +526,10 @@ class CustomKafkaSinkCLIParser(object):
         self.max_produce_buffer_ms = out_max_produce_buffer_ms
         self.max_message_size = out_max_message_size
         self.encoder = encoder
+        self._name = out_name
 
     def to_tuple(self):
-        return ("kafka", self.topic, self.brokers, self.log_level,
+        return ("kafka", self._name, self.topic, self.brokers, self.log_level,
                 self.max_produce_buffer_ms, self.max_message_size,
                 self.encoder)
 
@@ -550,8 +556,9 @@ def tcp_parse_input_addrs(args):
     parser = argparse.ArgumentParser(prog="wallaroo")
     parser.add_argument('-i', '--in', dest="input_addrs")
     input_addrs = parser.parse_known_args(args)[0].input_addrs
-    # split H1:P1,H2:P2... into [(H1, P1), (H2, P2), ...]
-    return [tuple(x.split(':')) for x in input_addrs.split(',')]
+    # split N1@H1:P1,N2@H2:P2... into [(N1, H1, P1), (N2, H2, P2), ...]
+    return [tuple(x.replace('@',':').split(':'))
+            for x in input_addrs.split(',')]
 
 
 def tcp_parse_output_addrs(args):
@@ -564,6 +571,7 @@ def tcp_parse_output_addrs(args):
 
 def kafka_parse_source_options(args):
     parser = argparse.ArgumentParser(prog="wallaroo")
+    parser.add_argument('--kafka_source_name', dest="name")
     parser.add_argument('--kafka_source_topic', dest="topic",
                         default="")
     parser.add_argument('--kafka_source_brokers', dest="brokers",
@@ -576,11 +584,13 @@ def kafka_parse_source_options(args):
 
     brokers = [_kafka_parse_broker(b) for b in known_args.brokers.split(",")]
 
-    return (known_args.topic, brokers, known_args.log_level)
+    return (known_args.name, known_args.topic, brokers, known_args.log_level)
 
 
 def kafka_parse_sink_options(args):
     parser = argparse.ArgumentParser(prog="wallaroo")
+    # TODO: enable this when named sinks are implemented
+    #parser.add_argument('--kafka_sink_name', dest="name")
     parser.add_argument('--kafka_sink_topic', dest="topic",
                         default="")
     parser.add_argument('--kafka_sink_brokers', dest="brokers",
@@ -600,8 +610,9 @@ def kafka_parse_sink_options(args):
     known_args = parser.parse_known_args(args)[0]
 
     brokers = [_kafka_parse_broker(b) for b in known_args.brokers.split(",")]
+    name = "" # Replace with real value when this is implemented for sinks
 
-    return (known_args.topic, brokers, known_args.log_level,
+    return (name, known_args.topic, brokers, known_args.log_level,
             known_args.max_produce_buffer_ms, known_args.max_message_size)
 
 

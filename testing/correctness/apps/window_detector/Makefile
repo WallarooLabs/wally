@@ -73,8 +73,8 @@ window_detector_tests_python3: window_detector_sliding_gensource_test_python3
 window_detector_tumbling_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sequence-sender '(0,100]' 0 '>I' key_0 \
-		--sequence-sender '(0,100]' 0 '>I' key_1 \
+		--sequence-sender '(0,100]' "'tumbling window'" '>I' key_0 \
+		--sequence-sender '(0,100]' "'tumbling window'" '>I' key_1 \
 		--log-level error \
 		--command 'machida --application-module window_detector --window-type tumbling $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
@@ -86,8 +86,8 @@ window_detector_tumbling_test_python:
 window_detector_counting_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sequence-sender '(0,100]' 0 '>I' key_0 \
-		--sequence-sender '(0,100]' 0 '>I' key_1 \
+		--sequence-sender '(0,100]' "'counting window'" '>I' key_0 \
+		--sequence-sender '(0,100]' "'counting window'" '>I' key_1 \
 		--log-level error \
 		--command 'machida --application-module window_detector --window-type counting $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type counting --output' \
@@ -99,8 +99,8 @@ window_detector_counting_test_python:
 window_detector_sliding_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sequence-sender '(0,100]' 0 '>I' key_0 \
-		--sequence-sender '(0,100]' 0 '>I' key_1 \
+		--sequence-sender '(0,100]' "'sliding window'" '>I' key_0 \
+		--sequence-sender '(0,100]' "'sliding window'" '>I' key_1 \
 		--log-level error \
 		--command 'machida --application-module window_detector --window-type sliding $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type sliding --output' \
@@ -112,48 +112,45 @@ window_detector_sliding_test_python:
 window_detector_tumbling_gensource_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sources 0 \
 		--log-level error \
 		--command 'machida --application-module window_detector --gen-source --window-type tumbling $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 200 \
+		--sink-expect 1000 \
 		--sink-expect-allow-more
 
 window_detector_counting_gensource_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sources 0 \
 		--log-level error \
 		--command 'machida --application-module window_detector --gen-source --window-type counting $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type counting --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 200 \
+		--sink-expect 1000 \
 		--sink-expect-allow-more
 
 window_detector_sliding_gensource_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sources 0 \
 		--log-level error \
 		--command 'machida --application-module window_detector --gen-source --window-type sliding $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type sliding --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 400 \
+		--sink-expect 1000 \
 		--sink-expect-allow-more
 
 # Python3 tests
 window_detector_tumbling_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sequence-sender '(0,100]' 0 '>I' key_0 \
-		--sequence-sender '(0,100]' 0 '>I' key_1 \
+		--sequence-sender '(0,100]' "'tumbling window'" '>I' key_0 \
+		--sequence-sender '(0,100]' "'tumbling window'" '>I' key_1 \
 		--log-level error \
 		--command 'machida3 --application-module window_detector --window-type tumbling $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python3 _validate.py --window-type tumbling --output' \
@@ -165,8 +162,8 @@ window_detector_tumbling_test_python3:
 window_detector_counting_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sequence-sender '(0,100]' 0 '>I' key_0 \
-		--sequence-sender '(0,100]' 0 '>I' key_1 \
+		--sequence-sender '(0,100]' "'counting window'" '>I' key_0 \
+		--sequence-sender '(0,100]' "'counting window'" '>I' key_1 \
 		--log-level error \
 		--command 'machida3 --application-module window_detector --window-type counting $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python3 _validate.py --window-type counting --output' \
@@ -178,8 +175,8 @@ window_detector_counting_test_python3:
 window_detector_sliding_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sequence-sender '(0,100]' 0 '>I' key_0 \
-		--sequence-sender '(0,100]' 0 '>I' key_1 \
+		--sequence-sender '(0,100]' "'sliding window'" '>I' key_0 \
+		--sequence-sender '(0,100]' "'sliding window'" '>I' key_1 \
 		--log-level error \
 		--command 'machida3 --application-module window_detector --window-type sliding $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python3 _validate.py --window-type sliding --output' \
@@ -191,40 +188,37 @@ window_detector_sliding_test_python3:
 window_detector_tumbling_gensource_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sources 0 \
 		--log-level error \
 		--command 'machida3 --application-module window_detector --gen-source --window-type tumbling $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python3 _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 200 \
+		--sink-expect 1000 \
 		--sink-expect-allow-more
 
 window_detector_counting_gensource_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sources 0 \
 		--log-level error \
 		--command 'machida3 --application-module window_detector --gen-source --window-type counting $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python3 _validate.py --window-type counting --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 200 \
+		--sink-expect 1000 \
 		--sink-expect-allow-more
 
 window_detector_sliding_gensource_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sources 0 \
 		--log-level error \
 		--command 'machida3 --application-module window_detector --gen-source --window-type sliding $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python3 _validate.py --window-type sliding --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 400 \
+		--sink-expect 1000 \
 		--sink-expect-allow-more
 
 # end of prevent rules from being evaluated/included multiple times

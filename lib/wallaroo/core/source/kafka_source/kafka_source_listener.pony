@@ -26,40 +26,57 @@ use "wallaroo/core/common"
 use "wallaroo/core/partitioning"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
-use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
+use "wallaroo_labs/mort"
 
-class val KafkaSourceListenerBuilderBuilder[In: Any val]
-  let _ksco: KafkaConfigOptions val
-  let _handler: SourceHandler[In] val
-  let _tcp_auth: TCPConnectionAuth
+class val KafkaSourceListenerBuilderBuilder[In: Any val] is
+  SourceListenerBuilderBuilder
 
-  new val create(ksco: KafkaConfigOptions val, handler: SourceHandler[In] val,
-    tcp_auth: TCPConnectionAuth)
+  let _source_config: KafkaSourceConfig[In]
+
+  new val create(source_config: KafkaSourceConfig[In])
   =>
-    _ksco = ksco
-    _handler = handler
-    _tcp_auth = tcp_auth
+    _source_config = source_config
 
-  fun apply(worker_name: String, pipeline_name: String,
-    runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
-    router: Router, metrics_conn: MetricsSink,
-    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
-    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
-    event_log: EventLog, auth: AmbientAuth,
+  fun apply(worker_name: String,
+    pipeline_name: String,
+    runner_builder: RunnerBuilder,
+    partitioner_builder: PartitionerBuilder,
+    router: Router,
+    metrics_conn: MetricsSink,
+    metrics_reporter: MetricsReporter iso,
+    router_registry: RouterRegistry,
+    outgoing_boundary_builders: Map[String,
+    OutgoingBoundaryBuilder] val,
+    event_log: EventLog,
+    auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, target_router: Router = EmptyRouter):
+    recovering: Bool,
+    worker_source_config: WorkerSourceConfig,
+    target_router: Router = EmptyRouter):
     KafkaSourceListenerBuilder[In]
   =>
-    KafkaSourceListenerBuilder[In](worker_name, pipeline_name, runner_builder,
-      partitioner_builder, router, metrics_conn, consume metrics_reporter,
-      router_registry, outgoing_boundary_builders, event_log, auth,
-      layout_initializer, recovering, target_router, _ksco, _handler,
-      _tcp_auth)
+    match worker_source_config
+    | let config: WorkerKafkaSourceConfig =>
+      KafkaSourceListenerBuilder[In](worker_name, pipeline_name,
+        runner_builder, partitioner_builder, router, metrics_conn,
+        consume metrics_reporter, router_registry, outgoing_boundary_builders,
+        event_log, auth, layout_initializer, recovering, target_router,
+        config.ksco, _source_config.handler, _source_config.auth)
+    else
+      Unreachable()
+      KafkaSourceListenerBuilder[In](worker_name, pipeline_name,
+        runner_builder, partitioner_builder, router, metrics_conn,
+        consume metrics_reporter, router_registry, outgoing_boundary_builders,
+        event_log, auth, layout_initializer, recovering, target_router,
+        KafkaConfigOptions("", KafkaConsumeOnly, "",
+          recover val Array[(String, I32)] end, ""),
+        _source_config.handler, _source_config.auth)
+    end
 
 class val KafkaSourceListenerBuilder[In: Any val]
   let _worker_name: WorkerName
