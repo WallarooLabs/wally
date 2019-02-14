@@ -24,6 +24,10 @@ import sys
 import wallaroo.experimental
 
 
+# Stand-in for the full command line args tuple to be created during startup.
+_ARGS = tuple()
+
+
 class Unbuffered(object):
     def __init__(self, stream):
         self.stream = stream
