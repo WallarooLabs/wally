@@ -62,7 +62,7 @@ In another shell, set up your environment variables if you haven't already done 
 Run `machida` with `--application-module word_count`:
 
 ```bash
-machida --application-module word_count --in 127.0.0.1:7010 \
+machida --application-module word_count --in 'Split and count'@127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --cluster-initializer --ponythreads=1
@@ -83,7 +83,7 @@ To add additional workers, you can use the following commands to demonstrate aut
 Worker 2:
 
 ```bash
-machida --application-module word_count --in 127.0.0.1:7010 \
+machida --application-module word_count --in 'Split and Count'127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6000 --name worker2 --ponythreads=1 -j 127.0.0.1:6000
 ```
@@ -91,7 +91,7 @@ machida --application-module word_count --in 127.0.0.1:7010 \
 Worker 3:
 
 ```bash
-machida --application-module word_count --in 127.0.0.1:7010 \
+machida --application-module word_count --in 'Split and Count'@127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6000 --name worker3 --ponythreads=1 -j 127.0.0.1:6000
 ```

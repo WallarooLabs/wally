@@ -57,7 +57,7 @@ For this, two things are needed:
 An application is constructed of one or more pipelines which can be merged at various points until they converge on one or more sinks. Our alerts application has only one source stream, so we only need to create one (called `transactions`):
 
 ```python
-gen_source = wallaroo.GenSourceConfig(TransactionsGenerator())
+gen_source = wallaroo.GenSourceConfig("Alerts (stateless)", TransactionsGenerator())
 transactions = wallaroo.source("Alerts (stateless)", gen_source)
 ```
 
@@ -96,7 +96,7 @@ After Wallaroo has loaded the application's python file, it will try to execute 
 def application_setup(args):
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
     
-    gen_source = wallaroo.GenSourceConfig(TransactionsGenerator())
+    gen_source = wallaroo.GenSourceConfig("Alerts", TransactionsGenerator())
     transactions = wallaroo.source("Alerts", gen_source)
 
     pipeline = (transactions
@@ -106,10 +106,10 @@ def application_setup(args):
     return wallaroo.build_application("Alerts", pipeline)
 ```
 
-Wallaroo provides the convenience functions `tcp_parse_input_addrs` and `tcp_parse_output_addrs` to parse host and port information that is passed on the command line, or the user can supply their own code for getting these values. When using the convenience functions, host/port pairs are represented on the command line as colon-separated values and multiple host/port values are represented by a comma-separated list of host/port values. The functions assume that `--in` is used for input addresses, and `--out` is used for output addresses. For example, this set of command line arguments would specify two input host/port values and one output:
+Wallaroo provides the convenience functions `tcp_parse_input_addrs` and `tcp_parse_output_addrs` to parse host and port information that is passed on the command line, or the user can supply their own code for getting these values. When using the convenience functions, host/port pairs are represented on the command line as colon-separated values and multiple host/port values are represented by a comma-separated list of host/port values. The functions assume that `--in` is used for input addresses, and `--out` is used for output addresses. For example, this set of command line arguments would specify two input (name, host, port) values and one output:
 
 ```
---in localhost:7001,localhost:7002 --out localhost:7010
+--in Alerts@localhost:7001,Alerts@localhost:7002 --out localhost:7010
 ```
 
 Since we are using an internal `GenSource` for our example, we only need to specify the `--out` argument.

@@ -108,7 +108,7 @@ Run `machida` with `--application-module market_spread`:
 
 ```bash
 machida --application-module market_spread \
-  --in 127.0.0.1:7010,127.0.0.1:7011 --out 127.0.0.1:7002 \
+  --in Orders@127.0.0.1:7010,'Market Data'@127.0.0.1:7011 --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --worker-name worker1 --external 127.0.0.1:5050 --cluster-initializer \
   --ponythreads=1 --ponynoblock

@@ -16,45 +16,45 @@ While a Wallaroo cluster is running, new workers can join the cluster.  To add w
 
 {{< tabs >}}
 {{< tab name="Python 2.7" codelang="bash" >}}
-machida --application-module alphabet --in 127.0.0.1:7010 \
+machida --application-module alphabet --in alphabet@127.0.0.1:7010 \
   --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w3 \
   --ponythreads 1
 {{< /tab >}}
 {{< tab name="Python 3" codelang="bash" >}}
-machida3 --application-module alphabet --in 127.0.0.1:7010 \
+machida3 --application-module alphabet --in alphabet@127.0.0.1:7010 \
   --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w3 \
   --ponythreads 1
 {{< /tab >}}
 {{< /tabs >}}
 
-The `--in` argument specifies the port that the TCP source will listen on, and the `--out` argument specifies the target address for data output over TCP. `--join` is used to specify the control channel address of the running worker we are contacting in order to join.  `--name` is used to specify the name of the joining worker.
+The `--in` argument specifies the name of the TCP source and the port it will listen on, and the `--out` argument specifies the target address for data output over TCP. `--join` is used to specify the control channel address of the running worker we are contacting in order to join.  `--name` is used to specify the name of the joining worker.
 
 If you want to add more than 1 new worker at a time, you must have all joining workers contact the same running worker and all must specify the same joining worker total as the `worker_count` command line argument.  For example, if 3 workers are joining, then in our case, they could all use `--join 127.0.0.1:12500` and `--worker-count 3`.  Their command lines might be as follows:
 
 {{< tabs >}}
 {{< tab name="Python 2.7" codelang="bash" >}}
-machida --application-module alphabet --in 127.0.0.1:7010 \
+machida --application-module alphabet --in alphabet@127.0.0.1:7010 \
   --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w3 --worker-count 3 \
   --ponythreads 1
 
-machida --application-module alphabet --in 127.0.0.1:7010 \
+machida --application-module alphabet --in alphabet@127.0.0.1:7010 \
   --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w4 --worker-count 3 \
   --ponythreads 1
 
-machida --application-module alphabet --in 127.0.0.1:7010 \
+machida --application-module alphabet --in alphabet@127.0.0.1:7010 \
   --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w5 --worker-count 3 \
   --ponythreads 1
 {{< /tab >}}
 {{< tab name="Python 3" codelang="bash" >}}
-machida3 --application-module alphabet --in 127.0.0.1:7010 \
+machida3 --application-module alphabet --in alphabet@127.0.0.1:7010 \
   --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w3 --worker-count 3 \
   --ponythreads 1
 
-machida3 --application-module alphabet --in 127.0.0.1:7010 \
+machida3 --application-module alphabet --in alphabet@127.0.0.1:7010 \
   --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w4 --worker-count 3 \
   --ponythreads 1
 
-machida3 --application-module alphabet --in 127.0.0.1:7010 \
+machida3 --application-module alphabet --in alphabet@127.0.0.1:7010 \
   --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w5 --worker-count 3 \
   --ponythreads 1
 {{< /tab >}}

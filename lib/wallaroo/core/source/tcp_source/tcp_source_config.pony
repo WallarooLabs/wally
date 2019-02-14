@@ -86,9 +86,9 @@ class val TCPSourceConfig[In: Any val] is SourceConfig
   let parallelism: USize
   let _worker_source_config: WorkerTCPSourceConfig
 
-  new val create(handler': FramedSourceHandler[In] val, host': String,
-    service': String, source_name': SourceName, valid': Bool,
-    parallelism': USize = 10)
+  new val create(source_name': SourceName,
+    handler': FramedSourceHandler[In] val, host': String, service': String,
+    valid': Bool, parallelism': USize = 10)
   =>
     handler = handler'
     parallelism = parallelism'

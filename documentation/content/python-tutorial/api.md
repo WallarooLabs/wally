@@ -616,9 +616,11 @@ The `wallaroo.TCPSourceConfig` class is used to define the properties of the TCP
 
 An instance of `TCPSourceConfig` is a required argument of [wallaroo.source](#wallaroo-source-name-source-config).
 
-##### `wallaroo.TCPSourceConfig(host, port, decoder)`
+##### `wallaroo.TCPSourceConfig(name, host, port, decoder)`
 
 The class used to define the properties of a Wallaroo TCPSource.
+
+`name` is a string representing the source's name.
 
 `host` is a string representing the host address.
 
@@ -634,9 +636,11 @@ The `wallaroo.KafkaSourceConfig` class is used to define the properties of the `
 
 An instance of `KafkaSourceConfig` is a required argument of [wallaroo.source](#wallaroo-source-name-source-config).
 
-##### `wallaroo.KafkaSourceConfig(topic, brokers, log_level, decoder)`
+##### `wallaroo.KafkaSourceConfig(name, topic, brokers, log_level, decoder)`
 
 The class used to define the properties of a Wallaroo KafkaSink.
+
+`name` is a string representing the Wallaroo source name.
 
 `topic` is a string.
 
