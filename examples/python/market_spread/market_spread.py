@@ -46,14 +46,13 @@ def application_setup(args):
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
     orders = wallaroo.source("Orders",
-        wallaroo.TCPSourceConfig(inputs["Orders"]["host"],
-                                 inputs["Orders"]["port"], "Orders",
+        wallaroo.TCPSourceConfig("Orders", inputs["Orders"]["host"],
+                                 inputs["Orders"]["port"],
                                  decode_order))
 
     market_data = wallaroo.source("Market Data",
-        wallaroo.TCPSourceConfig(inputs["Market Data"]["host"],
+        wallaroo.TCPSourceConfig("Market Data", inputs["Market Data"]["host"],
                                  inputs["Market Data"]["port"],
-                                 "Market Data",
                                  decode_market_data))
 
     pipeline = (orders.merge(market_data)
