@@ -29,16 +29,19 @@ SIDETYPE_SELL = 2
 
 def application_setup(args):
     input_addrs = wallaroo.tcp_parse_input_addrs(args)
-    order_host, order_port = input_addrs[0]
-    nbbo_host, nbbo_port = input_addrs[1]
+    inputs = {ip[0]: {"host": ip[1], "port": ip[2]} for ip in input_addrs}
 
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
     orders = wallaroo.source("Orders",
-        wallaroo.TCPSourceConfig(order_host, order_port, order_decoder))
+        wallaroo.TCPSourceConfig("Orders", inputs["Orders"]["host"],
+                                 inputs["Orders"]["port"],
+                                 decode_order))
 
     market_data = wallaroo.source("Market Data",
-        wallaroo.TCPSourceConfig(nbbo_host, nbbo_port, market_data_decoder))
+        wallaroo.TCPSourceConfig("Market Data", inputs["Market Data"]["host"],
+                                 inputs["Market Data"]["port"],
+                                 decode_market_data))
 
     pipeline = (orders.merge(market_data)
         .key_by(extract_symbol)

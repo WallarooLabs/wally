@@ -471,7 +471,7 @@ def encoder(func):
 
 
 class TCPSourceConfig(object):
-    def __init__(self, host, port, name, decoder, parallelism=10):
+    def __init__(self, name, host, port, decoder, parallelism=10):
         self._host = host
         self._port = port
         self._name = name

@@ -68,7 +68,7 @@ def application_setup(args):
 
     print("Using TCP Source")
     in_name, in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
-    source = wallaroo.TCPSourceConfig(in_host, in_port, in_name, decoder)
+    source = wallaroo.TCPSourceConfig(in_name, in_host, in_port, decoder)
     inputs = wallaroo.source(pipe_name, source)
 
     # programmatically add computations

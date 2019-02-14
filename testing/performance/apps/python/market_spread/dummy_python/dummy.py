@@ -17,11 +17,11 @@ import struct
 import wallaroo
 
 def application_setup(args):
-    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+    in_name, in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
     pipeline = (wallaroo.source("Dummy",
-                    wallaroo.TCPSourceConfig(in_host, in_port, decoder))
+                    wallaroo.TCPSourceConfig(in_name, in_host, in_port, decoder))
       .to(count)
       .key_by(partition)
       .to(count_partitioned)
