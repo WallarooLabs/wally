@@ -42,6 +42,7 @@ use "wallaroo/core/windows"
 use "serialise"
 use "wallaroo_labs/mort"
 
+use @set_command_line_args[I32](module: ModuleP, args: Pointer[U8] val)
 use @set_user_serialization_fns[None](module: Pointer[U8] tag)
 use @user_serialization_get_size[USize](o: Pointer[U8] tag)
 use @user_serialization[None](o: Pointer[U8] tag, bs: Pointer[U8] tag)
@@ -125,6 +126,7 @@ use @PyList_New[Pointer[U8] val](size: USize)
 use @PyList_Size[USize](l: Pointer[U8] box)
 use @PyList_GetItem[Pointer[U8] val](l: Pointer[U8] box, i: USize)
 use @PyList_SetItem[I32](l: Pointer[U8] box, i: USize, item: Pointer[U8] box)
+use @PyList_AsTuple[Pointer[U8] val](list: Pointer[U8] tag)
 use @PyLong_AsLong[I64](i: Pointer[U8] box)
 use @PyObject_HasAttrString[I32](o: Pointer[U8] box, attr: Pointer[U8] tag)
 
@@ -832,7 +834,14 @@ primitive Machida
         end
       end
 
-
+  fun set_command_line_args(m: ModuleP, args: Array[String val] val) =>
+    let l = @PyList_New(args.size())
+    for (i, v) in args.pairs() do
+      @PyList_SetItem(l, i, @PyUnicode_FromStringAndSize(v.cstring(), v.size()))
+    end
+    let t = @PyList_AsTuple(l)
+    dec_ref(l)
+    let result = @set_command_line_args(m, t)
 
   fun set_user_serialization_fns(m: Pointer[U8] val) =>
     @set_user_serialization_fns(m)

@@ -35,6 +35,9 @@ def application_setup(args):
                     help="Number of partitions for use with internal source")
     pargs, _ = parser.parse_known_args(args)
 
+    if not '--cluster-initializer' in wallaroo._ARGS:
+        pargs.partitions = 0
+
     if pargs.gen_source:
         print("Using internal source generator")
         source = wallaroo.GenSourceConfig("Detector",
@@ -64,9 +67,13 @@ class MultiPartitionGenerator(object):
         self.partitions = partitions
 
     def initial_value(self):
+        if self.partitions == 0:
+            return None
         return self.format_message(0,1)
 
     def apply(self, v):
+        if self.partitions == 0:
+            return None
         last_key = int(v.key)
         last_value = v.value()
         if (last_key + 1) == self.partitions:
