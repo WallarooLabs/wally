@@ -63,6 +63,7 @@ actor Main
 
         try
           Machida.set_user_serialization_fns(module)
+          Machida.set_command_line_args(module, env.args)
 
           let application_setup =
             Machida.application_setup(module, options.remaining())?
