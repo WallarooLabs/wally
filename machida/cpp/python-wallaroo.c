@@ -305,6 +305,14 @@ extern PyObject *extract_key(PyObject *key_extractor, PyObject *data)
   return pValue;
 }
 
+extern int set_command_line_args(PyObject *module, PyObject *tuple)
+{
+  PyObject *wallaroo = PyObject_GetAttrString(module, "wallaroo");
+  int result = PyObject_SetAttrString(wallaroo, "_ARGS", tuple);
+  Py_DECREF(wallaroo);
+  return result;
+}
+
 extern void set_user_serialization_fns(PyObject *module)
 {
   if (PyObject_HasAttrString(module, "deserialize") && PyObject_HasAttrString(module, "serialize"))
