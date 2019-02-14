@@ -408,7 +408,8 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
     msg = MultiSequenceGenerator(base_parts=workers * partition_multiplier - 1)
 
     # Start cluster
-    source_names = ["source{}".format(x) for x in range(1, sources+1)]
+    #source_names = ["source{}".format(x) for x in range(1, sources+1)]
+    source_names = ["Detector"] if sources > 0 else []
     logging.debug("Creating cluster")
     with Cluster(command=command, host=host, sources=source_names,
                  workers=workers, sinks=sinks, sink_mode=sink_mode,

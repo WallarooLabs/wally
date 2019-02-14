@@ -405,7 +405,7 @@ def add_runner(worker_id, runners, command, source_addrs, sink_addrs, metrics_ad
                           in_block=(
                               IN_BLOCK.format(inputs=','.join(
                                   '{}@{}'.format(src_nm, addr)
-                                  for src_nm, addr in source_addrs.items()))
+                                  for src_nm, addr in source_addrs[worker_id].items()))
                               if source_addrs else ''),
                           join_block=JOIN_CMD.format(
                               join_addr=control_addr,
@@ -464,7 +464,7 @@ class Cluster(object):
         self.restarted_workers = TypedList(types=(Runner,))
         self.runners = TypedList(types=(Runner,))
         self.source_names = sources
-        self.source_addrs = []
+        self.source_addrs = {}
         self.sink_addrs = []
         self.sinks = []
         self.senders = []
@@ -519,7 +519,7 @@ class Cluster(object):
                 d = dict(zip(self.source_names,
                              source_addrs[i * sources: (i+1) * sources]))
                 if d:
-                    self.source_addrs.append(d)
+                    self.source_addrs[i] = d
             start_runners(self.workers, self.command, self.source_addrs,
                           self.sink_addrs,
                           self.metrics_addr, self.res_dir, workers,
@@ -568,9 +568,8 @@ class Cluster(object):
         for i in range(by):
             d = dict(zip(
                          self.source_names,
-                         addrs[i*sources: (i+1)*source]))
-            if d:
-                self.source_addrs.append(d)
+                         addrs[i*sources: (i+1)*sources]))
+            self.source_addrs[self._worker_id_counter + i] = d
         for x in range(by):
             runner = add_runner(
                 worker_id=self._worker_id_counter,
@@ -582,9 +581,9 @@ class Cluster(object):
                 control_addr=self.workers[0].control,
                 res_dir=self.res_dir,
                 workers=by,
-                my_control_addr=addrs[x][0],
-                my_data_addr=addrs[x][1],
-                my_external_addr=addrs[x][2])
+                my_control_addr=worker_addrs[x][0],
+                my_data_addr=worker_addrs[x][1],
+                my_external_addr=worker_addrs[x][2])
             self._worker_id_counter += 1
             runners.append(runner)
             self.runners.append(runner)
