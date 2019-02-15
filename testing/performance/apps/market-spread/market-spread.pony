@@ -97,7 +97,7 @@ actor Main
           .key_by(OrderSymbolExtractor)
 
         let nbbos = Wallaroo.source[FixNbboMessage val]("Nbbo",
-            TCPSourceConmarketfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
+            TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
               TCPSourceConfigCLIParser("Nbbo", env.args)?))
           .key_by(NbboSymbolExtractor)
 
