@@ -127,6 +127,7 @@ use @PyList_SetItem[I32](l: Pointer[U8] box, i: USize, item: Pointer[U8] box)
 use @PyList_AsTuple[Pointer[U8] val](list: Pointer[U8] tag)
 use @PyInt_AsLong[I64](i: Pointer[U8] box)
 use @PyObject_HasAttrString[I32](o: Pointer[U8] box, attr: Pointer[U8] tag)
+use @PyObject_IsTrue[I32](o: Pointer[U8] box)
 
 type CString is Pointer[U8] tag
 
@@ -912,12 +913,21 @@ primitive _SourceConfig
         PyFramedSourceHandler(d)?
       end
 
+      let valid: Bool = recover val
+        let v = @PyObject_IsTrue(@PyTuple_GetItem(source_config_tuple, 5))
+        if v == 1 then
+          true
+        else
+          false
+        end
+      end
+
       let parallelism = recover val
-        USize.from[I64](@PyInt_AsLong(@PyTuple_GetItem(source_config_tuple, 5)))
+        USize.from[I64](@PyInt_AsLong(@PyTuple_GetItem(source_config_tuple, 6)))
       end
 
       TCPSourceConfig[(PyData val | None)](source_name, decoder, host, port,
-        parallelism)
+        valid, parallelism)
     | "kafka-internal" =>
       let ksclip = KafkaSourceConfigCLIParser(env.out, source_name)
       let ksco = ksclip.parse_options(env.args)?
