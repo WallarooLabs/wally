@@ -63,29 +63,11 @@ class CSVGenAction(argparse.Action):
 
 class ALOSeqGenAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        # (part, stop, source-index)
-        if len(values) == 1:
-            # only part is specified
-            part = values[0]
-            stop = 100
-            source = 0
-        elif len(values) == 2:
-            # assume source idx is 0
-            part, stop = values
-            stop = int(stop)
-            source = 0
-        elif len(values) == 3:
-            # values[2] is source idx
-            part, stop, source = values
-            stop = int(stop)
-            source = int(source)
-        else:
-            msg = ('Argument "{f}" requires 2 or 3 arguments specifying '
-                   'stop [, partition [, source-index ]].\n'
-                   'When unspecified, source-index is 0.'
-                   .format(f=self.dest))
-            raise argparse.ArgumentTypeError(msg)
-        gen = ALOSequenceGenerator(part, stop)
+        # (range, source_name, key)
+        key = values[0]
+        start, stop = SeqGenAction.parse_range(values[1])
+        source = values[2]
+        gen = ALOSequenceGenerator(key, stop, start)
         try:
             dest = getattr(namespace, self.dest)
             if not dest:
@@ -111,16 +93,16 @@ class SeqGenAction(argparse.Action):
         produce 0, 1, 2, ..., 999.
         """
         if len(values) == 2:
-            start, stop = self.__range_parse__(values[0])
+            start, stop = self.parse_range(values[0])
             source = values[1]
             gen = sequence_generator(stop, start)
         elif len(values) == 3:
-            start, stop = self.__range_parse__(values[0])
+            start, stop = self.parse_range(values[0])
             source = values[1]
             header_fmt = values[2]
             gen = sequence_generator(stop, start, header_fmt)
         elif len(values) == 4:
-            start, stop = self.__range_parse__(values[0])
+            start, stop = self.parse_range(values[0])
             source = values[1]
             header_fmt = values[2]
             partition = values[3]
@@ -143,7 +125,8 @@ class SeqGenAction(argparse.Action):
             setattr(namespace, self.dest, dest)
         dest.append((gen, source))
 
-    def __range_parse__(self, range_str):
+    @staticmethod
+    def parse_range(range_str):
         start, stop = range_str.lstrip().rstrip().split(',')
         start_type, start_val = start[:1], start[1:]
         if not start_val:
@@ -404,9 +387,9 @@ def CLI():
                       action=CSVGenAction, nargs='+',
                       metavar=('item1,item2,...', 'source_name', 'header_format'),
                       help="Send values from a comma delimited string")
-    gens.add_argument('--alo-sequence-sender', dest='generators',
-                      action=ALOSeqGenAction, nargs='+',
-                      metavar=('partition', 'stop', 'source-index'),
+    gens.add_argument('--alo-sequence-sender', dest='sources',
+                      action=ALOSeqGenAction, nargs=3,
+                      metavar=('range', 'source_name', 'key'),
                       help=("Send values from the set of integers up to "
                             "STOP, using an at-least-once connector."))
 
