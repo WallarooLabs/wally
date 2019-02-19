@@ -116,7 +116,9 @@ actor TCPSourceListener[In: Any val] is SourceListener
     _host = host
     _service = service
     _valid = valid
-
+    _limit = parallelism
+    _init_size = init_size
+    _max_size = max_size
 
     match router
     | let pr: StatePartitionRouter =>
