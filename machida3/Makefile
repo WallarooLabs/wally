@@ -66,7 +66,7 @@ clean-machida3: machida3_clean
 
 machida3_clean:
 	$(QUIET)rm -rf $(MACHIDA3_BUILD)
-	$(QUIET)rm -f $(MACHIDA3_PATH)/machida.d
+	$(QUIET)rm -f $(MACHIDA3_PATH)/machida3.d
 	$(QUIET)rm -rf $(MACHIDA3_PATH)/.deps
 
 
