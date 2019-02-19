@@ -50,7 +50,7 @@ use "wallaroo_labs/messages"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/queue"
 use "wallaroo_labs/string_set"
-use "wallaroo/core/source/connector_source2"
+use "wallaroo/core/source/connector_source"
 
 class val LocalTopology
   let _app_name: String
