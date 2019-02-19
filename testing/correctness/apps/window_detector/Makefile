@@ -36,7 +36,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
 
 
 WINDOW_DETECTOR_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-window_detector_tests: LOGLEVEL = debug
+window_detector_tests: LOGLEVEL = error
 
 # standard rules generation makefile
 include $(rules_mk_path)
@@ -56,28 +56,27 @@ window_detector_tests: window_detector_tests_python3
 # Pony
 
 # Python
-# TODO: uncomment these:
 window_detector_tests_python: window_detector_tumbling_test_python
 window_detector_tests_python: window_detector_counting_test_python
 window_detector_tests_python: window_detector_sliding_test_python
-#machida has no --in arg: window_detector_tests_python: window_detector_tumbling_gensource_test_python
-#machida has no --in arg: window_detector_tests_python: window_detector_counting_gensource_test_python
-#machida has no --in arg: window_detector_tests_python: window_detector_sliding_gensource_test_python
+window_detector_tests_python: window_detector_tumbling_gensource_test_python
+window_detector_tests_python: window_detector_counting_gensource_test_python
+window_detector_tests_python: window_detector_sliding_gensource_test_python
 window_detector_tests_python: window_detector_tumbling_alo_source_test_python
 window_detector_tests_python: window_detector_counting_alo_source_test_python
-#sink gets TOO MANY items (e.g. 344 instead of 200): window_detector_tests_python: window_detector_sliding_alo_source_test_python
+window_detector_tests_python: window_detector_sliding_alo_source_test_python
 
 
 # Python3
 window_detector_tests_python3: window_detector_tumbling_test_python3
 window_detector_tests_python3: window_detector_sliding_test_python3
 window_detector_tests_python3: window_detector_counting_test_python3
-#machida has no --in arg: window_detector_tests_python3: window_detector_tumbling_gensource_test_python3
-#machida has no --in arg: window_detector_tests_python3: window_detector_counting_gensource_test_python3
-#machida has no --in arg: window_detector_tests_python3: window_detector_sliding_gensource_test_python3
+window_detector_tests_python3: window_detector_tumbling_gensource_test_python3
+window_detector_tests_python3: window_detector_counting_gensource_test_python3
+window_detector_tests_python3: window_detector_sliding_gensource_test_python3
 window_detector_tests_python3: window_detector_tumbling_alo_source_test_python3
 window_detector_tests_python3: window_detector_counting_alo_source_test_python3
-#sink gets TOO MANY items (e.g. 344 instead of 200): window_detector_tests_python3: window_detector_sliding_alo_source_test_python3
+window_detector_tests_python3: window_detector_sliding_alo_source_test_python3
 
 # Individual test definitions below
 #
@@ -85,8 +84,8 @@ window_detector_tests_python3: window_detector_counting_alo_source_test_python3
 window_detector_tumbling_alo_source_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--alo-sequence-sender key_0 100 \
-		--alo-sequence-sender key_1 100 \
+		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
+		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module window_detector --source alo --window-type tumbling $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
@@ -98,21 +97,21 @@ window_detector_tumbling_alo_source_test_python:
 window_detector_sliding_alo_source_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--alo-sequence-sender key_0 100 \
-		--alo-sequence-sender key_1 100 \
+		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
+		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module window_detector --source alo --window-type sliding $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
-		--workers 1 \
-		--sink-expect 200
+		--workers 5 \
+		--sink-expect 400
 
 window_detector_counting_alo_source_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--alo-sequence-sender key_0 100 \
-		--alo-sequence-sender key_1 100 \
+		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
+		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module window_detector --source alo --window-type counting $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
@@ -165,7 +164,7 @@ window_detector_tumbling_gensource_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
 		--log-level $(LOGLEVEL) \
-		--command 'machida --application-module window_detector --gen-source --window-type tumbling $(RUN_WITH_RESILIENCE)' \
+		--command 'machida --application-module window_detector --source gensource --window-type tumbling $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -177,7 +176,7 @@ window_detector_counting_gensource_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
 		--log-level $(LOGLEVEL) \
-		--command 'machida --application-module window_detector --gen-source --window-type counting $(RUN_WITH_RESILIENCE)' \
+		--command 'machida --application-module window_detector --source gensource --window-type counting $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type counting --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -189,7 +188,7 @@ window_detector_sliding_gensource_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
 		--log-level $(LOGLEVEL) \
-		--command 'machida --application-module window_detector --gen-source --window-type sliding $(RUN_WITH_RESILIENCE)' \
+		--command 'machida --application-module window_detector --source gensource --window-type sliding $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type sliding --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -201,8 +200,8 @@ window_detector_sliding_gensource_test_python:
 window_detector_tumbling_alo_source_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--alo-sequence-sender key_0 100 \
-		--alo-sequence-sender key_1 100 \
+		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
+		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module window_detector --source alo --window-type tumbling $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
@@ -214,21 +213,21 @@ window_detector_tumbling_alo_source_test_python3:
 window_detector_sliding_alo_source_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--alo-sequence-sender key_0 100 \
-		--alo-sequence-sender key_1 100 \
+		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
+		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module window_detector --source alo --window-type sliding $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 200
+		--sink-expect 400
 
 window_detector_counting_alo_source_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--alo-sequence-sender key_0 100 \
-		--alo-sequence-sender key_1 100 \
+		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
+		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module window_detector --source alo --window-type counting $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
@@ -281,7 +280,7 @@ window_detector_tumbling_gensource_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
 		--log-level $(LOGLEVEL) \
-		--command 'machida3 --application-module window_detector --gen-source --window-type tumbling $(RUN_WITH_RESILIENCE)' \
+		--command 'machida3 --application-module window_detector --source gensource --window-type tumbling $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python3 _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -293,7 +292,7 @@ window_detector_counting_gensource_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
 		--log-level $(LOGLEVEL) \
-		--command 'machida3 --application-module window_detector --gen-source --window-type counting $(RUN_WITH_RESILIENCE)' \
+		--command 'machida3 --application-module window_detector --source gensource --window-type counting $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python3 _validate.py --window-type counting --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -305,7 +304,7 @@ window_detector_sliding_gensource_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
 		--log-level $(LOGLEVEL) \
-		--command 'machida3 --application-module window_detector --gen-source --window-type sliding $(RUN_WITH_RESILIENCE)' \
+		--command 'machida3 --application-module window_detector --source gensource --window-type sliding $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python3 _validate.py --window-type sliding --output' \
 		--output 'received.txt' \
 		--batch-size 50 \

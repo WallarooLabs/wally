@@ -51,8 +51,8 @@ def application_setup(args):
     if not '--cluster-initializer' in wallaroo._ARGS:
         pargs.partitions = 0
 
-    source_name = "{} window".format(pargs.window_type)
-    if pargs.gen_source:
+    source_name = "window detector"
+    if pargs.source == 'gensource':
         print("Using internal source generator")
         source = wallaroo.GenSourceConfig(source_name,
             MultiPartitionGenerator(pargs.partitions))
@@ -62,9 +62,9 @@ def application_setup(args):
         source = wallaroo.TCPSourceConfig(in_name, in_host, in_port, decoder)
     elif pargs.source == 'alo':
         print("Using at-least-once source")
-        in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
-        source = wallaroo.experimental.SourceConnector2Config(
-            "window_detector_feed",
+        in_name, in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+        source = wallaroo.experimental.SourceConnectorConfig(
+            name=source_name,
             encoder=encode_feed,
             decoder=decode_feed,
             host=in_host,
