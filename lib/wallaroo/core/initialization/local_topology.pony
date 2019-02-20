@@ -863,7 +863,6 @@ actor LocalTopologyInitializer is LayoutInitializer
           end
         end
         for b in sl_builders.values() do
-          @printf[I32]("^*#^*#^*# sl_builders starting early\n".cstring())
           let ba = b.apply(_env)
           sl_actors.push(ba)
         end

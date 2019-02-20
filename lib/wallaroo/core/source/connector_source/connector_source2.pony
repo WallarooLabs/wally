@@ -142,9 +142,6 @@ actor ConnectorSource2[In: Any val] is Source
     A new connection accepted on a server.
     """
     _source_id = source_id
-                @printf[I32]("^*^* %s.%s my source_id = %s\n".cstring(),
-                  __loc.type_name().cstring(), __loc.method_name().cstring(),
-                  _source_id.string().cstring())
     _auth = auth
     _event_log = event_log
     _metrics_reporter = consume metrics_reporter'
@@ -177,7 +174,6 @@ actor ConnectorSource2[In: Any val] is Source
     ifdef "resilience" then
       _mute_local()
     end
-    @printf[I32]("YYY create: %s 0x%lx source_id = %s\n".cstring(), __loc.type_name().cstring(), this, _source_id.string().cstring())
 
   be accept(fd: U32, init_size: USize = 64, max_size: USize = 16384) =>
     """
@@ -613,10 +609,8 @@ actor ConnectorSource2[In: Any val] is Source
     for (o_id, o) in _outputs.pairs() do
       match o
       | let ob: OutgoingBoundary =>
-        @printf[I32]("QQQ: %s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
         ob.forward_barrier(o_id, _source_id, token)
       else
-        @printf[I32]("QQQ: %s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
         o.receive_barrier(_source_id, this, token)
       end
     end
@@ -630,7 +624,7 @@ actor ConnectorSource2[In: Any val] is Source
     | let sbt: CheckpointBarrierToken =>
       _notify.barrier_complete(sbt.id)
     else
-      @printf[I32]("^*^* %s.%s when %s\n".cstring(),
+      @printf[I32]("DEBUG %s.%s when %s\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring(),
         token.string().cstring())
       Fail() // TODO does this happen in practice?
@@ -663,9 +657,11 @@ actor ConnectorSource2[In: Any val] is Source
         p.push(c)
       end
     end
-    @printf[I32]("^*^* %s.%s my source_id = %s, payload.size = %d\n".cstring(),
-      __loc.type_name().cstring(), __loc.method_name().cstring(),
-      _source_id.string().cstring(), p.size())
+    ifdef "trace" then
+      @printf[I32]("TRACE: %s.%s my source_id = %s, payload.size = %d\n".cstring(),
+        __loc.type_name().cstring(), __loc.method_name().cstring(),
+        _source_id.string().cstring(), p.size())
+    end
 
     _notify.rollback(checkpoint_id, payload)
     _next_checkpoint_id = checkpoint_id + 1
@@ -1009,18 +1005,22 @@ actor ConnectorSource2[In: Any val] is Source
 
   be stream_notify_result(session_tag: USize, success: Bool,
     stream_id: U64, point_of_reference: U64, last_message_id: U64) =>
-    @printf[I32]("^*^* %s.%s(%s, %lu, %lu, %lu)\n".cstring(),
-      __loc.type_name().cstring(), __loc.method_name().cstring(),
-      success.string().cstring(), stream_id, point_of_reference,
-      last_message_id)
+    ifdef "trace" then
+      @printf[I32]("TRACE: %s.%s(%s, %lu, %lu, %lu)\n".cstring(),
+        __loc.type_name().cstring(), __loc.method_name().cstring(),
+        success.string().cstring(), stream_id, point_of_reference,
+        last_message_id)
+    end
     _notify.stream_notify_result(session_tag, success,
       stream_id, point_of_reference, last_message_id)
 
   be get_all_streams_result(session_tag: USize,
     data: Array[(U64,String,U64)] val)
   =>
-    @printf[I32]("^*^* %s.%s(%lu, ...%d...)\n".cstring(),
-      __loc.type_name().cstring(), __loc.method_name().cstring(),
-      session_tag, data.size())
+    ifdef "trace" then
+      @printf[I32]("TRACE: %s.%s(%lu, ...%d...)\n".cstring(),
+        __loc.type_name().cstring(), __loc.method_name().cstring(),
+        session_tag, data.size())
+    end
     _notify.get_all_streams_result(session_tag, data)
 
