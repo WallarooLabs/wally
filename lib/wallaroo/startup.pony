@@ -798,7 +798,6 @@ actor Startup
     end
 
   be clean_shutdown() =>
-    @printf[I32]("QQQ clean_shutdown\n".cstring())
     let promise = Promise[None]
     promise.next[None]({(n: None): None => _self.clean_recovery_files()})
     try (_event_log as EventLog).dispose() end

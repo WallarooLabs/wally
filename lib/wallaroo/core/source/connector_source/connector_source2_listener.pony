@@ -361,16 +361,20 @@ actor ConnectorSource2Listener[In: Any val] is SourceListener
     stream_id: U64, stream_name: String, point_of_reference: U64,
     connector_source: ConnectorSource2[In] tag)
   =>
-    @printf[I32]("^*^* %s.%s(%lu, %lu, ...)\n".cstring(),
-      __loc.type_name().cstring(), __loc.method_name().cstring(),
-      stream_id, point_of_reference)
+    ifdef "trace" then
+      @printf[I32]("TRACE: %s.%s(%lu, %lu, ...)\n".cstring(),
+        __loc.type_name().cstring(), __loc.method_name().cstring(),
+        stream_id, point_of_reference)
+    end
     if _active_streams.contains(stream_id) then
       try
         (let stream_name': String, let tag_or_none: Any tag,
           let p_o_r, let last_message_id) = _active_streams(stream_id)?
-        @printf[I32]("^*^* %s.%s existing stream_id %lu @ p-o-r %lu l-msgid %lu in-use %s\n".cstring(),
-          __loc.type_name().cstring(), __loc.method_name().cstring(),
-          stream_id, p_o_r, last_message_id, (not (tag_or_none is None)).string().cstring())
+        ifdef "trace" then
+          @printf[I32]("TRACE: %s.%s existing stream_id %lu @ p-o-r %lu l-msgid %lu in-use %s\n".cstring(),
+            __loc.type_name().cstring(), __loc.method_name().cstring(),
+            stream_id, p_o_r, last_message_id, (not (tag_or_none is None)).string().cstring())
+        end
         if stream_name' != stream_name then
           Fail()
         end
@@ -388,23 +392,29 @@ actor ConnectorSource2Listener[In: Any val] is SourceListener
             (stream_name, connector_source, p_o_r, last_message_id)
           connector_source.stream_notify_result(session_tag, true,
             stream_id, p_o_r, last_message_id)
-          @printf[I32]("^*^* %s.%s existing stream_id %lu is ok\n".cstring(),
-            __loc.type_name().cstring(), __loc.method_name().cstring(),
-            stream_id)
+          ifdef "trace" then
+            @printf[I32]("TRACE: %s.%s existing stream_id %lu is ok\n".cstring(),
+              __loc.type_name().cstring(), __loc.method_name().cstring(),
+              stream_id)
+          end
         else
           connector_source.stream_notify_result(session_tag, false,
             0, 0, 0) // TODO args
-          @printf[I32]("^*^* %s.%s existing stream_id %lu is rejected\n".cstring(),
-            __loc.type_name().cstring(), __loc.method_name().cstring(),
-            stream_id)
+          ifdef "trace" then
+            @printf[I32]("TRACE: %s.%s existing stream_id %lu is rejected\n".cstring(),
+              __loc.type_name().cstring(), __loc.method_name().cstring(),
+              stream_id)
+          end
         end
       else
         Fail()
       end
     else
-      @printf[I32]("^*^* %s.%s new stream_id %lu @ p-o-r %lu\n".cstring(),
-        __loc.type_name().cstring(), __loc.method_name().cstring(),
-        stream_id, point_of_reference)
+      ifdef "trace" then
+        @printf[I32]("TRACE: %s.%s new stream_id %lu @ p-o-r %lu\n".cstring(),
+          __loc.type_name().cstring(), __loc.method_name().cstring(),
+          stream_id, point_of_reference)
+      end
       _active_streams(stream_id) =
         (stream_name, connector_source, point_of_reference, point_of_reference)
       connector_source.stream_notify_result(session_tag, true,
@@ -429,7 +439,7 @@ actor ConnectorSource2Listener[In: Any val] is SourceListener
         end
       end
     ifdef "trace" then
-      @printf[I32]("^*^* %s.%s(stmid %lu, chkp %lu, p-o-r %lu, l-msgid %lu, conn %s) update %s\n".cstring(),
+      @printf[I32]("TRACE: %s.%s(stmid %lu, chkp %lu, p-o-r %lu, l-msgid %lu, conn %s) update %s\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring(),
         stream_id, checkpoint_id, point_of_reference, last_message_id,
         (if connector_source is None then
