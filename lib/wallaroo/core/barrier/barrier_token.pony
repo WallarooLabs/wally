@@ -19,6 +19,7 @@ Copyright 2018 The Wallaroo Authors.
 use "collections"
 use "wallaroo/core/autoscale"
 use "wallaroo/core/checkpoint"
+use "wallaroo/core/common"
 use "wallaroo_labs/partial_order"
 
 
@@ -48,10 +49,14 @@ primitive InitialBarrierToken is BarrierToken
 class val AutoscaleBarrierToken is BarrierToken
   let _worker: String
   let _id: AutoscaleId
+  let _leaving_workers: Array[WorkerName] val
 
-  new val create(worker': String, id': AutoscaleId) =>
+  new val create(worker': String, id': AutoscaleId,
+    lws: Array[WorkerName] val)
+  =>
     _worker = worker'
     _id = id'
+    _leaving_workers = lws
 
   fun eq(that: box->BarrierToken): Bool =>
     match that
@@ -66,6 +71,9 @@ class val AutoscaleBarrierToken is BarrierToken
 
   fun id(): AutoscaleId =>
     _id
+
+  fun leaving_workers(): Array[WorkerName] val =>
+    _leaving_workers
 
   fun lt(that: box->BarrierToken): Bool =>
     match that

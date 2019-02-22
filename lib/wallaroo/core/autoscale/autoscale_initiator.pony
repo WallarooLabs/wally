@@ -35,27 +35,31 @@ actor AutoscaleInitiator
     checkpoint_initiator: CheckpointInitiator)
   =>
     _worker_name = w_name
-    _current_autoscale_tokens = AutoscaleTokens(_worker_name, 0)
+    _current_autoscale_tokens = AutoscaleTokens(_worker_name, 0,
+      recover Array[WorkerName] end)
     _barrier_initiator = barrier_initiator
     _checkpoint_initiator = checkpoint_initiator
 
-  be initiate_autoscale(autoscale_initiate_promise: AutoscaleResultPromise)
+  be initiate_autoscale(autoscale_initiate_promise: AutoscaleResultPromise,
+    leaving_workers: Array[WorkerName] val = recover Array[WorkerName] end)
   =>
     let promise = Promise[None]
     promise
       .next[None]({(_: None) => _self.inject_autoscale_barrier(
-        autoscale_initiate_promise)})
+        autoscale_initiate_promise, leaving_workers)})
 
     _checkpoint_initiator.clear_pending_checkpoints(promise)
 
   be inject_autoscale_barrier(
-    autoscale_initiate_promise: AutoscaleResultPromise)
+    autoscale_initiate_promise: AutoscaleResultPromise,
+    leaving_workers: Array[WorkerName] val)
   =>
     @printf[I32]("Checking there are no in flight messages.\n".cstring())
     if _autoscale_token_in_progress then Fail() end
     _autoscale_token_in_progress = true
     let next_id = _current_autoscale_tokens.id + 1
-    _current_autoscale_tokens = AutoscaleTokens(_worker_name, next_id)
+    _current_autoscale_tokens = AutoscaleTokens(_worker_name, next_id,
+      leaving_workers)
 
     let barrier_promise = Promise[BarrierToken]
     barrier_promise
