@@ -17,15 +17,16 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "wallaroo/core/barrier"
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
 use "wallaroo/core/metrics"
+use "wallaroo/core/recovery"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
-use "wallaroo/core/barrier"
-use "wallaroo/core/recovery"
-use "wallaroo/core/checkpoint"
 
 trait tag Sink is (Consumer & DisposableActor & BarrierProcessor)
+  be barrier_fully_acked(token: BarrierToken)
   fun inputs(): Map[RoutingId, Producer] box
 
 interface val SinkConfig[Out: Any val]

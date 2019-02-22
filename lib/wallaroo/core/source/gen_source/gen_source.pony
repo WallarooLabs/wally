@@ -474,7 +474,7 @@ actor GenSource[V: Any val] is Source
       end
     end
 
-  be barrier_complete(token: BarrierToken) =>
+  be barrier_fully_acked(token: BarrierToken) =>
     ifdef "checkpoint_trace" then
       @printf[I32]("barrier_complete at GenSource %s\n".cstring(),
         _source_id.string().cstring())

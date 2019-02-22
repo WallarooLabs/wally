@@ -18,14 +18,14 @@ Copyright 2017 The Wallaroo Authors.
 
 use "collections"
 use "promises"
-use "wallaroo/core/boundary"
-use "wallaroo/core/common"
-use "wallaroo/core/partitioning"
 use "wallaroo/core/barrier"
-use "wallaroo/core/data_receiver"
-use "wallaroo/core/recovery"
+use "wallaroo/core/boundary"
 use "wallaroo/core/checkpoint"
+use "wallaroo/core/common"
+use "wallaroo/core/data_receiver"
 use "wallaroo/core/metrics"
+use "wallaroo/core/partitioning"
+use "wallaroo/core/recovery"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
@@ -60,7 +60,7 @@ trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
   be mute(a: Any tag)
   be unmute(a: Any tag)
   be initiate_barrier(token: BarrierToken)
-  be barrier_complete(token: BarrierToken)
+  be barrier_fully_acked(token: BarrierToken)
   be update_worker_data_service(worker_name: String,
     host: String, service: String)
   // Called to indicate that an in progress checkpoint when Source was created

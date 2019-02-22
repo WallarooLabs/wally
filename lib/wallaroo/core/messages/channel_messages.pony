@@ -401,10 +401,10 @@ primitive ChannelMsgEncoder
   _encode(ForwardInjectBlockingBarrierMsg(token, wait_for_token, sender),
     auth)?
 
-  fun forwarded_inject_barrier_complete(token: BarrierToken,
+  fun forwarded_inject_barrier_fully_acked(token: BarrierToken,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-  _encode(ForwardedInjectBarrierCompleteMsg(token), auth)?
+  _encode(ForwardedInjectBarrierFullyAckedMsg(token), auth)?
 
   fun remote_initiate_barrier(sender: String, token: BarrierToken,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -428,10 +428,10 @@ primitive ChannelMsgEncoder
     _encode(ForwardBarrierMsg(target_step_id, origin_step_id, token,
       seq_id), auth)?
 
-  fun barrier_complete(token: BarrierToken, auth: AmbientAuth):
+  fun barrier_fully_acked(token: BarrierToken, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
-    _encode(BarrierCompleteMsg(token), auth)?
+    _encode(BarrierFullyAckedMsg(token), auth)?
 
   fun event_log_initiate_checkpoint(checkpoint_id: CheckpointId,
     sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
@@ -525,14 +525,14 @@ primitive ChannelMsgEncoder
     """
     _encode(AckRegisterProducersMsg(sender), auth)?
 
-  fun rollback_barrier_complete(token: CheckpointRollbackBarrierToken,
+  fun rollback_barrier_fully_acked(token: CheckpointRollbackBarrierToken,
     sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
-    Sent from the primary checkpoint worker to the recovering worker to indicate
-    that rollback barrier is complete.
+    Sent from the primary checkpoint worker to the recovering worker to
+    indicate that rollback barrier is fully acked.
     """
-    _encode(RollbackBarrierCompleteMsg(token, sender), auth)?
+    _encode(RollbackBarrierFullyAckedMsg(token, sender), auth)?
 
   fun event_log_initiate_rollback(token: CheckpointRollbackBarrierToken,
     sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
@@ -1220,7 +1220,7 @@ class val ForwardInjectBlockingBarrierMsg is ChannelMsg
     wait_for_token = wait_for_token'
     sender = sender'
 
-class val ForwardedInjectBarrierCompleteMsg is ChannelMsg
+class val ForwardedInjectBarrierFullyAckedMsg is ChannelMsg
   let token: BarrierToken
 
   new val create(token': BarrierToken) =>
@@ -1265,7 +1265,7 @@ class val ForwardBarrierMsg is ChannelMsg
     token = token'
     seq_id = seq_id'
 
-class val BarrierCompleteMsg is ChannelMsg
+class val BarrierFullyAckedMsg is ChannelMsg
   let token: BarrierToken
 
   new val create(token': BarrierToken)
@@ -1388,7 +1388,7 @@ class val AckRegisterProducersMsg is ChannelMsg
   new val create(sender': WorkerName) =>
     sender = sender'
 
-class val RollbackBarrierCompleteMsg is ChannelMsg
+class val RollbackBarrierFullyAckedMsg is ChannelMsg
   let token: CheckpointRollbackBarrierToken
   let sender: WorkerName
 
