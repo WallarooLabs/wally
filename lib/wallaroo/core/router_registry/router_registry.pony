@@ -698,7 +698,7 @@ actor RouterRegistry
     let promise = Promise[None]
     promise.next[None]({(_: None) =>
       _self.shrink_autoscale_barrier_complete()})
-    _autoscale_initiator.initiate_autoscale(promise)
+    _autoscale_initiator.initiate_autoscale(promise, leaving_workers)
 
   fun ref stop_the_world_for_shrink_migration(
     remaining_workers: Array[WorkerName] val,

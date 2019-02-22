@@ -17,6 +17,7 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 use "wallaroo/core/barrier"
+use "wallaroo/core/common"
 
 class val AutoscaleTokens
   let worker: String
@@ -24,8 +25,8 @@ class val AutoscaleTokens
   let initial_token: AutoscaleBarrierToken
   let resume_token: AutoscaleResumeBarrierToken
 
-  new val create(w: String, id': AutoscaleId) =>
+  new val create(w: String, id': AutoscaleId, lws: Array[WorkerName] val) =>
     worker = w
     id = id'
-    initial_token = AutoscaleBarrierToken(w, id)
+    initial_token = AutoscaleBarrierToken(w, id, lws)
     resume_token = AutoscaleResumeBarrierToken(w, id)
