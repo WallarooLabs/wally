@@ -35,6 +35,7 @@ actor Main is TestList
     test(_TestMessageMsg)
     test(_TestAckMsg)
     test(_TestRestartMsg)
+    test(_TestUpdateSourcesMsg)
 
 class iso _TestBitFlags is UnitTest
   fun name(): String => "connector_wire_messages/_TestBitFlags"
@@ -125,7 +126,11 @@ class iso _TestOkMsg is UnitTest
   fun apply(h: TestHelper) ? =>
     let ic: U32 = 100
     let cl: Array[Credit] val = [(1, "1", 0); (2, "2", 1); (3, "3", 2)]
-    let a = OkMsg(ic, cl)
+    let sl: SourceList val = [
+      ("s1", "1.1.1.1:1234")
+      ("source2", "127.0.0.1:5000")
+      ("s3", "8.8.8.8:80")]
+    let a = OkMsg(ic, cl, sl)
     let encoded = Frame.encode(a)
     let m = Frame.decode(encoded)?
     let b = m as OkMsg
@@ -140,6 +145,14 @@ class iso _TestOkMsg is UnitTest
       h.assert_eq[StreamId](cr._1, cl(i)?._1)
       h.assert_eq[StreamName](cr._2, cl(i)?._2)
       h.assert_eq[PointOfRef](cr._3, cl(i)?._3)
+    end
+    for (i, p) in a.source_list.pairs() do
+      h.assert_eq[SourceName](p._1, sl(i)?._1)
+      h.assert_eq[SourceAddress](p._2, sl(i)?._2)
+    end
+    for (i, p) in b.source_list.pairs() do
+      h.assert_eq[SourceName](p._1, sl(i)?._1)
+      h.assert_eq[SourceAddress](p._2, sl(i)?._2)
     end
 
 class iso _TestErrorMsg is UnitTest
@@ -339,3 +352,24 @@ class iso _TestRestartMsg is UnitTest
     let encoded = Frame.encode(a)
     let m = Frame.decode(encoded)?
     let b = m as RestartMsg
+
+class iso _TestUpdateSourcesMsg is UnitTest
+  fun name(): String => "connector_wire_messages/_TestUpdateSourcesMsg"
+
+  fun apply(h: TestHelper) ? =>
+    let sl: SourceList val = [
+      ("s1", "1.1.1.1:1234")
+      ("source2", "127.0.0.1:5000")
+      ("s3", "8.8.8.8:80")]
+    let a = UpdateSourcesMsg(sl)
+    let encoded = Frame.encode(a)
+    let m = Frame.decode(encoded)?
+    let b = m as UpdateSourcesMsg
+    for (i, p) in a.source_list.pairs() do
+      h.assert_eq[SourceName](p._1, sl(i)?._1)
+      h.assert_eq[SourceAddress](p._2, sl(i)?._2)
+    end
+    for (i, p) in b.source_list.pairs() do
+      h.assert_eq[SourceName](p._1, sl(i)?._1)
+      h.assert_eq[SourceAddress](p._2, sl(i)?._2)
+    end
