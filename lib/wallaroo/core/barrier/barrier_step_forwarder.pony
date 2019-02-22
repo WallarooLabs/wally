@@ -60,7 +60,7 @@ class BarrierStepForwarder
     // have already been cleared to make way for it.
     ifdef debug then
       if barrier_token > _barrier_token then
-        @printf[I32]("Invariant violation: received barrier %s is greater than current barrier %s \n".cstring(), barrier_token.string().cstring(), _barrier_token.string().cstring())
+        @printf[I32]("Invariant violation: received barrier %s is greater than current barrier %s at Step %s\n".cstring(), barrier_token.string().cstring(), _barrier_token.string().cstring(), _step_id.string().cstring())
       end
 
       Invariant(not (barrier_token > _barrier_token))
@@ -74,8 +74,8 @@ class BarrierStepForwarder
 
     if barrier_token != _barrier_token then
       @printf[I32]("Received %s when still processing %s at step %s\n"
-        .cstring(), _barrier_token.string().cstring(),
-        barrier_token.string().cstring(), _step_id.string().cstring())
+        .cstring(), barrier_token.string().cstring(),
+        _barrier_token.string().cstring(), _step_id.string().cstring())
       Fail()
     end
 
