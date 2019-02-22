@@ -401,10 +401,6 @@ actor BarrierInitiator is Initializable
       else
         Fail()
       end
-
-      for s in _sources.values() do
-        s.initiate_barrier(barrier_token)
-      end
     end
 
   be worker_ack_barrier_start(w: String, token: BarrierToken) =>
@@ -487,8 +483,8 @@ actor BarrierInitiator is Initializable
     for all worker acks.
     """
     if not _disposed then
-      let next_handler = WorkerAcksBarrierHandler(this, barrier_token, _workers,
-        workers_acked, result_promise)
+      let next_handler = WorkerAcksBarrierHandler(this, barrier_token,
+        _workers, workers_acked, result_promise)
       try
         _active_barriers.update_handler(barrier_token, next_handler)?
       else
