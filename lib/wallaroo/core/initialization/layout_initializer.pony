@@ -21,8 +21,8 @@ use "promises"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/messages"
-use "wallaroo/ent/data_receiver"
-use "wallaroo/ent/checkpoint"
+use "wallaroo/core/data_receiver"
+use "wallaroo/core/checkpoint"
 
 trait tag LayoutInitializer
   be initialize(cluster_initializer: (ClusterInitializer | None) = None,

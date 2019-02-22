@@ -19,8 +19,8 @@ Copyright 2017 The Wallaroo Authors.
 use "wallaroo_labs/mort"
 use "wallaroo/core/invariant"
 use "wallaroo/core/topology"
-use "wallaroo/ent/barrier"
-use "wallaroo/ent/checkpoint"
+use "wallaroo/core/barrier"
+use "wallaroo/core/checkpoint"
 
 trait StepMessageProcessor
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,

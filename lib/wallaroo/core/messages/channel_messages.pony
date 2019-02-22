@@ -26,10 +26,10 @@ use "wallaroo/core/common"
 use "wallaroo/core/initialization"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
-use "wallaroo/ent/barrier"
-use "wallaroo/ent/data_receiver"
-use "wallaroo/ent/router_registry"
-use "wallaroo/ent/checkpoint"
+use "wallaroo/core/barrier"
+use "wallaroo/core/data_receiver"
+use "wallaroo/core/router_registry"
+use "wallaroo/core/checkpoint"
 
 
 primitive ChannelMsgEncoder
