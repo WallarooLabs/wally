@@ -221,7 +221,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   let _recovery: Recovery
   let _recovery_replayer: RecoveryReconnecter
   let _checkpoint_initiator: CheckpointInitiator
-  let _barrier_initiator: BarrierInitiator
+  let _barrier_coordinator: BarrierCoordinator
   var _is_initializer: Bool
   var _outgoing_boundary_builders:
     Map[WorkerName, OutgoingBoundaryBuilder] val =
@@ -271,7 +271,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     is_initializer: Bool, data_receivers: DataReceivers,
     event_log: EventLog, recovery: Recovery,
     recovery_replayer: RecoveryReconnecter,
-    checkpoint_initiator: CheckpointInitiator, barrier_initiator: BarrierInitiator,
+    checkpoint_initiator: CheckpointInitiator, barrier_coordinator: BarrierCoordinator,
     local_topology_file: String, data_channel_file: String,
     worker_names_file: String, local_keys_filepath: FilePath,
     the_journal: SimpleJournal, do_local_file_io: Bool,
@@ -292,7 +292,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _recovery = recovery
     _recovery_replayer = recovery_replayer
     _checkpoint_initiator = checkpoint_initiator
-    _barrier_initiator = barrier_initiator
+    _barrier_coordinator = barrier_coordinator
     _local_topology_file = local_topology_file
     _data_channel_file = data_channel_file
     _worker_names_file = worker_names_file
@@ -305,7 +305,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _worker_source_configs = worker_source_configs
     _router_registry.register_local_topology_initializer(this)
     _phase.set_initializable(_checkpoint_initiator)
-    _phase.set_initializable(_barrier_initiator)
+    _phase.set_initializable(_barrier_coordinator)
     _recovery.update_initializer(this)
 
   be update_topology(t: LocalTopology) =>
@@ -434,7 +434,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         end
 
         for w in t.worker_names.values() do
-          _barrier_initiator.add_worker(w)
+          _barrier_coordinator.add_worker(w)
           _checkpoint_initiator.add_worker(w)
         end
 
@@ -727,7 +727,7 @@ actor LocalTopologyInitializer is LayoutInitializer
               // infrastructure doesn't allow that. This means that currently
               // the same sink_id is attached to sink replicas across workers.
               let sink = egress_builder(_worker_name, consume sink_reporter,
-                _event_log, _recovering, _barrier_initiator,
+                _event_log, _recovering, _barrier_coordinator,
                 _checkpoint_initiator, _env, _auth,
                 _outgoing_boundaries)
 
@@ -753,7 +753,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
               let sinks = multi_sink_builder(_worker_name,
                 consume sink_reporter, _event_log, _recovering,
-                _barrier_initiator, _checkpoint_initiator, _env, _auth,
+                _barrier_coordinator, _checkpoint_initiator, _env, _auth,
                 _outgoing_boundaries)
 
               for i in Range[USize](0, sinks.size()) do
@@ -817,7 +817,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   _metrics_conn)
                 let b_source = BarrierSource(t.barrier_source_id,
                   _router_registry, _event_log, consume b_reporter)
-                _barrier_initiator.register_barrier_source(b_source)
+                _barrier_coordinator.register_barrier_source(b_source)
                 barrier_source = b_source
               end
               try
@@ -1059,7 +1059,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     match _topology
     | let t: LocalTopology =>
       if _recovering then
-        _recovery.start_recovery(this, t.worker_names)
+        _recovery.start_recovery(t.worker_names)
       else
         _phase.report_recovery_ready_to_work()
         _event_log.quick_initialize(this)

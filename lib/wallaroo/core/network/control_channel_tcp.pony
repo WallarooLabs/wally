@@ -49,7 +49,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _recovery: Recovery
   let _recovery_replayer: RecoveryReconnecter
   let _router_registry: RouterRegistry
-  let _barrier_initiator: BarrierInitiator
+  let _barrier_coordinator: BarrierCoordinator
   let _checkpoint_initiator: CheckpointInitiator
   let _recovery_file: FilePath
   let _event_log: EventLog
@@ -62,7 +62,7 @@ class ControlChannelListenNotifier is TCPListenNotify
     initializer: (ClusterInitializer | None) = None,
     layout_initializer: LayoutInitializer, recovery: Recovery,
     recovery_replayer: RecoveryReconnecter, router_registry: RouterRegistry,
-    barrier_initiator: BarrierInitiator, checkpoint_initiator: CheckpointInitiator,
+    barrier_coordinator: BarrierCoordinator, checkpoint_initiator: CheckpointInitiator,
     recovery_file: FilePath, data_host: String, data_service: String,
     event_log: EventLog, recovery_file_cleaner: RecoveryFileCleaner,
     the_journal: SimpleJournal, do_local_file_io: Bool,
@@ -79,7 +79,7 @@ class ControlChannelListenNotifier is TCPListenNotify
     _recovery = recovery
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
-    _barrier_initiator = barrier_initiator
+    _barrier_coordinator = barrier_coordinator
     _checkpoint_initiator = checkpoint_initiator
     _recovery_file = recovery_file
     _event_log = event_log
@@ -128,7 +128,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
     ControlChannelConnectNotifier(_worker_name, _auth, _connections,
       _initializer, _layout_initializer, _recovery, _recovery_replayer,
-      _router_registry, _barrier_initiator, _checkpoint_initiator,
+      _router_registry, _barrier_coordinator, _checkpoint_initiator,
       _d_host, _d_service, _event_log, _recovery_file_cleaner)
 
   fun ref closed(listen: TCPListener ref) =>
@@ -143,7 +143,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _recovery: Recovery
   let _recovery_replayer: RecoveryReconnecter
   let _router_registry: RouterRegistry
-  let _barrier_initiator: BarrierInitiator
+  let _barrier_coordinator: BarrierCoordinator
   let _checkpoint_initiator: CheckpointInitiator
   let _d_host: String
   let _d_service: String
@@ -155,7 +155,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     connections: Connections, initializer: (ClusterInitializer | None),
     layout_initializer: LayoutInitializer, recovery: Recovery,
     recovery_replayer: RecoveryReconnecter, router_registry: RouterRegistry,
-    barrier_initiator: BarrierInitiator, checkpoint_initiator: CheckpointInitiator,
+    barrier_coordinator: BarrierCoordinator, checkpoint_initiator: CheckpointInitiator,
     data_host: String, data_service: String, event_log: EventLog,
     recovery_file_cleaner: RecoveryFileCleaner)
   =>
@@ -167,7 +167,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     _recovery = recovery
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
-    _barrier_initiator = barrier_initiator
+    _barrier_coordinator = barrier_coordinator
     _checkpoint_initiator = checkpoint_initiator
     _d_host = data_host
     _d_service = data_service
@@ -458,37 +458,52 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         let promise = Promise[BarrierToken]
         promise.next[None]({(t: BarrierToken) =>
           try
-            let msg = ChannelMsgEncoder.forwarded_inject_barrier_complete(t,
+            let msg = ChannelMsgEncoder.forwarded_inject_barrier_fully_acked(t,
               _auth)?
             _connections.send_control(m.sender, msg)
           else
             Fail()
           end
         })
-        _barrier_initiator.inject_barrier(m.token, promise)
+        _barrier_coordinator.inject_barrier(m.token, promise)
       | let m: ForwardInjectBlockingBarrierMsg =>
         let promise = Promise[BarrierToken]
         promise.next[None]({(t: BarrierToken) =>
           try
-            let msg = ChannelMsgEncoder.forwarded_inject_barrier_complete(t,
+            let msg = ChannelMsgEncoder.forwarded_inject_barrier_fully_acked(t,
               _auth)?
             _connections.send_control(m.sender, msg)
           else
             Fail()
           end
+        },
+        {() =>
+          try
+            let msg = ChannelMsgEncoder.forwarded_inject_barrier_aborted(
+              m.token, _auth)?
+            _connections.send_control(m.sender, msg)
+          else
+            Fail()
+          end
         })
-        _barrier_initiator.inject_blocking_barrier(m.token, promise,
+        _barrier_coordinator.inject_blocking_barrier(m.token, promise,
           m.wait_for_token)
-      | let m: ForwardedInjectBarrierCompleteMsg =>
-        _barrier_initiator.forwarded_inject_barrier_complete(m.token)
+      | let m: ForwardedInjectBarrierFullyAckedMsg =>
+        _barrier_coordinator.forwarded_inject_barrier_fully_acked(m.token)
+      | let m: ForwardedInjectBarrierAbortedMsg =>
+        _barrier_coordinator.forwarded_inject_barrier_aborted(m.token)
       | let m: RemoteInitiateBarrierMsg =>
-        _barrier_initiator.remote_initiate_barrier(m.sender, m.token)
-      | let m: WorkerAckBarrierStartMsg =>
-        _barrier_initiator.worker_ack_barrier_start(m.sender, m.token)
+        _barrier_coordinator.remote_initiate_barrier(m.sender, m.token)
+      | let m: RemoteAbortBarrierMsg =>
+        _barrier_coordinator.remote_abort_barrier(m.token)
       | let m: WorkerAckBarrierMsg =>
-        _barrier_initiator.worker_ack_barrier(m.sender, m.token)
-      | let m: BarrierCompleteMsg =>
-        _barrier_initiator.remote_barrier_complete(m.token)
+        _barrier_coordinator.worker_ack_barrier(m.sender, m.token)
+      | let m: WorkerAbortBarrierMsg =>
+        _barrier_coordinator.worker_abort_barrier(m.sender, m.token)
+      | let m: BarrierFullyAckedMsg =>
+        _barrier_coordinator.remote_barrier_fully_acked(m.token)
+      | let m: AbortCheckpointMsg =>
+        _checkpoint_initiator.abort_checkpoint(m.checkpoint_id)
       | let m: EventLogInitiateCheckpointMsg =>
         let promise = Promise[CheckpointId]
         promise.next[None]({(s_id: CheckpointId) =>
@@ -536,7 +551,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         let promise = Promise[CheckpointRollbackBarrierToken]
         promise.next[None]({(t: CheckpointRollbackBarrierToken) =>
           try
-            let msg = ChannelMsgEncoder.rollback_barrier_complete(t,
+            let msg = ChannelMsgEncoder.rollback_barrier_fully_acked(t,
               _worker_name, _auth)?
             _connections.send_control(m.sender, msg)
           else
@@ -580,8 +595,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _router_registry.producers_register_downstream(promise)
       | let m: AckRegisterProducersMsg =>
         _recovery.worker_ack_register_producers(m.sender)
-      | let m: RollbackBarrierCompleteMsg =>
-        _recovery.rollback_barrier_complete(m.token)
+      | let m: RollbackBarrierFullyAckedMsg =>
+        _recovery.rollback_barrier_fully_acked(m.token)
       | let m: EventLogInitiateRollbackMsg =>
         let promise = Promise[CheckpointRollbackBarrierToken]
         promise.next[None]({(t: CheckpointRollbackBarrierToken) =>

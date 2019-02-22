@@ -333,7 +333,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       end
     end
 
-  be barrier_complete(token: BarrierToken) =>
+  be barrier_fully_acked(token: BarrierToken) =>
     None
 
   //////////////

@@ -47,7 +47,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter
   var _initializer: (LocalTopologyInitializer | None) = None
-  let _barrier_initiator: BarrierInitiator
+  let _barrier_coordinator: BarrierCoordinator
   var _barrier_acker: (BarrierSinkAcker | None) = None
   let _checkpoint_initiator: CheckpointInitiator
 
@@ -82,7 +82,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   new create(sink_id: RoutingId, name: String, event_log: EventLog,
     recovering: Bool, encoder_wrapper: KafkaEncoderWrapper,
     metrics_reporter: MetricsReporter iso, conf: KafkaConfig val,
-    barrier_initiator: BarrierInitiator, checkpoint_initiator: CheckpointInitiator,
+    barrier_coordinator: BarrierCoordinator, checkpoint_initiator: CheckpointInitiator,
     auth: TCPConnectionAuth)
   =>
     _name = name
@@ -92,7 +92,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
     _conf = conf
-    _barrier_initiator = barrier_initiator
+    _barrier_coordinator = barrier_coordinator
     _checkpoint_initiator = checkpoint_initiator
     _auth = auth
 
@@ -104,7 +104,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
              end
 
     _message_processor = NormalSinkMessageProcessor(this)
-    _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_initiator)
+    _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_coordinator)
 
   fun ref create_producer_mapping(client: KafkaClient, mapping: KafkaProducerMapping):
     (KafkaProducerMapping | None)
@@ -244,7 +244,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   be register_producer(id: RoutingId, producer: Producer) =>
     // If we have at least one input, then we are involved in checkpointing.
     if _inputs.size() == 0 then
-      _barrier_initiator.register_sink(this)
+      _barrier_coordinator.register_sink(this)
       _event_log.register_resilient(_sink_id, this)
     end
 
@@ -269,7 +269,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
 
       // If we have no inputs, then we are not involved in checkpointing.
       if _inputs.size() == 0 then
-        _barrier_initiator.unregister_sink(this)
+        _barrier_coordinator.unregister_sink(this)
         _event_log.unregister_resilient(_sink_id, this)
       end
     end
@@ -406,6 +406,9 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
         qb.inject_barrier(this)
       end
     end
+
+  be barrier_fully_acked(token: BarrierToken) =>
+    None
 
   fun ref _clear_barriers() =>
     try

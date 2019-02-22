@@ -138,13 +138,13 @@ class val EgressBuilder
 
   fun apply(worker_name: String, reporter: MetricsReporter ref,
     event_log: EventLog, recovering: Bool,
-    barrier_initiator: BarrierInitiator,
+    barrier_coordinator: BarrierCoordinator,
     checkpoint_initiator: CheckpointInitiator, env: Env, auth: AmbientAuth,
     proxies: Map[String, OutgoingBoundary] val =
       recover Map[String, OutgoingBoundary] end): Sink
   =>
-    _sink_builder(_name, event_log, reporter.clone(), env, barrier_initiator,
-      checkpoint_initiator, recovering)
+    _sink_builder(_name, event_log, reporter.clone(), env, barrier_coordinator,
+      checkpoint_initiator, recovering, worker_name, auth)
 
 class val MultiSinkBuilder
   let _name: String
@@ -169,7 +169,7 @@ class val MultiSinkBuilder
 
   fun apply(worker_name: String, reporter: MetricsReporter ref,
     event_log: EventLog, recovering: Bool,
-    barrier_initiator: BarrierInitiator,
+    barrier_coordinator: BarrierCoordinator,
     checkpoint_initiator: CheckpointInitiator, env: Env, auth: AmbientAuth,
     proxies: Map[String, OutgoingBoundary] val =
       recover Map[String, OutgoingBoundary] end): Array[Sink] val
@@ -177,7 +177,8 @@ class val MultiSinkBuilder
     let sinks = recover iso Array[Sink] end
     for sb in _sink_builders.values() do
       let next_sink = sb(_name, event_log, reporter.clone(), env,
-        barrier_initiator, checkpoint_initiator, recovering)
+        barrier_coordinator, checkpoint_initiator, recovering,
+        worker_name, auth)
       sinks.push(next_sink)
     end
     consume sinks

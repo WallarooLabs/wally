@@ -17,6 +17,7 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 use "promises"
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
 use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
@@ -24,7 +25,6 @@ use "wallaroo/core/barrier"
 use "wallaroo/core/data_receiver"
 use "wallaroo/core/network"
 use "wallaroo/core/router_registry"
-use "wallaroo/core/checkpoint"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
 
@@ -33,7 +33,8 @@ actor Recovery
   Phases:
     1) _AwaitRecovering: Waiting for start_recovery() to be called
     2) _BoundariesReconnect: Wait for all boundaries to reconnect.
-       rollback.
+       It is possible to skip this phase if we are rolling back online because
+       of a checkpoint abort.
     3) _PrepareRollback: Have EventLog tell all resilients to prepare for
     4) _RollbackLocalKeys: Roll back topology. Wait for acks from all workers.
        register downstream.
@@ -85,13 +86,12 @@ actor Recovery
   be update_checkpoint_id(s_id: CheckpointId) =>
     _checkpoint_id = s_id
 
-  be start_recovery(initializer: LocalTopologyInitializer,
-    workers: Array[WorkerName] val)
+  be start_recovery(workers: Array[WorkerName] val,
+    with_reconnect: Bool = true)
   =>
     _workers = workers
-    _initializer = initializer
     _router_registry.stop_the_world()
-    _recovery_phase.start_recovery(_workers, this)
+    _recovery_phase.start_recovery(_workers, this, with_reconnect)
 
   be recovery_reconnect_finished() =>
     _recovery_phase.recovery_reconnect_finished()
@@ -105,7 +105,7 @@ actor Recovery
   be worker_ack_register_producers(w: WorkerName) =>
     _recovery_phase.worker_ack_register_producers(w)
 
-  be rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
+  be rollback_barrier_fully_acked(token: CheckpointRollbackBarrierToken) =>
     _recovery_phase.rollback_barrier_complete(token)
 
   be data_receivers_ack() =>
@@ -140,13 +140,19 @@ actor Recovery
   =>
     _recovery_phase.ack_recovery_initiated(worker, token)
 
-  fun ref _start_reconnect(workers: Array[WorkerName] val) =>
-    ifdef "resilience" then
-      @printf[I32]("|~~ - Recovery Phase: Reconnect - ~~|\n".cstring())
+  fun ref _start_reconnect(workers: Array[WorkerName] val,
+    with_reconnect: Bool)
+  =>
+    if with_reconnect then
+      ifdef "resilience" then
+        @printf[I32]("|~~ - Recovery Phase: Reconnect - ~~|\n".cstring())
+      end
+      _recovery_phase = _BoundariesReconnect(_recovery_reconnecter, workers,
+        this)
+      _recovery_phase.start_reconnect()
+    else
+      _prepare_rollback()
     end
-    _recovery_phase = _BoundariesReconnect(_recovery_reconnecter, workers,
-      this)
-    _recovery_phase.start_reconnect()
 
   fun ref _prepare_rollback() =>
     ifdef "resilience" then
@@ -201,7 +207,7 @@ actor Recovery
       @printf[I32]("|~~ - Recovery Phase: Rollback Barrier - ~~|\n".cstring())
       let promise = Promise[CheckpointRollbackBarrierToken]
       promise.next[None]({(token: CheckpointRollbackBarrierToken) =>
-        _self.rollback_barrier_complete(token)
+        _self.rollback_barrier_fully_acked(token)
       })
       _checkpoint_initiator.initiate_rollback(promise, _worker_name)
 

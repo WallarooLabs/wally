@@ -111,8 +111,8 @@ class val TCPSinkBuilder
 
   fun apply(sink_name: String, event_log: EventLog,
     reporter: MetricsReporter iso, env: Env,
-    barrier_initiator: BarrierInitiator, checkpoint_initiator: CheckpointInitiator,
-    recovering: Bool): Sink
+    barrier_coordinator: BarrierCoordinator, checkpoint_initiator: CheckpointInitiator,
+    recovering: Bool, worker_name_: WorkerName, auth_: AmbientAuth): Sink
   =>
     @printf[I32](("Connecting to sink at " + _host + ":" + _service + "\n")
       .cstring())
@@ -120,5 +120,5 @@ class val TCPSinkBuilder
     let id: RoutingId = RoutingIdGenerator()
 
     TCPSink(id, sink_name, event_log, recovering, env, _encoder_wrapper,
-      consume reporter, barrier_initiator, checkpoint_initiator, _host, _service,
+      consume reporter, barrier_coordinator, checkpoint_initiator, _host, _service,
       _initial_msgs)
