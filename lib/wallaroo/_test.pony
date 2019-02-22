@@ -24,11 +24,11 @@ This package represents the unit test suite for Wallaroo.
 All tests can be run by compiling and running this package.
 """
 use "ponytest"
-use cluster_manager = "ent/cluster_manager"
+use cluster_manager = "core/cluster_manager"
 use data_channel = "core/data_channel"
 use initialization = "core/initialization"
-use recovery = "ent/recovery"
-use spike = "ent/spike"
+use recovery = "core/recovery"
+use spike = "core/spike"
 use topology = "core/topology"
 use windows = "core/windows"
 

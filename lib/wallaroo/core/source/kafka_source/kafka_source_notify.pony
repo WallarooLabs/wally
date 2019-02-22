@@ -26,7 +26,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
-use "wallaroo/ent/recovery"
+use "wallaroo/core/recovery"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
 

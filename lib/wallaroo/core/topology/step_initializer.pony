@@ -27,12 +27,12 @@ use "wallaroo/core/routing"
 use "wallaroo/core/sink"
 use "wallaroo/core/source"
 use "wallaroo/core/source/tcp_source"
-use "wallaroo/ent/barrier"
-use "wallaroo/ent/checkpoint"
-use "wallaroo/ent/data_receiver"
-use "wallaroo/ent/network"
-use "wallaroo/ent/recovery"
-use "wallaroo/ent/router_registry"
+use "wallaroo/core/barrier"
+use "wallaroo/core/checkpoint"
+use "wallaroo/core/data_receiver"
+use "wallaroo/core/network"
+use "wallaroo/core/recovery"
+use "wallaroo/core/router_registry"
 
 
 type StepInitializer is (StepBuilder | SourceData | EgressBuilder |

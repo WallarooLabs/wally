@@ -16,7 +16,7 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "wallaroo/ent/recovery"
+use "wallaroo/core/recovery"
 use "wallaroo_labs/mort"
 use "wallaroo/core/common"
 use "wallaroo/core/partitioning"

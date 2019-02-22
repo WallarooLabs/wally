@@ -22,10 +22,10 @@ use "wallaroo/core/boundary"
 use "wallaroo/core/initialization"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
-use "wallaroo/ent/barrier"
-use "wallaroo/ent/data_receiver"
-use "wallaroo/ent/recovery"
-use "wallaroo/ent/checkpoint"
+use "wallaroo/core/barrier"
+use "wallaroo/core/data_receiver"
+use "wallaroo/core/recovery"
+use "wallaroo/core/checkpoint"
 
 
 actor DummyConsumer is Consumer

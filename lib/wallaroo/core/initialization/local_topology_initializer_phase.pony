@@ -21,7 +21,7 @@ use "net"
 
 use "wallaroo/core/common"
 use "wallaroo/core/invariant"
-use "wallaroo/ent/checkpoint"
+use "wallaroo/core/checkpoint"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
 

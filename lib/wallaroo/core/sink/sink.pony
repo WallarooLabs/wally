@@ -21,9 +21,9 @@ use "wallaroo/core/common"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
-use "wallaroo/ent/barrier"
-use "wallaroo/ent/recovery"
-use "wallaroo/ent/checkpoint"
+use "wallaroo/core/barrier"
+use "wallaroo/core/recovery"
+use "wallaroo/core/checkpoint"
 
 trait tag Sink is (Consumer & DisposableActor & BarrierProcessor)
   fun inputs(): Map[RoutingId, Producer] box

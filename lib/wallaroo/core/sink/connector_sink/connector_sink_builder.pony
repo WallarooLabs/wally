@@ -22,9 +22,9 @@ use "wallaroo/core/common"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/sink"
-use "wallaroo/ent/barrier"
-use "wallaroo/ent/recovery"
-use "wallaroo/ent/checkpoint"
+use "wallaroo/core/barrier"
+use "wallaroo/core/recovery"
+use "wallaroo/core/checkpoint"
 
 
 primitive ConnectorSinkConfigCLIParser

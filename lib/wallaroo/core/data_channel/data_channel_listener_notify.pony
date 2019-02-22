@@ -29,8 +29,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use "collections"
 use "wallaroo/core/boundary"
-use "wallaroo/ent/data_receiver"
-use "wallaroo/ent/router_registry"
+use "wallaroo/core/data_receiver"
+use "wallaroo/core/router_registry"
 use "wallaroo/core/topology"
 
 interface DataChannelListenNotify
