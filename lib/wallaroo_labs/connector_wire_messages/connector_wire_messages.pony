@@ -108,6 +108,7 @@ primitive FrameTag
     | 5 => MessageMsg.decode(consume rb)?
     | 6 => AckMsg.decode(consume rb)?
     | 7 => RestartMsg.decode(consume rb)
+    | 8 => UpdateSourcesMsg.decode(consume rb)?
     else
       error
     end
@@ -122,6 +123,7 @@ primitive FrameTag
     | let m: MessageMsg => 5
     | let m: AckMsg => 6
     | let m: RestartMsg => 7
+    | let m: UpdateSourcesMsg => 8
     end
 
 // Framing
@@ -133,6 +135,9 @@ type EventTimeType is I64
 type MessageId is U64
 type MessageBytes is ByteSeq
 type KeyBytes is ByteSeq
+type SourceName is String
+type SourceAddress is String
+type SourceList is Array[(SourceName, SourceAddress)]
 
 
 type Message is ( HelloMsg |
@@ -142,7 +147,8 @@ type Message is ( HelloMsg |
                   NotifyAckMsg |
                   MessageMsg |
                   AckMsg |
-                  RestartMsg )
+                  RestartMsg |
+                  UpdateSourcesMsg)
 
 trait MessageTrait
   fun encode(wb: Writer = Writer): Writer ?
@@ -207,10 +213,14 @@ class HelloMsg is MessageTrait
 class OkMsg is MessageTrait
   let initial_credits: U32
   let credit_list: Array[Credit] val
+  let source_list: SourceList val
 
-  new create(initial_credits': U32, credit_list': Array[Credit] val) =>
+  new create(initial_credits': U32, credit_list': Array[Credit] val,
+    source_list': SourceList val)
+  =>
     initial_credits = initial_credits'
     credit_list = credit_list'
+    source_list = source_list'
 
   new decode(rb: Reader) ? =>
     initial_credits = rb.u32_be()?
@@ -225,6 +235,17 @@ class OkMsg is MessageTrait
     end
     credit_list = consume cl
 
+    let sl = recover iso SourceList end
+    let sl_size = rb.u32_be()?.usize()
+    for x in col.Range(0, sl_size) do
+      let snl = rb.u16_be()?.usize()
+      let sn = String.from_array(rb.block(snl)?)
+      let sal = rb.u16_be()?.usize()
+      let sa = String.from_array(rb.block(sal)?)
+      sl.push((sn, sa))
+    end
+    source_list = consume sl
+
   fun encode(wb: Writer = Writer): Writer =>
     wb.u32_be(initial_credits)
     wb.u32_be(credit_list.size().u32())
@@ -233,6 +254,13 @@ class OkMsg is MessageTrait
       wb.u16_be(v._2.size().u16())
       wb.write(v._2)
       wb.u64_be(v._3)
+    end
+    wb.u32_be(source_list.size().u32())
+    for v in source_list.values() do
+      wb.u16_be(v._1.size().u16())
+      wb.write(v._1)
+      wb.u16_be(v._2.size().u16())
+      wb.write(v._2)
     end
     wb
 
@@ -433,3 +461,31 @@ class RestartMsg is MessageTrait
   new  decode(rb: Reader) =>
     """
     """
+
+class UpdateSourcesMsg is MessageTrait
+  let source_list: SourceList val
+
+  new create(source_list': SourceList val) =>
+    source_list = source_list'
+
+  new decode(rb: Reader) ? =>
+    let source_list_size = rb.u32_be()?.usize()
+    let sl = recover iso SourceList end
+    for x in col.Range(0, source_list_size) do
+      let sn_length = rb.u16_be()?.usize()
+      let sn = String.from_array(rb.block(sn_length)?)
+      let sa_length = rb.u16_be()?.usize()
+      let sa = String.from_array(rb.block(sa_length)?)
+      sl.push((sn, sa))
+    end
+    source_list = consume sl
+
+  fun encode(wb: Writer = Writer): Writer =>
+    wb.u32_be(source_list.size().u32())
+    for sl in source_list.values() do
+      wb.u16_be(sl._1.size().u16())
+      wb.write(sl._1)
+      wb.u16_be(sl._2.size().u16())
+      wb.write(sl._2)
+    end
+    wb

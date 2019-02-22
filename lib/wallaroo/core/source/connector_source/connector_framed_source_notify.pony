@@ -733,7 +733,7 @@ class ConnectorSourceNotify[In: Any val]
 
     let w: Writer = w.create()
     _credits = _max_credits
-     _send_reply(_connector_source, cwm.OkMsg(_credits, data))
+     _send_reply(_connector_source, cwm.OkMsg(_credits, data, []))
 
     _fsm_state = _ProtoFsmStreaming
 
