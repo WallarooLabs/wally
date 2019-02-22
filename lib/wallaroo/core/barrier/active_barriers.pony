@@ -17,6 +17,7 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 use "collections"
+use "wallaroo/core/sink"
 use "wallaroo_labs/mort"
 
 class ActiveBarriers
@@ -72,7 +73,7 @@ class ActiveBarriers
     end
     _barriers(barrier_token) = handler
 
-  fun ref ack_barrier(s: BarrierReceiver, barrier_token: BarrierToken) =>
+  fun ref ack_barrier(s: Sink, barrier_token: BarrierToken) =>
     try
       _barriers(barrier_token)?.ack_barrier(s)
     else

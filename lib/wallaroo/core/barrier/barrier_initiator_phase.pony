@@ -17,6 +17,7 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 use "promises"
+use "wallaroo/core/sink"
 use "wallaroo/core/source"
 use "wallaroo_labs/mort"
 
@@ -53,7 +54,7 @@ trait _BarrierInitiatorPhase
       false
     end
 
-  fun ref ack_barrier(s: BarrierReceiver, barrier_token: BarrierToken,
+  fun ref ack_barrier(s: Sink, barrier_token: BarrierToken,
     active_barriers: ActiveBarriers)
   =>
     active_barriers.ack_barrier(s, barrier_token)
@@ -68,7 +69,7 @@ trait _BarrierInitiatorPhase
   =>
     active_barriers.worker_ack_barrier(w, barrier_token)
 
-  fun ref barrier_complete(token: BarrierToken) =>
+  fun ref barrier_fully_acked(token: BarrierToken) =>
     _invalid_call()
     Fail()
 
@@ -96,7 +97,7 @@ class _NormalBarrierInitiatorPhase is _BarrierInitiatorPhase
   fun ready_for_next_token(): Bool =>
     true
 
-  fun ref barrier_complete(token: BarrierToken) =>
+  fun ref barrier_fully_acked(token: BarrierToken) =>
     _initiator.next_token()
 
 class _RecoveringBarrierInitiatorPhase is _BarrierInitiatorPhase
@@ -124,7 +125,7 @@ class _RecoveringBarrierInitiatorPhase is _BarrierInitiatorPhase
         "barrier\n").cstring())
     end
 
-  fun ref ack_barrier(s: BarrierReceiver, barrier_token: BarrierToken,
+  fun ref ack_barrier(s: Sink, barrier_token: BarrierToken,
     active_barriers: ActiveBarriers)
   =>
     match barrier_token
@@ -219,7 +220,7 @@ class _BlockingBarrierInitiatorPhase is _BarrierInitiatorPhase
       end
     end
 
-  fun ref barrier_complete(token: BarrierToken) =>
+  fun ref barrier_fully_acked(token: BarrierToken) =>
     if token == _wait_for_token then
       _initiator.next_token()
     end
@@ -250,13 +251,13 @@ class _RollbackBarrierInitiatorPhase is _BarrierInitiatorPhase
       _initiator.queue_barrier(barrier_token, result_promise)
     end
 
-  fun ref barrier_complete(token: BarrierToken) =>
+  fun ref barrier_fully_acked(token: BarrierToken) =>
     """
     We are clearing all old barrier info, so we ignore this.
     """
     None
 
-  fun ref rollback_barrier_complete(token: BarrierToken) =>
+  fun ref rollback_barrier_fully_acked(token: BarrierToken) =>
     if token == _token then
       _initiator.next_token()
     end
@@ -268,7 +269,7 @@ class _RollbackBarrierInitiatorPhase is _BarrierInitiatorPhase
   // current rollback token. By the time the rollback token is acked at
   // all sinks, we know that no more past activity will arrive.
   /////////////////////////////
-  fun ref ack_barrier(s: BarrierReceiver, barrier_token: BarrierToken,
+  fun ref ack_barrier(s: Sink, barrier_token: BarrierToken,
     active_barriers: ActiveBarriers)
   =>
     if barrier_token == _token then
