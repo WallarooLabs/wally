@@ -25,8 +25,10 @@ class val AutoscaleTokens
   let initial_token: AutoscaleBarrierToken
   let resume_token: AutoscaleResumeBarrierToken
 
-  new val create(w: String, id': AutoscaleId, lws: Array[WorkerName] val) =>
+  new val create(w: String, id': AutoscaleId,
+    leaving_workers: Array[WorkerName] val)
+  =>
     worker = w
     id = id'
-    initial_token = AutoscaleBarrierToken(w, id, lws)
+    initial_token = AutoscaleBarrierToken(w, id, leaving_workers)
     resume_token = AutoscaleResumeBarrierToken(w, id)

@@ -52,11 +52,11 @@ class val AutoscaleBarrierToken is BarrierToken
   let _leaving_workers: Array[WorkerName] val
 
   new val create(worker': String, id': AutoscaleId,
-    lws: Array[WorkerName] val)
+    leaving_workers': Array[WorkerName] val)
   =>
     _worker = worker'
     _id = id'
-    _leaving_workers = lws
+    _leaving_workers = leaving_workers'
 
   fun eq(that: box->BarrierToken): Bool =>
     match that
