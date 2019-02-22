@@ -376,6 +376,9 @@ actor ConnectorSink is Sink
       end
     end
 
+  be barrier_fully_acked(token: BarrierToken) =>
+    None
+
   fun ref _clear_barriers() =>
     try
       (_barrier_acker as BarrierSinkAcker).clear()

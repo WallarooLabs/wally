@@ -22,10 +22,10 @@ use "wallaroo/core/common"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
+use "wallaroo/core/network"
 use "wallaroo/core/source"
 use "wallaroo/core/source/barrier_source"
 use "wallaroo/core/sink"
-use "wallaroo/core/network"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/string_set"
 
@@ -57,7 +57,7 @@ actor BarrierInitiator is Initializable
   let _connections: Connections
   var _barrier_sources: SetIs[BarrierSource] = _barrier_sources.create()
   let _sources: Map[RoutingId, Source] = _sources.create()
-  let _sinks: SetIs[BarrierReceiver] = _sinks.create()
+  let _sinks: SetIs[Sink] = _sinks.create()
   let _workers: StringSet = _workers.create()
 
   // When we send barriers to a different primary worker, we use this map
@@ -273,7 +273,7 @@ actor BarrierInitiator is Initializable
       end
     end
 
-  be forwarded_inject_barrier_complete(barrier_token: BarrierToken) =>
+  be forwarded_inject_barrier_fully_acked(barrier_token: BarrierToken) =>
     try
       let promise = _pending_promises.remove(barrier_token)?._2
       promise(barrier_token)
@@ -420,7 +420,7 @@ actor BarrierInitiator is Initializable
 
   fun ref start_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise,
-    acked_sinks: SetIs[BarrierReceiver] val,
+    acked_sinks: SetIs[Sink] val,
     acked_ws: SetIs[String] val, primary_worker: String)
   =>
     if not _disposed then
@@ -461,7 +461,7 @@ actor BarrierInitiator is Initializable
       _active_barriers.check_for_completion(barrier_token)
     end
 
-  be ack_barrier(s: BarrierReceiver, barrier_token: BarrierToken) =>
+  be ack_barrier(s: Sink, barrier_token: BarrierToken) =>
     """
     Called by sinks when they have received barrier barriers on all
     their inputs.
@@ -533,15 +533,15 @@ actor BarrierInitiator is Initializable
     else
       Fail()
     end
-    barrier_complete(barrier_token, result_promise)
+    barrier_fully_acked(barrier_token, result_promise)
 
-  fun ref barrier_complete(barrier_token: BarrierToken,
+  fun ref barrier_fully_acked(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
   =>
     if not _disposed then
       result_promise(barrier_token)
       try
-        let msg = ChannelMsgEncoder.barrier_complete(barrier_token, _auth)?
+        let msg = ChannelMsgEncoder.barrier_fully_acked(barrier_token, _auth)?
         for w in _workers.values() do
           if w != _worker_name then _connections.send_control(w, msg) end
         end
@@ -550,13 +550,16 @@ actor BarrierInitiator is Initializable
       end
 
       for b_source in _barrier_sources.values() do
-        b_source.barrier_complete(barrier_token)
+        b_source.barrier_fully_acked(barrier_token)
       end
       for s in _sources.values() do
-        s.barrier_complete(barrier_token)
+        s.barrier_fully_acked(barrier_token)
+      end
+      for s in _sinks.values() do
+        s.barrier_fully_acked(barrier_token)
       end
 
-      _phase.barrier_complete(barrier_token)
+      _phase.barrier_fully_acked(barrier_token)
     end
 
   fun ref next_token() =>
@@ -585,14 +588,14 @@ actor BarrierInitiator is Initializable
       end
     end
 
-  be remote_barrier_complete(barrier_token: BarrierToken) =>
+  be remote_barrier_fully_acked(barrier_token: BarrierToken) =>
     """
     Called in response to primary worker for this barrier token sending
     message that this barrier is complete. We can now inform all local
     sources (for example, so they can ack messages up to a checkpoint).
     """
     for s in _sources.values() do
-      s.barrier_complete(barrier_token)
+      s.barrier_fully_acked(barrier_token)
     end
 
   be dispose() =>

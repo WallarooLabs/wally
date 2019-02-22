@@ -458,7 +458,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         let promise = Promise[BarrierToken]
         promise.next[None]({(t: BarrierToken) =>
           try
-            let msg = ChannelMsgEncoder.forwarded_inject_barrier_complete(t,
+            let msg = ChannelMsgEncoder.forwarded_inject_barrier_fully_acked(t,
               _auth)?
             _connections.send_control(m.sender, msg)
           else
@@ -470,7 +470,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         let promise = Promise[BarrierToken]
         promise.next[None]({(t: BarrierToken) =>
           try
-            let msg = ChannelMsgEncoder.forwarded_inject_barrier_complete(t,
+            let msg = ChannelMsgEncoder.forwarded_inject_barrier_fully_acked(t,
               _auth)?
             _connections.send_control(m.sender, msg)
           else
@@ -479,16 +479,16 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         })
         _barrier_initiator.inject_blocking_barrier(m.token, promise,
           m.wait_for_token)
-      | let m: ForwardedInjectBarrierCompleteMsg =>
-        _barrier_initiator.forwarded_inject_barrier_complete(m.token)
+      | let m: ForwardedInjectBarrierFullyAckedMsg =>
+        _barrier_initiator.forwarded_inject_barrier_fully_acked(m.token)
       | let m: RemoteInitiateBarrierMsg =>
         _barrier_initiator.remote_initiate_barrier(m.sender, m.token)
       | let m: WorkerAckBarrierStartMsg =>
         _barrier_initiator.worker_ack_barrier_start(m.sender, m.token)
       | let m: WorkerAckBarrierMsg =>
         _barrier_initiator.worker_ack_barrier(m.sender, m.token)
-      | let m: BarrierCompleteMsg =>
-        _barrier_initiator.remote_barrier_complete(m.token)
+      | let m: BarrierFullyAckedMsg =>
+        _barrier_initiator.remote_barrier_fully_acked(m.token)
       | let m: EventLogInitiateCheckpointMsg =>
         let promise = Promise[CheckpointId]
         promise.next[None]({(s_id: CheckpointId) =>
@@ -536,7 +536,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         let promise = Promise[CheckpointRollbackBarrierToken]
         promise.next[None]({(t: CheckpointRollbackBarrierToken) =>
           try
-            let msg = ChannelMsgEncoder.rollback_barrier_complete(t,
+            let msg = ChannelMsgEncoder.rollback_barrier_fully_acked(t,
               _worker_name, _auth)?
             _connections.send_control(m.sender, msg)
           else
@@ -580,8 +580,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _router_registry.producers_register_downstream(promise)
       | let m: AckRegisterProducersMsg =>
         _recovery.worker_ack_register_producers(m.sender)
-      | let m: RollbackBarrierCompleteMsg =>
-        _recovery.rollback_barrier_complete(m.token)
+      | let m: RollbackBarrierFullyAckedMsg =>
+        _recovery.rollback_barrier_fully_acked(m.token)
       | let m: EventLogInitiateRollbackMsg =>
         let promise = Promise[CheckpointRollbackBarrierToken]
         promise.next[None]({(t: CheckpointRollbackBarrierToken) =>
