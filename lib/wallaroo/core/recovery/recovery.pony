@@ -33,7 +33,8 @@ actor Recovery
   Phases:
     1) _AwaitRecovering: Waiting for start_recovery() to be called
     2) _BoundariesReconnect: Wait for all boundaries to reconnect.
-       rollback.
+       It is possible to skip this phase if we are rolling back online because
+       of a checkpoint abort.
     3) _PrepareRollback: Have EventLog tell all resilients to prepare for
     4) _RollbackLocalKeys: Roll back topology. Wait for acks from all workers.
        register downstream.
@@ -80,6 +81,7 @@ actor Recovery
     if not is_recovering then
       _router_registry.recovery_protocol_complete()
     end
+    _checkpoint_initiator.set_recovery(this)
 
   be update_initializer(initializer: LocalTopologyInitializer) =>
     _initializer = initializer
@@ -87,13 +89,12 @@ actor Recovery
   be update_checkpoint_id(s_id: CheckpointId) =>
     _checkpoint_id = s_id
 
-  be start_recovery(initializer: LocalTopologyInitializer,
-    workers: Array[WorkerName] val)
+  be start_recovery(workers: Array[WorkerName] val,
+    with_reconnect: Bool = true)
   =>
     _workers = workers
-    _initializer = initializer
     _router_registry.stop_the_world()
-    _recovery_phase.start_recovery(_workers, this)
+    _recovery_phase.start_recovery(_workers, this, with_reconnect)
 
   be recovery_reconnect_finished() =>
     _recovery_phase.recovery_reconnect_finished()
@@ -142,13 +143,19 @@ actor Recovery
   =>
     _recovery_phase.ack_recovery_initiated(worker, token)
 
-  fun ref _start_reconnect(workers: Array[WorkerName] val) =>
-    ifdef "resilience" then
-      @printf[I32]("|~~ - Recovery Phase: Reconnect - ~~|\n".cstring())
+  fun ref _start_reconnect(workers: Array[WorkerName] val,
+    with_reconnect: Bool)
+  =>
+    if with_reconnect then
+      ifdef "resilience" then
+        @printf[I32]("|~~ - Recovery Phase: Reconnect - ~~|\n".cstring())
+      end
+      _recovery_phase = _BoundariesReconnect(_recovery_reconnecter, workers,
+        this)
+      _recovery_phase.start_reconnect()
+    else
+      _prepare_rollback()
     end
-    _recovery_phase = _BoundariesReconnect(_recovery_reconnecter, workers,
-      this)
-    _recovery_phase.start_reconnect()
 
   fun ref _prepare_rollback() =>
     ifdef "resilience" then
