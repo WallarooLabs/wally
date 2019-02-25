@@ -33,6 +33,20 @@ use "wallaroo_labs/mort"
 
 trait tag Resilient
   be prepare_for_rollback()
+
+  be incremental_rollback(payload: ByteSeq val, event_log: EventLog,
+    checkpoint_id: CheckpointId)
+  =>
+    """
+    A Resilient implementation can choose to write more than one entry per
+    checkpoint. In this case, all entries before the last one will trigger an
+    incremental_rollback call. For Resilients that do not implement this
+    behavior, we fail, since they will stick to one entry per checkpoint.
+    """
+    //!@ Temporary fix because of Pony wallaroo_labs/mort import bug
+    event_log.fail()
+    // Fail()
+
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
 
@@ -152,6 +166,10 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
         _WaitingForCheckpointInitiationEventLogPhase(1, this)
       end
 
+  //!@ Temporary fix because of Pony wallaroo_labs/mort import bug
+  be fail() =>
+    Fail()
+
   be set_barrier_initiator(barrier_initiator: BarrierInitiator) =>
     _barrier_initiator = barrier_initiator
 
@@ -216,9 +234,17 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
     _phase.initiate_checkpoint(checkpoint_id, promise, this)
 
   be checkpoint_state(resilient_id: RoutingId, checkpoint_id: CheckpointId,
-    payload: Array[ByteSeq] val)
+    payload: Array[ByteSeq] val, is_last_entry: Bool = true)
   =>
-    _phase.checkpoint_state(resilient_id, checkpoint_id, payload)
+    """
+    When a Resilient checkpoints state, it provides its id and the CheckpointId
+    along with the payload for a single event log entry. If a Resilient must
+    write more than one entry per checkpoint, then it will use the
+    is_last_entry flag to indicate when it is writing the last one, after
+    which it should not write any more for that checkpoint.
+    """
+    _phase.checkpoint_state(resilient_id, checkpoint_id, payload,
+      is_last_entry)
 
   fun ref _initiate_checkpoint(checkpoint_id: CheckpointId,
     promise: Promise[CheckpointId],
@@ -237,27 +263,32 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
             p.resilient_id.string().cstring(),
             checkpoint_id.string().cstring())
         end
-        _phase.checkpoint_state(p.resilient_id, checkpoint_id, p.payload)
+        _phase.checkpoint_state(p.resilient_id, checkpoint_id, p.payload,
+          p.is_last_entry)
       end
     end
 
   fun ref _checkpoint_state(resilient_id: RoutingId,
-    checkpoint_id: CheckpointId, payload: Array[ByteSeq] val)
+    checkpoint_id: CheckpointId, payload: Array[ByteSeq] val,
+    is_last_entry: Bool)
   =>
     if payload.size() > 0 then
-      _queue_log_entry(resilient_id, checkpoint_id, payload)
+      _queue_log_entry(resilient_id, checkpoint_id, payload, is_last_entry)
     end
-    _phase.state_checkpointed(resilient_id)
+    if is_last_entry then
+      _phase.state_checkpointed(resilient_id)
+    end
 
   fun ref _queue_log_entry(resilient_id: RoutingId,
     checkpoint_id: CheckpointId, payload: Array[ByteSeq] val,
-    force_write: Bool = false)
+    is_last_entry: Bool, force_write: Bool = false)
   =>
     ifdef "resilience" then
       // add to backend buffer after encoding
       // encode right away to amortize encoding cost per entry when received
       // as opposed to when writing a batch to disk
-      _backend.encode_entry(resilient_id, checkpoint_id, payload)
+      _backend.encode_entry(resilient_id, checkpoint_id, payload,
+        is_last_entry)
 
       num_encoded = num_encoded + 1
 
@@ -343,10 +374,15 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
     _phase.expect_rollback_count(count)
 
   fun ref rollback_from_log_entry(resilient_id: RoutingId,
-    payload: ByteSeq val, checkpoint_id: CheckpointId)
+    payload: ByteSeq val, is_last_entry: Bool, checkpoint_id: CheckpointId)
   =>
     try
-      _resilients(resilient_id)?.rollback(payload, this, checkpoint_id)
+      let resilient = _resilients(resilient_id)?
+      if is_last_entry then
+        resilient.rollback(payload, this, checkpoint_id)
+      else
+        resilient.incremental_rollback(payload, this, checkpoint_id)
+      end
     else
       @printf[I32](("Can't find resilient %s for rollback data\n").cstring(),
         resilient_id.string().cstring())
