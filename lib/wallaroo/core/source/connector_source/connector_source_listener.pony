@@ -45,9 +45,9 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
-actor ConnectorSource2Listener[In: Any val] is SourceListener
+actor ConnectorSourceListener[In: Any val] is SourceListener
   """
-  # ConnectorSource2Listener
+  # ConnectorSourceListener
   """
   var _hack_counter: U128 = 65
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
@@ -82,8 +82,8 @@ actor ConnectorSource2Listener[In: Any val] is SourceListener
   var _init_size: USize
   var _max_size: USize
 
-  let _connected_sources: SetIs[ConnectorSource2[In]] = _connected_sources.create()
-  let _available_sources: Array[ConnectorSource2[In]] = _available_sources.create()
+  let _connected_sources: SetIs[ConnectorSource[In]] = _connected_sources.create()
+  let _available_sources: Array[ConnectorSource[In]] = _available_sources.create()
 
   // Active Stream Registry
   let _active_streams: Map[U64, (String,Any tag,U64,U64)] =
@@ -147,11 +147,11 @@ actor ConnectorSource2Listener[In: Any val] is SourceListener
     for i in Range(0, _limit) do
       let source_id = _hack_counter
       _hack_counter = _hack_counter + 1
-      let notify = ConnectorSource2Notify[In](source_id, _pipeline_name,
+      let notify = ConnectorSourceNotify[In](source_id, _pipeline_name,
         _env, _auth, _handler, _runner_builder, _partitioner_builder, _router,
         _metrics_reporter.clone(), _event_log, _target_router, _cookie,
         _max_credits, _refill_credits)
-      let source = ConnectorSource2[In](source_id, _auth, this,
+      let source = ConnectorSource[In](source_id, _auth, this,
         consume notify, _event_log, _router,
         _outgoing_boundary_builders, _layout_initializer,
         _metrics_reporter.clone(), _router_registry)
@@ -229,7 +229,7 @@ actor ConnectorSource2Listener[In: Any val] is SourceListener
     _outgoing_boundary_builders = consume new_boundary_builders
 
   be dispose() =>
-    @printf[I32]("Shutting down ConnectorSource2Listener\n".cstring())
+    @printf[I32]("Shutting down ConnectorSourceListener\n".cstring())
     _close()
 
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
@@ -249,7 +249,7 @@ actor ConnectorSource2Listener[In: Any val] is SourceListener
       _event = AsioEvent.none()
     end
 
-  be _conn_closed(s: ConnectorSource2[In]) =>
+  be _conn_closed(s: ConnectorSource[In]) =>
     """
     An accepted connection has closed. If we have dropped below the limit, try
     to accept new connections.
@@ -277,7 +277,7 @@ actor ConnectorSource2Listener[In: Any val] is SourceListener
     if _closed then
       return
     elseif _count >= _limit then
-      @printf[I32]("ConnectorSource2Listener: Already reached connection limit\n"
+      @printf[I32]("ConnectorSourceListener: Already reached connection limit\n"
         .cstring())
       return
     end
@@ -348,7 +348,7 @@ actor ConnectorSource2Listener[In: Any val] is SourceListener
   // Active Stream Registry
 
   be get_all_streams(session_tag: USize,
-    connector_source: ConnectorSource2[In] tag)
+    connector_source: ConnectorSource[In] tag)
   =>
     let data: Array[(U64,String,U64)] trn = recover data.create() end
 
@@ -360,7 +360,7 @@ actor ConnectorSource2Listener[In: Any val] is SourceListener
 
   be stream_notify(session_tag: USize,
     stream_id: U64, stream_name: String, point_of_reference: U64,
-    connector_source: ConnectorSource2[In] tag)
+    connector_source: ConnectorSource[In] tag)
   =>
     ifdef "trace" then
       @printf[I32]("TRACE: %s.%s(%lu, %lu, ...)\n".cstring(),
@@ -424,7 +424,7 @@ actor ConnectorSource2Listener[In: Any val] is SourceListener
 
   be stream_update(stream_id: U64, checkpoint_id: CheckpointId,
     point_of_reference: U64, last_message_id: U64,
-    connector_source: (ConnectorSource2[In] tag|None))
+    connector_source: (ConnectorSource[In] tag|None))
   =>
     let update = if connector_source is None then
         true

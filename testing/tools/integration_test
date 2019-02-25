@@ -317,6 +317,23 @@ class SinkAwaitAction(argparse.Action):
             dest.append(values[0])
 
 
+class SinkAwaitKeysAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        """
+        Parameters values: [key, value]
+        """
+        if len(values) != 2:
+            msg = ('Argument "{f}" requires 2 arguments specifying '
+                   'key value '.format(f=self.dest))
+            raise argparse.ArgumentTypeError(msg)
+        key, value = values
+        dest = getattr(namespace, self.dest)
+        if not dest:
+            dest = []
+            setattr(namespace, self.dest, dest)
+        dest.append((key, value))
+
+
 LOG_LEVELS = {'none': 0,
               '1': 1,
               'debug': 10,
@@ -465,6 +482,9 @@ def CLI():
                          metavar=('value', 'header'),
                          help=("Stop after receiving all await values in the"
                                "sink"))
+    stopper.add_argument('--sink-await-keys', action=SinkAwaitKeysAction,
+                         nargs='+', metavar=('key', 'value'),
+                         help=("Key and Value to match on, as strings"))
     expect.add_argument('--sink-stop-timeout', type=float, default=30,
                         help=("Timeout in seconds before raising a "
                               "TimeoutError"))
@@ -556,6 +576,7 @@ def CLI():
                     sink_expect_allow_more = args.sink_expect_allow_more,
                     sink_stop_timeout = args.sink_stop_timeout,
                     sink_await = args.sink_await,
+                    sink_await_keys = args.sink_await_keys,
                     delay = args.delay,
                     validate_file = (args.output if args.validation_cmd else
                                      False),

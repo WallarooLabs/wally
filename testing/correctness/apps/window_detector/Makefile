@@ -92,7 +92,8 @@ window_detector_tumbling_alo_source_test_python:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 200
+		--sink-await-key key_0 100 \
+		--sink-await-key key_1 100
 
 window_detector_sliding_alo_source_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -101,11 +102,12 @@ window_detector_sliding_alo_source_test_python:
 		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module window_detector --source alo --window-type sliding $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --window-type tumbling --output' \
+		--validation-cmd 'python _validate.py --window-type sliding --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 400
+		--sink-await-key key_0 100 \
+		--sink-await-key key_1 100
 
 window_detector_counting_alo_source_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -114,11 +116,12 @@ window_detector_counting_alo_source_test_python:
 		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module window_detector --source alo --window-type counting $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --window-type tumbling --output' \
+		--validation-cmd 'python _validate.py --window-type counting --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 200
+		--sink-await-key key_0 100 \
+		--sink-await-key key_1 100
 
 window_detector_tumbling_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -131,7 +134,8 @@ window_detector_tumbling_test_python:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 200
+		--sink-await-key key_0 100 \
+		--sink-await-key key_1 100
 
 window_detector_counting_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -144,7 +148,8 @@ window_detector_counting_test_python:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 200
+		--sink-await-key key_0 100 \
+		--sink-await-key key_1 100
 
 window_detector_sliding_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -157,8 +162,8 @@ window_detector_sliding_test_python:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 200 \
-		--sink-expect-allow-more
+		--sink-await-key key_0 100 \
+		--sink-await-key key_1 100
 
 window_detector_tumbling_gensource_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -169,8 +174,8 @@ window_detector_tumbling_gensource_test_python:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 1000 \
-		--sink-expect-allow-more
+		--sink-await-key 0 100 \
+		--sink-await-key 1 100
 
 window_detector_counting_gensource_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -181,8 +186,8 @@ window_detector_counting_gensource_test_python:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 1000 \
-		--sink-expect-allow-more
+		--sink-await-key 0 100 \
+		--sink-await-key 1 100
 
 window_detector_sliding_gensource_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -193,8 +198,8 @@ window_detector_sliding_gensource_test_python:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 1000 \
-		--sink-expect-allow-more
+		--sink-await-key 0 100 \
+		--sink-await-key 1 100
 
 # Python3 tests
 window_detector_tumbling_alo_source_test_python3:
@@ -208,7 +213,8 @@ window_detector_tumbling_alo_source_test_python3:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 200
+		--sink-await-key key_0 100 \
+		--sink-await-key key_1 100
 
 window_detector_sliding_alo_source_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -217,11 +223,12 @@ window_detector_sliding_alo_source_test_python3:
 		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module window_detector --source alo --window-type sliding $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --window-type tumbling --output' \
+		--validation-cmd 'python _validate.py --window-type sliding --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 400
+		--sink-await-key key_0 100 \
+		--sink-await-key key_1 100
 
 window_detector_counting_alo_source_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -230,11 +237,12 @@ window_detector_counting_alo_source_test_python3:
 		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module window_detector --source alo --window-type counting $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --window-type tumbling --output' \
+		--validation-cmd 'python _validate.py --window-type counting --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 200
+		--sink-await-key key_0 100 \
+		--sink-await-key key_1 100
 
 window_detector_tumbling_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -247,7 +255,8 @@ window_detector_tumbling_test_python3:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 200
+		--sink-await-key key_0 100 \
+		--sink-await-key key_1 100
 
 window_detector_counting_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -260,7 +269,8 @@ window_detector_counting_test_python3:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 200
+		--sink-await-key key_0 100 \
+		--sink-await-key key_1 100
 
 window_detector_sliding_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -273,8 +283,8 @@ window_detector_sliding_test_python3:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 200 \
-		--sink-expect-allow-more
+		--sink-await-key key_0 100 \
+		--sink-await-key key_1 100
 
 window_detector_tumbling_gensource_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -285,8 +295,8 @@ window_detector_tumbling_gensource_test_python3:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 1000 \
-		--sink-expect-allow-more
+		--sink-await-key 0 100 \
+		--sink-await-key 1 100
 
 window_detector_counting_gensource_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -297,8 +307,8 @@ window_detector_counting_gensource_test_python3:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 1000 \
-		--sink-expect-allow-more
+		--sink-await-key 0 100 \
+		--sink-await-key 1 100
 
 window_detector_sliding_gensource_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -309,8 +319,8 @@ window_detector_sliding_gensource_test_python3:
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-expect 1000 \
-		--sink-expect-allow-more
+		--sink-await-key 0 100 \
+		--sink-await-key 1 100
 
 # end of prevent rules from being evaluated/included multiple times
 endif
