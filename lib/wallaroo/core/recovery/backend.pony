@@ -79,7 +79,7 @@ trait Backend
   fun ref start_rollback(checkpoint_id: CheckpointId): USize
   fun ref write(): USize ?
   fun ref encode_entry(resilient_id: RoutingId, checkpoint_id: CheckpointId,
-    payload: Array[ByteSeq] val)
+    payload: Array[ByteSeq] val, is_last_entry: Bool)
   fun ref encode_checkpoint_id(checkpoint_id: CheckpointId)
   fun bytes_written(): USize
 
@@ -90,7 +90,7 @@ class EmptyBackend is Backend
   fun ref start_rollback(checkpoint_id: CheckpointId): USize => Fail(); 0
   fun ref write(): USize => Fail(); 0
   fun ref encode_entry(resilient_id: RoutingId, checkpoint_id: CheckpointId,
-    payload: Array[ByteSeq] val)
+    payload: Array[ByteSeq] val, is_last_entry: Bool)
   =>
     Fail()
   fun ref encode_checkpoint_id(checkpoint_id: CheckpointId) => Fail()
@@ -108,7 +108,7 @@ class DummyBackend is Backend
   fun ref start_rollback(checkpoint_id: CheckpointId): USize => 0
   fun ref write(): USize => 0
   fun ref encode_entry(resilient_id: RoutingId, checkpoint_id: CheckpointId,
-    payload: Array[ByteSeq] val)
+    payload: Array[ByteSeq] val, is_last_entry: Bool)
   =>
     None
   fun ref encode_checkpoint_id(checkpoint_id: CheckpointId) => None
@@ -181,8 +181,8 @@ class FileBackend is Backend
 
     // array to hold recovered data temporarily until we've sent it off to
     // be replayed.
-    // (resilient_id, payload)
-    var replay_buffer: Array[(RoutingId, ByteSeq val)] ref =
+    // (resilient_id, payload, is_last_entry)
+    var replay_buffer: Array[(RoutingId, ByteSeq val, Bool)] ref =
       replay_buffer.create()
     var current_checkpoint_id: CheckpointId = 0
     var target_checkpoint_offset_start: USize = 0
@@ -202,8 +202,8 @@ class FileBackend is Backend
           first_data_entry_found = true
           target_checkpoint_offset_start = _file.position() - 1
         end
-        // First skip resilient_id
-        _file.seek(16)
+        // First skip is_last_found byte and resilient_id
+        _file.seek(17)
         // Read payload size
         r.append(_file.read(4))
         let size = try r.u32_be()? else Fail(); 0 end
@@ -238,7 +238,12 @@ class FileBackend is Backend
       r.append(_file.read(1))
       match try _LogDecoder.decode(r.u8()?)? else Fail(); _LogDataEntry end
       | _LogDataEntry =>
-        r.append(_file.read(20))
+        r.append(_file.read(21))
+        let is_last_entry =
+          recover
+            let last_entry_byte = try r.u8()? else Fail(); 0 end
+            if last_entry_byte == 1 then true else false end
+          end
         let resilient_id = try r.u128_be()? else Fail(); 0 end
         let payload_length = try r.u32_be()? else Fail(); 0 end
         let payload = recover val
@@ -249,7 +254,7 @@ class FileBackend is Backend
           end
         end
         // put entry into temporary recovered buffer
-        replay_buffer.push((resilient_id, payload))
+        replay_buffer.push((resilient_id, payload, is_last_entry))
       | _LogCheckpointIdEntry =>
         break
       | _LogRestartEntry =>
@@ -270,7 +275,8 @@ class FileBackend is Backend
     _event_log.expect_rollback_count(replay_buffer.size())
     for entry in replay_buffer.values() do
       num_replayed = num_replayed + 1
-      _event_log.rollback_from_log_entry(entry._1, entry._2, checkpoint_id)
+      _event_log.rollback_from_log_entry(entry._1, entry._2, entry._3,
+        checkpoint_id)
     end
 
     @printf[I32](("RESILIENCE: Replayed %d entries from recovery log " +
@@ -288,7 +294,7 @@ class FileBackend is Backend
     _bytes_written
 
   fun ref encode_entry(resilient_id: RoutingId, checkpoint_id: CheckpointId,
-    payload: Array[ByteSeq] val)
+    payload: Array[ByteSeq] val, is_last_entry: Bool)
   =>
     ifdef debug then
       Invariant(payload.size() > 0)
@@ -306,6 +312,7 @@ class FileBackend is Backend
     end
 
     _writer.u8(_LogDataEntry.encode())
+    _writer.u8(if is_last_entry then 1 else 0 end)
     _writer.u128_be(resilient_id)
     _writer.u32_be(payload_size.u32())
     _writer.writev(payload)
@@ -470,9 +477,9 @@ class RotatingFileBackend is Backend
     bytes_written'
 
   fun ref encode_entry(resilient_id: RoutingId, checkpoint_id: CheckpointId,
-    payload: Array[ByteSeq] val)
+    payload: Array[ByteSeq] val, is_last_entry: Bool)
   =>
-    _backend.encode_entry(resilient_id, checkpoint_id, payload)
+    _backend.encode_entry(resilient_id, checkpoint_id, payload, is_last_entry)
 
   fun ref encode_checkpoint_id(checkpoint_id: CheckpointId) =>
     _backend.encode_checkpoint_id(checkpoint_id)
