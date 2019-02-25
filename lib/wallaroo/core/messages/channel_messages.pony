@@ -60,7 +60,7 @@ primitive ChannelMsgEncoder
     _encode(KeyMigrationMsg(step_group, key, checkpoint_id, state,
       worker), auth)?
 
-  fun migration_batch_complete(sender: String,
+  fun migration_batch_complete(sender: WorkerName,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -69,7 +69,7 @@ primitive ChannelMsgEncoder
     """
     _encode(MigrationBatchCompleteMsg(sender), auth)?
 
-  fun ack_migration_batch_complete(worker: String,
+  fun ack_migration_batch_complete(worker: WorkerName,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -114,7 +114,7 @@ primitive ChannelMsgEncoder
     """
     _encode(PrepareShrinkMsg(remaining_workers, leaving_workers), auth)?
 
-  fun leaving_migration_ack_request(sender: String, auth: AmbientAuth):
+  fun leaving_migration_ack_request(sender: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
     """
@@ -123,7 +123,7 @@ primitive ChannelMsgEncoder
     """
     _encode(LeavingMigrationAckRequestMsg(sender), auth)?
 
-  fun leaving_migration_ack(sender: String, auth: AmbientAuth):
+  fun leaving_migration_ack(sender: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
     """
@@ -132,27 +132,27 @@ primitive ChannelMsgEncoder
     """
     _encode(LeavingMigrationAckMsg(sender), auth)?
 
-  fun mute_request(originating_worker: String, auth: AmbientAuth):
+  fun mute_request(originating_worker: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
     _encode(MuteRequestMsg(originating_worker), auth)?
 
-  fun unmute_request(originating_worker: String, auth: AmbientAuth):
+  fun unmute_request(originating_worker: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
     _encode(UnmuteRequestMsg(originating_worker), auth)?
 
-  fun identify_control_port(worker_name: String, service: String,
+  fun identify_control_port(worker_name: WorkerName, service: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(IdentifyControlPortMsg(worker_name, service), auth)?
 
-  fun identify_data_port(worker_name: String, service: String,
+  fun identify_data_port(worker_name: WorkerName, service: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(IdentifyDataPortMsg(worker_name, service), auth)?
 
-  fun reconnect_data_port(worker_name: String, service: String,
+  fun reconnect_data_port(worker_name: WorkerName, service: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(ReconnectDataPortMsg(worker_name, service), auth)?
@@ -167,7 +167,7 @@ primitive ChannelMsgEncoder
   =>
     _encode(SpinUpStepMsg(step_id, step_builder), auth)?
 
-  fun topology_ready(worker_name: String, auth: AmbientAuth):
+  fun topology_ready(worker_name: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
     _encode(TopologyReadyMsg(worker_name), auth)?
@@ -179,7 +179,7 @@ primitive ChannelMsgEncoder
   =>
     _encode(CreateConnectionsMsg(c_addrs, d_addrs), auth)?
 
-  fun connections_ready(worker_name: String, auth: AmbientAuth):
+  fun connections_ready(worker_name: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
     _encode(ConnectionsReadyMsg(worker_name), auth)?
@@ -220,7 +220,8 @@ primitive ChannelMsgEncoder
     """
     _encode(RequestRecoveryInfoMsg(worker_name), auth)?
 
-  fun inform_recovering_worker(worker_name: String, checkpoint_id: CheckpointId,
+  fun inform_recovering_worker(worker_name: WorkerName,
+    checkpoint_id: CheckpointId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -228,7 +229,7 @@ primitive ChannelMsgEncoder
     """
     _encode(InformRecoveringWorkerMsg(worker_name, checkpoint_id), auth)?
 
-  fun join_cluster(worker_name: String, worker_count: USize,
+  fun join_cluster(worker_name: WorkerName, worker_count: USize,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -238,12 +239,12 @@ primitive ChannelMsgEncoder
     _encode(JoinClusterMsg(worker_name, worker_count), auth)?
 
   // TODO: Update this once new workers become first class citizens
-  fun inform_joining_worker(worker_name: String, metric_app_name: String,
+  fun inform_joining_worker(worker_name: WorkerName, metric_app_name: String,
     l_topology: LocalTopology, checkpoint_id: CheckpointId,
     rollback_id: RollbackId, metric_host: String, metric_service: String,
     control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val,
-    worker_names: Array[String] val, primary_checkpoint_worker: String,
+    worker_names: Array[String] val, primary_checkpoint_worker: WorkerName,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -261,8 +262,8 @@ primitive ChannelMsgEncoder
     """
     _encode(InformJoinErrorMsg(msg), auth)?
 
-  fun joining_worker_initialized(worker_name: String, c_addr: (String, String),
-    d_addr: (String, String),
+  fun joining_worker_initialized(worker_name: WorkerName,
+    c_addr: (String, String), d_addr: (String, String),
     step_group_routing_ids: Map[RoutingId, RoutingId] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -406,17 +407,17 @@ primitive ChannelMsgEncoder
   =>
   _encode(ForwardedInjectBarrierFullyAckedMsg(token), auth)?
 
-  fun remote_initiate_barrier(sender: String, token: BarrierToken,
+  fun remote_initiate_barrier(sender: WorkerName, token: BarrierToken,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(RemoteInitiateBarrierMsg(sender, token), auth)?
 
-  fun worker_ack_barrier_start(sender: String, token: BarrierToken,
+  fun worker_ack_barrier_start(sender: WorkerName, token: BarrierToken,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(WorkerAckBarrierStartMsg(sender, token), auth)?
 
-  fun worker_ack_barrier(sender: String, token: BarrierToken,
+  fun worker_ack_barrier(sender: WorkerName, token: BarrierToken,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(WorkerAckBarrierMsg(sender, token), auth)?
@@ -433,23 +434,28 @@ primitive ChannelMsgEncoder
   =>
     _encode(BarrierFullyAckedMsg(token), auth)?
 
+  fun abort_checkpoint(checkpoint_id: CheckpointId, sender: WorkerName,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(AbortCheckpointMsg(checkpoint_id, sender), auth)?
+
   fun event_log_initiate_checkpoint(checkpoint_id: CheckpointId,
-    sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
+    sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(EventLogInitiateCheckpointMsg(checkpoint_id, sender), auth)?
 
   fun event_log_write_checkpoint_id(checkpoint_id: CheckpointId,
-    sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
+    sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(EventLogWriteCheckpointIdMsg(checkpoint_id, sender), auth)?
 
-  fun event_log_ack_checkpoint(checkpoint_id: CheckpointId, sender: String,
+  fun event_log_ack_checkpoint(checkpoint_id: CheckpointId, sender: WorkerName,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(EventLogAckCheckpointMsg(checkpoint_id, sender), auth)?
 
   fun event_log_ack_checkpoint_id_written(checkpoint_id: CheckpointId,
-    sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
+    sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(EventLogAckCheckpointIdWrittenMsg(checkpoint_id, sender), auth)?
 
@@ -535,12 +541,12 @@ primitive ChannelMsgEncoder
     _encode(RollbackBarrierFullyAckedMsg(token, sender), auth)?
 
   fun event_log_initiate_rollback(token: CheckpointRollbackBarrierToken,
-    sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
+    sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(EventLogInitiateRollbackMsg(token, sender), auth)?
 
   fun event_log_ack_rollback(token: CheckpointRollbackBarrierToken,
-    sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
+    sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(EventLogAckRollbackMsg(token, sender), auth)?
 
@@ -549,18 +555,18 @@ primitive ChannelMsgEncoder
   =>
     _encode(ResumeCheckpointMsg(sender), auth)?
 
-  fun resume_processing(sender: String, auth: AmbientAuth):
+  fun resume_processing(sender: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
     _encode(ResumeProcessingMsg(sender), auth)?
 
-  fun register_producer(sender: String, source_id: RoutingId, target_id: RoutingId,
-    auth: AmbientAuth): Array[ByteSeq] val ?
+  fun register_producer(sender: WorkerName, source_id: RoutingId,
+    target_id: RoutingId, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(RegisterProducerMsg(sender, source_id, target_id), auth)?
 
-  fun unregister_producer(sender: String, source_id: RoutingId, target_id: RoutingId,
-    auth: AmbientAuth): Array[ByteSeq] val ?
+  fun unregister_producer(sender: WorkerName, source_id: RoutingId,
+    target_id: RoutingId, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(UnregisterProducerMsg(sender, source_id, target_id), auth)?
 
@@ -587,26 +593,26 @@ class val UnknownChannelMsg is ChannelMsg
     data = d
 
 class val IdentifyControlPortMsg is ChannelMsg
-  let worker_name: String
+  let worker_name: WorkerName
   let service: String
 
-  new val create(name: String, s: String) =>
+  new val create(name: WorkerName, s: String) =>
     worker_name = name
     service = s
 
 class val IdentifyDataPortMsg is ChannelMsg
-  let worker_name: String
+  let worker_name: WorkerName
   let service: String
 
-  new val create(name: String, s: String) =>
+  new val create(name: WorkerName, s: String) =>
     worker_name = name
     service = s
 
 class val ReconnectDataPortMsg is ChannelMsg
-  let worker_name: String
+  let worker_name: WorkerName
   let service: String
 
-  new val create(name: String, s: String) =>
+  new val create(name: WorkerName, s: String) =>
     worker_name = name
     service = s
 
@@ -625,9 +631,9 @@ class val SpinUpStepMsg is ChannelMsg
     step_builder = s_builder
 
 class val TopologyReadyMsg is ChannelMsg
-  let worker_name: String
+  let worker_name: WorkerName
 
-  new val create(name: String) =>
+  new val create(name: WorkerName) =>
     worker_name = name
 
 class val CreateConnectionsMsg is ChannelMsg
@@ -641,9 +647,9 @@ class val CreateConnectionsMsg is ChannelMsg
     data_addrs = d_addrs
 
 class val ConnectionsReadyMsg is ChannelMsg
-  let worker_name: String
+  let worker_name: WorkerName
 
-  new val create(name: String) =>
+  new val create(name: WorkerName) =>
     worker_name = name
 
 class val CreateDataChannelListener is ChannelMsg
@@ -706,10 +712,10 @@ class val KeyMigrationMsg is ChannelMsg
   // The next checkpoint that this migrated step will be a part of
   let _checkpoint_id: CheckpointId
   let _state: ByteSeq val
-  let _worker: String
+  let _worker: WorkerName
 
   new val create(step_group': RoutingId, key': Key,
-    checkpoint_id': CheckpointId, state': ByteSeq val, worker': String)
+    checkpoint_id': CheckpointId, state': ByteSeq val, worker': WorkerName)
   =>
     _step_group = step_group'
     _key = key'
@@ -724,27 +730,27 @@ class val KeyMigrationMsg is ChannelMsg
   fun worker(): String => _worker
 
 class val MigrationBatchCompleteMsg is ChannelMsg
-  let sender_name: String
+  let sender_name: WorkerName
 
-  new val create(sender: String) =>
+  new val create(sender: WorkerName) =>
     sender_name = sender
 
 class val AckMigrationBatchCompleteMsg is ChannelMsg
-  let sender_name: String
+  let sender_name: WorkerName
 
-  new val create(sender: String) =>
+  new val create(sender: WorkerName) =>
     sender_name = sender
 
 class val MuteRequestMsg is ChannelMsg
-  let originating_worker: String
+  let originating_worker: WorkerName
 
-  new val create(worker: String) =>
+  new val create(worker: WorkerName) =>
     originating_worker = worker
 
 class val UnmuteRequestMsg is ChannelMsg
-  let originating_worker: String
+  let originating_worker: WorkerName
 
-  new val create(worker: String) =>
+  new val create(worker: WorkerName) =>
     originating_worker = worker
 
 class val KeyMigrationCompleteMsg is ChannelMsg
@@ -785,23 +791,23 @@ class val PrepareShrinkMsg is ChannelMsg
     leaving_workers = leaving_workers'
 
 class val LeavingMigrationAckRequestMsg is ChannelMsg
-  let sender: String
+  let sender: WorkerName
 
-  new val create(sender': String) =>
+  new val create(sender': WorkerName) =>
     sender = sender'
 
 class val LeavingMigrationAckMsg is ChannelMsg
-  let sender: String
+  let sender: WorkerName
 
-  new val create(sender': String) =>
+  new val create(sender': WorkerName) =>
     sender = sender'
 
 class val AckDataReceivedMsg is ChannelMsg
-  let sender_name: String
+  let sender_name: WorkerName
   let sender_step_id: RoutingId
   let seq_id: SeqId
 
-  new val create(sender_name': String, sender_step_id': U128,
+  new val create(sender_name': WorkerName, sender_step_id': U128,
     seq_id': SeqId)
   =>
     sender_name = sender_name'
@@ -1005,19 +1011,19 @@ class val RequestRecoveryInfoMsg is ChannelMsg
   """
   This message is sent to the cluster when beginning recovery.
   """
-  let sender: String
+  let sender: WorkerName
 
-  new val create(sender': String) =>
+  new val create(sender': WorkerName) =>
     sender = sender'
 
 class val InformRecoveringWorkerMsg is ChannelMsg
   """
   This message is sent as a response to a RequestRecoveryInfo message.
   """
-  let sender: String
+  let sender: WorkerName
   let checkpoint_id: CheckpointId
 
-  new val create(sender': String, s_id: CheckpointId) =>
+  new val create(sender': WorkerName, s_id: CheckpointId) =>
     sender = sender'
     checkpoint_id = s_id
 
@@ -1026,10 +1032,10 @@ class val JoinClusterMsg is ChannelMsg
   This message is sent from a worker requesting to join a running cluster to
   any existing worker in the cluster.
   """
-  let worker_name: String
+  let worker_name: WorkerName
   let worker_count: USize
 
-  new val create(w: String, wc: USize) =>
+  new val create(w: WorkerName, wc: USize) =>
     worker_name = w
     worker_count = wc
 
@@ -1078,12 +1084,12 @@ class val InformJoinErrorMsg is ChannelMsg
 
 // TODO: Don't send host over since we need to determine that on receipt
 class val JoiningWorkerInitializedMsg is ChannelMsg
-  let worker_name: String
+  let worker_name: WorkerName
   let control_addr: (String, String)
   let data_addr: (String, String)
   let step_group_routing_ids: Map[RoutingId, RoutingId] val
 
-  new val create(name: String, c_addr: (String, String),
+  new val create(name: WorkerName, c_addr: (String, String),
     d_addr: (String, String), s_routing_ids: Map[RoutingId, RoutingId] val)
   =>
     worker_name = name
@@ -1122,9 +1128,9 @@ class val InitiateStopTheWorldForShrinkMigrationMsg is ChannelMsg
     leaving_workers = l_ws
 
 class val LeavingWorkerDoneMigratingMsg is ChannelMsg
-  let worker_name: String
+  let worker_name: WorkerName
 
-  new val create(name: String)
+  new val create(name: WorkerName)
   =>
     worker_name = name
 
@@ -1143,13 +1149,13 @@ class val AnnounceConnectionsMsg is ChannelMsg
     new_step_group_routing_ids = sri
 
 class val AnnounceJoiningWorkersMsg is ChannelMsg
-  let sender: String
+  let sender: WorkerName
   let control_addrs: Map[String, (String, String)] val
   let data_addrs: Map[String, (String, String)] val
   let new_step_group_routing_ids:
     Map[WorkerName, Map[RoutingId, RoutingId] val] val
 
-  new val create(sender': String,
+  new val create(sender': WorkerName,
     c_addrs: Map[String, (String, String)] val,
     d_addrs: Map[String, (String, String)] val,
     sri: Map[WorkerName, Map[RoutingId, RoutingId] val] val)
@@ -1160,11 +1166,11 @@ class val AnnounceJoiningWorkersMsg is ChannelMsg
     new_step_group_routing_ids = sri
 
 class val AnnounceHashPartitionsGrowMsg is ChannelMsg
-  let sender: String
+  let sender: WorkerName
   let joining_workers: Array[String] val
   let hash_partitions: Map[RoutingId, HashPartitions] val
 
-  new val create(sender': String, joining_workers': Array[String] val,
+  new val create(sender': WorkerName, joining_workers': Array[String] val,
     hash_partitions': Map[RoutingId, HashPartitions] val)
   =>
     sender = sender'
@@ -1172,9 +1178,9 @@ class val AnnounceHashPartitionsGrowMsg is ChannelMsg
     hash_partitions = hash_partitions'
 
 class val ConnectedToJoiningWorkersMsg is ChannelMsg
-  let sender: String
+  let sender: WorkerName
 
-  new val create(sender': String) =>
+  new val create(sender': WorkerName) =>
     sender = sender'
 
 class val AnnounceNewSourceMsg is ChannelMsg
@@ -1182,10 +1188,10 @@ class val AnnounceNewSourceMsg is ChannelMsg
   This message is sent to notify another worker that a new source has
   been created on this worker and that routers should be updated.
   """
-  let sender: String
+  let sender: WorkerName
   let source_id: RoutingId
 
-  new val create(sender': String, id: RoutingId) =>
+  new val create(sender': WorkerName, id: RoutingId) =>
     sender = sender'
     source_id = id
 
@@ -1227,26 +1233,26 @@ class val ForwardedInjectBarrierFullyAckedMsg is ChannelMsg
     token = token'
 
 class val RemoteInitiateBarrierMsg is ChannelMsg
-  let sender: String
+  let sender: WorkerName
   let token: BarrierToken
 
-  new val create(sender': String, token': BarrierToken) =>
+  new val create(sender': WorkerName, token': BarrierToken) =>
     sender = sender'
     token = token'
 
 class val WorkerAckBarrierStartMsg is ChannelMsg
-  let sender: String
+  let sender: WorkerName
   let token: BarrierToken
 
-  new val create(sender': String, token': BarrierToken) =>
+  new val create(sender': WorkerName, token': BarrierToken) =>
     sender = sender'
     token = token'
 
 class val WorkerAckBarrierMsg is ChannelMsg
-  let sender: String
+  let sender: WorkerName
   let token: BarrierToken
 
-  new val create(sender': String, token': BarrierToken) =>
+  new val create(sender': WorkerName, token': BarrierToken) =>
     sender = sender'
     token = token'
 
@@ -1271,6 +1277,14 @@ class val BarrierFullyAckedMsg is ChannelMsg
   new val create(token': BarrierToken)
   =>
     token = token'
+
+class val AbortCheckpointMsg is ChannelMsg
+  let checkpoint_id: CheckpointId
+  let sender: WorkerName
+
+  new val create(checkpoint_id': CheckpointId, sender': WorkerName) =>
+    checkpoint_id = checkpoint_id'
+    sender = sender'
 
 class val EventLogInitiateCheckpointMsg is ChannelMsg
   let checkpoint_id: CheckpointId
@@ -1397,34 +1411,36 @@ class val RollbackBarrierFullyAckedMsg is ChannelMsg
     sender = sender'
 
 class val ResumeCheckpointMsg is ChannelMsg
-  let sender: String
+  let sender: WorkerName
 
-  new val create(sender': String) =>
+  new val create(sender': WorkerName) =>
     sender = sender'
 
 class val ResumeProcessingMsg is ChannelMsg
-  let sender: String
+  let sender: WorkerName
 
-  new val create(sender': String) =>
+  new val create(sender': WorkerName) =>
     sender = sender'
 
 class val RegisterProducerMsg is ChannelMsg
-  let sender: String
+  let sender: WorkerName
   let source_id: RoutingId
   let target_id: RoutingId
 
-  new val create(sender': String, source_id': RoutingId, target_id': RoutingId)
+  new val create(sender': WorkerName, source_id': RoutingId,
+    target_id': RoutingId)
   =>
     sender = sender'
     source_id = source_id'
     target_id = target_id'
 
 class val UnregisterProducerMsg is ChannelMsg
-  let sender: String
+  let sender: WorkerName
   let source_id: RoutingId
   let target_id: RoutingId
 
-  new val create(sender': String, source_id': RoutingId, target_id': RoutingId)
+  new val create(sender': WorkerName, source_id': RoutingId,
+    target_id': RoutingId)
   =>
     sender = sender'
     source_id = source_id'
