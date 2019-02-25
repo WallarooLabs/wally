@@ -25,7 +25,7 @@ use "wallaroo_labs/mort"
 
 primitive ConnectorSourceConfigCLIParser
   fun apply(args: Array[String] val):
-    Map[SourceName, ConnectorSource2ConfigOptions] val ?
+    Map[SourceName, ConnectorSourceConfigOptions] val ?
   =>
     let in_arg = "in"
     let short_in_arg = "i"
@@ -47,9 +47,9 @@ primitive ConnectorSourceConfigCLIParser
     error
 
   fun _from_input_string(inputs: String):
-    Map[SourceName, ConnectorSource2ConfigOptions] val
+    Map[SourceName, ConnectorSourceConfigOptions] val
   =>
-    let opts = recover trn Map[SourceName, ConnectorSource2ConfigOptions] end
+    let opts = recover trn Map[SourceName, ConnectorSourceConfigOptions] end
 
     for input in inputs.split(",").values() do
       try
@@ -63,7 +63,7 @@ primitive ConnectorSourceConfigCLIParser
         let refill_credits = address_data(4)?.u32()?
 
         opts.update(source_name_and_address(0)?,
-          ConnectorSource2ConfigOptions(source_name', host, service, cookie,
+          ConnectorSourceConfigOptions(source_name', host, service, cookie,
             max_credits, refill_credits))
       else
         FatalUserError("Inputs must be in the `source_name@host:service`" +
@@ -74,7 +74,7 @@ primitive ConnectorSourceConfigCLIParser
     consume opts
 
 // TODO: Refactor. Why is this identical to WorkerConnectorSourceConfig?
-class val ConnectorSource2ConfigOptions
+class val ConnectorSourceConfigOptions
   let host: String
   let service: String
   let source_name: SourceName
@@ -107,7 +107,7 @@ class val ConnectorSourceConfig[In: Any val] is SourceConfig
       service, cookie, max_credits, refill_credits)
 
   new val from_options(foo: Bool, handler': FramedSourceHandler[In] val,
-    opts: ConnectorSource2ConfigOptions, parallelism': USize = 10)
+    opts: ConnectorSourceConfigOptions, parallelism': USize = 10)
   =>
     handler = handler'
     parallelism = parallelism'

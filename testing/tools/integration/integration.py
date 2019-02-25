@@ -16,6 +16,7 @@
 from collections import namedtuple
 import io
 import itertools
+import json
 import logging
 import os
 import re
@@ -49,12 +50,20 @@ FROM_TAIL = int(os.environ.get("FROM_TAIL", 10))
 VERSION = '0.0.1'
 COOKIE = 'cookie'
 
+
+def json_keyval_extract(msg):
+    d = json.loads(msg[4:])
+    key = str(d.get('key'))
+    val = str(d.get('value'))
+    return (key, val)
+
+
 def pipeline_test(sources, expected, command, workers=1,
                   mode='framed', sinks=1, decoder=None, pre_processor=None,
                   batch_size=1, sender_interval=0.001,
                   sink_expect=None, sink_expect_allow_more=False,
                   sink_stop_timeout=DEFAULT_SINK_STOP_TIMEOUT,
-                  sink_await=None, delay=30,
+                  sink_await=None, sink_await_keys=None, delay=30,
                   validate_file=None, giles_mode=False,
                   host='127.0.0.1', listen_attempts=1,
                   ready_timeout=30,
@@ -139,6 +148,7 @@ def pipeline_test(sources, expected, command, workers=1,
     then expected should be [1,1,1,2,2,2].
     """
     try:
+        # TODO: [Nisan] update this to make sense. This doesn't make sense anymore.
         if sink_expect is not None:
             if not isinstance(sink_expect, (list, tuple)):
                 sink_expect = [sink_expect for x in range(sinks)]
@@ -153,6 +163,9 @@ def pipeline_test(sources, expected, command, workers=1,
         elif sink_await is not None:
             if len(sink_await) != sinks:
                 sink_await = [sink_await[:] for x in range(sinks)]
+        elif sink_await_keys is not None:
+            if len(sink_await_keys) != sinks:
+                sink_await_keys = [sink_await_keys for x in range(sinks)]
 
         # figure out source count based on source names
         source_names = list(set([src[1] for src in sources]))
@@ -226,6 +239,15 @@ def pipeline_test(sources, expected, command, workers=1,
                     cluster.sink_await(values=sink_await_vals,
                                        timeout=sink_stop_timeout,
                                        sink=sink)
+            elif sink_await_keys:
+                logging.debug("Awaiting on {} (key,value) pairs with a timeout of "
+                              "{} seconds".format(sum(map(len, sink_await_keys)),
+                                                  sink_stop_timeout))
+                for sink, sink_await_vals in zip(cluster.sinks, sink_await_keys):
+                    cluster.sink_await(values=sink_await_vals,
+                                       timeout=sink_stop_timeout,
+                                       sink=sink,
+                                       func=json_keyval_extract)
             else:
                 logging.debug('Waiting {} seconds before shutting down '
                               'cluster.'
