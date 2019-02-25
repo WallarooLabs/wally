@@ -26,6 +26,7 @@ use "wallaroo/core/barrier"
 use "wallaroo/core/data_receiver"
 use "wallaroo/core/recovery"
 use "wallaroo/core/checkpoint"
+use "wallaroo_labs/mort"
 
 
 actor DummyConsumer is Consumer
