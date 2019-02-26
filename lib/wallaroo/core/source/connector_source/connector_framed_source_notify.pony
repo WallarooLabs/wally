@@ -236,6 +236,9 @@ class ConnectorSourceNotify[In: Any val]
           return _to_error_state(source, "Bad protocol FSM state")
         end
 
+        // TODO [source-migration]: rename _stream_map to _active_streams
+        // and also checking _pending_notify, _pending_close, and
+        // _pending_relinquish for short-circuit notify_ack(false)
         if _stream_map.contains(m.stream_id) then
           // we're already handling this stream, it's ok to reject quickly
           process_notify_msg(m.stream_id, m.stream_name, m.point_of_ref,
@@ -246,6 +249,7 @@ class ConnectorSourceNotify[In: Any val]
             where stream_id = m.stream_id, stream_name =m.stream_name,
             point_of_ref = m.point_of_ref) end)
           _request_stream_id(m.stream_id, source.session_id, promise)
+          // TODO [source-migration]: add to _pending_notify
         end
 
       | let m: cwm.NotifyAckMsg =>
