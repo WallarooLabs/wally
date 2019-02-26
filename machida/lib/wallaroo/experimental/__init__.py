@@ -151,6 +151,8 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         # connection details are given from the base
         self._host = host
         self._port = int(port)  # but convert port to int
+        self._source_name = None
+        self._source_map = {}
         self.credits = 0
         self.version = version
         self.cookie = cookie
@@ -204,6 +206,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 break
             else:
                 time.sleep(dt)
+        return self.error
 
     #############################################
     # asyncore loop to run in background thread #
@@ -245,7 +248,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
 
     def _handle_frame(self, frame):
         msg = cwm.Frame.decode(frame)
-        # Ok, Error, NotifyAck, Ack, Restart
+        # Ok, Error, NotifyAck, Ack, Restart, UpdateSources
         if isinstance(msg, cwm.Ok):
             self._handle_ok(msg)
         elif isinstance(msg, cwm.Error):
@@ -262,6 +265,8 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             self._handle_ack(msg)
         elif isinstance(msg, cwm.Restart):
             self.handle_restart()
+        elif isinstance(msg, cwm.UpdateSources):
+            self._handle_update_sources(msg)
         # messages that should only go connector->wallaroo
         # Notify, Hello, Message
         elif isinstance(msg, (cwm.Hello, cwm.Message, cwm.Notify)):
@@ -283,6 +288,18 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             raise ProtocolError("Got an Ok message outside of a"
                                 " handshake")
         else:
+            # update the source map
+            local_addr = "{}:{}".format(self._host, self._port)
+            self._source_map = dict(msg.source_list)
+            logging.info("Updated source_map to {}".format(self._source_map))
+            for name, addr in msg.source_list:
+                if addr == local_addr:
+                    self._source_name = name
+                    break
+            else:
+                raise ProtocolError("Current connection could not found in "
+                    "the source connection map returned by Wallaroo.")
+
             # deposit the credits
             self.credits += msg.initial_credits
             for stream_id, stream_name, point_of_ref in msg.credit_list:
@@ -344,18 +361,40 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                     new = old
                 self.stream_acked(new)
 
+    def _handle_update_sources(self, msg):
+        new_source_map = dict(msg.source_list)
+        logging.info("Updating sources from {} to {}".format(
+            self._source_map, new_source_map))
+        self._source_map = new_source_map
+
     ##########################
     # Outoing communications #
     ##########################
 
     def connect(self):
         self.handshake_complete = False
+        # Maybe do the source shuffle
+        if self._source_name is not None:
+            # _source_name is None when connecting right after startup
+            if not self._source_name in self._source_map:
+                # The previously connected source was shrunk
+                # choose a new source, host, and port from _source_map
+                self._source_name = min(self._source_map.keys())
+                self._host, self._port = (
+                    self._source_map[self._source_name].split(':'))
+                self._port = int(self._port)
+                logging.info("Updating source to: ({} <{}:{}>)".format(
+                    self._source_name, self._host, self._port))
+
         conn = socket.socket()
         try:
             conn.connect( (self._host, self._port) )
-        except:
+        except Exception as err:
+            logging.error("Failed to connect to {}:{}".format(self._host,
+                self._port))
+            self.error = err
             self.stopped.set()
-            raise
+            raise err
         self._conn = conn
         self._conn.setblocking(1) # Set socket to blocking mode
 

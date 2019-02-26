@@ -11,8 +11,11 @@ import traceback
 from wallaroo.experimental import connector_wire_messages as cwm
 
 class AsyncServer(asynchat.async_chat, object):
-    def __init__(self, handler_id, sock, streams=None):
+    def __init__(self, dispatcher, handler_id, sock, streams=None, name=None, source_map={}):
         print("AsyncServer.__init__", handler_id, sock)
+        self._dispatcher = dispatcher
+        self.name = name
+        self.source_map = source_map
         self._id = handler_id
         self._conn = sock
         asynchat.async_chat.__init__(self, sock=self._conn)
@@ -56,7 +59,7 @@ class AsyncServer(asynchat.async_chat, object):
         self.count = 0
         if isinstance(msg, cwm.Hello):
             # respond with an ok or an error
-            ok = cwm.Ok(200, self._streams.values())
+            ok = cwm.Ok(200, self._streams.values(), self.source_map.items())
             self.write(ok)
         elif isinstance(msg, cwm.Notify):
             # respond with notifyack
@@ -87,6 +90,7 @@ class AsyncServer(asynchat.async_chat, object):
 
     def handle_message(self, msg):
         # send an ack every 100 messages
+        print("{} received message: {}".format(self.name, msg))
         if msg.message_id:
             self._streams[msg.stream_id][2] = msg.message_id
         if msg.flags & cwm.Message.Eos:
@@ -96,7 +100,7 @@ class AsyncServer(asynchat.async_chat, object):
                                acks= [(msg.stream_id, self._streams[msg.stream_id][2])]))
 
     def write(self, msg):
-        print("write {}".format(msg))
+        print("{} write {}".format(self.name, msg))
         data = cwm.Frame.encode(msg)
         super(AsyncServer, self).push(data)
 
@@ -104,13 +108,16 @@ class AsyncServer(asynchat.async_chat, object):
         if self.received_count % 200 == 0:
             # but reset point_of_ref back to 0 every 500
             # ... yes this will cause the sender to run forever.
-            print("Sending ack for streams!")
+            print("{} Sending ack for streams!".format(self.name))
             ack = cwm.Ack(
                 credits = 200,
                 acks = [
                     (sid, por) for sid, _, por in self._streams.values()])
             self.write(ack)
-        if self.received_count % 1000 == 0:
+        if self.received_count == 500:
+            # migrate!
+            self.migrate()
+        elif self.received_count % 1000 == 0:
             # send a restart every 1000 messages
             self.write(cwm.Restart())
 
@@ -118,31 +125,51 @@ class AsyncServer(asynchat.async_chat, object):
         _type, _value, _traceback = sys.exc_info()
         traceback.print_exception(_type, _value, _traceback)
 
+    def migrate(self):
+        print("Migrating from {}".format(self.name))
+        # remove self from source map
+        del self.source_map[self.name]
+        print("Remaining sources: {}".format(self.source_map))
+        # craft update sources msg
+        msg = cwm.UpdateSources(self.source_map.items())
+        self.write(msg)
+        self.write(cwm.Restart())
+        self.close()
+        self._dispatcher.close()
+
     def close(self):
         print("Closing the connection")
         print("last received id by stream:\n\t{}".format(
             "\n\t".join("{}, {}: {}".format(sid, sn, mid)
                       for sid, sn, mid in self._streams.values())))
         super(AsyncServer, self).close()
+        self.socket.close()
 
 
 class EchoServer(asyncore.dispatcher):
 
-    def __init__(self, host, port):
+    def __init__(self, name, host, port, source_map={}, state={}):
         asyncore.dispatcher.__init__(self)
         self.create_socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.set_reuse_addr()
         self.bind((host, port))
         self.listen(1)
+        self.name = name
+        self.source_map = source_map
+        self.source_map[self.name] = "{}:{}".format(host, port)
         self.count = 0
-        self._streams = {}
+        self._streams = state
 
     def handle_accepted(self, sock, addr):
         print('Incoming connection from %s' % repr(addr))
-        handler = AsyncServer(self.count, sock, self._streams)
+        handler = AsyncServer(self, self.count, sock, self._streams, self.name, self.source_map)
         self.count += 1
 
-server = EchoServer('127.0.0.1', 7100)
-print("server: ", server)
-print("asyncore file: ", asyncore.__file__)
+
+state = {}
+sources = {}
+server1 = EchoServer('server1', '127.0.0.1', 7100, sources, state)
+server2 = EchoServer('server2', '127.0.0.1', 7101, sources, state)
+print("server1: ", server1)
+print("server2: ", server2)
 asyncore.loop(timeout=0.000001)
