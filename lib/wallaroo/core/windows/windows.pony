@@ -230,8 +230,8 @@ class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
 
   fun state_wrapper(key: Key, rand: Random): StateWrapper[In, Out, Acc] =>
     // If the application will be using aligned windows, we must
-    // ingore the provided Rand and supply Zeros.
-    let rand' = if _align_windows then Zeros else rand end
+    // ingore the provided Rand and supply Zeroes.
+    let rand' = if _align_windows then _Zeroes else rand end
     RangeWindows[In, Out, Acc](key, _agg, _range,
                                _slide, _delay, rand')
 
@@ -262,10 +262,6 @@ class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
 
   fun name(): String =>
     _agg.name()
-
-class Zeros is Random
-  new create(_: U64 = 0 , _: U64 = 0) => None
-  fun ref next(): U64 => 0
 
 class RangeWindows[In: Any val, Out: Any val, Acc: State ref] is
   Windows[In, Out, Acc]
@@ -447,3 +443,7 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
       Fail()
       recover Array[U8] end
     end
+
+class _Zeroes is Random
+  new create(_: U64 = 0 , _: U64 = 0) => None
+  fun ref next(): U64 => 0
