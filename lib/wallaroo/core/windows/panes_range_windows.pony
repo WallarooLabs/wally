@@ -75,8 +75,8 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     _panes = Array[(Acc | EmptyPane)](pane_count)
     _panes_start_ts = Array[U64](pane_count)
     _earliest_window_idx = 0
-    var pane_start: U64 =
-      (watermark_ts - _delay) + window_alignment_offset
+    var pane_start: U64 = ((watermark_ts - _delay) - window_alignment_offset)
+
     for i in Range(0, pane_count) do
       _panes.push(EmptyPane)
       _panes_start_ts.push(pane_start)

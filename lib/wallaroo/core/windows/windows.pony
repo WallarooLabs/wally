@@ -38,11 +38,13 @@ class RangeWindowsBuilder
   var _range: U64
   var _slide: U64
   var _delay: U64
+  var _align_windows: Bool
 
   new create(range: U64) =>
     _range = range
     _slide = range
     _delay = 0
+    _align_windows = false
 
   fun ref with_slide(slide: U64): RangeWindowsBuilder =>
     _slide = slide
@@ -50,6 +52,14 @@ class RangeWindowsBuilder
 
   fun ref with_delay(delay: U64): RangeWindowsBuilder =>
     _delay = delay
+    this
+
+  fun ref unaligned() : RangeWindowsBuilder =>
+    _align_windows = false
+    this
+
+  fun ref aligned() : RangeWindowsBuilder =>
+    _align_windows = true
     this
 
   fun ref over[In: Any val, Out: Any val, S: State ref](
@@ -60,7 +70,8 @@ class RangeWindowsBuilder
         "But found slide " + _slide.string() + " for range " + _range.string())
     end
 
-    RangeWindowsStateInitializer[In, Out, S](agg, _range, _slide, _delay)
+    RangeWindowsStateInitializer[In, Out, S](
+      agg, _range, _slide, _delay, _align_windows)
 
 class CountWindowsBuilder
   var _count: USize
@@ -200,9 +211,10 @@ class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
   let _range: U64
   let _slide: U64
   let _delay: U64
+  let _align_windows: Bool
 
   new val create(agg: Aggregation[In, Out, Acc], range: U64, slide: U64,
-    delay: U64)
+    delay: U64, align_windows: Bool)
   =>
     if range == 0 then
       FatalUserError("Range windows must have a range greater than 0!\n")
@@ -214,9 +226,14 @@ class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
     _range = range
     _slide = slide
     _delay = delay
+    _align_windows = align_windows
 
   fun state_wrapper(key: Key, rand: Random): StateWrapper[In, Out, Acc] =>
-    RangeWindows[In, Out, Acc](key, _agg, _range, _slide, _delay, rand)
+    // If the application will be using aligned windows, we must
+    // ingore the provided Rand and supply Zeros.
+    let rand' = if _align_windows then Zeros else rand end
+    RangeWindows[In, Out, Acc](key, _agg, _range,
+                               _slide, _delay, rand')
 
   fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
     RunnerBuilder
@@ -245,6 +262,10 @@ class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
 
   fun name(): String =>
     _agg.name()
+
+class Zeros is Random
+  new create(_: U64 = 0 , _: U64 = 0) => None
+  fun ref next(): U64 => 0
 
 class RangeWindows[In: Any val, Out: Any val, Acc: State ref] is
   Windows[In, Out, Acc]
