@@ -26,6 +26,7 @@ use "wallaroo/core/common"
 use "wallaroo/core/state"
 use "wallaroo/core/topology"
 use "wallaroo_labs/time"
+use "time"
 
 actor _WindowTests is TestList
   new create(env: Env) => PonyTest(env, this)
@@ -50,6 +51,7 @@ actor _WindowTests is TestList
     test(_TestSlidingWindowsStragglersSequence)
     test(_TestSlidingWindowsSequence)
     test(_TestCountWindows)
+    test(_TestStaggerIsSane)
 
 class iso _TestTumblingWindowsTimeoutTrigger is UnitTest
   fun name(): String => "windows/_TestTumblingWindowsTimeoutTrigger"
@@ -871,6 +873,24 @@ class iso _TestCountWindows is UnitTest
     else
       false
     end
+
+class iso _TestStaggerIsSane is UnitTest
+  fun name(): String => "windows/_TestStaggerIsSane"
+
+  fun apply(h: TestHelper) ? =>
+    let range: U64 = Seconds(1)
+    let slide = range
+    let delay: U64 = Seconds(2)
+    // Make sure that for any generated window, the
+    // first event is never lost due to random stagger.
+    for random_window in Range(0,1000) do
+      var tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+        delay, Rand(Time.nanos().u64(), Time.nanos().u64()))
+        .>apply(1, Seconds(10), Seconds(10))
+      var res = tw(99, Seconds(14), Seconds(14))
+      h.assert_array_eq[USize]([0;0;1], _ForceArray(res._1)?)
+    end
+
 
 class _Total is State
   var v: USize = 0

@@ -28,6 +28,33 @@ use "wallaroo_labs/time"
 
 type NanosecondsSinceEpoch is U64
 
+
+actor Main
+  new create(env: Env) =>
+    try
+      let pipeline = recover val
+        let events = Wallaroo.source[Event]("Multi_Aggregations",
+          TCPSourceConfig[Event]
+              .from_options(EventDecoder,
+                            TCPSourceConfigCLIParser(env.args)?(0)?))
+        events
+          .key_by(GetEventKey)
+          .to[Event](Wallaroo.range_windows(Milliseconds(50))
+                      .aligned()
+                      .over[Event, Event, EventTotal](
+                        SumEvents))
+          .to[Event](Wallaroo.range_windows(Seconds(1))
+                       .aligned()
+                       .over[Event, Event, EventTotal](
+                         SumEvents2))
+          .to_sink(TCPSinkConfig[Event].from_options(
+            EventEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
+      end
+      Wallaroo.build_application(env, "EventAggregations", pipeline)
+    else
+      @printf[I32]("Couldn't build topology\n".cstring())
+    end
+
 class val Event
   // A generic event, bearing an original event time, a key,
   // and a piece of data.
@@ -122,27 +149,3 @@ primitive EventDecoder is FramedSourceHandler[Event]
 
   fun event_time_ns(e: Event): U64 =>
     e.event_time
-
-actor Main
-  new create(env: Env) =>
-    try
-      let pipeline = recover val
-        let events = Wallaroo.source[Event]("Multi_Aggregations",
-          TCPSourceConfig[Event]
-              .from_options(EventDecoder,
-                            TCPSourceConfigCLIParser(env.args)?(0)?))
-        events
-          .key_by(GetEventKey)
-          .to[Event](Wallaroo.range_windows(Milliseconds(50))
-                      .over[Event, Event, EventTotal](
-                        SumEvents))
-          .to[Event](Wallaroo.range_windows(Seconds(1))
-                       .over[Event, Event, EventTotal](
-                         SumEvents2))
-          .to_sink(TCPSinkConfig[Event].from_options(
-            EventEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
-      end
-      Wallaroo.build_application(env, "EventAggregations", pipeline)
-    else
-      @printf[I32]("Couldn't build topology\n".cstring())
-    end
