@@ -57,9 +57,9 @@ use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 use @pony_asio_event_set_writeable[None](event: AsioEventID, writeable: Bool)
 
-actor ConnectorSource2[In: Any val] is Source
+actor ConnectorSource[In: Any val] is Source
   """
-  # ConnectorSource2
+  # ConnectorSource
 
   ## Future work
   * Switch to requesting credits via promise
@@ -83,8 +83,8 @@ actor ConnectorSource2[In: Any val] is Source
   let _pending_barriers: Array[BarrierToken] = _pending_barriers.create()
 
   // Connector
-  let _listen: ConnectorSource2Listener[In]
-  let _notify: ConnectorSource2Notify[In]
+  let _listen: ConnectorSourceListener[In]
+  let _notify: ConnectorSourceNotify[In]
   var _next_size: USize = 0
   var _max_size: USize = 0
   var _connect_count: U32 = 0
@@ -129,10 +129,10 @@ actor ConnectorSource2[In: Any val] is Source
   var _next_checkpoint_id: CheckpointId = 1
 
   // Active Stream Registry
-  let _active_stream_registry: ConnectorSource2Listener[In]
+  let _active_stream_registry: ConnectorSourceListener[In]
 
   new create(source_id: RoutingId, auth: AmbientAuth,
-    listen: ConnectorSource2Listener[In], notify: ConnectorSource2Notify[In] iso,
+    listen: ConnectorSourceListener[In], notify: ConnectorSourceNotify[In] iso,
     event_log: EventLog, router': Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
@@ -470,7 +470,7 @@ actor ConnectorSource2[In: Any val] is Source
   =>
     """
     Build a new boundary for each builder that corresponds to a worker we
-    don't yet have a boundary to. Each ConnectorSource2 has its own
+    don't yet have a boundary to. Each ConnectorSource has its own
     OutgoingBoundary to each worker to allow for higher throughput.
     """
     for (target_worker_name, builder) in boundary_builders.pairs() do
@@ -506,7 +506,7 @@ actor ConnectorSource2[In: Any val] is Source
       _outgoing_boundaries.remove(worker)?
     else
       ifdef debug then
-        @printf[I32]("ConnectorSource2 couldn't find boundary to %s to disconnect\n"
+        @printf[I32]("ConnectorSource couldn't find boundary to %s to disconnect\n"
           .cstring(), worker.cstring())
       end
     end
@@ -539,7 +539,7 @@ actor ConnectorSource2[In: Any val] is Source
       _router_registry.unregister_source(this, _source_id)
       _event_log.unregister_resilient(_source_id, this)
       _unregister_all_outputs()
-      @printf[I32]("Shutting down ConnectorSource2\n".cstring())
+      @printf[I32]("Shutting down ConnectorSource\n".cstring())
       for b in _outgoing_boundaries.values() do
         b.dispose()
       end
@@ -566,7 +566,7 @@ actor ConnectorSource2[In: Any val] is Source
         | let ob: OutgoingBoundary => b_count = b_count + 1
         end
       end
-      @printf[I32]("ConnectorSource2 %s has %s boundaries.\n".cstring(),
+      @printf[I32]("ConnectorSource %s has %s boundaries.\n".cstring(),
         _source_id.string().cstring(), b_count.string().cstring())
     end
 
@@ -586,12 +586,12 @@ actor ConnectorSource2[In: Any val] is Source
   be initiate_barrier(token: BarrierToken) =>
     if not _is_pending and not _disposed then
       ifdef "checkpoint_trace" then
-        @printf[I32]("ConnectorSource2 received initiate_barrier %s\n"
+        @printf[I32]("ConnectorSource received initiate_barrier %s\n"
           .cstring(), token.string().cstring())
       end
       _initiate_barrier(token)
     else
-      @printf[I32]("ConnectorSource2 received initiate_barrier %s NOT IS_PENDING AND NOT DISPOSED\n"
+      @printf[I32]("ConnectorSource received initiate_barrier %s NOT IS_PENDING AND NOT DISPOSED\n"
           .cstring(), token.string().cstring())
     end
 
@@ -617,7 +617,7 @@ actor ConnectorSource2[In: Any val] is Source
 
   be barrier_complete(token: BarrierToken) =>
     ifdef "checkpoint_trace" then
-      @printf[I32]("barrier_complete at ConnectorSource2 %s\n".cstring(),
+      @printf[I32]("barrier_complete at ConnectorSource %s\n".cstring(),
         _source_id.string().cstring())
     end
     match token
@@ -957,13 +957,13 @@ actor ConnectorSource2[In: Any val] is Source
 
   fun ref _mute() =>
     ifdef debug then
-      @printf[I32]("Muting ConnectorSource2\n".cstring())
+      @printf[I32]("Muting ConnectorSource\n".cstring())
     end
     _muted = true
 
   fun ref _unmute() =>
     ifdef debug then
-      @printf[I32]("Unmuting ConnectorSource2\n".cstring())
+      @printf[I32]("Unmuting ConnectorSource\n".cstring())
     end
     _muted = false
     if not _reading then
