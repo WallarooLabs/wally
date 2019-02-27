@@ -30,7 +30,7 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
-class val ConnectorSource2ListenerBuilder[In: Any val]
+class val ConnectorSourceListenerBuilder[In: Any val]
   let _worker_name: WorkerName
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
@@ -88,7 +88,7 @@ class val ConnectorSource2ListenerBuilder[In: Any val]
     _refill_credits = refill_credits
 
   fun apply(env: Env): SourceListener =>
-    ConnectorSource2Listener[In](env, _worker_name, _pipeline_name,
+    ConnectorSourceListener[In](env, _worker_name, _pipeline_name,
       _runner_builder, _partitioner_builder,
       _router, _metrics_conn, _metrics_reporter.clone(), _router_registry,
       _outgoing_boundary_builders, _event_log, _auth, _layout_initializer,
@@ -117,11 +117,11 @@ class val ConnectorSourceListenerBuilderBuilder[In: Any val] is SourceListenerBu
     recovering: Bool,
     worker_source_config: WorkerSourceConfig,
     target_router: Router = EmptyRouter):
-    ConnectorSource2ListenerBuilder[In]
+    ConnectorSourceListenerBuilder[In]
   =>
     match worker_source_config
     | let config: WorkerConnectorSourceConfig =>
-      ConnectorSource2ListenerBuilder[In](worker_name, pipeline_name,
+      ConnectorSourceListenerBuilder[In](worker_name, pipeline_name,
         runner_builder, partitioner_builder, router, metrics_conn,
         consume metrics_reporter, router_registry, outgoing_boundary_builders,
         event_log, auth, layout_initializer, recovering, target_router,
@@ -130,7 +130,7 @@ class val ConnectorSourceListenerBuilderBuilder[In: Any val] is SourceListenerBu
         config.refill_credits)
     else
       Unreachable()
-      ConnectorSource2ListenerBuilder[In](worker_name, pipeline_name,
+      ConnectorSourceListenerBuilder[In](worker_name, pipeline_name,
         runner_builder, partitioner_builder, router, metrics_conn,
         consume metrics_reporter, router_registry, outgoing_boundary_builders,
         event_log, auth, layout_initializer, recovering, target_router,
