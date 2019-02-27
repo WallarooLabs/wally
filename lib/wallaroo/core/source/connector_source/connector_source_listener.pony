@@ -49,7 +49,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   """
   # ConnectorSourceListener
   """
-  var _hack_counter: U128 = 65
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _env: Env
   let _worker_name: WorkerName
@@ -145,8 +144,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       + host + ":" + service + "\n").cstring())
 
     for i in Range(0, _limit) do
-      let source_id = _hack_counter
-      _hack_counter = _hack_counter + 1
+      let source_id = _routing_id_gen()
       let notify = ConnectorSourceNotify[In](source_id, _pipeline_name,
         _env, _auth, _handler, _runner_builder, _partitioner_builder, _router,
         _metrics_reporter.clone(), _event_log, _target_router, _cookie,
