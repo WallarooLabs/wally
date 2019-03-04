@@ -74,8 +74,13 @@ trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
   // initialization order of events.
   be first_checkpoint_complete()
 
+// !TODO! We need to rename SourceListener to something more generic, possibly
+// SourceManager, since its role is to manage local sources, but not
+// necessarily listen (e.g. if it's pull-based). When this is renamed, we
+// also need to rename `start_listening`
 trait tag SourceListener is (DisposableActor & BoundaryUpdatable)
   be start_listening()
+  be start_sources()
   be recovery_protocol_complete()
   be update_router(router: StatePartitionRouter)
   be add_boundary_builders(

@@ -138,7 +138,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     _cookie = cookie
     _max_credits = max_credits
     _refill_credits = refill_credits
-
     _limit = parallelism
     _init_size = init_size
     _max_size = max_size
@@ -195,18 +194,23 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
         _pipeline_name.cstring(), _host.cstring(), _service.cstring())
     end
 
-  be recovery_protocol_complete() =>
-    """
-    Called when Recovery is finished. If we're not recovering, that's right
-    away. At that point, we can tell sources that from our perspective it's
-    safe to unmute.
-    """
+  be start_sources() =>
+    _start_sources()
+
+  fun ref _start_sources() =>
     for s in _available_sources.values() do
       s.unmute(this)
     end
     for s in _connected_sources.values() do
       s.unmute(this)
     end
+
+  be recovery_protocol_complete() =>
+    """
+    Called when Recovery is finished. At that point, we can tell sources that
+    from our perspective it's safe to unmute and start listening.
+    """
+    _start_sources()
 
   be update_router(router: Router) =>
     _router = router
