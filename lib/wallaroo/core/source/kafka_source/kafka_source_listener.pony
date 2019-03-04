@@ -218,6 +218,11 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
       None
     end
 
+  be start_sources() =>
+    // !TODO!: We need the listener to wait until this point to actually
+    // start reading in data
+    None
+
   be recovery_protocol_complete() =>
     None
 
