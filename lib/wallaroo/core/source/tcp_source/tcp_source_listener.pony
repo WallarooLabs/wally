@@ -28,7 +28,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+use "buffered"
 use "collections"
+use "crypto"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/partitioning"
@@ -134,7 +136,12 @@ actor TCPSourceListener[In: Any val] is SourceListener
           + host + ":" + service + "\n").cstring())
 
     for i in Range(0, _limit) do
-      let source_id = _routing_id_gen()
+      let name = _worker_name + ":" + _pipeline_name + " source " + i.string()
+      let temp_id = MD5(name)
+      let rb = Reader
+      rb.append(temp_id)
+      let source_id = try rb.u128_le()? else Fail(); 0 end
+
       let notify = TCPSourceNotify[In](source_id, _pipeline_name, _env,
         _auth, _handler, _runner_builder, _partitioner_builder, _router,
         _metrics_reporter.clone(), _event_log, _target_router)
@@ -169,18 +176,24 @@ actor TCPSourceListener[In: Any val] is SourceListener
       end
     end
 
-  be recovery_protocol_complete() =>
-    """
-    Called when Recovery is finished. If we're not recovering, that's right
-    away. At that point, we can tell sources that from our perspective it's
-    safe to unmute.
-    """
+  be start_sources() =>
+    _start_sources()
+
+  fun ref _start_sources() =>
     for s in _available_sources.values() do
       s.unmute(this)
     end
     for s in _connected_sources.values() do
       s.unmute(this)
     end
+
+  be recovery_protocol_complete() =>
+    """
+    Called when Recovery is finished. At that point, we can tell sources that
+    from our perspective it's safe to unmute and begin listening for new
+    connections.
+    """
+    _start_sources()
 
   be update_router(router: Router) =>
     _router = router

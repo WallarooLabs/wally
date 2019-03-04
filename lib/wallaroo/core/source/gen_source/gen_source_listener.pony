@@ -147,6 +147,11 @@ actor GenSourceListener[In: Any val] is SourceListener
   be start_listening() =>
     None
 
+  be start_sources() =>
+    for s in _sources.values() do
+      s.unmute(this)
+    end
+
   be recovery_protocol_complete() =>
     for s in _sources.values() do
       s.unmute(this)

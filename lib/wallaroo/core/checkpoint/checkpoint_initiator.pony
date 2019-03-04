@@ -46,6 +46,8 @@ actor CheckpointInitiator is Initializable
   let _event_log: EventLog
   let _barrier_initiator: BarrierInitiator
 
+  var _recovery: (Recovery | None) = None
+
   // Used as a way to identify outdated timer-based initiate_checkpoint calls
   var _checkpoint_group: USize = 0
 
@@ -122,6 +124,9 @@ actor CheckpointInitiator is Initializable
         end
       end
     end
+
+  be set_recovery(r: Recovery) =>
+    _recovery = r
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
     initializer.report_created(this)
