@@ -77,9 +77,7 @@ actor Recovery
     _connections = connections
     _router_registry = router_registry
     _data_receivers = data_receivers
-    if not is_recovering then
-      _router_registry.recovery_protocol_complete()
-    end
+    _checkpoint_initiator.set_recovery(this)
 
   be update_initializer(initializer: LocalTopologyInitializer) =>
     _initializer = initializer

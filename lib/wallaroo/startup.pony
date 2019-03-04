@@ -212,6 +212,19 @@ actor Startup
 
       let m_addr = _startup_options.m_arg as Array[String]
 
+      (let c_host, let c_service, let d_host, let d_service) =
+        if _startup_options.is_initializer then
+          (_startup_options.c_host,
+            _startup_options.c_service,
+            _startup_options.d_host,
+            _startup_options.d_service)
+        else
+          (_startup_options.my_c_host,
+            _startup_options.my_c_service,
+            _startup_options.my_d_host,
+            _startup_options.my_d_service)
+        end
+
       if _startup_options.worker_name == "" then
         @printf[I32](("You must specify a worker name via " +
           "--name/-n.\n").cstring())
@@ -339,9 +352,8 @@ actor Startup
       _router_registry = router_registry
 
       let recovery_reconnecter = RecoveryReconnecter(auth,
-        _startup_options.worker_name, _startup_options.my_d_service,
-        data_receivers, router_registry,
-        connections, _is_recovering)
+        _startup_options.worker_name, d_service, data_receivers,
+        router_registry, connections, _is_recovering)
 
       let recovery = Recovery(auth, _startup_options.worker_name,
         event_log, recovery_reconnecter, checkpoint_initiator, connections,
@@ -388,19 +400,6 @@ actor Startup
         end
       end
 
-      (let c_host, let c_service, let d_host, let d_service) =
-        if _startup_options.is_initializer then
-          (_startup_options.c_host,
-            _startup_options.c_service,
-            _startup_options.d_host,
-            _startup_options.d_service)
-        else
-          (_startup_options.my_c_host,
-            _startup_options.my_c_service,
-            _startup_options.my_d_host,
-            _startup_options.my_d_service)
-        end
-
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections, _startup_options.is_initializer,
@@ -430,15 +429,9 @@ actor Startup
         end
       end
 
-      if _startup_options.is_initializer then
-        connections.make_and_register_recoverable_listener(
-          auth, consume control_notifier, control_channel_filepath,
-          _startup_options.c_host, _startup_options.c_service)
-      else
-        connections.make_and_register_recoverable_listener(
-          auth, consume control_notifier, control_channel_filepath,
-          _startup_options.my_c_host, _startup_options.my_c_service)
-      end
+      connections.make_and_register_recoverable_listener(
+        auth, consume control_notifier, control_channel_filepath,
+        c_host, c_service)
 
       if _is_recovering then
         let recovered_workers = _recover_worker_names(
@@ -481,17 +474,17 @@ actor Startup
       // TODO: Are we creating connections to all addresses or just
       // initializer?
       (let c_host, let c_service) =
-        if m.sender_name == "initializer" then
-          (info_sending_host, m.control_addrs("initializer")?._2)
+        if m.sender_name == initializer_name then
+          (info_sending_host, m.control_addrs(initializer_name)?._2)
         else
-          m.control_addrs("initializer")?
+          m.control_addrs(initializer_name)?
         end
 
       (let d_host, let d_service) =
-        if m.sender_name == "initializer" then
-          (info_sending_host, m.data_addrs("initializer")?._2)
+        if m.sender_name == initializer_name then
+          (info_sending_host, m.data_addrs(initializer_name)?._2)
         else
-          m.data_addrs("initializer")?
+          m.data_addrs(initializer_name)?
         end
 
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
