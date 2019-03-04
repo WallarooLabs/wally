@@ -735,81 +735,44 @@ def test_ack():
 
 
 class Restart(object):
+    """
+    Restart(address: String)
+    """
+    def __init__(self, address=None):
+        self.address = address
+
     def __str__(self):
-        return "Restart()"
+        return "Restart({!r})".format(self.address)
 
     def __eq__(self, other):
-        return isinstance(other, Restart)
+        return (other.address == self.address)
 
     def encode(self):
-        return b''
+        b_addr = self.address.encode()
+        return struct.pack('>I{}s'.format(len(b_addr)),
+                           len(b_addr),
+                           b_addr)
 
     @staticmethod
     def decode(bs):
-        return Restart()
+        if len(bs) > 0:
+            reader = StringIO(bs)
+            a_length = struct.unpack('>I', reader.read(4))[0]
+            addr = reader.read(a_length).decode()
+        else:
+            addr = None
+        return Restart(addr)
 
 
 def test_restart():
-    r = Restart()
+    addr = '127.0.0.1:5555'
+    r = Restart(addr)
     encoded = r.encode()
-    assert(len(encoded) == 0)
+    assert(len(encoded) == len(addr.encode()) + 4)
     decoded = Restart.decode(encoded)
     assert(isinstance(decoded, Restart))
     assert(decoded == r)
     assert(str(decoded) == str(r))
-
-
-class UpdateSources(object):
-    """
-    UpdateSources(source_list: Array[(source_name: String, address: String)])
-    """
-    def __init__(self, source_list):
-        self.source_list = source_list
-
-    def __str__(self):
-        return "UpdateSources(source_list={!r})".format(self.source_list)
-
-    def __eq__(self, other):
-        return (self.source_list == other.source_list)
-
-    def encode(self):
-        packed_sources = []
-        for source, addr in self.source_list:
-            s = source.encode()
-            a = addr.encode()
-            packed_sources.append(
-                struct.pack('>H{}sH{}s'.format(len(s), len(a)),
-                            len(s), s,
-                            len(a), a))
-        return (struct.pack('>I', len(packed_sources)) +
-                b''.join(packed_sources))
-
-    @staticmethod
-    def decode(bs):
-        reader = StringIO(bs)
-        source_list_length = struct.unpack('>I', reader.read(4))[0]
-        source_list = []
-        for _ in range(source_list_length):
-            source_length = struct.unpack('>H', reader.read(2))[0]
-            source = reader.read(source_length).decode()
-            addr_length = struct.unpack('>H', reader.read(2))[0]
-            addr = reader.read(addr_length).decode()
-            source_list.append((source, addr))
-        return UpdateSources(source_list)
-
-
-def test_update_sources():
-    source_list = [("s1", "1.1.1.1:1234"), ("s2", "127.0.0.1:5000")]
-    US = UpdateSources(source_list)
-    assert(US.source_list == source_list)
-    encoded = US.encode()
-    assert(len(encoded) == 4 + sum((4 + sum(map(len, map(str.encode, v)))
-                                    for v in source_list)))
-    decoded = US.decode(encoded)
-    assert(isinstance(decoded, UpdateSources))
-    assert(decoded.source_list == source_list)
-    assert(decoded == US)
-    assert(str(decoded) == str(US))
 
 
 class Frame(object):
@@ -820,8 +783,7 @@ class Frame(object):
                           (4, NotifyAck),
                           (5, Message),
                           (6, Ack),
-                          (7, Restart),
-                          (8, UpdateSources)]
+                          (7, Restart)]
     _FRAME_TYPE_MAP = dict([(v, t) for v, t in _FRAME_TYPE_TUPLES] +
                            [(t, v) for v, t in _FRAME_TYPE_TUPLES])
 
@@ -856,8 +818,7 @@ def test_frame():
     msgs.append(NotifyAck(False, 123, 1001))
     # Message framing is tested in the test_message test
     msgs.append(Ack(1000, [(123, 999), (300, 200)]))
-    msgs.append(Restart())
-    msgs.append(UpdateSources([("s1", "1.1.1.1:1234"), ("s2", "127.0.0.1:5000")]))
+    msgs.append(Restart('127.0.0.1:5555'))
 
     for msg in msgs:
         _test_frame_encode_decode(msg)

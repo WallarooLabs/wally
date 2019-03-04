@@ -150,9 +150,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                  host, port):
         # connection details are given from the base
         self._host = host
-        self._port = int(port)  # but convert port to int
-        self._source_name = None
-        self._source_map = {}
+        self._port = int(port)  # convert port to int
         self.credits = 0
         self.version = version
         self.cookie = cookie
@@ -162,8 +160,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         # Stream details
         # live streams for this connection
         self._streams = {}  # {stream_id: {'stream': Stream, 'por': por}}
-        self._ok = {} # same structure, but for _all_ streams the connector
-                        # may have told us about
         self._pending_eos = {}  # {stream_id: point_of_ref}
 
         self.handshake_complete = False
@@ -248,7 +244,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
 
     def _handle_frame(self, frame):
         msg = cwm.Frame.decode(frame)
-        # Ok, Error, NotifyAck, Ack, Restart, UpdateSources
+        # Ok, Error, NotifyAck, Ack, Restart
         if isinstance(msg, cwm.Ok):
             self._handle_ok(msg)
         elif isinstance(msg, cwm.Error):
@@ -264,9 +260,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         elif isinstance(msg, cwm.Ack):
             self._handle_ack(msg)
         elif isinstance(msg, cwm.Restart):
-            self.handle_restart()
-        elif isinstance(msg, cwm.UpdateSources):
-            self._handle_update_sources(msg)
+            self.handle_restart(msg)
         # messages that should only go connector->wallaroo
         # Notify, Hello, Message
         elif isinstance(msg, (cwm.Hello, cwm.Message, cwm.Notify)):
@@ -288,48 +282,11 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             raise ProtocolError("Got an Ok message outside of a"
                                 " handshake")
         else:
-            # update the source map
-            local_addr = "{}:{}".format(self._host, self._port)
-            self._source_map = dict(msg.source_list)
-            logging.info("Updated source_map to {}".format(self._source_map))
-            for name, addr in msg.source_list:
-                if addr == local_addr:
-                    self._source_name = name
-                    break
-            else:
-                raise ProtocolError("Current connection could not found in "
-                    "the source connection map returned by Wallaroo.")
-
             # deposit the credits
             self.credits += msg.initial_credits
-            for stream_id, stream_name, point_of_ref in msg.credit_list:
-                # don't bother.
-                break
-                # Try to get old stream data
-                old = self._streams.get(stream_id, None)
-
-                # New stream: call stream_added (this is the normal behaviour)
-                if old is None:
-                    new = Stream(stream_id, stream_name, point_of_ref, False)
-                    self._streams[stream_id] = new
-
-                # if notify was called before connect(), we may have known
-                # streams in _streams
-                else:
-                    # stream collision... throw error and close connection
-                    if old.name != stream_name:
-                        raise ConnectorError("Got wrong stream name for "
-                                             "stream. Expected {} but got {}."
-                                             .format(old.name, stream_name))
-                    # save it as closed
-                    new = Stream(stream_id, stream_name, point_of_ref, False)
-                    self._streams[stream_id] = new
-                    # stream_acked, to ensure source is reset if necessary
-                    self.stream_acked(new)
-
             # set handshake_complete
             self.handshake_complete = True
-            # set terminator to 4
+            # set terminator to 4 to expect the next message's header
             self.set_terminator(4)
 
     def _handle_notify_ack(self, msg):
@@ -361,31 +318,12 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                     new = old
                 self.stream_acked(new)
 
-    def _handle_update_sources(self, msg):
-        new_source_map = dict(msg.source_list)
-        logging.info("Updating sources from {} to {}".format(
-            self._source_map, new_source_map))
-        self._source_map = new_source_map
-
     ##########################
     # Outoing communications #
     ##########################
 
     def connect(self):
         self.handshake_complete = False
-        # Maybe do the source shuffle
-        if self._source_name is not None:
-            # _source_name is None when connecting right after startup
-            if not self._source_name in self._source_map:
-                # The previously connected source was shrunk
-                # choose a new source, host, and port from _source_map
-                self._source_name = min(self._source_map.keys())
-                self._host, self._port = (
-                    self._source_map[self._source_name].split(':'))
-                self._port = int(self._port)
-                logging.info("Updating source to: ({} <{}:{}>)".format(
-                    self._source_name, self._host, self._port))
-
         conn = socket.socket()
         try:
             conn.connect( (self._host, self._port) )
@@ -618,7 +556,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         logging.warning(ProtocolError(
             "Received an unrecognized message: {}".format(msg)))
 
-    def handle_restart(self):
+    def handle_restart(self, msg):
         logging.warning("Received RESTART message. Closing streams and "
             "reinitiating handshake.")
         # reset credits
@@ -631,6 +569,14 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 new = Stream(stream.id, stream.name, stream.point_of_ref, False)
                 self._streams[sid] = new
                 self.stream_closed(new)
+        # optionally update target host and port
+        if msg.address:
+            logging.info("Updating target address from {}:{} to {}"
+                .format(self._host, self._port, msg.address))
+            host, port = msg.address.split(':')
+            port = int(port)
+            self._host = host
+            self._port = port
         # try to connect again
         self.connect()
         self.handle_restarted(self._streams)
