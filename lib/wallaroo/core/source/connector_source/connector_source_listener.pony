@@ -115,12 +115,11 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     _host = host
     _service = service
 
-    _event = @pony_os_listen_tcp[AsioEventID](this,
-      host.cstring(), service.cstring())
+    _event = AsioEvent.none()
+    _fd = @pony_asio_event_fd(_event)
     _limit = parallelism
     _init_size = init_size
     _max_size = max_size
-    _fd = @pony_asio_event_fd(_event)
 
     match router
     | let pr: StatePartitionRouter =>
@@ -130,10 +129,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       _router_registry.register_stateless_partition_router_subscriber(
         spr.partition_routing_id(), this)
     end
-
-    @printf[I32]((pipeline_name + " source attempting to listen on "
-      + host + ":" + service + "\n").cstring())
-    _notify_listening()
 
     for i in Range(0, _limit) do
       let source_id = _routing_id_gen()
@@ -159,18 +154,31 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       _available_sources.push(source)
     end
 
-  be recovery_protocol_complete() =>
-    """
-    Called when Recovery is finished. If we're not recovering, that's right
-    away. At that point, we can tell sources that from our perspective it's
-    safe to unmute.
-    """
+  be start_sources() =>
+    _start_sources()
+
+  fun ref _start_sources() =>
+    _event = @pony_os_listen_tcp[AsioEventID](this,
+      _host.cstring(), _service.cstring())
+    _fd = @pony_asio_event_fd(_event)
+
+    @printf[I32]((_pipeline_name + " source attempting to listen on "
+      + _host + ":" + _service + "\n").cstring())
+    _notify_listening()
+
     for s in _available_sources.values() do
       s.unmute(this)
     end
     for s in _connected_sources.values() do
       s.unmute(this)
     end
+
+  be recovery_protocol_complete() =>
+    """
+    Called when Recovery is finished. At that point, we can tell sources that
+    from our perspective it's safe to unmute and start listening.
+    """
+    _start_sources()
 
   be update_router(router: Router) =>
     _router = router
