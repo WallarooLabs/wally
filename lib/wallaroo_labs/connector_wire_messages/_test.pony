@@ -35,7 +35,6 @@ actor Main is TestList
     test(_TestMessageMsg)
     test(_TestAckMsg)
     test(_TestRestartMsg)
-    test(_TestUpdateSourcesMsg)
 
 class iso _TestBitFlags is UnitTest
   fun name(): String => "connector_wire_messages/_TestBitFlags"
@@ -348,28 +347,10 @@ class iso _TestRestartMsg is UnitTest
   fun name(): String => "connector_wire_messages/_TestRestartMsg"
 
   fun apply(h: TestHelper) ? =>
-    let a = RestartMsg
+    let addr: String = "127.0.0.1:5555"
+    let a = RestartMsg(addr)
     let encoded = Frame.encode(a)
     let m = Frame.decode(encoded)?
     let b = m as RestartMsg
-
-class iso _TestUpdateSourcesMsg is UnitTest
-  fun name(): String => "connector_wire_messages/_TestUpdateSourcesMsg"
-
-  fun apply(h: TestHelper) ? =>
-    let sl: SourceList val = [
-      ("s1", "1.1.1.1:1234")
-      ("source2", "127.0.0.1:5000")
-      ("s3", "8.8.8.8:80")]
-    let a = UpdateSourcesMsg(sl)
-    let encoded = Frame.encode(a)
-    let m = Frame.decode(encoded)?
-    let b = m as UpdateSourcesMsg
-    for (i, p) in a.source_list.pairs() do
-      h.assert_eq[SourceName](p._1, sl(i)?._1)
-      h.assert_eq[SourceAddress](p._2, sl(i)?._2)
-    end
-    for (i, p) in b.source_list.pairs() do
-      h.assert_eq[SourceName](p._1, sl(i)?._1)
-      h.assert_eq[SourceAddress](p._2, sl(i)?._2)
-    end
+    h.assert_eq[String](a.addr, addr)
+    h.assert_eq[String](b.addr, addr)

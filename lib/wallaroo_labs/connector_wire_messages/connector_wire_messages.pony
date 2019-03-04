@@ -108,7 +108,6 @@ primitive FrameTag
     | 5 => MessageMsg.decode(consume rb)?
     | 6 => AckMsg.decode(consume rb)?
     | 7 => RestartMsg.decode(consume rb)
-    | 8 => UpdateSourcesMsg.decode(consume rb)?
     else
       error
     end
@@ -123,7 +122,6 @@ primitive FrameTag
     | let m: MessageMsg => 5
     | let m: AckMsg => 6
     | let m: RestartMsg => 7
-    | let m: UpdateSourcesMsg => 8
     end
 
 // Framing
@@ -135,9 +133,6 @@ type EventTimeType is I64
 type MessageId is U64
 type MessageBytes is ByteSeq
 type KeyBytes is ByteSeq
-type SourceName is String
-type SourceAddress is String
-type SourceList is Array[(SourceName, SourceAddress)]
 
 
 type Message is ( HelloMsg |
@@ -147,8 +142,7 @@ type Message is ( HelloMsg |
                   NotifyAckMsg |
                   MessageMsg |
                   AckMsg |
-                  RestartMsg |
-                  UpdateSourcesMsg)
+                  RestartMsg)
 
 trait MessageTrait
   fun encode(wb: Writer = Writer): Writer ?
@@ -451,41 +445,16 @@ class AckMsg is MessageTrait
     wb
 
 class RestartMsg is MessageTrait
-  new create() =>
-    """
-    """
+  let address: String
+
+  new create(address': String) =>
+    address = address'
 
   fun encode(wb: Writer = Writer): Writer =>
+    wb.u32_be(address.size().u32())
+    wb.write(address)
     wb
 
-  new  decode(rb: Reader) =>
-    """
-    """
-
-class UpdateSourcesMsg is MessageTrait
-  let source_list: SourceList val
-
-  new create(source_list': SourceList val) =>
-    source_list = source_list'
-
-  new decode(rb: Reader) ? =>
-    let source_list_size = rb.u32_be()?.usize()
-    let sl = recover iso SourceList end
-    for x in col.Range(0, source_list_size) do
-      let sn_length = rb.u16_be()?.usize()
-      let sn = String.from_array(rb.block(sn_length)?)
-      let sa_length = rb.u16_be()?.usize()
-      let sa = String.from_array(rb.block(sa_length)?)
-      sl.push((sn, sa))
-    end
-    source_list = consume sl
-
-  fun encode(wb: Writer = Writer): Writer =>
-    wb.u32_be(source_list.size().u32())
-    for sl in source_list.values() do
-      wb.u16_be(sl._1.size().u16())
-      wb.write(sl._1)
-      wb.u16_be(sl._2.size().u16())
-      wb.write(sl._2)
-    end
-    wb
+  new decode(rb: Reader) =>
+    let a_size: rb.u32_be()?.usize()
+    let address = rb.block(a_size)?

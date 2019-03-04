@@ -55,6 +55,11 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _env: Env
   let _worker_name: WorkerName
+
+  // TODO [source-migration] pass _leader_name as a parameter rather than
+  // relying on a default starting value (e.g. "initializer" doesn't work for grow)
+  var _leader_name: WorkerName = "initializer"
+
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
   let _partitioner_builder: PartitionerBuilder
@@ -158,11 +163,13 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       + host + ":" + service + "\n").cstring())
 
     for i in Range(0, _limit) do
+      // TODO [source-migration]: use deterministic unique source ids
+      // see john's slack message
       let source_id = _routing_id_gen()
       let notify = ConnectorSourceNotify[In](source_id, _pipeline_name,
         _env, _auth, _handler, _runner_builder, _partitioner_builder, _router,
         _metrics_reporter.clone(), _event_log, _target_router, _cookie,
-        _max_credits, _refill_credits)
+        _max_credits, _refill_credits, _host, _service)
       let source = ConnectorSource[In](source_id, _auth, this,
         consume notify, _event_log, _router,
         _outgoing_boundary_builders, _layout_initializer,

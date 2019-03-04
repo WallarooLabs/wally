@@ -1038,7 +1038,8 @@ actor RouterRegistry
     else
       Fail()
     end
-    // inform joining workers the current name of the leader (for each source type_)
+    // TODO [source-migration]
+    // inform joining workers of current source leader (for each source type)
     begin_join_migration(target_workers, next_checkpoint_id)
 
   fun ref begin_join_migration(target_workers: Array[WorkerName] val,
