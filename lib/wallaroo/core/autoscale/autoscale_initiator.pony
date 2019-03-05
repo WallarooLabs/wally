@@ -26,18 +26,18 @@ use "wallaroo_labs/mort"
 actor AutoscaleInitiator
   let _self: AutoscaleInitiator tag = this
   let _worker_name: WorkerName
-  let _barrier_initiator: BarrierInitiator
+  let _barrier_coordinator: BarrierCoordinator
   let _checkpoint_initiator: CheckpointInitiator
   var _current_autoscale_tokens: AutoscaleTokens
   var _autoscale_token_in_progress: Bool = false
 
-  new create(w_name: WorkerName, barrier_initiator: BarrierInitiator,
+  new create(w_name: WorkerName, barrier_coordinator: BarrierCoordinator,
     checkpoint_initiator: CheckpointInitiator)
   =>
     _worker_name = w_name
     _current_autoscale_tokens = AutoscaleTokens(_worker_name, 0,
       recover Array[WorkerName] end, recover Array[WorkerName] end)
-    _barrier_initiator = barrier_initiator
+    _barrier_coordinator = barrier_coordinator
     _checkpoint_initiator = checkpoint_initiator
 
   be initiate_autoscale(autoscale_initiate_promise: AutoscaleResultPromise,
@@ -68,7 +68,7 @@ actor AutoscaleInitiator
       .next[None](recover this~autoscale_barrier_complete() end)
       .next[None]({(_: None) => autoscale_initiate_promise(None)})
 
-    _barrier_initiator.inject_blocking_barrier(
+    _barrier_coordinator.inject_blocking_barrier(
       _current_autoscale_tokens.initial_token, barrier_promise,
       _current_autoscale_tokens.resume_token)
 
@@ -83,7 +83,7 @@ actor AutoscaleInitiator
       .next[None](recover this~autoscale_resume_complete() end)
       .next[None]({(_: None) => autoscale_resume_promise(None)})
 
-    _barrier_initiator.inject_barrier(_current_autoscale_tokens.resume_token,
+    _barrier_coordinator.inject_barrier(_current_autoscale_tokens.resume_token,
       barrier_promise)
 
   be autoscale_barrier_complete(barrier_token: BarrierToken) =>

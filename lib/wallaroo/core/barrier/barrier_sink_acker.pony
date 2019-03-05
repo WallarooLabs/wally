@@ -26,15 +26,15 @@ class BarrierSinkAcker
   let _sink_id: RoutingId
   let _sink: Sink ref
   var _barrier_token: BarrierToken = InitialBarrierToken
-  let _barrier_initiator: BarrierInitiator
+  let _barrier_coordinator: BarrierCoordinator
   let _inputs_blocking: Map[RoutingId, Producer] = _inputs_blocking.create()
 
   new create(sink_id: RoutingId, sink: Sink ref,
-    barrier_initiator: BarrierInitiator)
+    barrier_coordinator: BarrierCoordinator)
   =>
     _sink_id = sink_id
     _sink = sink
-    _barrier_initiator = barrier_initiator
+    _barrier_coordinator = barrier_coordinator
 
   fun ref higher_priority(token: BarrierToken): Bool =>
     token > _barrier_token
@@ -85,7 +85,7 @@ class BarrierSinkAcker
 
   fun ref _check_completion(inputs: Map[RoutingId, Producer] box) =>
     if inputs.size() == _inputs_blocking.size() then
-      _barrier_initiator.ack_barrier(_sink, _barrier_token)
+      _barrier_coordinator.ack_barrier(_sink, _barrier_token)
       let b_token = _barrier_token
       clear()
       _sink.barrier_complete(b_token)
