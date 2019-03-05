@@ -29,13 +29,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 use "collections"
+use "promises"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/checkpoint"
 use "wallaroo/core/data_receiver"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
+use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
+use "wallaroo/core/network"
 use "wallaroo/core/partitioning"
 use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
@@ -65,6 +68,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   let _layout_initializer: LayoutInitializer
   let _recovering: Bool
   let _target_router: Router
+  let _connections: Connections
   let _parallelism: USize
   let _handler: FramedSourceHandler[In] val
   let _host: String
@@ -85,8 +89,11 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   let _available_sources: Array[ConnectorSource[In]] = _available_sources.create()
 
   // Active Stream Registry
-  let _active_streams: Map[U64, (String,Any tag,U64,U64)] =
-    _active_streams.create()
+  let _local_stream_registry: LocalConnectorStreamRegistry[In] =
+    _local_stream_registry.create()
+
+   // Global Stream Registry
+   let _global_stream_registry: GlobalConnectorStreamRegistry
 
   new create(env: Env, worker_name: WorkerName, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
@@ -95,12 +102,15 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, target_router: Router = EmptyRouter, parallelism: USize,
+    recovering: Bool, target_router: Router = EmptyRouter,
+    connections: Connections, workers_list: Array[WorkerName] val,
+    parallelism: USize,
     handler: FramedSourceHandler[In] val,
     host: String, service: String, cookie: String,
     max_credits: U32, refill_credits: U32,
     init_size: USize = 64, max_size: USize = 16384)
   =>
+    @printf[I32]("^^^^Creating ConnectorSourceListener...\n".cstring())
     """
     Listens for both IPv4 and IPv6 connections.
     """
@@ -119,6 +129,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     _layout_initializer = layout_initializer
     _recovering = recovering
     _target_router = target_router
+    _connections = connections
     _parallelism = parallelism
     _handler = handler
     _host = host
@@ -130,6 +141,9 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     _limit = parallelism
     _init_size = init_size
     _max_size = max_size
+
+    _global_stream_registry = GlobalConnectorStreamRegistry(_worker_name,
+      _pipeline_name, _connections, _host, _service, workers_list)
 
     match router
     | let pr: StatePartitionRouter =>
@@ -226,6 +240,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
 
     _outgoing_boundary_builders = consume new_boundary_builders
 
+
   be dispose() =>
     @printf[I32]("Shutting down ConnectorSourceListener\n".cstring())
     _close()
@@ -267,6 +282,104 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     if _count < _limit then
       _accept()
     end
+
+  be add_worker(worker: WorkerName) =>
+    // TODO: Update global registry map
+    // _global_stream_registry.add_worker(worker, _host, _service)
+    None
+
+  be remove_worker(worker: WorkerName) =>
+    // TODO: Update global registry map
+    // _global_stream_registry.remove_worker(worker)
+    None
+
+  be receive_msg(msg: SourceListenerMsg) =>
+    // we only care for messages that belong to this source name
+    if (msg.source_name() == _pipeline_name) then
+      match msg
+      |  let m: ConnectorStreamIdRequestMsg =>
+        _process_stream_id_request(m)
+      | let m: ConnectorStreamIdRequestResponseMsg =>
+        _maybe_process_pending_request(m)
+      | let m: ConnectorStreamIdRelinquishMsg =>
+        _relinquish_stream_id_msg(m)
+      | let m: ConnectorStreamIdRelinquishResponseMsg =>
+        _process_relinquish_stream_id_ack_msg(m)
+      | let m: ConnectorStreamRegRelinquishLeadershipMsg =>
+        _process_relinquish_leadership_msg(m)
+      | let m: ConnectorStreamAddSourceAddrMsg =>
+        _process_add_source_addr_msg(m)
+      end
+    else
+      @printf[I32](("**Dropping message** _pipeline_name: " +
+         _pipeline_name +  " =/= source_name: " + msg.source_name() + " \n")
+        .cstring())
+    end
+
+  be _maybe_process_pending_request(m: ConnectorStreamIdRequestResponseMsg) =>
+    if _global_stream_registry.contains_request(m.request_id) then
+      _global_stream_registry.process_request_response(m.request_id, m.can_use)
+    else
+      // Received request_id for a request not in map
+      None
+    end
+
+  be request_stream_id(stream_id: U64, request_id: ConnectorStreamIdRequest,
+    promise: Promise[Bool])
+  =>
+    _global_stream_registry.request_stream_id(stream_id, request_id, promise)
+
+  be _process_add_source_addr_msg(msg: ConnectorStreamAddSourceAddrMsg) =>
+    _global_stream_registry.add_source_address(msg.worker_name, msg.host,
+      msg.service)
+
+  be _process_relinquish_stream_id_ack_msg(
+    msg: ConnectorStreamIdRelinquishResponseMsg)
+  =>
+    if _global_stream_registry.contains_relinquish_request(msg.request_id) then
+      _global_stream_registry.process_relinquish_response(msg.request_id,
+        msg.relinquished)
+    else
+      // Received request_id for a request not in map
+      None
+    end
+
+  be _process_stream_id_request(msg: ConnectorStreamIdRequestMsg) =>
+    _global_stream_registry.process_stream_id_request(msg.worker_name,
+      msg.stream_id, msg.request_id)
+
+  // be relinquish_stream_id(stream_id: U64, last_acked_msg: U64) =>
+  //   _global_stream_registry.
+
+  be _relinquish_stream_id_msg(msg: ConnectorStreamIdRelinquishMsg) =>
+    _global_stream_registry.process_relinquish_stream_id_request(
+      msg.worker_name, msg.stream_id, msg.last_acked_msg, msg.request_id)
+
+  be _process_relinquish_leadership_msg(
+    msg: ConnectorStreamRegRelinquishLeadershipMsg)
+  =>
+    _global_stream_registry.process_relinquish_leadership_request(
+      msg.worker_name, msg.active_stream_map, msg.inactive_stream_map,
+      msg.source_addr_map)
+
+  be get_all_streams(session_tag: USize,
+    connector_source: ConnectorSource[In] tag)
+  =>
+    _local_stream_registry.get_all_streams(session_tag, connector_source)
+
+  be stream_notify(session_tag: USize,
+    stream_id: U64, stream_name: String, point_of_reference: U64,
+    connector_source: ConnectorSource[In] tag)
+  =>
+    _local_stream_registry.stream_notify(session_tag, stream_id,
+      stream_name, point_of_reference, connector_source)
+
+  be stream_update(stream_id: U64, checkpoint_id: CheckpointId,
+    point_of_reference: U64, last_message_id: U64,
+    connector_source: (ConnectorSource[In] tag|None))
+  =>
+    _local_stream_registry.stream_update(stream_id, checkpoint_id,
+      point_of_reference, last_message_id, connector_source)
 
   fun ref _accept(ns: U32 = 0) =>
     """
@@ -341,114 +454,4 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
 
       @pony_os_socket_close[None](_fd)
       _fd = -1
-    end
-
-  // Active Stream Registry
-
-  be get_all_streams(session_tag: USize,
-    connector_source: ConnectorSource[In] tag)
-  =>
-    let data: Array[(U64,String,U64)] trn = recover data.create() end
-
-    for (stream_id, (stream_name, _, p_o_r, last_message_id)) in _active_streams.pairs()
-    do
-      data.push((stream_id, stream_name, p_o_r))
-    end
-    connector_source.get_all_streams_result(session_tag, consume data)
-
-  be stream_notify(session_tag: USize,
-    stream_id: U64, stream_name: String, point_of_reference: U64,
-    connector_source: ConnectorSource[In] tag)
-  =>
-    ifdef "trace" then
-      @printf[I32]("TRACE: %s.%s(%lu, %lu, ...)\n".cstring(),
-        __loc.type_name().cstring(), __loc.method_name().cstring(),
-        stream_id, point_of_reference)
-    end
-    if _active_streams.contains(stream_id) then
-      try
-        (let stream_name': String, let tag_or_none: Any tag,
-          let p_o_r, let last_message_id) = _active_streams(stream_id)?
-        ifdef "trace" then
-          @printf[I32]("TRACE: %s.%s existing stream_id %lu @ p-o-r %lu l-msgid %lu in-use %s\n".cstring(),
-            __loc.type_name().cstring(), __loc.method_name().cstring(),
-            stream_id, p_o_r, last_message_id, (not (tag_or_none is None)).string().cstring())
-        end
-        if stream_name' != stream_name then
-          Fail()
-        end
-
-        if tag_or_none is None then
-          if point_of_reference != p_o_r then
-            // TODO any other action needed?
-            ifdef "trace" then
-              @printf[I32](("stream_notify: stream-id %d stream %s " +
-                "point_of_reference %lu != recorded p_o_r %lu").cstring(),
-              stream_id, stream_name.cstring(), point_of_reference, p_o_r)
-            end
-          end
-          _active_streams(stream_id) =
-            (stream_name, connector_source, p_o_r, last_message_id)
-          connector_source.stream_notify_result(session_tag, true,
-            stream_id, p_o_r, last_message_id)
-          ifdef "trace" then
-            @printf[I32]("TRACE: %s.%s existing stream_id %lu is ok\n".cstring(),
-              __loc.type_name().cstring(), __loc.method_name().cstring(),
-              stream_id)
-          end
-        else
-          connector_source.stream_notify_result(session_tag, false,
-            0, 0, 0) // TODO args
-          ifdef "trace" then
-            @printf[I32]("TRACE: %s.%s existing stream_id %lu is rejected\n".cstring(),
-              __loc.type_name().cstring(), __loc.method_name().cstring(),
-              stream_id)
-          end
-        end
-      else
-        Fail()
-      end
-    else
-      ifdef "trace" then
-        @printf[I32]("TRACE: %s.%s new stream_id %lu @ p-o-r %lu\n".cstring(),
-          __loc.type_name().cstring(), __loc.method_name().cstring(),
-          stream_id, point_of_reference)
-      end
-      _active_streams(stream_id) =
-        (stream_name, connector_source, point_of_reference, point_of_reference)
-      connector_source.stream_notify_result(session_tag, true,
-        stream_id, point_of_reference, point_of_reference)
-    end
-
-  be stream_update(stream_id: U64, checkpoint_id: CheckpointId,
-    point_of_reference: U64, last_message_id: U64,
-    connector_source: (ConnectorSource[In] tag|None))
-  =>
-    let update = if connector_source is None then
-        true
-      else
-        try
-          if _active_streams(stream_id)?._2 is None then
-            false
-          else
-            true
-          end
-        else
-          false
-        end
-      end
-    ifdef "trace" then
-      @printf[I32]("TRACE: %s.%s(stmid %lu, chkp %lu, p-o-r %lu, l-msgid %lu, conn %s) update %s\n".cstring(),
-        __loc.type_name().cstring(), __loc.method_name().cstring(),
-        stream_id, checkpoint_id, point_of_reference, last_message_id,
-        (if connector_source is None then
-          "None"
-        else
-          "not None"
-        end).cstring(), update.string().cstring())
-    end
-    if update then
-      let stream_name = try _active_streams(stream_id)?._1 else Fail(); "" end
-      _active_streams(stream_id) =
-        (stream_name, connector_source, point_of_reference, last_message_id)
     end

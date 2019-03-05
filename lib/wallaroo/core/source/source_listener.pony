@@ -25,6 +25,7 @@ use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
 use "wallaroo/core/initialization"
 use "wallaroo/core/metrics"
+use "wallaroo/core/network"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source/tcp_source"
@@ -49,5 +50,7 @@ interface val SourceListenerBuilderBuilder
     layout_initializer: LayoutInitializer,
     recovering: Bool,
     worker_source_config: WorkerSourceConfig,
+    connections: Connections,
+    workers_list: Array[WorkerName] val,
     target_router: Router = EmptyRouter):
     SourceListenerBuilder

@@ -52,7 +52,7 @@ COOKIE = 'cookie'
 
 
 def json_keyval_extract(msg):
-    d = json.loads(msg[4:])
+    d = json.loads(msg[4:].decode())
     key = str(d.get('key'))
     val = str(d.get('value'))
     return (key, val)
