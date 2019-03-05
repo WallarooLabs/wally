@@ -173,10 +173,14 @@ actor BarrierInitiator is Initializable
     if _active_barriers.barrier_in_progress() then
       _pending.push(_PendingSourceInit(s))
     else
-      let promise = Promise[Source]
-      promise.next[None](recover this~source_registration_complete() end)
-      s.register_downstreams(promise)
+      _initialize_source(s)
     end
+
+  fun ref _initialize_source(s: Source) =>
+    _phase = _SourcePendingBarrierInitiatorPhase(this)
+    let promise = Promise[Source]
+    promise.next[None](recover this~source_registration_complete() end)
+    s.register_downstreams(promise)
 
   be source_registration_complete(s: Source) =>
     _phase.source_registration_complete(s)
@@ -601,10 +605,7 @@ actor BarrierInitiator is Initializable
           let next = _pending.shift()?
           match next
           | let p: _PendingSourceInit =>
-            _phase = _SourcePendingBarrierInitiatorPhase(this)
-            let promise = Promise[Source]
-            promise.next[None](recover this~source_registration_complete() end)
-            p.source.register_downstreams(promise)
+            _initialize_source(p.source)
             return
           | let p: _PendingBarrier =>
             _inject_barrier(p.token, p.promise)
