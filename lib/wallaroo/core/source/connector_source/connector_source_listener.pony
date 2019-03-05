@@ -283,6 +283,9 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       _accept()
     end
 
+  /////////////////////////////
+  // Multiple Active Sources
+  /////////////////////////////
   be add_worker(worker: WorkerName) =>
     // TODO: Update global registry map
     // _global_stream_registry.add_worker(worker, _host, _service)
@@ -316,6 +319,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
         .cstring())
     end
 
+  // TODO [source-migration] consider changing to a fun ref
   be _maybe_process_pending_request(m: ConnectorStreamIdRequestResponseMsg) =>
     if _global_stream_registry.contains_request(m.request_id) then
       _global_stream_registry.process_request_response(m.request_id, m.can_use)
@@ -329,10 +333,12 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   =>
     _global_stream_registry.request_stream_id(stream_id, request_id, promise)
 
+  // TODO [source-migration] consider changing to a fun ref
   be _process_add_source_addr_msg(msg: ConnectorStreamAddSourceAddrMsg) =>
     _global_stream_registry.add_source_address(msg.worker_name, msg.host,
       msg.service)
 
+  // TODO [source-migration] consider changing to a fun ref
   be _process_relinquish_stream_id_ack_msg(
     msg: ConnectorStreamIdRelinquishResponseMsg)
   =>
@@ -344,6 +350,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       None
     end
 
+  // TODO [source-migration] consider changing to a fun ref
   be _process_stream_id_request(msg: ConnectorStreamIdRequestMsg) =>
     _global_stream_registry.process_stream_id_request(msg.worker_name,
       msg.stream_id, msg.request_id)
@@ -351,10 +358,12 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   // be relinquish_stream_id(stream_id: U64, last_acked_msg: U64) =>
   //   _global_stream_registry.
 
+  // TODO [source-migration] consider changing to a fun ref
   be _relinquish_stream_id_msg(msg: ConnectorStreamIdRelinquishMsg) =>
     _global_stream_registry.process_relinquish_stream_id_request(
       msg.worker_name, msg.stream_id, msg.last_acked_msg, msg.request_id)
 
+  // TODO [source-migration] consider changing to a fun ref
   be _process_relinquish_leadership_msg(
     msg: ConnectorStreamRegRelinquishLeadershipMsg)
   =>
@@ -381,6 +390,10 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     _local_stream_registry.stream_update(stream_id, checkpoint_id,
       point_of_reference, last_message_id, connector_source)
 
+
+  ///////////////////////
+  // Listener Connector
+  ///////////////////////
   fun ref _accept(ns: U32 = 0) =>
     """
     Accept connections as long as we have spawned fewer than our limit.
