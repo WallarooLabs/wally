@@ -38,6 +38,7 @@ use "wallaroo/core/router_registry"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
+use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
@@ -257,6 +258,15 @@ actor TCPSourceListener[In: Any val] is SourceListener
     if _count < _limit then
       _accept()
     end
+
+  be add_worker(worker: WorkerName) =>
+    None
+
+  be remove_worker(worker: WorkerName) =>
+    None
+
+  be receive_msg(msg: SourceListenerMsg) =>
+    None
 
   fun ref _accept(ns: U32 = 0) =>
     """

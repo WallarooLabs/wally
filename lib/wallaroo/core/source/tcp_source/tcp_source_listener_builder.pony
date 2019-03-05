@@ -24,6 +24,7 @@ use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
 use "wallaroo/core/initialization"
 use "wallaroo/core/metrics"
+use "wallaroo/core/network"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
@@ -106,6 +107,8 @@ class val TCPSourceListenerBuilderBuilder[In: Any val] is
     layout_initializer: LayoutInitializer,
     recovering: Bool,
     worker_source_config: WorkerSourceConfig,
+    connections: Connections,
+    workers_list: Array[WorkerName] val,
     target_router: Router = EmptyRouter):
     TCPSourceListenerBuilder[In]
   =>

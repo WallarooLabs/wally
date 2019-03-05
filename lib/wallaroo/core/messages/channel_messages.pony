@@ -29,6 +29,7 @@ use "wallaroo/core/topology"
 use "wallaroo/core/barrier"
 use "wallaroo/core/data_receiver"
 use "wallaroo/core/router_registry"
+use "wallaroo/core/source/connector_source"
 use "wallaroo/core/checkpoint"
 
 
@@ -564,6 +565,64 @@ primitive ChannelMsgEncoder
   =>
     _encode(UnregisterProducerMsg(sender, source_id, target_id), auth)?
 
+  fun connector_stream_request(worker_name: WorkerName, source_name: String,
+    stream_id: U64, request_id: ConnectorStreamIdRequest,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(ConnectorStreamIdRequestMsg(worker_name, source_name, stream_id,
+      request_id), auth)?
+
+  fun connector_stream_request_response(source_name: String, stream_id: U64,
+    request_id: ConnectorStreamIdRequest, can_use: Bool,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(ConnectorStreamIdRequestResponseMsg(source_name, stream_id,
+      request_id, can_use), auth)?
+
+  fun connector_relinquish_stream_id(worker_name: String, source_name: String,
+    stream_id: U64, last_acked_msg: U64,
+    request_id: ConnectorRelinquishStreamIdRequest,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(ConnectorStreamIdRelinquishMsg(worker_name, source_name, stream_id,
+      last_acked_msg, request_id), auth)?
+
+  fun connector_relinquish_stream_request_response(source_name: String,
+    request_id: ConnectorRelinquishStreamIdRequest, relinquished: Bool,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(ConnectorStreamIdRelinquishResponseMsg(source_name, request_id,
+      relinquished), auth)?
+
+  fun add_connector_stream_source_addr(worker_name: WorkerName,
+    source_name: String, host: String, service: String,
+    auth: AmbientAuth) : Array[ByteSeq] val ?
+  =>
+    _encode(ConnectorStreamAddSourceAddrMsg(worker_name, source_name,
+      host, service), auth)?
+
+  fun connector_reg_leader_state_received_ack(leader_name: WorkerName,
+    source_name: String, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(ConnectorStreamRegLeaderStateReceivedAckMsg(leader_name,
+      source_name), auth)?
+
+  fun connector_stream_reg_new_leader(leader_name: WorkerName,
+    source_name: String, auth: AmbientAuth) : Array[ByteSeq] val ?
+  =>
+    _encode(ConnectorStreamRegNewLeaderMsg(leader_name, source_name), auth)?
+
+  fun connector_stream_relinquish_leadership_state(
+    relinquishing_leader_name: WorkerName, source_name: String,
+    active_stream_map: Map[U64, WorkerName] val,
+    inactive_stream_map: Map[U64, U64] val,
+    source_addr_map: Map[WorkerName, (String, String)] val,
+    auth: AmbientAuth) : Array[ByteSeq] val ?
+  =>
+    _encode(ConnectorStreamRegRelinquishLeadershipMsg(
+      relinquishing_leader_name, source_name, active_stream_map,
+      inactive_stream_map, source_addr_map), auth)?
+
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg =>
     try
@@ -579,6 +638,9 @@ primitive ChannelMsgDecoder
     end
 
 trait val ChannelMsg
+
+trait val SourceListenerMsg is ChannelMsg
+  fun source_name(): String
 
 class val UnknownChannelMsg is ChannelMsg
   let data: Array[U8] val
@@ -645,6 +707,149 @@ class val ConnectionsReadyMsg is ChannelMsg
 
   new val create(name: String) =>
     worker_name = name
+
+class val ConnectorStreamRegNewLeaderMsg is SourceListenerMsg
+  let leader_name: WorkerName
+  let _source_name: String
+
+  new val create(leader_name': WorkerName, source_name': String) =>
+    leader_name = leader_name'
+    _source_name = source_name'
+
+  fun source_name(): String =>
+    _source_name
+
+class val ConnectorStreamRegLeaderStateReceivedAckMsg is SourceListenerMsg
+  let leader_name: WorkerName
+  let _source_name: String
+
+  new val create(leader_name': WorkerName, source_name': String) =>
+    leader_name = leader_name'
+    _source_name = source_name'
+
+  fun source_name(): String =>
+    _source_name
+
+class val ConnectorStreamAddSourceAddrMsg is SourceListenerMsg
+  let worker_name: String
+  let _source_name: String
+  let host: String
+  let service: String
+
+  new val create(worker_name': WorkerName, source_name': String,
+    host': String, service': String)
+  =>
+    worker_name = worker_name'
+    _source_name = source_name'
+    host = host'
+    service = service'
+
+  fun source_name(): String =>
+    _source_name
+
+
+class val ConnectorStreamRegRelinquishLeadershipMsg is SourceListenerMsg
+  let worker_name: String
+  let _source_name: String
+  let active_stream_map: Map[U64, WorkerName] val
+  let inactive_stream_map: Map[U64, U64] val
+  let source_addr_map: Map[WorkerName, (String, String)] val
+
+  new val create(worker_name': WorkerName, source_name': String,
+    active_stream_map': Map[U64, WorkerName] val,
+    inactive_stream_map': Map[U64, U64] val,
+    source_addr_map': Map[WorkerName, (String, String)] val)
+  =>
+    worker_name = worker_name'
+    _source_name = source_name'
+    active_stream_map = active_stream_map'
+    inactive_stream_map = inactive_stream_map'
+    source_addr_map = source_addr_map'
+
+  fun source_name(): String =>
+    _source_name
+
+class val ConnectorStreamIdRelinquishMsg is SourceListenerMsg
+  let worker_name: String
+  let _source_name: String
+  let stream_id: U64
+  let last_acked_msg: U64
+  let request_id: ConnectorRelinquishStreamIdRequest
+
+  new val create(worker_name': WorkerName, source_name': String,
+    stream_id': U64,  last_acked_msg': U64,
+    request_id': ConnectorRelinquishStreamIdRequest)
+  =>
+    worker_name = worker_name'
+    _source_name = source_name'
+    stream_id = stream_id'
+    last_acked_msg = last_acked_msg'
+    request_id = request_id'
+
+  fun source_name(): String =>
+    _source_name
+
+class val ConnectorStreamIdRelinquishResponseMsg is SourceListenerMsg
+  let _source_name: String
+  let request_id: ConnectorRelinquishStreamIdRequest
+  let relinquished: Bool
+
+  new val create(source_name': String,
+    request_id':ConnectorRelinquishStreamIdRequest, relinquished': Bool)
+  =>
+    _source_name = source_name'
+    request_id = request_id'
+    relinquished = relinquished'
+
+  fun source_name(): String =>
+    _source_name
+
+class val ConnectorStreamIdRequestMsg is SourceListenerMsg
+  let worker_name: WorkerName
+  let _source_name: String
+  let stream_id: U64
+  let request_id: ConnectorStreamIdRequest
+
+  new val create(worker_name': WorkerName, source_name': String,
+    stream_id': U64, request_id': ConnectorStreamIdRequest)
+  =>
+    worker_name = worker_name'
+    _source_name = source_name'
+    stream_id = stream_id'
+    request_id = request_id'
+
+  fun source_name(): String =>
+    _source_name
+
+class val ConnectorStreamIdRequestResponseMsg is SourceListenerMsg
+  let _source_name: String
+  let stream_id: U64
+  let request_id: ConnectorStreamIdRequest
+  let can_use: Bool
+
+  new val create(source_name': String, stream_id': U64,
+    request_id': ConnectorStreamIdRequest, can_use': Bool)
+  =>
+    _source_name = source_name'
+    stream_id = stream_id'
+    request_id = request_id'
+    can_use = can_use'
+
+  fun source_name(): String =>
+    _source_name
+
+class val ConnectorUpdateRegistryMsg is SourceListenerMsg
+  let _source_name: String
+  var registry: Map[WorkerName, Set[U64]] val
+
+  new val create(source_name': String,
+    registry': Map[WorkerName, Set[U64]] val)
+  =>
+    _source_name = source_name'
+    registry =  registry'
+
+  fun source_name(): String =>
+    _source_name
 
 class val CreateDataChannelListener is ChannelMsg
   let workers: Array[String] val

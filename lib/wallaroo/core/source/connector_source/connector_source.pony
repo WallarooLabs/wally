@@ -46,6 +46,7 @@ use "wallaroo/core/data_receiver"
 use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
 use "wallaroo/core/checkpoint"
+use cwm = "wallaroo_labs/connector_wire_messages"
 use "wallaroo_labs/mort"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
@@ -128,8 +129,8 @@ actor ConnectorSource[In: Any val] is Source
   // Checkpoint
   var _next_checkpoint_id: CheckpointId = 1
 
-  // Active Stream Registry
-  let _active_stream_registry: ConnectorSourceListener[In]
+  //Session Id
+  var session_id: RoutingId = 0
 
   new create(source_id: RoutingId, auth: AmbientAuth,
     listen: ConnectorSourceListener[In], notify: ConnectorSourceNotify[In] iso,
@@ -138,6 +139,7 @@ actor ConnectorSource[In: Any val] is Source
     layout_initializer: LayoutInitializer,
     metrics_reporter': MetricsReporter iso, router_registry: RouterRegistry)
   =>
+    @printf[I32]("^^^^Creating ConnectorSource...\n".cstring())
     """
     A new connection accepted on a server.
     """
@@ -149,7 +151,6 @@ actor ConnectorSource[In: Any val] is Source
     _notify = consume notify
     _layout_initializer = layout_initializer
     _router_registry = router_registry
-    _active_stream_registry = listen
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
@@ -163,7 +164,7 @@ actor ConnectorSource[In: Any val] is Source
 
     _router = router'
     _update_router(router')
-    _notify.set_active_stream_registry(_active_stream_registry, this)
+    _notify.set_stream_registries(_listen, this)
 
     _notify.update_boundaries(_outgoing_boundaries)
 
@@ -207,6 +208,7 @@ actor ConnectorSource[In: Any val] is Source
       _pending_sent = 0
       _pending_writev_total = 0
 
+      session_id = _routing_id_gen()
       _pending_reads()
     end
 
@@ -627,6 +629,9 @@ actor ConnectorSource[In: Any val] is Source
       @printf[I32]("DEBUG %s.%s when %s\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring(),
         token.string().cstring())
+      // TODO [source-migration]: this shouldn't actually fail, there are many
+      // barrier token types for which it's safe to do nothing.
+      // Bug john for documentation on this.
       Fail() // TODO does this happen in practice?
     end
     None
@@ -1024,3 +1029,8 @@ actor ConnectorSource[In: Any val] is Source
     end
     _notify.get_all_streams_result(session_tag, data)
 
+  be process_notify_msg(process: Bool, stream_id: U64,
+    stream_name: String, point_of_ref: U64)
+  =>
+    _notify.process_notify_msg(stream_id, stream_name,
+    point_of_ref, this, process)
