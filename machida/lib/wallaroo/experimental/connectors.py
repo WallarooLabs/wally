@@ -182,7 +182,6 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
         self._idx = -1
         self.joining = set()
         self.open = set()
-        self.was_ever_opened = set()
         self.pending_eos_ack = {}  # {stream_id: point_of_ref}
         self.closed = set()
         self._added_source = False
@@ -266,16 +265,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             key = self.keys[self._idx]
             # if stream is not in an open state, return nothing.
             if not key in self.open:
-                # We know 'return None' is bad: infinite loop of sender
-                # never finishing and is never thread.join'able.
-                #
-                # We know always 'raise StopIteration' is not good: the
-                # stream_added() method may not have been called yet, so
-                # we will never iterate anything.
-                if key in self.was_ever_opened:
-                    raise StopIteration
-                else:
-                    return None
+                return None
             try:
                 # get source at key
                 source = self.sources[key][0]
@@ -301,9 +291,17 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                 return None
         elif not self._added_source:
             # In very fast select loops, we might reach the end condition
-            # before we have a chance to add our first source
+            # before we have a chance to add our first source, so keep
+            # spinning
+            return None
+        elif not self.closed:
+            # There's a race when added_source can be set, but keys isn't
+            # populated yet. If closed is empty, we haven't yet closed any
+            # sources, so shouldn't terminate the loop
             return None
         else:
+            logging.debug("__next__: raising StopIteration")
+            logging.debug("keys: {}, joining: {}, open: {}, pending_eos_ack: {}, closed: {}, _added_source: {}".format(self.keys, self.joining, self.open, self.pending_eos_ack, self.closed, self._added_source))
             raise StopIteration
 
     def stream_added(self, stream):
@@ -331,7 +329,6 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                 if stream.point_of_ref != source.point_of_ref():
                     source.reset(stream.point_of_ref)
             self.open.add(stream.id)
-            self.was_ever_opened.add(stream.id)
         else:
             raise ConnectorError("Stream {} was opened for unknown source. "
                                  "Please use the add_source interface."

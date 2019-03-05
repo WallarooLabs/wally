@@ -79,21 +79,27 @@ def test_hello():
 class Ok(object):
     """
     Ok(initial_credits: U32,
-       credit_list: Array[(stream_id: U64,
-                           stream_name: bytes,
-                           point_of_ref: U64)])
+        credit_list: Array[(stream_id: U64,
+                            stream_name: bytes,
+                            point_of_ref: U64)],
+        source_list: Array[(source_name: String,
+                            source_address: String)])
+
    """
-    def __init__(self, initial_credits, credit_list):
+    def __init__(self, initial_credits, credit_list, source_list):
         self.initial_credits = initial_credits
         self.credit_list = credit_list
+        self.source_list = source_list
 
     def __str__(self):
-        return ("Ok(initial_credits={!r}, credit_list={!r})"
-                .format(self.initial_credits, self.credit_list))
+        return ("Ok(initial_credits={!r}, credit_list={!r}, source_list={!r})"
+                .format(self.initial_credits, self.credit_list,
+                        self.source_list))
 
     def __eq__(self, other):
         return (self.initial_credits == other.initial_credits and
-                self.credit_list == other.credit_list)
+                self.credit_list == other.credit_list and
+                self.source_list == other.source_list)
 
     def encode(self):
         packed_credits = []
@@ -104,9 +110,19 @@ class Ok(object):
                             len(sn),
                             sn,
                             por))
+        packed_sources = []
+        for source, addr in self.source_list:
+            s = source.encode()
+            a = addr.encode()
+            packed_sources.append(
+                struct.pack('>H{}sH{}s'.format(len(s), len(a)),
+                            len(s), s,
+                            len(a), a))
         return (struct.pack('>II', self.initial_credits,
                             len(self.credit_list)) +
-                b''.join(packed_credits))
+                b''.join(packed_credits) +
+                struct.pack('>I', len(packed_sources)) +
+                b''.join(packed_sources))
 
     @staticmethod
     def decode(bs):
@@ -122,16 +138,27 @@ class Ok(object):
             credit_list.append((stream_id,
                                 stream_name,
                                 point_of_ref))
-        return Ok(initial_credit, credit_list)
+        source_list_length = struct.unpack('>I', reader.read(4))[0]
+        source_list = []
+        for _ in range(source_list_length):
+            source_length = struct.unpack('>H', reader.read(2))[0]
+            source = reader.read(source_length).decode()
+            addr_length = struct.unpack('>H', reader.read(2))[0]
+            addr = reader.read(addr_length).decode()
+            source_list.append((source, addr))
+        return Ok(initial_credit, credit_list, source_list)
 
 
 def test_ok():
     ic, cl = 100, [(1, b"1", 0), (2, b"2", 1)]
-    ok = Ok(ic, cl)
+    sl = [("source1", "127.0.0.1:7000"), ("source2", "192.168.0.1:5555")]
+    ok = Ok(ic, cl, sl)
     assert(ok.initial_credits == ic)
     assert(ok.credit_list == cl)
+    assert(ok.source_list == sl)
     encoded = ok.encode()
-    assert(len(encoded) == (4 + 4 + len(cl)*(8 + 2 + 1 + 8)))
+    assert(len(encoded) == (4 + 4 + len(cl)*(8 + 2 + 1 + 8) +
+                            4 + sum((4 + sum(map(len, p)) for p in sl))))
     decoded = Ok.decode(encoded)
     assert(isinstance(decoded, Ok))
     assert(decoded.initial_credits == ic)
@@ -708,24 +735,40 @@ def test_ack():
 
 
 class Restart(object):
+    """
+    Restart(address: String)
+    """
+    def __init__(self, address=None):
+        self.address = address
+
     def __str__(self):
-        return "Restart()"
+        return "Restart({!r})".format(self.address)
 
     def __eq__(self, other):
-        return isinstance(other, Restart)
+        return (other.address == self.address)
 
     def encode(self):
-        return b''
+        b_addr = self.address.encode()
+        return struct.pack('>I{}s'.format(len(b_addr)),
+                           len(b_addr),
+                           b_addr)
 
     @staticmethod
     def decode(bs):
-        return Restart()
+        if len(bs) > 0:
+            reader = StringIO(bs)
+            a_length = struct.unpack('>I', reader.read(4))[0]
+            addr = reader.read(a_length).decode()
+        else:
+            addr = None
+        return Restart(addr)
 
 
 def test_restart():
-    r = Restart()
+    addr = '127.0.0.1:5555'
+    r = Restart(addr)
     encoded = r.encode()
-    assert(len(encoded) == 0)
+    assert(len(encoded) == len(addr.encode()) + 4)
     decoded = Restart.decode(encoded)
     assert(isinstance(decoded, Restart))
     assert(decoded == r)
@@ -769,13 +812,13 @@ def test_frame():
     assert(Frame.read_header(struct.pack('>I', 50)) == 50)
     msgs = []
     msgs.append(Hello("version", "cookie", "program_name", "instance_name"))
-    msgs.append(Ok(100, [(1,b"",1), (2, b"2", 2)]))
+    msgs.append(Ok(100, [(1,b"",1), (2, b"2", 2)], [("s1", "1.1.1.1:1234")]))
     msgs.append(Error("this is an error message"))
     msgs.append(Notify(123, b"stream123", 1001))
     msgs.append(NotifyAck(False, 123, 1001))
     # Message framing is tested in the test_message test
     msgs.append(Ack(1000, [(123, 999), (300, 200)]))
-    msgs.append(Restart())
+    msgs.append(Restart('127.0.0.1:5555'))
 
     for msg in msgs:
         _test_frame_encode_decode(msg)

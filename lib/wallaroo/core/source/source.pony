@@ -25,6 +25,7 @@ use "wallaroo/core/barrier"
 use "wallaroo/core/data_receiver"
 use "wallaroo/core/recovery"
 use "wallaroo/core/checkpoint"
+use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
@@ -81,3 +82,6 @@ trait tag SourceListener is (DisposableActor & BoundaryUpdatable)
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
   be update_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
+  be add_worker(worker: WorkerName)
+  be remove_worker(worker: WorkerName)
+  be receive_msg(msg: SourceListenerMsg)

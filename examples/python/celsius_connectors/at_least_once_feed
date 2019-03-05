@@ -25,6 +25,7 @@ To run it:
     ```
 """
 
+import logging
 import threading
 import time
 
@@ -32,18 +33,20 @@ from wallaroo.experimental.connectors import (
                                    FramedFileReader,
                                    MultiSourceConnector)
 
+logging.root.setLevel(logging.DEBUG)
 
 class Sender(threading.Thread):
     def __init__(self, client):
         super(Sender, self).__init__()
         self.daemon = True
         self.client = client
+        self.error = None
 
     def run(self):
-        self.client.connect()
-        self.client.join()
+        self.error = self.client.join()
 
     def start(self):
+        self.client.connect()
         super(Sender, self).start()
         time.sleep(0.05)
 
@@ -65,19 +68,19 @@ client2 = MultiSourceConnector(version, cookie, program_name, instance_name,
 
 
 sender1 = Sender(client)
-sender2 = Sender(client2)
+#sender2 = Sender(client2)
 
 sender1.start()
-sender2.start()
+#sender2.start()
 
 client.add_source(FramedFileReader(filename = 'celsius.msg'))
-client2.add_source(FramedFileReader(filename = 'celsius.msg.2'))
+#client2.add_source(FramedFileReader(filename = 'celsius.msg.2'))
 
 
 sender1.join()
-sender2.join()
+#sender2.join()
 
 # Rely on the iterator method of our connector subclass
 print("Reached the end of all files. Shutting down.")
 print(client._sent)
-print(client2._sent)
+#print(client2._sent)

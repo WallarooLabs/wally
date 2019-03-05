@@ -25,7 +25,9 @@ use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/partitioning"
 use "wallaroo/core/initialization"
+use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
+use "wallaroo/core/network"
 use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
 use "wallaroo/core/routing"
@@ -57,6 +59,8 @@ class val KafkaSourceListenerBuilderBuilder[In: Any val] is
     layout_initializer: LayoutInitializer,
     recovering: Bool,
     worker_source_config: WorkerSourceConfig,
+    connections: Connections,
+    workers_list: Array[WorkerName] val,
     target_router: Router = EmptyRouter):
     KafkaSourceListenerBuilder[In]
   =>
@@ -373,4 +377,13 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     _outgoing_boundary_builders = consume new_boundary_builders
 
   be dispose() =>
+    None
+
+  be add_worker(worker: WorkerName) =>
+    None
+
+  be remove_worker(worker: WorkerName) =>
+    None
+
+  be receive_msg(msg: SourceListenerMsg) =>
     None

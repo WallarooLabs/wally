@@ -150,7 +150,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                  host, port):
         # connection details are given from the base
         self._host = host
-        self._port = int(port)  # but convert port to int
+        self._port = int(port)  # convert port to int
         self.credits = 0
         self.version = version
         self.cookie = cookie
@@ -160,8 +160,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         # Stream details
         # live streams for this connection
         self._streams = {}  # {stream_id: {'stream': Stream, 'por': por}}
-        self._ok = {} # same structure, but for _all_ streams the connector
-                        # may have told us about
         self._pending_eos = {}  # {stream_id: point_of_ref}
 
         self.handshake_complete = False
@@ -204,6 +202,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 break
             else:
                 time.sleep(dt)
+        return self.error
 
     #############################################
     # asyncore loop to run in background thread #
@@ -261,7 +260,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         elif isinstance(msg, cwm.Ack):
             self._handle_ack(msg)
         elif isinstance(msg, cwm.Restart):
-            self.handle_restart()
+            self.handle_restart(msg)
         # messages that should only go connector->wallaroo
         # Notify, Hello, Message
         elif isinstance(msg, (cwm.Hello, cwm.Message, cwm.Notify)):
@@ -285,34 +284,9 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         else:
             # deposit the credits
             self.credits += msg.initial_credits
-            for stream_id, stream_name, point_of_ref in msg.credit_list:
-                # don't bother.
-                break
-                # Try to get old stream data
-                old = self._streams.get(stream_id, None)
-
-                # New stream: call stream_added (this is the normal behaviour)
-                if old is None:
-                    new = Stream(stream_id, stream_name, point_of_ref, False)
-                    self._streams[stream_id] = new
-
-                # if notify was called before connect(), we may have known
-                # streams in _streams
-                else:
-                    # stream collision... throw error and close connection
-                    if old.name != stream_name:
-                        raise ConnectorError("Got wrong stream name for "
-                                             "stream. Expected {} but got {}."
-                                             .format(old.name, stream_name))
-                    # save it as closed
-                    new = Stream(stream_id, stream_name, point_of_ref, False)
-                    self._streams[stream_id] = new
-                    # stream_acked, to ensure source is reset if necessary
-                    self.stream_acked(new)
-
             # set handshake_complete
             self.handshake_complete = True
-            # set terminator to 4
+            # set terminator to 4 to expect the next message's header
             self.set_terminator(4)
 
     def _handle_notify_ack(self, msg):
@@ -353,9 +327,12 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         conn = socket.socket()
         try:
             conn.connect( (self._host, self._port) )
-        except:
+        except Exception as err:
+            logging.error("Failed to connect to {}:{}".format(self._host,
+                self._port))
+            self.error = err
             self.stopped.set()
-            raise
+            raise err
         self._conn = conn
         self._conn.setblocking(1) # Set socket to blocking mode
 
@@ -579,7 +556,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         logging.warning(ProtocolError(
             "Received an unrecognized message: {}".format(msg)))
 
-    def handle_restart(self):
+    def handle_restart(self, msg):
         logging.warning("Received RESTART message. Closing streams and "
             "reinitiating handshake.")
         # reset credits
@@ -592,6 +569,14 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 new = Stream(stream.id, stream.name, stream.point_of_ref, False)
                 self._streams[sid] = new
                 self.stream_closed(new)
+        # optionally update target host and port
+        if msg.address:
+            logging.info("Updating target address from {}:{} to {}"
+                .format(self._host, self._port, msg.address))
+            host, port = msg.address.split(':')
+            port = int(port)
+            self._host = host
+            self._port = port
         # try to connect again
         self.connect()
         self.handle_restarted(self._streams)

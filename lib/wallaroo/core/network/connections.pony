@@ -31,6 +31,7 @@ use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/source"
+use "wallaroo/core/source/connector_source"
 use "wallaroo/core/topology"
 use "wallaroo/core/data_receiver"
 use "wallaroo/core/recovery"
@@ -817,6 +818,110 @@ actor Connections is Cluster
     @printf[I32]("SLF: TODO Connections.update_worker_data_service: anything with _data_conns iteration & update?\n".cstring())
     // TODO ^^^^
 
+  be request_stream_id(leader: WorkerName, worker_name: WorkerName,
+    source_name: String, stream_id: U64, request_id: ConnectorStreamIdRequest)
+  =>
+    try
+      let stream_id_request_msg = ChannelMsgEncoder.connector_stream_request(
+        worker_name, source_name, stream_id, request_id, _auth)?
+      _send_control(leader, stream_id_request_msg)
+    else
+      Fail()
+    end
+
+  be respond_to_stream_id_request(worker_name: WorkerName, source_name: String,
+    stream_id: U64, request_id: ConnectorStreamIdRequest, can_use: Bool)
+  =>
+    try
+      let stream_id_request_response_msg =
+        ChannelMsgEncoder.connector_stream_request_response(
+          source_name, stream_id, request_id, can_use, _auth)?
+        _send_control(worker_name, stream_id_request_response_msg)
+    else
+      Fail()
+    end
+
+  be relinquish_stream_id(leader: WorkerName, worker_name: WorkerName,
+    source_name: String, stream_id: U64, last_acked_msg: U64,
+    request_id: ConnectorRelinquishStreamIdRequest)
+  =>
+    try
+      let stream_id_relinquish_msg =
+        ChannelMsgEncoder.connector_relinquish_stream_id(worker_name,
+          source_name, stream_id, last_acked_msg, request_id, _auth)?
+        _send_control(leader, stream_id_relinquish_msg)
+    else
+      Fail()
+    end
+
+  be respond_to_relinquish_stream_id_request(worker_name: WorkerName,
+    source_name: String, request_id: ConnectorRelinquishStreamIdRequest,
+    relinquished: Bool)
+  =>
+    try
+      let relinquish_stream_id_request_resonse_msg =
+        ChannelMsgEncoder.connector_relinquish_stream_request_response(
+          source_name, request_id, relinquished, _auth)?
+        _send_control(worker_name, relinquish_stream_id_request_resonse_msg)
+    else
+      Fail()
+    end
+
+  be add_connector_stream_source_addr(leader: WorkerName,
+    worker_name: WorkerName, source_name: String, host: String,
+    service: String)
+  =>
+    try
+      let add_connector_source_addr_msg =
+        ChannelMsgEncoder.add_connector_stream_source_addr(worker_name,
+          source_name, host, service, _auth)?
+      _send_control(leader, add_connector_source_addr_msg)
+
+    else
+      Fail()
+    end
+
+  be connector_reg_leader_state_received_ack(leader_name: WorkerName,
+    worker_name: WorkerName, source_name: String) =>
+    try
+      let connector_reg_new_leader_ack_msg =
+        ChannelMsgEncoder.connector_reg_leader_state_received_ack(leader_name,
+          source_name, _auth)?
+        _send_control(worker_name, connector_reg_new_leader_ack_msg)
+    else
+      Fail()
+    end
+
+  be connector_stream_reg_broadcast_new_leader(leader_name: WorkerName,
+    source_name: String, workers_list: Array[WorkerName] val)
+  =>
+    try
+      let connector_reg_new_leader_msg =
+        ChannelMsgEncoder.connector_stream_reg_new_leader(leader_name,
+          source_name, _auth)?
+        for worker in workers_list.values() do
+          _send_control(worker, connector_reg_new_leader_msg)
+        end
+    else
+      Fail()
+    end
+
+  be connector_stream_relinquish_leadership_state(new_leader_name: WorkerName,
+    relinquishing_leader_name: WorkerName, source_name: String,
+    active_stream_map: Map[U64, WorkerName] val,
+    inactive_stream_map: Map[U64, U64] val,
+    source_addr_map: Map[WorkerName, (String, String)] val)
+  =>
+    try
+      let connector_stream_relinquish_leadership_state_msg =
+        ChannelMsgEncoder.connector_stream_relinquish_leadership_state(
+          relinquishing_leader_name, source_name, active_stream_map,
+          inactive_stream_map, source_addr_map, _auth)?
+      _send_control(new_leader_name,
+        connector_stream_relinquish_leadership_state_msg)
+    else
+      Fail()
+    end
 
 // Ensures that the cluster shuts down, even if there are straggler actors.
 class _ExitTimerNotify is TimerNotify

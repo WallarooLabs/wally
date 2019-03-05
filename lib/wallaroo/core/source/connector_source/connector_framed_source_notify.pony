@@ -19,6 +19,7 @@ Copyright 2017-2019 The Wallaroo Authors.
 use "backpressure"
 use "buffered"
 use "collections"
+use "promises"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/checkpoint"
@@ -67,7 +68,7 @@ class _StreamState
   barrier_checkpoint_id = barrier_checkpoint_id'
 
 class ConnectorSourceNotify[In: Any val]
-  let _source_id: RoutingId
+  let source_id: RoutingId
   let _env: Env
   let _auth: AmbientAuth
   let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
@@ -79,10 +80,24 @@ class ConnectorSourceNotify[In: Any val]
   var _router: Router
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
+  // TODO [source-migration] conflate both as _listener
   var _active_stream_registry: (None|ConnectorSourceListener[In]) = None
+  var _global_stream_registry: (None|ConnectorSourceListener[In]) = None
   var _connector_source: (None|ConnectorSource[In] ref) = None
 
+  // we need these for RestartMsg(host, port)
+  var host: String
+  var service: String
+
+  // stream state management
+  // TODO [source-migration]: replace these with references to listener
+  // and local active streams
+  var _stream_registry: (None|ConnectorSourceListener[In]) = None
   let _stream_map: Map[U64, _StreamState] = _stream_map.create()
+  let _streams_pending_close: Set[U64] = _streams_pending_close.create()
+  let _streams_pending_relinquish: Map[U64, _StreamState] =
+    _streams_pending_relinquish.create()
+
   var _session_active: Bool = false
   var _session_tag: USize = 0
   var _fsm_state: _ProtoFsmState = _ProtoFsmDisconnected
@@ -99,14 +114,14 @@ class ConnectorSourceNotify[In: Any val]
   // policies
   var _watermark_ts: U64 = 0
 
-  new iso create(source_id: RoutingId, pipeline_name: String, env: Env,
+  new iso create(source_id': RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
     router': Router, metrics_reporter: MetricsReporter iso,
     event_log: EventLog, target_router: Router, cookie: String,
-    max_credits: U32, refill_credits: U32)
+    max_credits: U32, refill_credits: U32, host': String, service': String)
   =>
-    _source_id = source_id
+    source_id = source_id'
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"
     _env = env
@@ -120,6 +135,9 @@ class ConnectorSourceNotify[In: Any val]
     _cookie = cookie
     _max_credits = max_credits
     _refill_credits = refill_credits
+    host = host'
+    service = service'
+
     ifdef "trace" then
       @printf[I32]("%s: max_credits = %lu, refill_credits = %lu\n".cstring(), __loc.type_name().cstring(), max_credits, refill_credits)
     end
@@ -204,10 +222,11 @@ class ConnectorSourceNotify[In: Any val]
         // by this connector's one & only pipeline as defined by the
         // app's pipeline definition.
 
-        _fsm_state = _ProtoFsmHandshake
-        (_active_stream_registry as ConnectorSourceListener[In]).
-          get_all_streams(_session_tag,
-            _connector_source as ConnectorSource[In])
+        // process Hello: reply immediately with an Ok(credits, [], [])
+        // reset _credits to _max_credits
+        _credits = _max_credits
+        _send_reply(_connector_source, cwm.OkMsg(_credits, [], []))
+        _fsm_state = _ProtoFsmStreaming
         return _continue_perhaps(source)
 
       | let m: cwm.OkMsg =>
@@ -231,18 +250,20 @@ class ConnectorSourceNotify[In: Any val]
           return _to_error_state(source, "Bad protocol FSM state")
         end
 
-        try
-          if not _stream_map.contains(m.stream_id) then
-            (_active_stream_registry as ConnectorSourceListener[In])
-              .stream_notify(_session_tag, m.stream_id, m.stream_name,
-                m.point_of_ref, _connector_source as ConnectorSource[In])
-            _stream_map(m.stream_id) = _StreamState(true, 0, 0, 0, 0)
-          else
-            _send_reply(source, cwm.NotifyAckMsg(false, m.stream_id, 0))
-            return _continue_perhaps(source)
-          end
+        // TODO [source-migration]: rename _stream_map to _active_streams
+        // and also checking _pending_notify, _pending_close, and
+        // _pending_relinquish for short-circuit notify_ack(false)
+        if _stream_map.contains(m.stream_id) then
+          // we're already handling this stream, it's ok to reject quickly
+          process_notify_msg(m.stream_id, m.stream_name, m.point_of_ref,
+            source, false)
         else
-          Fail()
+          let promise = Promise[Bool]
+          promise.next[None](recover source~process_notify_msg(
+            where stream_id = m.stream_id, stream_name =m.stream_name,
+            point_of_ref = m.point_of_ref) end)
+          _request_stream_id(m.stream_id, source.session_id, promise)
+          // TODO [source-migration]: add to _pending_notify
         end
 
       | let m: cwm.NotifyAckMsg =>
@@ -303,11 +324,23 @@ class ConnectorSourceNotify[In: Any val]
 
               @printf[I32]("NH: processing body 3\n".cstring())
               if cwm.Eos.is_set(m.flags) then
+                // local removal of stream_id
                 @printf[I32]("NH: processing body 3: EOS\n".cstring())
-                (_active_stream_registry as ConnectorSourceListener[In]).stream_update(
-                  stream_id, s.barrier_checkpoint_id, s.barrier_last_message_id,
-                  msg_id, None)
+                // TODO [source-migration]
+                // add this to pending close
+                // when we get an ack, check pending close, and relinquish
+                // ownership of fully closed (in the global registry)
+                (_active_stream_registry as ConnectorSourceListener[In])
+                  .stream_update(stream_id, s.barrier_checkpoint_id,
+                    s.barrier_last_message_id, msg_id, None)
+                // wait for an ack on this msg id before fully closing the
+                // stream
+                // TODO [source-migration]: Nisan pick up from here!
+                _streams_pending_close.set(stream_id)
                 try _stream_map.remove(stream_id)? else Fail() end
+                // global remove of stream_id
+                // (_global_stream_registry as ConnectorSourceListener[In])
+                //   .relinquish_stream_id(stream_id, s.barrier_last_message_id)
               end
 
               @printf[I32]("NH: processing body 4\n".cstring())
@@ -436,7 +469,7 @@ class ConnectorSourceNotify[In: Any val]
         (true, ingest_ts)
       | let d: In =>
         _runner.run[In](_pipeline_name, pipeline_time_spent, d,
-          consume initial_key, ingest_ts, _watermark_ts, _source_id,
+          consume initial_key, ingest_ts, _watermark_ts, source_id,
           source, _router, msg_uid, None, decode_end_ts,
           latest_metrics_id, ingest_ts, _metrics_reporter)
       end
@@ -560,26 +593,30 @@ class ConnectorSourceNotify[In: Any val]
   fun ref _clear_stream_map() =>
     for (stream_id, s) in _stream_map.pairs() do
       try
-        (_active_stream_registry as ConnectorSourceListener[In]).stream_update(
-          stream_id, s.barrier_checkpoint_id, s.barrier_last_message_id,
-          s.last_message_id, None)
+        (_active_stream_registry as ConnectorSourceListener[In])
+        .stream_update(stream_id, s.barrier_checkpoint_id,
+          s.barrier_last_message_id, s.last_message_id, None)
       else
         Fail()
       end
     end
     _stream_map.clear()
 
-  fun ref set_active_stream_registry(
-    active_stream_registry: ConnectorSourceListener[In],
+  fun ref set_stream_registries(
+    listener: ConnectorSourceListener[In],
     connector_source: ConnectorSource[In] ref) =>
     ifdef "trace" then
       @printf[I32]("TRACE: %s.%s\n".cstring(), __loc.type_name().cstring(), __loc.method_name().cstring())
     end
-    _active_stream_registry = active_stream_registry
+    _active_stream_registry = listener
+    _global_stream_registry = listener
     _connector_source = connector_source
 
   fun create_checkpoint_state(): Array[ByteSeq val] val =>
-    // recover val ["<{stand-in for state for ConnectorSource with routing id="; _source_id.string(); "}>"] end
+    // recover val ["<{stand-in for state for ConnectorSource with routing id="; source_id.string(); "}>"] end
+
+    // TODO [source-migration]: include the pending_close, pending_relinquish
+    // states as well
     let w: Writer = w.create()
     for (stream_id, s) in _stream_map.pairs() do
       w.u64_be(stream_id)
@@ -604,6 +641,8 @@ class ConnectorSourceNotify[In: Any val]
       @printf[I32]("TRACE: %s.%s(%lu)\n".cstring(), __loc.type_name().cstring(), __loc.method_name().cstring(), checkpoint_id)
     end
 
+    // TODO [source-migration]: load pending_close, pending_relinquish states as
+    // well
     let r = Reader
     r.append(payload)
     try
@@ -616,7 +655,8 @@ class ConnectorSourceNotify[In: Any val]
           @printf[I32]("TRACE: read = s-id %lu b-ckp-id %lu b-l-msg-id %lu l-msg-id %lu\n".cstring(),
           stream_id, barrier_checkpoint_id, barrier_last_message_id, last_message_id)
         end
-        (_active_stream_registry as ConnectorSourceListener[In]).stream_update(stream_id, barrier_checkpoint_id,
+        (_active_stream_registry as ConnectorSourceListener[In])
+        .stream_update(stream_id, barrier_checkpoint_id,
             barrier_last_message_id, last_message_id, None)
       end
     end
@@ -645,7 +685,8 @@ class ConnectorSourceNotify[In: Any val]
             checkpoint_id, s.barrier_last_message_id, s.last_message_id)
         end
         try
-          (_active_stream_registry as ConnectorSourceListener[In]).stream_update(
+          (_active_stream_registry as ConnectorSourceListener[In])
+            .stream_update(
               stream_id, checkpoint_id, s.barrier_last_message_id,
               s.last_message_id,
               (_connector_source as ConnectorSource[In]))
@@ -705,6 +746,7 @@ class ConnectorSourceNotify[In: Any val]
       Fail()
     end
 
+  // TODO [source-migration]: deprecate this
   fun ref get_all_streams_result(session_tag: USize,
     data: Array[(U64,String,U64)] val)
   =>
@@ -717,11 +759,37 @@ class ConnectorSourceNotify[In: Any val]
         session_tag, data.size())
     end
 
-    let w: Writer = w.create()
     _credits = _max_credits
-     _send_reply(_connector_source, cwm.OkMsg(_credits, data))
+    // create and send OkMsg
+     _send_reply(_connector_source, cwm.OkMsg(_credits, data, []))
 
     _fsm_state = _ProtoFsmStreaming
+
+  fun ref process_notify_msg(stream_id: U64, stream_name: String,
+    point_of_ref: U64, source: ConnectorSource[In] ref,
+    stream_id_free: Bool)
+  =>
+    if stream_id_free then
+      try
+        (_active_stream_registry as ConnectorSourceListener[In])
+          .stream_notify(_session_tag, stream_id, stream_name,
+            point_of_ref, _connector_source as ConnectorSource[In])
+        _stream_map(stream_id) = _StreamState(true, 0, 0, 0, 0)
+      else
+        Fail()
+      end
+    else
+      _send_reply(source, cwm.NotifyAckMsg(false, stream_id, 0))
+    end
+
+  fun ref _request_stream_id(stream_id: U64, session_id: RoutingId,
+    promise: Promise[Bool])
+  =>
+    let request_id = ConnectorStreamIdRequest(stream_id, session_id)
+    try
+      (_active_stream_registry as ConnectorSourceListener[In])
+        .request_stream_id(stream_id, request_id, promise)
+    end
 
   fun ref _to_error_state(source: (ConnectorSource[In] ref|None), msg: String): Bool
   =>
@@ -736,6 +804,8 @@ class ConnectorSourceNotify[In: Any val]
     let cs: Array[(cwm.StreamId, cwm.PointOfRef)] trn =
       recover trn cs.create() end
 
+    // TODO [source-migration]: if stream.await_eos_ack, remove
+    // it from the _stream_map. Otherwise it stays
     for (stream_id, s) in _stream_map.pairs() do
       cs.push((stream_id, s.barrier_last_message_id))
     end
@@ -747,7 +817,7 @@ class ConnectorSourceNotify[In: Any val]
       @printf[I32]("TRACE: %s.%s()\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring())
     end
-    _send_reply(_connector_source, cwm.RestartMsg)
+    _send_reply(_connector_source, cwm.RestartMsg(host + ":" + service))
     try (_connector_source as ConnectorSource[In] ref).close() else Fail() end
     // The .close() method ^^^ calls our closed() method which will
     // twiddle all of the appropriate state variables.
@@ -755,16 +825,10 @@ class ConnectorSourceNotify[In: Any val]
   fun _send_reply(source: (ConnectorSource[In] ref|None), msg: cwm.Message) =>
     match source
     | let s: ConnectorSource[In] ref =>
+      // write the frame data and length encode it
       let w1: Writer = w1.create()
-      let w2: Writer = w2.create()
-
       let b1 = cwm.Frame.encode(msg, w1)
-      w2.u32_be(b1.size().u32())
-      @printf[I32]("b1: %s\n".cstring(), _print_array[U8](b1).cstring())
-      w2.writev([b1])
-
-      let b2 = recover trn w2.done() end
-      s.writev_final(consume b2)
+      s.writev_final(Bytes.length_encode(b1))
     else
       Fail()
     end

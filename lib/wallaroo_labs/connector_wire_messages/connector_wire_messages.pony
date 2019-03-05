@@ -107,7 +107,7 @@ primitive FrameTag
     | 4 => NotifyAckMsg.decode(consume rb)?
     | 5 => MessageMsg.decode(consume rb)?
     | 6 => AckMsg.decode(consume rb)?
-    | 7 => RestartMsg.decode(consume rb)
+    | 7 => RestartMsg.decode(consume rb)?
     else
       error
     end
@@ -133,6 +133,10 @@ type EventTimeType is I64
 type MessageId is U64
 type MessageBytes is ByteSeq
 type KeyBytes is ByteSeq
+// TODO [source-migration]: deprecate these types
+type SourceName is String
+type SourceAddress is String
+type SourceList is Array[(SourceName, SourceAddress)] val
 
 
 type Message is ( HelloMsg |
@@ -142,7 +146,7 @@ type Message is ( HelloMsg |
                   NotifyAckMsg |
                   MessageMsg |
                   AckMsg |
-                  RestartMsg )
+                  RestartMsg)
 
 trait MessageTrait
   fun encode(wb: Writer = Writer): Writer ?
@@ -207,10 +211,14 @@ class HelloMsg is MessageTrait
 class OkMsg is MessageTrait
   let initial_credits: U32
   let credit_list: Array[Credit] val
+  let source_list: SourceList val
 
-  new create(initial_credits': U32, credit_list': Array[Credit] val) =>
+  new create(initial_credits': U32, credit_list': Array[Credit] val,
+    source_list': SourceList val)
+  =>
     initial_credits = initial_credits'
     credit_list = credit_list'
+    source_list = source_list'
 
   new decode(rb: Reader) ? =>
     initial_credits = rb.u32_be()?
@@ -225,6 +233,17 @@ class OkMsg is MessageTrait
     end
     credit_list = consume cl
 
+    let sl = recover iso SourceList end
+    let sl_size = rb.u32_be()?.usize()
+    for x in col.Range(0, sl_size) do
+      let snl = rb.u16_be()?.usize()
+      let sn = String.from_array(rb.block(snl)?)
+      let sal = rb.u16_be()?.usize()
+      let sa = String.from_array(rb.block(sal)?)
+      sl.push((sn, sa))
+    end
+    source_list = consume sl
+
   fun encode(wb: Writer = Writer): Writer =>
     wb.u32_be(initial_credits)
     wb.u32_be(credit_list.size().u32())
@@ -233,6 +252,13 @@ class OkMsg is MessageTrait
       wb.u16_be(v._2.size().u16())
       wb.write(v._2)
       wb.u64_be(v._3)
+    end
+    wb.u32_be(source_list.size().u32())
+    for v in source_list.values() do
+      wb.u16_be(v._1.size().u16())
+      wb.write(v._1)
+      wb.u16_be(v._2.size().u16())
+      wb.write(v._2)
     end
     wb
 
@@ -423,13 +449,16 @@ class AckMsg is MessageTrait
     wb
 
 class RestartMsg is MessageTrait
-  new create() =>
-    """
-    """
+  let address: String
+
+  new create(address': String) =>
+    address = address'
 
   fun encode(wb: Writer = Writer): Writer =>
+    wb.u32_be(address.size().u32())
+    wb.write(address)
     wb
 
-  new  decode(rb: Reader) =>
-    """
-    """
+  new decode(rb: Reader) ? =>
+    let a_size = rb.u32_be()?.usize()
+    address = String.from_array(rb.block(a_size)?)
