@@ -614,6 +614,9 @@ class ConnectorSourceNotify[In: Any val]
 
   fun create_checkpoint_state(): Array[ByteSeq val] val =>
     // recover val ["<{stand-in for state for ConnectorSource with routing id="; source_id.string(); "}>"] end
+
+    // TODO [source-migration]: include the pending_close, pending_relinquish
+    // states as well
     let w: Writer = w.create()
     for (stream_id, s) in _stream_map.pairs() do
       w.u64_be(stream_id)
@@ -638,6 +641,8 @@ class ConnectorSourceNotify[In: Any val]
       @printf[I32]("TRACE: %s.%s(%lu)\n".cstring(), __loc.type_name().cstring(), __loc.method_name().cstring(), checkpoint_id)
     end
 
+    // TODO [source-migration]: load pending_close, pending_relinquish states as
+    // well
     let r = Reader
     r.append(payload)
     try
@@ -820,18 +825,10 @@ class ConnectorSourceNotify[In: Any val]
   fun _send_reply(source: (ConnectorSource[In] ref|None), msg: cwm.Message) =>
     match source
     | let s: ConnectorSource[In] ref =>
+      // write the frame data and length encode it
       let w1: Writer = w1.create()
-      // TODO [source-migration]: Maybe get rid of this debug print?
-      // Ask Scott about this.
-      let w2: Writer = w2.create()
-
       let b1 = cwm.Frame.encode(msg, w1)
-      w2.u32_be(b1.size().u32())
-      @printf[I32]("b1: %s\n".cstring(), _print_array[U8](b1).cstring())
-      w2.writev([b1])
-
-      let b2 = recover trn w2.done() end
-      s.writev_final(consume b2)
+      s.writev_final(Bytes.length_encode(b1))
     else
       Fail()
     end
