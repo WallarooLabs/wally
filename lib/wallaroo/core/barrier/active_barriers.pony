@@ -21,6 +21,11 @@ use "wallaroo/core/sink"
 use "wallaroo_labs/mort"
 
 class ActiveBarriers
+  """
+  All in-flight barriers, each of which has its own BarrierHandler. As the
+  barrier goes through processing phases, the BarrierHandler is updated to
+  the next phase.
+  """
   let _barriers: Map[BarrierToken, BarrierHandler] = _barriers.create()
 
   fun barrier_in_progress(): Bool =>

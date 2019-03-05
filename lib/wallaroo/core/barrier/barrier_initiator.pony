@@ -40,12 +40,29 @@ actor BarrierInitiator is Initializable
   received it on. Once it has received barriers over all inputs, it will
   forward the barrier downstream.
 
-  The BarrierInitiator can manage one barrier protocol at a time. The details
-  of the protocol depend on the BarrierToken and are opaque to the
-  BarrierInitiator. That means it can be used as part of different protocols
-  if they require general barrier processing behavior (for example,
-  the checkpointing protocol and the protocol checking that all in flight
-  messages have been processed).
+  The details of the barrier protocol depend on the BarrierToken and are
+  opaque to the BarrierInitiator. That means it can be used as part of
+  different protocols if they require general barrier processing behavior
+  (for example, the checkpointing protocol and the protocol checking that all
+  in flight messages have been processed).
+
+  Phases:
+    1) _InitialBarrierInitiatorPhase: Waiting for constructor to complete, at
+       which point we transition either to _NormalBarrierInitiatorPhase or
+       _RecoveringBarrierInitiatorPhase, depending on if we're recovering
+    2) _NormalBarrierInitiatorPhase: Normal barrier processing.
+    3) _RecoveringBarrierInitiatorPhase: Indicates we started in recovery
+       mode. We drop all barrier tokens that are not
+       CheckpointRollbackBarrierToken.
+    4) _SourcePendingBarrierInitiatorPhase: This phase is initiated if we
+       pull a pending new source off the pending queue. In this phase, we
+       queue new barriers and wait to inject them until after the pending
+       source has registered with its downstreams.
+    5) _BlockingBarrierInitiatorPhase: While processing a "blocking barrier",
+       we queue all incoming barriers.
+    6) _RollbackBarrierInitiatorPhase: We transition to this phase in response
+       to the injection of a CheckpointRollbackBarrierToken. During this phase,
+       we queue all incoming barriers.
   """
   let _auth: AmbientAuth
   let _worker_name: String
