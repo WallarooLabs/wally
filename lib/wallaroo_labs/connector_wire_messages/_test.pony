@@ -352,5 +352,5 @@ class iso _TestRestartMsg is UnitTest
     let encoded = Frame.encode(a)
     let m = Frame.decode(encoded)?
     let b = m as RestartMsg
-    h.assert_eq[String](a.addr, addr)
-    h.assert_eq[String](b.addr, addr)
+    h.assert_eq[String](a.address, addr)
+    h.assert_eq[String](b.address, addr)

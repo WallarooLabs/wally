@@ -56,10 +56,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   let _env: Env
   let _worker_name: WorkerName
 
-  // TODO [source-migration] pass _leader_name as a parameter rather than
-  // relying on a default starting value (e.g. "initializer" doesn't work for grow)
-  var _leader_name: WorkerName = "initializer"
-
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
   let _partitioner_builder: PartitionerBuilder
