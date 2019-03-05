@@ -107,7 +107,7 @@ primitive FrameTag
     | 4 => NotifyAckMsg.decode(consume rb)?
     | 5 => MessageMsg.decode(consume rb)?
     | 6 => AckMsg.decode(consume rb)?
-    | 7 => RestartMsg.decode(consume rb)
+    | 7 => RestartMsg.decode(consume rb)?
     else
       error
     end
@@ -133,6 +133,10 @@ type EventTimeType is I64
 type MessageId is U64
 type MessageBytes is ByteSeq
 type KeyBytes is ByteSeq
+// TODO [source-migration]: deprecate these types
+type SourceName is String
+type SourceAddress is String
+type SourceList is Array[(SourceName, SourceAddress)] val
 
 
 type Message is ( HelloMsg |
@@ -455,6 +459,6 @@ class RestartMsg is MessageTrait
     wb.write(address)
     wb
 
-  new decode(rb: Reader) =>
-    let a_size: rb.u32_be()?.usize()
-    let address = rb.block(a_size)?
+  new decode(rb: Reader) ? =>
+    let a_size = rb.u32_be()?.usize()
+    address = String.from_array(rb.block(a_size)?)

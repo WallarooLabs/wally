@@ -87,7 +87,7 @@ class ConnectorSourceNotify[In: Any val]
 
   // we need these for RestartMsg(host, port)
   var host: String
-  var service = String
+  var service: String
 
   // stream state management
   // TODO [source-migration]: replace these with references to listener
@@ -96,7 +96,7 @@ class ConnectorSourceNotify[In: Any val]
   let _stream_map: Map[U64, _StreamState] = _stream_map.create()
   let _streams_pending_close: Set[U64] = _streams_pending_close.create()
   let _streams_pending_relinquish: Map[U64, _StreamState] =
-    _streams_pending_release.create()
+    _streams_pending_relinquish.create()
 
   var _session_active: Bool = false
   var _session_tag: USize = 0
