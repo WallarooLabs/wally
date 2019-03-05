@@ -39,6 +39,7 @@ use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
+use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
@@ -188,3 +189,12 @@ actor GenSourceListener[In: Any val] is SourceListener
 
   be dispose() =>
     @printf[I32]("Shutting down GenSourceListener\n".cstring())
+
+  be add_worker(worker: WorkerName) =>
+    None
+
+  be remove_worker(worker: WorkerName) =>
+    None
+
+  be receive_msg(msg: SourceListenerMsg) =>
+    None

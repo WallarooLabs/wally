@@ -1026,6 +1026,9 @@ actor RouterRegistry
     // Update BarrierInitiator about new workers
     for w in target_workers.values() do
       _barrier_initiator.add_worker(w)
+      for source_listener in _source_listeners.values() do
+        source_listener.add_worker(w)
+      end
     end
 
     // Inform other current workers to begin migration
@@ -1037,6 +1040,7 @@ actor RouterRegistry
     else
       Fail()
     end
+    // inform joining workers the current name of the leader (for each source type_)
     begin_join_migration(target_workers, next_checkpoint_id)
 
   fun ref begin_join_migration(target_workers: Array[WorkerName] val,
@@ -1444,6 +1448,9 @@ actor RouterRegistry
     for w in leaving_workers.values() do
       _barrier_initiator.remove_worker(w)
       _checkpoint_initiator.remove_worker(w)
+      for source_listener in _source_listeners.values() do
+        source_listener.remove_worker(w)
+      end
       // !TODO!: Do we need this ??
       _unmute_request(w)
     end
@@ -1542,4 +1549,12 @@ actor RouterRegistry
     _distribute_boundary_builders()
     for source in _sources.values() do
       source.update_worker_data_service(worker, host, service)
+    end
+
+  be receive_source_listener_msg(msg: SourceListenerMsg) =>
+    _receive_source_listener_msg(msg)
+
+  fun ref _receive_source_listener_msg(msg: SourceListenerMsg) =>
+    for source_listener in _source_listeners.values() do
+      source_listener.receive_msg(msg)
     end

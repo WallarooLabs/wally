@@ -840,13 +840,15 @@ actor LocalTopologyInitializer is LayoutInitializer
                 // Set up SourceListener builders
                 let source_runner_builder = source_data.runner_builder()
                 let partitioner_builder = source_data.partitioner_builder()
+                // pass in list of workers
                 let sl_builder_builder =
                   source_data.source_listener_builder_builder()
                 let sl_builder = sl_builder_builder(_worker_name,
                   source_name, source_runner_builder, partitioner_builder,
                   out_router, _metrics_conn, consume source_reporter,
                   _router_registry, _outgoing_boundary_builders, _event_log,
-                  _auth, this, _recovering, worker_source_config)
+                  _auth, this, _recovering, worker_source_config, _connections,
+                  t.worker_names)
                 sl_builders.push(sl_builder)
               else
                 Fail()

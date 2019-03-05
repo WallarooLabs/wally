@@ -25,6 +25,7 @@ use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
 use "wallaroo/core/initialization"
 use "wallaroo/core/metrics"
+use "wallaroo/core/network"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
@@ -45,6 +46,8 @@ class val ConnectorSourceListenerBuilder[In: Any val]
   let _layout_initializer: LayoutInitializer
   let _recovering: Bool
   let _target_router: Router
+  let _connections: Connections
+  let _workers_list: Array[WorkerName] val
   let _parallelism: USize
   let _handler: FramedSourceHandler[In] val
   let _host: String
@@ -60,7 +63,9 @@ class val ConnectorSourceListenerBuilder[In: Any val]
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, target_router: Router = EmptyRouter, parallelism: USize,
+    recovering: Bool, target_router: Router = EmptyRouter,
+    connections: Connections, workers_list: Array[WorkerName] val,
+    parallelism: USize,
     handler: FramedSourceHandler[In] val,
     host: String, service: String, cookie: String,
     max_credits: U32, refill_credits: U32)
@@ -79,6 +84,8 @@ class val ConnectorSourceListenerBuilder[In: Any val]
     _layout_initializer = layout_initializer
     _recovering = recovering
     _target_router = target_router
+    _connections = connections
+    _workers_list = workers_list
     _parallelism = parallelism
     _handler = handler
     _host = host
@@ -92,7 +99,8 @@ class val ConnectorSourceListenerBuilder[In: Any val]
       _runner_builder, _partitioner_builder,
       _router, _metrics_conn, _metrics_reporter.clone(), _router_registry,
       _outgoing_boundary_builders, _event_log, _auth, _layout_initializer,
-      _recovering, _target_router, _parallelism, _handler, _host, _service,
+      _recovering, _target_router, _connections,
+      _workers_list, _parallelism, _handler, _host, _service,
       _cookie, _max_credits, _refill_credits)
 
 class val ConnectorSourceListenerBuilderBuilder[In: Any val] is SourceListenerBuilderBuilder
@@ -116,6 +124,8 @@ class val ConnectorSourceListenerBuilderBuilder[In: Any val] is SourceListenerBu
     layout_initializer: LayoutInitializer,
     recovering: Bool,
     worker_source_config: WorkerSourceConfig,
+    connections: Connections,
+    workers_list: Array[WorkerName] val,
     target_router: Router = EmptyRouter):
     ConnectorSourceListenerBuilder[In]
   =>
@@ -125,7 +135,7 @@ class val ConnectorSourceListenerBuilderBuilder[In: Any val] is SourceListenerBu
         runner_builder, partitioner_builder, router, metrics_conn,
         consume metrics_reporter, router_registry, outgoing_boundary_builders,
         event_log, auth, layout_initializer, recovering, target_router,
-        _source_config.parallelism, _source_config.handler,
+        connections, workers_list, _source_config.parallelism, _source_config.handler,
         config.host, config.service, config.cookie, config.max_credits,
         config.refill_credits)
     else
@@ -134,6 +144,6 @@ class val ConnectorSourceListenerBuilderBuilder[In: Any val] is SourceListenerBu
         runner_builder, partitioner_builder, router, metrics_conn,
         consume metrics_reporter, router_registry, outgoing_boundary_builders,
         event_log, auth, layout_initializer, recovering, target_router,
-        _source_config.parallelism, _source_config.handler,
-        "0", "0", "0", 0, 0)
+        connections, workers_list, _source_config.parallelism,
+        _source_config.handler, "0", "0", "0", 0, 0)
     end
