@@ -25,6 +25,23 @@ use "wallaroo_labs/string_set"
 
 
 trait BarrierHandler
+  """
+  A BarrierHandler represents one of the following phases:
+  1) PendingBarrierHandler: A barrier has just been injected. We wait to
+     receive an ack from every worker that they have started this barrier's
+     handling procedure.
+  2a) InProgressPrimaryBarrierHandler: If we are the primary worker, we move
+     to this phase once the barrier has been acked as started by all workers.
+     We wait for all local sinks to ack the barrier, at which point we
+     transition to WorkerAcksBarrierHandler.
+  2b) InProgressSecondaryBarrierHandler: If we are not the primary worker, we
+     move to this phase once the barrier has been acked as started by all
+     workers. We wait for all local sinks to ack the barrier, at which point
+     we are done for this barrier (the rest is up to the primary worker).
+  3) WorkerAcksBarrierHandler: At this point all local sinks have acked the
+     barrier, so we wait for all other workers to ack that their local sinks
+     have also acked, at which point we are ready to complete the barrier.
+  """
   fun name(): String
   fun in_progress(): Bool
   fun ref ack_barrier(s: Sink) =>
@@ -52,12 +69,6 @@ trait BarrierHandler
   fun ref _invalid_call() =>
     @printf[I32]("Invalid call on BarrierHandler %s\n".cstring(),
       name().cstring())
-
-class WaitingBarrierHandler is BarrierHandler
-  fun name(): String =>
-    "WaitingBarrierHandler"
-  fun in_progress(): Bool =>
-    false
 
 class PendingBarrierHandler is BarrierHandler
   let _worker_name: String
