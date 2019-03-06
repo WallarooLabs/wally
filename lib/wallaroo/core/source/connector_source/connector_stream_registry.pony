@@ -47,7 +47,7 @@ class GlobalConnectorStreamRegistry
   var _inactive_stream_map: Map[U64, U64] =  _inactive_stream_map.create()
   var _source_addr_map: Map[WorkerName, (String, String)] =
     _source_addr_map.create()
-  let _workers_list: Array[WorkerName] = _workers_list.create()
+  let _workers_set: Set[WorkerName] = _workers_set.create()
   let _pending_id_requests_promises:
     Map[ConnectorStreamIdRequest, Promise[Bool]] =
       _pending_id_requests_promises.create()
@@ -64,7 +64,7 @@ class GlobalConnectorStreamRegistry
     _connections = connections
     _source_addr = (host, service)
     for worker in workers_list.values() do
-      _workers_list.push(worker)
+      _workers_set.set(worker)
     end
     _elect_leader()
 
@@ -174,6 +174,27 @@ class GlobalConnectorStreamRegistry
       None
     end
 
+  fun ref add_worker(worker_name: WorkerName) =>
+    // TODO [source-migration-3]: we are lazily not re-electing leader on grow,
+    // should we?
+    _workers_set.set(worker_name)
+
+  fun ref remove_worker(worker_name: WorkerName) =>
+    // TODO [source-migration-3]: it is assumed that if the registry belongs
+    // to the leaving worker, that streams would be relinquished in a different
+    // step in the migration process
+      _workers_set.unset(worker_name)
+    if _is_leader then
+      try
+        let new_leader_name = _leader_from_workers_list()?
+        relinquish_leadership(new_leader_name)
+      else
+        // TODO [source-migration-3]: what should happen to leader state, if a
+       // leader cannot be retrieved from the workers list?
+        None
+      end
+    end
+
   fun ref request_stream_id(stream_id: U64,
     request_id: ConnectorStreamIdRequest, promise: Promise[Bool])
   =>
@@ -246,7 +267,7 @@ class GlobalConnectorStreamRegistry
 
   fun ref _elect_leader() =>
     try
-      let leader_name = _leader_from_worker_list()?
+      let leader_name = _leader_from_workers_list()?
       if (leader_name == _worker_name) then
         _initiate_leader_state()
       else
@@ -258,9 +279,13 @@ class GlobalConnectorStreamRegistry
       Fail()
     end
 
-  fun ref _leader_from_worker_list(): WorkerName ? =>
+  fun ref _leader_from_workers_list(): WorkerName ? =>
+    let workers_list = Array[WorkerName]
+    for worker in _workers_set.values() do
+      workers_list.push(worker)
+    end
     let sorted_worker_names =
-      Sort[Array[WorkerName], WorkerName](_workers_list)
+      Sort[Array[WorkerName], WorkerName](workers_list)
     sorted_worker_names(0)?
 
   fun ref _initiate_leader_state() =>
@@ -273,7 +298,7 @@ class GlobalConnectorStreamRegistry
 
   fun ref _send_leader_source_address() =>
     try
-      let leader_name = _leader_from_worker_list()?
+      let leader_name = _leader_from_workers_list()?
       _connections.add_connector_stream_source_addr(leader_name, _worker_name,
         _source_name, _source_addr._1, _source_addr._2)
     else
@@ -285,9 +310,9 @@ class GlobalConnectorStreamRegistry
     _connections.connector_reg_leader_state_received_ack(_leader_name, worker_name, _source_name)
 
   fun ref _broadcast_new_leader() =>
-    let workers_list_size = _workers_list.size()
+    let workers_list_size = _workers_set.size()
     let workers_list = recover trn Array[WorkerName](workers_list_size) end
-    for worker in _workers_list.values() do
+    for worker in _workers_set.values() do
       workers_list.push(worker)
     end
 

@@ -295,12 +295,12 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   /////////////////////////////
   be add_worker(worker: WorkerName) =>
     // TODO: Update global registry map
-    // _global_stream_registry.add_worker(worker, _host, _service)
+    _global_stream_registry.add_worker(worker)
     None
 
   be remove_worker(worker: WorkerName) =>
     // TODO: Update global registry map
-    // _global_stream_registry.remove_worker(worker)
+    _global_stream_registry.remove_worker(worker)
     None
 
   be receive_msg(msg: SourceListenerMsg) =>
