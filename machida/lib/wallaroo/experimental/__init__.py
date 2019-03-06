@@ -189,7 +189,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
     def join(self, timeout=None):
         """
         Block until all sources have been exhausted or the timeout elapses
-        if provided. If not timeout is provided this may block forever.
+        if provided. If no timeout is provided this may block forever.
         """
         # wait for this
         dt = 0.0001

@@ -505,6 +505,9 @@ def CLI():
                            choices=['none', '1', 'debug', 'info', 'warning',
                                     'error', 'critical'],
                            default='info')
+    log_group.add_argument("--save-test-output", help=("Save the test output "
+                           "to files in tmp/wallaroo_test_errors"),
+                           action="store_true")
 
     term_group = parser.add_argument_group('Termination')
     term_group.add_argument('--runner-join_timeout', type=float, default=30,
@@ -631,17 +634,20 @@ def CLI():
             # Save logs to file in case of error
             save_logs_to_file(base_dir, log_stream, persistent_data)
 
-        if logging.root.level > logging.ERROR:
-            # If failed, and logging level means we didn't log error, include it
-            # in exit message
-            parser.exit(res.return_code, res.output)
-        else:
-            parser.exit(res.return_code)
+            if logging.root.level > logging.ERROR:
+                # If failed, and logging level means we didn't log error, include it
+                # in exit message
+                parser.exit(res.return_code, res.output)
+            else:
+                parser.exit(res.return_code)
 
     # Reached the end and nothing broke. Success!
     logging.info("Integration test completed successfully for command %r" %
                  args.command)
 
+    if args.save_test_output:
+        logging.info("Saving test output data to files")
+        save_logs_to_file(base_dir, log_stream, persistent_data)
 
 if __name__ == '__main__':
     CLI()
