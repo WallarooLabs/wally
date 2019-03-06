@@ -58,6 +58,23 @@ use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 use @pony_asio_event_set_writeable[None](event: AsioEventID, writeable: Bool)
 
+
+// Connector Types
+type StreamId is U64
+type PointOfReference is U64
+
+class val StreamState
+  let last_seen_por: StreamId  // last seen message id
+  let last_acked_por: PointOfReference // last message id that was checkpointed
+  let last_checkpoint_id: CheckpointId // last checkpoint id
+
+  new val create(last_seen_por': StreamId,
+    last_acked_por': PointOfReference, last_checkpoint_id': CheckpointId)
+=>
+  last_seen_por = last_seen_por'
+  last_acked_por = last_acked_por'
+  last_checkpoint_id = last_checkpoint_id'
+
 actor ConnectorSource[In: Any val] is Source
   """
   # ConnectorSource
@@ -133,7 +150,8 @@ actor ConnectorSource[In: Any val] is Source
   var session_id: RoutingId = 0
 
   new create(source_id: RoutingId, auth: AmbientAuth,
-    listen: ConnectorSourceListener[In], notify: ConnectorSourceNotify[In] iso,
+    listen: ConnectorSourceListener[In],
+    notify_parameters: ConnectorSourceNotifyParameters[In],
     event_log: EventLog, router': Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
@@ -148,7 +166,8 @@ actor ConnectorSource[In: Any val] is Source
     _event_log = event_log
     _metrics_reporter = consume metrics_reporter'
     _listen = listen
-    _notify = consume notify
+    _notify = ConnectorSourceNotify[In](source_id, notify_parameters,
+      _listen, this)
     _layout_initializer = layout_initializer
     _router_registry = router_registry
 
@@ -164,7 +183,6 @@ actor ConnectorSource[In: Any val] is Source
 
     _router = router'
     _update_router(router')
-    _notify.set_stream_registries(_listen, this)
 
     _notify.update_boundaries(_outgoing_boundaries)
 
@@ -181,7 +199,12 @@ actor ConnectorSource[In: Any val] is Source
     A new connection accepted on a server.
     """
     if not _disposed then
-      _notify.accepted(this)
+      // Purge pending requests on old session id
+      _listen.purge_pending_requests(session_id)
+      // Get new session id for new connection
+      session_id = _routing_id_gen()
+      // update notify's session value
+      _notify.accepted(this, session_id)
 
       _connect_count = 0
       _fd = fd
@@ -208,7 +231,6 @@ actor ConnectorSource[In: Any val] is Source
       _pending_sent = 0
       _pending_writev_total = 0
 
-      session_id = _routing_id_gen()
       _pending_reads()
     end
 
@@ -632,9 +654,9 @@ actor ConnectorSource[In: Any val] is Source
       // TODO [source-migration]: this shouldn't actually fail, there are many
       // barrier token types for which it's safe to do nothing.
       // Bug john for documentation on this.
-      Fail() // TODO does this happen in practice?
+      // TODO [source-migration]: Check with John on whether this is okay
+      None
     end
-    None
 
   //////////////
   // CHECKPOINTS
@@ -1008,29 +1030,8 @@ actor ConnectorSource[In: Any val] is Source
     // TODO: verify that removal of "in_sent" check is harmless
     _expect = _notify.expect(this, qty)
 
-  be stream_notify_result(session_tag: USize, success: Bool,
-    stream_id: U64, point_of_reference: U64, last_message_id: U64) =>
-    ifdef "trace" then
-      @printf[I32]("TRACE: %s.%s(%s, %lu, %lu, %lu)\n".cstring(),
-        __loc.type_name().cstring(), __loc.method_name().cstring(),
-        success.string().cstring(), stream_id, point_of_reference,
-        last_message_id)
-    end
-    _notify.stream_notify_result(session_tag, success,
-      stream_id, point_of_reference, last_message_id)
-
-  be get_all_streams_result(session_tag: USize,
-    data: Array[(U64,String,U64)] val)
+  be stream_notify_result(session_id': RoutingId, success: Bool,
+    stream_id: StreamId, point_of_reference: PointOfReference)
   =>
-    ifdef "trace" then
-      @printf[I32]("TRACE: %s.%s(%lu, ...%d...)\n".cstring(),
-        __loc.type_name().cstring(), __loc.method_name().cstring(),
-        session_tag, data.size())
-    end
-    _notify.get_all_streams_result(session_tag, data)
-
-  be process_notify_msg(process: Bool, stream_id: U64,
-    stream_name: String, point_of_ref: U64)
-  =>
-    _notify.process_notify_msg(stream_id, stream_name,
-    point_of_ref, this, process)
+    _notify.stream_notify_result(session_id', success, stream_id,
+      point_of_reference)

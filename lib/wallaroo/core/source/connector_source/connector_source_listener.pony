@@ -48,6 +48,9 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
+// TODO [source-migration] make this actor participate in checkpointing
+// and rollback, saving its local and global registries
+
 actor ConnectorSourceListener[In: Any val] is SourceListener
   """
   # ConnectorSourceListener
@@ -89,12 +92,8 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   let _connected_sources: SetIs[ConnectorSource[In]] = _connected_sources.create()
   let _available_sources: Array[ConnectorSource[In]] = _available_sources.create()
 
-  // Active Stream Registry
-  let _local_stream_registry: LocalConnectorStreamRegistry[In] =
-    _local_stream_registry.create()
-
-   // Global Stream Registry
-   let _global_stream_registry: GlobalConnectorStreamRegistry
+  // Stream Registry for managing updates to local and global stream state
+  let _stream_registry: LocalConnectorStreamRegistry[In]
 
   new create(env: Env, worker_name: WorkerName, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
@@ -142,7 +141,9 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     _init_size = init_size
     _max_size = max_size
 
-    _global_stream_registry = GlobalConnectorStreamRegistry(_worker_name,
+    // Pass LocalConnectorStreamRegistry the parameters it needs to create
+    // its own instance of the GlobalConnectorStreamRegistry
+    _stream_registry = _stream_registry.create(_worker_name,
       _pipeline_name, _connections, _host, _service, workers_list)
 
     match router
@@ -157,15 +158,16 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     @printf[I32]((pipeline_name + " source will listen (but not yet) on "
       + host + ":" + service + "\n").cstring())
 
+    let notify_parameters = ConnectorSourceNotifyParameters[In](_pipeline_name,
+      _env, _auth, _handler, _runner_builder, _partitioner_builder, _router,
+        _metrics_reporter.clone(), _event_log, _target_router, _cookie,
+        _max_credits, _refill_credits, _host, _service)
+
     for i in Range(0, _limit) do
       let source_name = _worker_name + _pipeline_name + i.string()
       let source_id = try _routing_id_gen(source_name)? else Fail(); 0 end
-      let notify = ConnectorSourceNotify[In](source_id, _pipeline_name,
-        _env, _auth, _handler, _runner_builder, _partitioner_builder, _router,
-        _metrics_reporter.clone(), _event_log, _target_router, _cookie,
-        _max_credits, _refill_credits, _host, _service)
       let source = ConnectorSource[In](source_id, _auth, this,
-        consume notify, _event_log, _router,
+         notify_parameters, _event_log, _router,
         _outgoing_boundary_builders, _layout_initializer,
         _metrics_reporter.clone(), _router_registry)
       source.mute(this)
@@ -289,125 +291,43 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       _accept()
     end
 
-  /////////////////////////////
-  // Multiple Active Sources
-  /////////////////////////////
+  ///////////////////////
+  // Inter-worker actions
+  // These are called via the connections or router actors (typically)
+  ///////////////////////
   be add_worker(worker: WorkerName) =>
-    // TODO: Update global registry map
-    _global_stream_registry.add_worker(worker)
-    None
+    _stream_registry.add_worker(worker)
 
   be remove_worker(worker: WorkerName) =>
-    // TODO: Update global registry map
-    _global_stream_registry.remove_worker(worker)
-    None
+    _stream_registry.remove_worker(worker)
 
   be receive_msg(msg: SourceListenerMsg) =>
-    // we only care for messages that belong to this source name
-    if (msg.source_name() == _pipeline_name) then
-      match msg
-      |  let m: ConnectorStreamIdRequestMsg =>
-        _process_stream_id_request(m)
-      | let m: ConnectorStreamIdRequestResponseMsg =>
-        _maybe_process_pending_request(m)
-      | let m: ConnectorStreamIdRelinquishMsg =>
-        _relinquish_stream_id_msg(m)
-      | let m: ConnectorStreamIdRelinquishResponseMsg =>
-        _process_relinquish_stream_id_ack_msg(m)
-      | let m: ConnectorStreamRegRelinquishLeadershipMsg =>
-        _process_relinquish_leadership_msg(m)
-      | let m: ConnectorStreamAddSourceAddrMsg =>
-        _process_add_source_addr_msg(m)
-      | let m: ConnectorStreamRegNewLeaderMsg =>
-        _process_new_reg_leader_msg(m)
-      | let m: ConnectorStreamRegLeaderStateReceivedAckMsg =>
-        _process_reg_leader_state_received_msg(m)
-      end
-    else
-      @printf[I32](("**Dropping message** _pipeline_name: " +
-         _pipeline_name +  " =/= source_name: " + msg.source_name() + " \n")
-        .cstring())
-    end
+    _stream_registry.listener_msg_received(msg)
 
-  fun ref _process_reg_leader_state_received_msg(
-    msg: ConnectorStreamRegLeaderStateReceivedAckMsg)
-  =>
-    _global_stream_registry.complete_leader_state_relinquish(msg.leader_name)
+  ////////////////////////////////////////
+  // Asynchronous stream registry actions
+  // These are called by a ConnectorSource (via it's notify class)
+  ////////////////////////////////////////
+  be purge_pending_requests(session_id: RoutingId) =>
+    _stream_registry.purge_pending_requests(session_id)
 
-  fun ref _process_new_reg_leader_msg(msg: ConnectorStreamRegNewLeaderMsg) =>
-    _global_stream_registry.update_leader(msg.leader_name)
+  be stream_relinquish(stream_id: StreamId, last_acked: PointOfReference) =>
+    _stream_registry.stream_relinquish(stream_id, last_acked)
 
-  // TODO [source-migration] consider changing to a fun ref
-  be _maybe_process_pending_request(m: ConnectorStreamIdRequestResponseMsg) =>
-    if _global_stream_registry.contains_request(m.request_id) then
-      _global_stream_registry.process_request_response(m.request_id, m.can_use)
-    else
-      // Received request_id for a request not in map
-      None
-    end
-
-  be request_stream_id(stream_id: U64, request_id: ConnectorStreamIdRequest,
-    promise: Promise[Bool])
-  =>
-    _global_stream_registry.request_stream_id(stream_id, request_id, promise)
-
-  // TODO [source-migration] consider changing to a fun ref
-  be _process_add_source_addr_msg(msg: ConnectorStreamAddSourceAddrMsg) =>
-    _global_stream_registry.add_source_address(msg.worker_name, msg.host,
-      msg.service)
-
-  // TODO [source-migration] consider changing to a fun ref
-  be _process_relinquish_stream_id_ack_msg(
-    msg: ConnectorStreamIdRelinquishResponseMsg)
-  =>
-    if _global_stream_registry.contains_relinquish_request(msg.request_id) then
-      _global_stream_registry.process_relinquish_response(msg.request_id,
-        msg.relinquished)
-    else
-      // Received request_id for a request not in map
-      None
-    end
-
-  // TODO [source-migration] consider changing to a fun ref
-  be _process_stream_id_request(msg: ConnectorStreamIdRequestMsg) =>
-    _global_stream_registry.process_stream_id_request(msg.worker_name,
-      msg.stream_id, msg.request_id)
-
-  // be relinquish_stream_id(stream_id: U64, last_acked_msg: U64) =>
-  //   _global_stream_registry.
-
-  // TODO [source-migration] consider changing to a fun ref
-  be _relinquish_stream_id_msg(msg: ConnectorStreamIdRelinquishMsg) =>
-    _global_stream_registry.process_relinquish_stream_id_request(
-      msg.worker_name, msg.stream_id, msg.last_acked_msg, msg.request_id)
-
-  // TODO [source-migration] consider changing to a fun ref
-  be _process_relinquish_leadership_msg(
-    msg: ConnectorStreamRegRelinquishLeadershipMsg)
-  =>
-    _global_stream_registry.process_relinquish_leadership_request(
-      msg.worker_name, msg.active_stream_map, msg.inactive_stream_map,
-      msg.source_addr_map)
-
-  be get_all_streams(session_tag: USize,
+  be stream_notify(request_id: ConnectorStreamNotifyId,
+    stream_id: StreamId, stream_name: String,
+    promise: Promise[NotifyResult[In]],
     connector_source: ConnectorSource[In] tag)
   =>
-    _local_stream_registry.get_all_streams(session_tag, connector_source)
+    _stream_registry.stream_notify(request_id,
+      stream_id, stream_name, promise, connector_source)
 
-  be stream_notify(session_tag: USize,
-    stream_id: U64, stream_name: String, point_of_reference: U64,
-    connector_source: ConnectorSource[In] tag)
-  =>
-    _local_stream_registry.stream_notify(session_tag, stream_id,
-      stream_name, point_of_reference, connector_source)
-
-  be stream_update(stream_id: U64, checkpoint_id: CheckpointId,
-    point_of_reference: U64, last_message_id: U64,
+  be stream_update(stream_id: StreamId, checkpoint_id: CheckpointId,
+    last_acked_por: PointOfReference, last_seen_por: PointOfReference,
     connector_source: (ConnectorSource[In] tag|None))
   =>
-    _local_stream_registry.stream_update(stream_id, checkpoint_id,
-      point_of_reference, last_message_id, connector_source)
-
+    _stream_registry.stream_update(stream_id, checkpoint_id,
+      last_acked_por, last_seen_por, connector_source)
 
   ///////////////////////
   // Listener Connector
