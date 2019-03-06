@@ -712,12 +712,13 @@ class ALOSender(StoppableThread):
         self.host = host
         self.port = port
         self.start_time = None
+        self.error = None
 
     def run(self):
         self.start_time = datetime.datetime.now()
         self.client.connect()
         self.client.add_source(self.source)
-        self.client.join()
+        self.error = self.client.join()
 
     def stop(self, error=None):
         logging.debug("ALOSender stop")
