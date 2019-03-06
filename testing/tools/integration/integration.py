@@ -29,7 +29,8 @@ from .control import (SinkAwaitValue,
 from .end_points import (ALOSender,
                          Sender,
                          Reader)
-from .errors import PipelineTestError
+from .errors import (PipelineTestError,
+                     TimeoutError)
 from .logger import INFO2
 
 from wallaroo.experimental.connectors import BaseSource
@@ -203,15 +204,14 @@ def pipeline_test(sources, expected, command, workers=1,
 
             # start each sender and await its completion before starting the next
             if cluster.senders:
-                logging.debug("senders step A")
                 for sender in cluster.senders:
-                    logging.debug("senders step B sender {}".format(sender))
                     sender.start()
-                    logging.debug("senders step C")
-                    sender.join()
-                    logging.debug("senders step D")
+                    sender.join(sink_stop_timeout)
+                    if sender.is_alive():
+                        raise TimeoutError("Sender {} failed to complete "
+                                           "within {} sceonds".format(
+                                               sender, sink_stop_timeout))
                     try:
-                        logging.debug("senders step E")
                         assert(sender.error is None)
                     except Exception as err:
                         logging.error("Sender exited with an error")
