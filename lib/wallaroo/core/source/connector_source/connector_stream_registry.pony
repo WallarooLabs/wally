@@ -37,12 +37,12 @@ use "wallaroo/core/network"
 use "wallaroo_labs/mort"
 
 class GlobalConnectorStreamRegistry
-  let _worker_name: String
+  var _worker_name: String
   let _source_name: String
   let _connections: Connections
   let _source_addr: (String, String)
   var _is_leader: Bool = false
-  var _leader_name: String = ""
+  var _leader_name: String = "Initializer"
   var _active_stream_map: Map[U64, WorkerName] = _active_stream_map.create()
   var _inactive_stream_map: Map[U64, U64] =  _inactive_stream_map.create()
   var _source_addr_map: Map[WorkerName, (String, String)] =
@@ -76,7 +76,8 @@ class GlobalConnectorStreamRegistry
       _connections.respond_to_stream_id_request(worker_name, _source_name,
         stream_id, request_id, can_use)
     else
-      // should the message be forwarded to the leader if we're not the leader?
+      // TODO [source-migration-3]: should the message be forwarded to the
+      // leader if we're not the leader?
       None
     end
 
@@ -94,7 +95,26 @@ class GlobalConnectorStreamRegistry
       _connections.respond_to_relinquish_stream_id_request(worker_name,
         _source_name, request_id, relinquished)
     else
-      // should the message be forwarded to the leader if we're not the leader?
+      // TODO [source-migration-3]: should the message be forwarded to the
+      // leader if we're not the leader?
+      None
+    end
+
+  fun ref update_leader(new_leader_name: WorkerName) =>
+    if not _is_leader then
+      _leader_name = new_leader_name
+    else
+      // TODO [source-migration-3]: is there a scenario where this can
+      // happen?
+      None
+    end
+
+  fun ref relinquish_leadership(new_leader_name: WorkerName) =>
+    if _is_leader then
+      _initiate_leadership_relinquishment(new_leader_name)
+    else
+      // TODO [source-migration-3]: should the message be forwarded to the
+      // leader if we're not the leader?
       None
     end
 
@@ -134,16 +154,23 @@ class GlobalConnectorStreamRegistry
 
     // update leader state
     _is_leader = true
+    _leader_name = _worker_name
     // send ack
+    _send_leader_state_received_ack(worker_name)
+    _broadcast_new_leader()
+
 
   fun ref add_source_address(worker_name: WorkerName, host: String,
     service: String)
   =>
     if _is_leader then
       _source_addr_map(worker_name) = (host, service)
-      // should we ack that source addr was received?
+      // TODO [source-migration-3]: we aren't acking here, primarily due
+      // to the fact that it's most likely that the source_addr_map is no
+      // longer needed
     else
-      // forward message to leader?
+      // TODO [source-migration-3]: should the message be forwarded to the
+      // leader if we're not the leader?
       None
     end
 
@@ -207,6 +234,16 @@ class GlobalConnectorStreamRegistry
       promise(relinquish)
     end
 
+  fun ref complete_leader_state_relinquish(new_leader_name: WorkerName) =>
+    _relinquish_leader_state(new_leader_name)
+
+  fun ref _relinquish_leader_state(new_leader_name: WorkerName) =>
+    _active_stream_map = Map[U64, WorkerName]()
+    _inactive_stream_map = Map[U64, U64]()
+    _source_addr_map = Map[WorkerName, (String, String)]()
+    _is_leader = false
+    _leader_name = new_leader_name
+
   fun ref _elect_leader() =>
     try
       let leader_name = _leader_from_worker_list()?
@@ -244,6 +281,39 @@ class GlobalConnectorStreamRegistry
       Fail()
     end
 
+  fun ref _send_leader_state_received_ack(worker_name: WorkerName) =>
+    _connections.connector_reg_leader_state_received_ack(_leader_name, worker_name, _source_name)
+
+  fun ref _broadcast_new_leader() =>
+    let workers_list_size = _workers_list.size()
+    let workers_list = recover trn Array[WorkerName](workers_list_size) end
+    for worker in _workers_list.values() do
+      workers_list.push(worker)
+    end
+
+    _connections.connector_stream_reg_broadcast_new_leader(
+      _worker_name, _source_name, consume workers_list)
+
+  fun ref _initiate_leadership_relinquishment(new_leader_name: WorkerName) =>
+    let active_stream_map_copy = recover trn Map[U64, WorkerName] end
+    for (k,v) in _active_stream_map.pairs() do
+      active_stream_map_copy(k) = v
+    end
+    let inactive_stream_map_copy = recover trn Map[U64, U64] end
+    for (k,v) in _inactive_stream_map.pairs() do
+      inactive_stream_map_copy(k) = v
+    end
+    let source_addr_map_copy = recover trn
+      Map[WorkerName, (String, String)]
+    end
+    for (k,v) in _source_addr_map.pairs() do
+      source_addr_map_copy(k) = v
+    end
+
+    _connections.connector_stream_relinquish_leadership_state(
+      new_leader_name, _worker_name, _source_name,
+      consume active_stream_map_copy, consume inactive_stream_map_copy,
+      consume source_addr_map_copy)
 
 class LocalConnectorStreamRegistry[In: Any val]
   let _active_streams: Map[U64, (String, Any tag, U64, U64)] =

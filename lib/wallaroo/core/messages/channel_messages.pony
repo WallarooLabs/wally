@@ -601,6 +601,28 @@ primitive ChannelMsgEncoder
     _encode(ConnectorStreamAddSourceAddrMsg(worker_name, source_name,
       host, service), auth)?
 
+  fun connector_reg_leader_state_received_ack(leader_name: WorkerName,
+    source_name: String, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(ConnectorStreamRegLeaderStateReceivedAckMsg(leader_name,
+      source_name), auth)?
+
+  fun connector_stream_reg_new_leader(leader_name: WorkerName,
+    source_name: String, auth: AmbientAuth) : Array[ByteSeq] val ?
+  =>
+    _encode(ConnectorStreamRegNewLeaderMsg(leader_name, source_name), auth)?
+
+  fun connector_stream_relinquish_leadership_state(
+    relinquishing_leader_name: WorkerName, source_name: String,
+    active_stream_map: Map[U64, WorkerName] val,
+    inactive_stream_map: Map[U64, U64] val,
+    source_addr_map: Map[WorkerName, (String, String)] val,
+    auth: AmbientAuth) : Array[ByteSeq] val ?
+  =>
+    _encode(ConnectorStreamRegRelinquishLeadershipMsg(
+      relinquishing_leader_name, source_name, active_stream_map,
+      inactive_stream_map, source_addr_map), auth)?
+
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg =>
     try
@@ -685,6 +707,28 @@ class val ConnectionsReadyMsg is ChannelMsg
 
   new val create(name: String) =>
     worker_name = name
+
+class val ConnectorStreamRegNewLeaderMsg is SourceListenerMsg
+  let leader_name: WorkerName
+  let _source_name: String
+
+  new val create(leader_name': WorkerName, source_name': String) =>
+    leader_name = leader_name'
+    _source_name = source_name'
+
+  fun source_name(): String =>
+    _source_name
+
+class val ConnectorStreamRegLeaderStateReceivedAckMsg is SourceListenerMsg
+  let leader_name: WorkerName
+  let _source_name: String
+
+  new val create(leader_name': WorkerName, source_name': String) =>
+    leader_name = leader_name'
+    _source_name = source_name'
+
+  fun source_name(): String =>
+    _source_name
 
 class val ConnectorStreamAddSourceAddrMsg is SourceListenerMsg
   let worker_name: String
