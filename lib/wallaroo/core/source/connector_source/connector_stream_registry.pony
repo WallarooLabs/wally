@@ -184,7 +184,7 @@ class GlobalConnectorStreamRegistry
     // to the leaving worker, that streams would be relinquished in a different
     // step in the migration process
       _workers_set.unset(worker_name)
-    if _is_leader then
+    if _is_leader and (worker_name == _worker_name) then
       try
         let new_leader_name = _leader_from_workers_list()?
         relinquish_leadership(new_leader_name)
