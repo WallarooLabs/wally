@@ -48,6 +48,9 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
+// TODO [source-migration] make this actor participate in checkpointing
+// and rollback, saving its local and global registries
+
 actor ConnectorSourceListener[In: Any val] is SourceListener
   """
   # ConnectorSourceListener
@@ -337,11 +340,11 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   fun ref _process_new_reg_leader_msg(msg: ConnectorStreamRegNewLeaderMsg) =>
     _global_stream_registry.update_leader(msg.leader_name)
 
-  // TODO [source-migration] consider changing to a fun ref
-  be _maybe_process_pending_request(m: ConnectorStreamIdRequestResponseMsg) =>
+  fun ref _maybe_process_pending_request(m: ConnectorStreamIdRequestResponseMsg) =>
     if _global_stream_registry.contains_request(m.request_id) then
       _global_stream_registry.process_request_response(m.request_id, m.can_use)
     else
+      // TODO [source-migration]: Figure out what should be done here
       // Received request_id for a request not in map
       None
     end
@@ -351,38 +354,34 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   =>
     _global_stream_registry.request_stream_id(stream_id, request_id, promise)
 
-  // TODO [source-migration] consider changing to a fun ref
-  be _process_add_source_addr_msg(msg: ConnectorStreamAddSourceAddrMsg) =>
+  fun ref _process_add_source_addr_msg(msg: ConnectorStreamAddSourceAddrMsg) =>
     _global_stream_registry.add_source_address(msg.worker_name, msg.host,
       msg.service)
 
-  // TODO [source-migration] consider changing to a fun ref
-  be _process_relinquish_stream_id_ack_msg(
+  fun ref _process_relinquish_stream_id_ack_msg(
     msg: ConnectorStreamIdRelinquishResponseMsg)
   =>
     if _global_stream_registry.contains_relinquish_request(msg.request_id) then
       _global_stream_registry.process_relinquish_response(msg.request_id,
         msg.relinquished)
     else
+      // TODO [source-migration]: Figure out what should be done here
       // Received request_id for a request not in map
       None
     end
 
-  // TODO [source-migration] consider changing to a fun ref
-  be _process_stream_id_request(msg: ConnectorStreamIdRequestMsg) =>
+  fun ref _process_stream_id_request(msg: ConnectorStreamIdRequestMsg) =>
     _global_stream_registry.process_stream_id_request(msg.worker_name,
       msg.stream_id, msg.request_id)
 
   // be relinquish_stream_id(stream_id: U64, last_acked_msg: U64) =>
   //   _global_stream_registry.
 
-  // TODO [source-migration] consider changing to a fun ref
-  be _relinquish_stream_id_msg(msg: ConnectorStreamIdRelinquishMsg) =>
+  fun ref _relinquish_stream_id_msg(msg: ConnectorStreamIdRelinquishMsg) =>
     _global_stream_registry.process_relinquish_stream_id_request(
       msg.worker_name, msg.stream_id, msg.last_acked_msg, msg.request_id)
 
-  // TODO [source-migration] consider changing to a fun ref
-  be _process_relinquish_leadership_msg(
+  fun ref _process_relinquish_leadership_msg(
     msg: ConnectorStreamRegRelinquishLeadershipMsg)
   =>
     _global_stream_registry.process_relinquish_leadership_request(

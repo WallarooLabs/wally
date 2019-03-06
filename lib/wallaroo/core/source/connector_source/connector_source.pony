@@ -632,9 +632,9 @@ actor ConnectorSource[In: Any val] is Source
       // TODO [source-migration]: this shouldn't actually fail, there are many
       // barrier token types for which it's safe to do nothing.
       // Bug john for documentation on this.
-      Fail() // TODO does this happen in practice?
+      // TODO [source-migration]: Check with John on whether this is okay
+      None
     end
-    None
 
   //////////////
   // CHECKPOINTS
