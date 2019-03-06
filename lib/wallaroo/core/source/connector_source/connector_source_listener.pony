@@ -319,12 +319,24 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
         _process_relinquish_leadership_msg(m)
       | let m: ConnectorStreamAddSourceAddrMsg =>
         _process_add_source_addr_msg(m)
+      | let m: ConnectorStreamRegNewLeaderMsg =>
+        _process_new_reg_leader_msg(m)
+      | let m: ConnectorStreamRegLeaderStateReceivedAckMsg =>
+        _process_reg_leader_state_received_msg(m)
       end
     else
       @printf[I32](("**Dropping message** _pipeline_name: " +
          _pipeline_name +  " =/= source_name: " + msg.source_name() + " \n")
         .cstring())
     end
+
+  fun ref _process_reg_leader_state_received_msg(
+    msg: ConnectorStreamRegLeaderStateReceivedAckMsg)
+  =>
+    _global_stream_registry.complete_leader_state_relinquish(msg.leader_name)
+
+  fun ref _process_new_reg_leader_msg(msg: ConnectorStreamRegNewLeaderMsg) =>
+    _global_stream_registry.update_leader(msg.leader_name)
 
   // TODO [source-migration] consider changing to a fun ref
   be _maybe_process_pending_request(m: ConnectorStreamIdRequestResponseMsg) =>

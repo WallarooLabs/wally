@@ -881,6 +881,48 @@ actor Connections is Cluster
       Fail()
     end
 
+  be connector_reg_leader_state_received_ack(leader_name: WorkerName,
+    worker_name: WorkerName, source_name: String) =>
+    try
+      let connector_reg_new_leader_ack_msg =
+        ChannelMsgEncoder.connector_reg_leader_state_received_ack(leader_name,
+          source_name, _auth)?
+        _send_control(worker_name, connector_reg_new_leader_ack_msg)
+    else
+      Fail()
+    end
+
+  be connector_stream_reg_broadcast_new_leader(leader_name: WorkerName,
+    source_name: String, workers_list: Array[WorkerName] val)
+  =>
+    try
+      let connector_reg_new_leader_msg =
+        ChannelMsgEncoder.connector_stream_reg_new_leader(leader_name,
+          source_name, _auth)?
+        for worker in workers_list.values() do
+          _send_control(worker, connector_reg_new_leader_msg)
+        end
+    else
+      Fail()
+    end
+
+  be connector_stream_relinquish_leadership_state(new_leader_name: WorkerName,
+    relinquishing_leader_name: WorkerName, source_name: String,
+    active_stream_map: Map[U64, WorkerName] val,
+    inactive_stream_map: Map[U64, U64] val,
+    source_addr_map: Map[WorkerName, (String, String)] val)
+  =>
+    try
+      let connector_stream_relinquish_leadership_state_msg =
+        ChannelMsgEncoder.connector_stream_relinquish_leadership_state(
+          relinquishing_leader_name, source_name, active_stream_map,
+          inactive_stream_map, source_addr_map, _auth)?
+      _send_control(new_leader_name,
+        connector_stream_relinquish_leadership_state_msg)
+    else
+      Fail()
+    end
+
 // Ensures that the cluster shuts down, even if there are straggler actors.
 class _ExitTimerNotify is TimerNotify
   fun ref apply(timer: Timer, count: U64): Bool =>
