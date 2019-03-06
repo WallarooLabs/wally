@@ -16,6 +16,8 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
+use "buffered"
+use "crypto"
 use "wallaroo_labs/guid"
 
 class MsgIdGenerator
@@ -35,3 +37,10 @@ class RequestIdGenerator
 
   fun ref apply(): RequestId =>
     _guid.u64()
+
+primitive DeterministicSourceIdGenerator
+  fun apply(text: String): RoutingId ? =>
+    let temp_id = MD5(text)
+    let rb = Reader
+    rb.append(temp_id)
+    rb.u128_le()?
