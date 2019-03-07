@@ -369,67 +369,35 @@ class LocalConnectorStreamRegistry[In: Any val]
 
   fun ref stream_notify(session_tag: USize,
     stream_id: U64, stream_name: String, point_of_reference: U64,
-    connector_source: ConnectorSource[In] tag)
+    connector_source: ConnectorSource[In] tag,
+    listener: ConnectorSourceListener[In] tag)
   =>
     ifdef "trace" then
       @printf[I32]("TRACE: %s.%s(%lu, %lu, ...)\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring(),
         stream_id, point_of_reference)
     end
-    if _active_streams.contains(stream_id) then
-      try
-        (let stream_name': String, let tag_or_none: Any tag,
-          let p_o_r, let last_message_id) = _active_streams(stream_id)?
-        ifdef "trace" then
-          @printf[I32]("TRACE: %s.%s existing stream_id %lu @ p-o-r %lu l-msgid %lu in-use %s\n".cstring(),
-            __loc.type_name().cstring(), __loc.method_name().cstring(),
-            stream_id, p_o_r, last_message_id, (not (tag_or_none is None)).string().cstring())
-        end
-        if stream_name' != stream_name then
-          Fail()
-        end
 
-        if tag_or_none is None then
-          if point_of_reference != p_o_r then
-            // TODO any other action needed?
-            ifdef "trace" then
-              @printf[I32](("stream_notify: stream-id %d stream %s " +
-                "point_of_reference %lu != recorded p_o_r %lu").cstring(),
-              stream_id, stream_name.cstring(), point_of_reference, p_o_r)
-            end
-          end
+    // stream_id in _active_streams.contains()?
+    try
+      (let stream_name': String, let tag_or_none: Any tag,
+       let last_acked: U64, let last_seen: U64) = _active_streams(stream_id)?
+      // connector_source == _active_streams(stream_id).connector_source?
+      if tag_or_none == connector_source then
+        // accept: already owned by requesting source
           _active_streams(stream_id) =
-            (stream_name, connector_source, p_o_r, last_message_id)
+            (stream_name, connector_source, last_acked, last_seen)
           connector_source.stream_notify_result(session_tag, true,
-            stream_id, p_o_r, last_message_id)
-          ifdef "trace" then
-            @printf[I32]("TRACE: %s.%s existing stream_id %lu is ok\n".cstring(),
-              __loc.type_name().cstring(), __loc.method_name().cstring(),
-              stream_id)
-          end
-        else
-          connector_source.stream_notify_result(session_tag, false,
-            0, 0, 0) // TODO args
-          ifdef "trace" then
-            @printf[I32]("TRACE: %s.%s existing stream_id %lu is rejected\n".cstring(),
-              __loc.type_name().cstring(), __loc.method_name().cstring(),
-              stream_id)
-          end
-        end
+            stream_id, last_acked, last_seen)
       else
-        Fail()
+        // reject: owned by another source in this registry
+          connector_source.stream_notify_result(session_tag, true,
+            stream_id, last_acked, last_seen)
       end
     else
-      ifdef "trace" then
-        @printf[I32]("TRACE: %s.%s new stream_id %lu @ p-o-r %lu\n".cstring(),
-          __loc.type_name().cstring(), __loc.method_name().cstring(),
-          stream_id, point_of_reference)
-      end
-      _active_streams(stream_id) =
-        (stream_name, connector_source, point_of_reference, point_of_reference)
-      connector_source.stream_notify_result(session_tag, true,
-        stream_id, point_of_reference, point_of_reference)
+      // defer to global
     end
+
 
   fun ref stream_update(stream_id: U64, checkpoint_id: CheckpointId,
     last_acked_por: U64, last_seen_por: U64,
