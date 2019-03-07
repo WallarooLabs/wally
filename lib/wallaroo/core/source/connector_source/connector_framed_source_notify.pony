@@ -260,7 +260,7 @@ class ConnectorSourceNotify[In: Any val]
           send_notify_ack(m.stream_id, m.stream_name, m.point_of_ref, source,
             false)
         else
-          _process_notify(where stream_id=m.stream_id,
+          _process_notify(where source=source, stream_id=m.stream_id,
             stream_name=m.stream_name, point_of_reference=m.point_of_reference)
         end
 
@@ -706,14 +706,11 @@ class ConnectorSourceNotify[In: Any val]
     Invariant(checkpoint_id == _barrier_checkpoint_id)
 
     if _session_active then
-      // TODO [source-migration]: loop over _pending_close, update them in
-      // registry, then use fun ref _relinquish_stream on them
       for (stream_id, s) in _active_streams.pairs() do
-
         ifdef "trace" then
-          @printf[I32]("TRACE: %s.%s(%lu) _barrier_last_message_id = %lu, _last_message_id = %lu\n".cstring(),
+          @printf[I32]("TRACE: %s.%s(%lu) active last_acked_por = %lu, last_seen_por = %lu\n".cstring(),
             __loc.type_name().cstring(), __loc.method_name().cstring(),
-            checkpoint_id, s.barrier_last_message_id, s.last_message_id)
+            checkpoint_id, s.last_acked_por, s.last_seen_por)
         end
 
         try
@@ -726,6 +723,32 @@ class ConnectorSourceNotify[In: Any val]
           Fail()
         end
       end
+
+      // TODO [source-migration]: loop over _pending_close, update them in
+      // registry, then use fun ref _relinquish_stream on them
+      let to_relinquish = recover ref Array[(U64, _StreamState)] end
+
+      for (stream_id, s) in _pending_close.pairs() do
+        ifdef "trace" then
+          @printf[I32]("TRACE: %s.%s(%lu) pending_close last_acked_por = %lu, last_seen_por = %lu\n".cstring(),
+              __loc.type_name().cstring(), __loc.method_name().cstring(),
+              checkpoint_id, s.last_acked_por, s.last_seen_por)
+        end
+
+        try
+          (_active_stream_registry as ConnectorSourceListener[In])
+            .stream_update(
+              stream_id, s.last_checkpoint_id, s.last_acked_por,
+              s.last_seen_por,
+              (_connector_source as ConnectorSource[In]))
+          to_relinquish.push((stream_id, s))
+        else
+          Fail()
+        end
+      end
+      // clear _pending_close
+      _pending_close.clear()
+      _relinquish_streams(consume to_relinquish)
 
       if _fsm_state is _ProtoFsmStreaming then
         // Send an Ack message to replenish credits
@@ -743,21 +766,19 @@ class ConnectorSourceNotify[In: Any val]
       end
     end
 
-  fun ref _process_notify(stream_id: U64, stream_name: String,
-    point_of_reference: U64)
+  fun ref _process_notify(source: ConnectorSource[In] ref, stream_id: U64,
+    stream_name: String, point_of_reference: U64)
   =>
     // add to _pending_notify
     _pending_notify.set(m.stream_id)
-    // add promise for handling result
-    let promise = Promise[Bool]
-    promise.next[None](recover source~send_notify_ack(
-      where stream_id=m.stream_id, stream_name=m.stream_name,
-      point_of_ref=m.point_of_ref) end)
+    // create promise for handling result
+    let promise = Promise[(ConnectorSource[In], Bool, U64)]
+    promise.next[None](recover SendNotifyAckFulfill(stream_id, stream_name) end)
     // send request to take ownership of this stream id
     _request_stream_id(m.stream_id, source.session_id, promise)
 
   fun ref _request_stream_id(stream_id: U64, session_id: RoutingId,
-    promise: Promise[Bool])
+    promise: Promise[(ConnectorSource[In], Bool, U64)])
   =>
     let request_id = ConnectorStreamIdRequest(stream_id, session_id)
     try
@@ -881,3 +902,16 @@ class ConnectorSourceNotify[In: Any val]
     error messages.
     """
     "[len=" + array.size().string() + ": " + ", ".join(array.values()) + "]"
+
+class SendNotifyAckFulfill is Fulfill[(Bool, U64), None]
+  let _stream_id: U64
+  let _stream_name: String
+
+  new create(stream_id: U64, stream_name: String) =>
+    _stream_id = stream_id
+    _stream_name = stream_name
+
+  fun apply(t: (source: ConnectorSource[In] ref, success: Bool,
+    last_acked: U64))
+  =>
+    t._1.send_notify_ack(t._2, _stream_id, _stream_name, t._3)

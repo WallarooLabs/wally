@@ -830,12 +830,14 @@ actor Connections is Cluster
     end
 
   be respond_to_stream_id_request(worker_name: WorkerName, source_name: String,
-    stream_id: U64, request_id: ConnectorStreamIdRequest, can_use: Bool)
+    stream_id: U64, point_of_reference: U64,
+    request_id: ConnectorStreamIdRequest, can_use: Bool)
   =>
     try
       let stream_id_request_response_msg =
         ChannelMsgEncoder.connector_stream_request_response(
-          source_name, stream_id, request_id, can_use, _auth)?
+          source_name, stream_id, point_of_reference, request_id, can_use,
+          _auth)?
         _send_control(worker_name, stream_id_request_response_msg)
     else
       Fail()

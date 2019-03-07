@@ -340,6 +340,10 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   fun ref _process_new_reg_leader_msg(msg: ConnectorStreamRegNewLeaderMsg) =>
     _global_stream_registry.update_leader(msg.leader_name)
 
+  fun ref _process_stream_id_request(msg: ConnectorStreamIdRequestMsg) =>
+    _global_stream_registry.process_stream_id_request(msg.worker_name,
+      msg.stream_id, msg.request_id)
+
   fun ref _maybe_process_pending_request(m: ConnectorStreamIdRequestResponseMsg) =>
     if _global_stream_registry.contains_request(m.request_id) then
       _global_stream_registry.process_request_response(m.request_id, m.can_use)
@@ -369,10 +373,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       // Received request_id for a request not in map
       None
     end
-
-  fun ref _process_stream_id_request(msg: ConnectorStreamIdRequestMsg) =>
-    _global_stream_registry.process_stream_id_request(msg.worker_name,
-      msg.stream_id, msg.request_id)
 
   // be relinquish_stream_id(stream_id: U64, last_acked_msg: U64) =>
   //   _global_stream_registry.
