@@ -41,7 +41,7 @@ primitive InstrumentParser
       let split = i.split(",")
       let name = split(1)?
       let ticker = split(3)?
-      let price = split(2)?.f64()
+      let price = split(2)?.f64()?
       InstrumentData(name, ticker, price)
     else
       None

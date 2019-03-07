@@ -23,6 +23,7 @@ use "collections"
 use "debug"
 use "wallaroo_labs/fix"
 use "wallaroo_labs/fix_generator_utils"
+use "wallaroo_labs/mort"
 use "random"
 use "time"
 
@@ -114,7 +115,7 @@ actor InitialNbboFileGenerator
   let _time: (I64 val, I64 val) = Time.now()
   var _rejected_instruments: Array[InstrumentData val] val
   var _nonrejected_instruments: Array[InstrumentData val] val
-  var _utc_timestamp: String
+  var _utc_timestamp: String = "0"
 
 
   new create(env: Env,
@@ -129,7 +130,11 @@ actor InitialNbboFileGenerator
     _rejected_instruments = rejected_instruments
     _nonrejected_instruments = nonrejected_instruments
     let date = PosixDate(_time._1, _time._2)
-    _utc_timestamp = date.format("%Y%m%d-%H:%M:%S.000")
+    try
+      _utc_timestamp = date.format("%Y%m%d-%H:%M:%S.000")?
+    else
+      Fail()
+    end
 
   be generate_and_write() =>
     generate_nbbo_messages(_rejected_instruments, true)
