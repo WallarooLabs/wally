@@ -105,3 +105,7 @@ listener
 notifier
   -> remove from _pending_relinquish
 ```
+
+
+
+At the end of a recovery, local_registry relinquishes any streams that don't have a connector_source associated with them
