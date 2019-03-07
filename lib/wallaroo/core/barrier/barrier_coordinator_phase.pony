@@ -17,6 +17,7 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 use "promises"
+use "wallaroo/core/common"
 use "wallaroo/core/sink"
 use "wallaroo/core/source"
 use "wallaroo_labs/mort"
@@ -24,9 +25,6 @@ use "wallaroo_labs/mort"
 
 trait _BarrierCoordinatorPhase
   fun name(): String
-
-  fun ref pending_rollback_barrier_acks(): PendingRollbackBarrierAcks =>
-    PendingRollbackBarrierAcks
 
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
@@ -54,20 +52,13 @@ trait _BarrierCoordinatorPhase
       false
     end
 
-  fun ref ack_barrier(s: Sink, barrier_token: BarrierToken,
-    active_barriers: ActiveBarriers)
-  =>
-    active_barriers.ack_barrier(s, barrier_token)
+  fun ref ack_barrier(s: Sink, barrier_token: BarrierToken) =>
+    _invalid_call()
+    Fail()
 
-  fun ref worker_ack_barrier_start(w: String, barrier_token: BarrierToken,
-    active_barriers: ActiveBarriers)
-  =>
-    active_barriers.worker_ack_barrier_start(w, barrier_token)
-
-  fun ref worker_ack_barrier(w: String, barrier_token: BarrierToken,
-    active_barriers: ActiveBarriers)
-  =>
-    active_barriers.worker_ack_barrier(w, barrier_token)
+  fun ref worker_ack_barrier(w: WorkerName, barrier_token: BarrierToken) =>
+    _invalid_call()
+    Fail()
 
   fun ref barrier_fully_acked(token: BarrierToken) =>
     _invalid_call()
@@ -83,8 +74,8 @@ class _InitialBarrierCoordinatorPhase is _BarrierCoordinatorPhase
 class _NormalBarrierCoordinatorPhase is _BarrierCoordinatorPhase
   let _coordinator: BarrierCoordinator ref
 
-  new create(initiator: BarrierCoordinator ref) =>
-    _initiator = initiator
+  new create(coordinator: BarrierCoordinator ref) =>
+    _coordinator = coordinator
 
   fun name(): String =>
     "_NormalBarrierCoordinatorPhase"
@@ -92,74 +83,68 @@ class _NormalBarrierCoordinatorPhase is _BarrierCoordinatorPhase
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
   =>
-    _initiator.initiate_barrier(barrier_token, result_promise)
+    _coordinator.initiate_barrier(barrier_token, result_promise)
+
+  fun ref ack_barrier(s: Sink, barrier_token: BarrierToken) =>
+    _coordinator._ack_barrier(s, barrier_token)
+
+  fun ref worker_ack_barrier(w: WorkerName, barrier_token: BarrierToken) =>
+    _coordinator._worker_ack_barrier(w, barrier_token)
 
   fun ready_for_next_token(): Bool =>
     true
 
   fun ref barrier_fully_acked(token: BarrierToken) =>
-    _initiator.next_token()
+    _coordinator.next_token()
 
 class _RecoveringBarrierCoordinatorPhase is _BarrierCoordinatorPhase
   let _coordinator: BarrierCoordinator ref
-  let _pending_rollback_barrier_acks: PendingRollbackBarrierAcks =
-    _pending_rollback_barrier_acks.create()
 
-  new create(initiator: BarrierCoordinator ref) =>
-    _initiator = initiator
+  new create(coordinator: BarrierCoordinator ref) =>
+    _coordinator = coordinator
 
   fun name(): String =>
     "_RecoveringBarrierCoordinatorPhase"
-
-  fun ref pending_rollback_barrier_acks(): PendingRollbackBarrierAcks =>
-    _pending_rollback_barrier_acks
 
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
   =>
     match barrier_token
     | let rbt: CheckpointRollbackBarrierToken =>
-      _initiator.initiate_barrier(barrier_token, result_promise)
+      _received_rollback_token("initiate_barrier", barrier_token)
     else
       @printf[I32](("Barrier Initiator recovering so ignoring non-rollback " +
         "barrier\n").cstring())
     end
 
-  fun ref ack_barrier(s: Sink, barrier_token: BarrierToken,
-    active_barriers: ActiveBarriers)
-  =>
+  fun ref ack_barrier(s: Sink, barrier_token: BarrierToken) =>
     match barrier_token
     | let rbt: CheckpointRollbackBarrierToken =>
-      _pending_rollback_barrier_acks.ack_barrier(s, rbt)
+      _coordinator._ack_barrier(s, barrier_token)
     else
-      @printf[I32](("Barrier Initiator recovering so ignoring non-rollback " +
-        "ack_barrier\n").cstring())
+      @printf[I32](("Barrier Initiator recovering so ignoring " +
+        "ack_barrier for %s\n").cstring(), barrier_token.string().cstring())
     end
 
-  fun ref worker_ack_barrier_start(w: String, barrier_token: BarrierToken,
-    active_barriers: ActiveBarriers)
-  =>
+  fun ref worker_ack_barrier(w: String, barrier_token: BarrierToken) =>
     match barrier_token
     | let rbt: CheckpointRollbackBarrierToken =>
-      _pending_rollback_barrier_acks.worker_ack_barrier_start(w, rbt)
+      _coordinator._worker_ack_barrier(w, barrier_token)
     else
-      @printf[I32](("Barrier Initiator recovering so ignoring non-rollback " +
-        "worker_ack_barrier_start\n").cstring())
-    end
-
-  fun ref worker_ack_barrier(w: String, barrier_token: BarrierToken,
-    active_barriers: ActiveBarriers)
-  =>
-    match barrier_token
-    | let rbt: CheckpointRollbackBarrierToken =>
-      _pending_rollback_barrier_acks.worker_ack_barrier(w, rbt)
-    else
-      @printf[I32](("Barrier Initiator recovering so ignoring non-rollback " +
-        "worker_ack_barrier\n").cstring())
+      @printf[I32](("Barrier Initiator recovering so ignoring old " +
+        "worker_ack_barrier for %s\n").cstring(),
+        barrier_token.string().cstring())
     end
 
   fun ready_for_next_token(): Bool =>
     true
+
+  fun _received_rollback_token(call_name: String, token: BarrierToken) =>
+    @printf[I32](("%s received at " +
+      "_RecoveringBarrierCoordinatorPhase for %s. We should have already " +
+      "transitioned to _RollbackBarrierCoordinatorPhase.\n").cstring(),
+      token.string().cstring(), call_name.cstring())
+    Fail()
 
 class _SourcePendingBarrierCoordinatorPhase is _BarrierCoordinatorPhase
   """
@@ -168,8 +153,8 @@ class _SourcePendingBarrierCoordinatorPhase is _BarrierCoordinatorPhase
   """
   let _coordinator: BarrierCoordinator ref
 
-  new create(initiator: BarrierCoordinator ref) =>
-    _initiator = initiator
+  new create(coordinator: BarrierCoordinator ref) =>
+    _coordinator = coordinator
 
   fun name(): String =>
     "_SourcePendingBarrierCoordinatorPhase"
@@ -177,20 +162,20 @@ class _SourcePendingBarrierCoordinatorPhase is _BarrierCoordinatorPhase
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
   =>
-    _initiator.queue_barrier(barrier_token, result_promise)
+    _coordinator.queue_barrier(barrier_token, result_promise)
 
   fun ref source_registration_complete(s: Source) =>
-    _initiator.source_pending_complete(s)
+    _coordinator.source_pending_complete(s)
 
 class _BlockingBarrierCoordinatorPhase is _BarrierCoordinatorPhase
   let _coordinator: BarrierCoordinator ref
   let _initial_token: BarrierToken
   let _wait_for_token: BarrierToken
 
-  new create(initiator: BarrierCoordinator ref, token: BarrierToken,
+  new create(coordinator: BarrierCoordinator ref, token: BarrierToken,
     wait_for_token: BarrierToken)
   =>
-    _initiator = initiator
+    _coordinator = coordinator
     _initial_token = token
     _wait_for_token = wait_for_token
 
@@ -207,7 +192,7 @@ class _BlockingBarrierCoordinatorPhase is _BarrierCoordinatorPhase
         @printf[I32]("BlockPhase: Initiating barrier %s!\n".cstring(),
           barrier_token.string().cstring())
       end
-      _initiator.initiate_barrier(barrier_token, result_promise)
+      _coordinator.initiate_barrier(barrier_token, result_promise)
     else
       ifdef "checkpoint_trace" then
         @printf[I32]("BlockPhase: Queuing barrier %s!\n".cstring(),
@@ -216,21 +201,27 @@ class _BlockingBarrierCoordinatorPhase is _BarrierCoordinatorPhase
       // TODO: We need to ensure that we don't queue checkpoints when we're
       // rolling back. This is a crude way to test that.
       if not (_wait_for_token > barrier_token) then
-        _initiator.queue_barrier(barrier_token, result_promise)
+        _coordinator.queue_barrier(barrier_token, result_promise)
       end
     end
 
+  fun ref ack_barrier(s: Sink, barrier_token: BarrierToken) =>
+    _coordinator._ack_barrier(s, barrier_token)
+
+  fun ref worker_ack_barrier(w: WorkerName, barrier_token: BarrierToken) =>
+    _coordinator._worker_ack_barrier(w, barrier_token)
+
   fun ref barrier_fully_acked(token: BarrierToken) =>
     if token == _wait_for_token then
-      _initiator.next_token()
+      _coordinator.next_token()
     end
 
 class _RollbackBarrierCoordinatorPhase is _BarrierCoordinatorPhase
   let _coordinator: BarrierCoordinator ref
   let _token: BarrierToken
 
-  new create(initiator: BarrierCoordinator ref, token: BarrierToken) =>
-    _initiator = initiator
+  new create(coordinator: BarrierCoordinator ref, token: BarrierToken) =>
+    _coordinator = coordinator
     _token = token
 
   fun name(): String =>
@@ -243,12 +234,12 @@ class _RollbackBarrierCoordinatorPhase is _BarrierCoordinatorPhase
     result_promise: BarrierResultPromise)
   =>
     if (barrier_token == _token) then
-      _initiator.initiate_barrier(barrier_token, result_promise)
+      _coordinator.initiate_barrier(barrier_token, result_promise)
     else
       // !TODO!: Is it safe to queue barriers that arrive after the rollback
       // token? Or should we be dropping all barriers until rollback is
       // complete?
-      _initiator.queue_barrier(barrier_token, result_promise)
+      _coordinator.queue_barrier(barrier_token, result_promise)
     end
 
   fun ref barrier_fully_acked(token: BarrierToken) =>
@@ -259,7 +250,7 @@ class _RollbackBarrierCoordinatorPhase is _BarrierCoordinatorPhase
 
   fun ref rollback_barrier_fully_acked(token: BarrierToken) =>
     if token == _token then
-      _initiator.next_token()
+      _coordinator.next_token()
     end
 
   ////////////////////////////
@@ -269,23 +260,13 @@ class _RollbackBarrierCoordinatorPhase is _BarrierCoordinatorPhase
   // current rollback token. By the time the rollback token is acked at
   // all sinks, we know that no more past activity will arrive.
   /////////////////////////////
-  fun ref ack_barrier(s: Sink, barrier_token: BarrierToken,
-    active_barriers: ActiveBarriers)
-  =>
+  fun ref ack_barrier(s: Sink, barrier_token: BarrierToken) =>
     if barrier_token == _token then
-      active_barriers.ack_barrier(s, barrier_token)
+      _coordinator._ack_barrier(s, barrier_token)
     end
 
-  fun ref worker_ack_barrier_start(w: String, barrier_token: BarrierToken,
-    active_barriers: ActiveBarriers)
+  fun ref worker_ack_barrier(w: String, barrier_token: BarrierToken)
   =>
     if barrier_token == _token then
-      active_barriers.worker_ack_barrier_start(w, barrier_token)
-    end
-
-  fun ref worker_ack_barrier(w: String, barrier_token: BarrierToken,
-    active_barriers: ActiveBarriers)
-  =>
-    if barrier_token == _token then
-      active_barriers.worker_ack_barrier(w, barrier_token)
+      _coordinator._worker_ack_barrier(w, barrier_token)
     end

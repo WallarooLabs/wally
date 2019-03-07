@@ -412,11 +412,6 @@ primitive ChannelMsgEncoder
   =>
     _encode(RemoteInitiateBarrierMsg(sender, token), auth)?
 
-  fun worker_ack_barrier_start(sender: WorkerName, token: BarrierToken,
-    auth: AmbientAuth): Array[ByteSeq] val ?
-  =>
-    _encode(WorkerAckBarrierStartMsg(sender, token), auth)?
-
   fun worker_ack_barrier(sender: WorkerName, token: BarrierToken,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -1233,14 +1228,6 @@ class val ForwardedInjectBarrierFullyAckedMsg is ChannelMsg
     token = token'
 
 class val RemoteInitiateBarrierMsg is ChannelMsg
-  let sender: WorkerName
-  let token: BarrierToken
-
-  new val create(sender': WorkerName, token': BarrierToken) =>
-    sender = sender'
-    token = token'
-
-class val WorkerAckBarrierStartMsg is ChannelMsg
   let sender: WorkerName
   let token: BarrierToken
 

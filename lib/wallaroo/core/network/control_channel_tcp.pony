@@ -483,8 +483,6 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _barrier_coordinator.forwarded_inject_barrier_fully_acked(m.token)
       | let m: RemoteInitiateBarrierMsg =>
         _barrier_coordinator.remote_initiate_barrier(m.sender, m.token)
-      | let m: WorkerAckBarrierStartMsg =>
-        _barrier_coordinator.worker_ack_barrier_start(m.sender, m.token)
       | let m: WorkerAckBarrierMsg =>
         _barrier_coordinator.worker_ack_barrier(m.sender, m.token)
       | let m: BarrierFullyAckedMsg =>
