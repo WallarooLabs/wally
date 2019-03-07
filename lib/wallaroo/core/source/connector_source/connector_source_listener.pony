@@ -388,11 +388,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       msg.worker_name, msg.active_stream_map, msg.inactive_stream_map,
       msg.source_addr_map)
 
-  be get_all_streams(session_tag: USize,
-    connector_source: ConnectorSource[In] tag)
-  =>
-    _local_stream_registry.get_all_streams(session_tag, connector_source)
-
   be stream_notify(session_tag: USize,
     stream_id: U64, stream_name: String, point_of_reference: U64,
     connector_source: ConnectorSource[In] tag)
@@ -401,11 +396,11 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       stream_name, point_of_reference, connector_source)
 
   be stream_update(stream_id: U64, checkpoint_id: CheckpointId,
-    point_of_reference: U64, last_message_id: U64,
+    last_acked_por: U64, last_seen_por: U64,
     connector_source: (ConnectorSource[In] tag|None))
   =>
     _local_stream_registry.stream_update(stream_id, checkpoint_id,
-      point_of_reference, last_message_id, connector_source)
+      last_acked_por, last_seen_por, connector_source)
 
 
   ///////////////////////

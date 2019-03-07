@@ -348,19 +348,6 @@ class LocalConnectorStreamRegistry[In: Any val]
   fun ref stream_is_present(stream_id: U64): Bool =>
     _active_streams.contains(stream_id)
 
-  fun ref get_all_streams(session_tag: USize,
-    connector_source: ConnectorSource[In] tag)
-  =>
-   let data: Array[(U64, String, U64)] trn = recover data.create() end
-
-
-   for (stream_id, (stream_name, _, p_o_r, last_message_id)) in
-    _active_streams.pairs()
-  do
-    data.push((stream_id, stream_name, p_o_r))
-  end
-  connector_source.get_all_streams_result(session_tag, consume data)
-
   fun ref stream_notify(session_tag: USize,
     stream_id: U64, stream_name: String, point_of_reference: U64,
     connector_source: ConnectorSource[In] tag)
@@ -426,7 +413,7 @@ class LocalConnectorStreamRegistry[In: Any val]
     end
 
   fun ref stream_update(stream_id: U64, checkpoint_id: CheckpointId,
-    point_of_reference: U64, last_message_id: U64,
+    last_acked_por: U64, last_seen_por: U64,
     connector_source: (ConnectorSource[In] tag | None))
   =>
     let update = if connector_source is None then
@@ -442,6 +429,7 @@ class LocalConnectorStreamRegistry[In: Any val]
         false
       end
     end
+
     ifdef "trace" then
       @printf[I32]("TRACE: %s.%s(stmid %lu, chkp %lu, p-o-r %lu, l-msgid %lu, conn %s) update %s\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring(),
@@ -452,10 +440,11 @@ class LocalConnectorStreamRegistry[In: Any val]
           "not None"
         end).cstring(), update.string().cstring())
     end
+
     if update then
       let stream_name = try _active_streams(stream_id)?._1 else Fail(); "" end
       _active_streams(stream_id) =
-        (stream_name, connector_source, point_of_reference, last_message_id)
+        (stream_name, connector_source, last_acked_por, last_seen_por)
     end
 
 
@@ -466,7 +455,6 @@ class val ConnectorStreamIdRequest is Equatable[ConnectorStreamIdRequest]
   new val create(stream_id': U64, session_id': RoutingId) =>
     stream_id = stream_id'
     session_id = session_id'
-
 
   fun eq(that: ConnectorStreamIdRequest box): Bool =>
      """
@@ -496,6 +484,3 @@ class val ConnectorRelinquishStreamIdRequest is
 
   fun hash(): USize =>
     session_id.hash() xor stream_id.hash()
-
-
-

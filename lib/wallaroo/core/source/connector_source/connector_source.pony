@@ -1019,18 +1019,7 @@ actor ConnectorSource[In: Any val] is Source
     _notify.stream_notify_result(session_tag, success,
       stream_id, point_of_reference, last_message_id)
 
-  be get_all_streams_result(session_tag: USize,
-    data: Array[(U64,String,U64)] val)
-  =>
-    ifdef "trace" then
-      @printf[I32]("TRACE: %s.%s(%lu, ...%d...)\n".cstring(),
-        __loc.type_name().cstring(), __loc.method_name().cstring(),
-        session_tag, data.size())
-    end
-    _notify.get_all_streams_result(session_tag, data)
-
-  be process_notify_msg(process: Bool, stream_id: U64,
+  be send_notify_ack(process: Bool, stream_id: U64,
     stream_name: String, point_of_ref: U64)
   =>
-    _notify.process_notify_msg(stream_id, stream_name,
-    point_of_ref, this, process)
+    _notify.send_notify_ack(stream_id, stream_name, point_of_ref, this, process)
