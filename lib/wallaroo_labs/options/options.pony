@@ -243,7 +243,7 @@ class Options is Iterator[(ParsedOption | ParseError | None)]
         match opt.arg
         | StringArgument => return (opt.long, argument.clone())
         | I64Argument => return (opt.long, argument.i64()?)
-        | F64Argument => return (opt.long, argument.f64())
+        | F64Argument => return (opt.long, argument.f64()?)
         end
       else
         if opt.requires_argument() then
