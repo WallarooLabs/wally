@@ -1018,8 +1018,3 @@ actor ConnectorSource[In: Any val] is Source
     end
     _notify.stream_notify_result(session_tag, success,
       stream_id, point_of_reference, last_message_id)
-
-  be send_notify_ack(process: Bool, stream_id: U64,
-    stream_name: String, point_of_ref: U64)
-  =>
-    _notify.send_notify_ack(stream_id, stream_name, point_of_ref, this, process)

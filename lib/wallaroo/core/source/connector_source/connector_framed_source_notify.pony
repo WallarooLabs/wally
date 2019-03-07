@@ -88,11 +88,6 @@ class ConnectorSourceNotify[In: Any val]
   var service: String
 
   // stream state management
-  // TODO [source-migration]: replace these with references to listener
-  // and local active streams
-  let _stream_map: Map[U64, _StreamState] = _stream_map.create()
-  var _stream_registry: (None|ConnectorSourceListener[In]) = None
-
   var _active_streams: Map[U64, _StreamState]= _active_steams.create()
   var _pending_notify: Set[U64] = _pending_notify.create()
   var _pending_close: Map[U64, _StreamState] = _pending_close.create()
@@ -771,19 +766,16 @@ class ConnectorSourceNotify[In: Any val]
   =>
     // add to _pending_notify
     _pending_notify.set(m.stream_id)
-    // create promise for handling result
-    let promise = Promise[(ConnectorSource[In], Bool, U64)]
-    promise.next[None](recover SendNotifyAckFulfill(stream_id, stream_name) end)
-    // send request to take ownership of this stream id
-    _request_stream_id(m.stream_id, source.session_id, promise)
 
-  fun ref _request_stream_id(stream_id: U64, session_id: RoutingId,
-    promise: Promise[(ConnectorSource[In], Bool, U64)])
-  =>
-    let request_id = ConnectorStreamIdRequest(stream_id, session_id)
+    // create a promise for handling result
+    let promise = Promise[NotifyResult]
+    promise.next[None](recover NotifyResultFulfill(stream_id) end)
+
+    // send request to take ownership of this stream id
+    let request_id = ConnectorStreamIdRequest(stream_id, source.session_id)
     try
-      (_active_stream_registry as ConnectorSourceListener[In])
-        .request_stream_id(stream_id, request_id, promise)
+      (_listener as ConnectorSourceListener[In])
+        .stream_notify(stream_id, request_id, _session_tag, promise)
     end
 
   fun ref stream_notify_result(session_tag: USize, success: Bool,
@@ -794,7 +786,7 @@ class ConnectorSourceNotify[In: Any val]
       // connection, or else the TCP connection is closed now,
       // so ignore it.
       // If the connection has been closed, any state about this query would
-      // have already been purged.
+      // have already been purged from any local state
       return
     end
 
@@ -805,46 +797,16 @@ class ConnectorSourceNotify[In: Any val]
         stream_id, point_of_reference)
     end
 
-    try
-      // if stream_id in _pending_notify:
-      //  and success:
-      //    return True
-      // else:
-      //    ??
-      try
-        // remove entry from _pending_notify set
-        _pending_notify.extract(stream_id)?
-        // create _StreamState to place in _active_streams
-        let s = _StreamState(point_of_reference, poi
-        
-          // format response parameters
-        else
-          false
-        end
-      else
-        false
-      end
-      let success_reply =
-        // TODO [source-migration]: check _pending_notify instead?
-        // revisit this process to make sure it still makes sense
-        // TODO [source-migration]: continue replacement of _stream_map
-        if success and (not _active_streams.contains(stream_id)) then
-          true
-        else
-          let s = _stream_map(stream_id)?
-          if success and s.pending_query then
-            s.pending_query = false
-            s.base_point_of_reference = point_of_reference
-            true
-          else
-            false
-          end
-        end
-      let m = cwm.NotifyAckMsg(success_reply, stream_id, point_of_reference)
-      _send_reply(_connector_source, m)
-    else
-      Fail()
+    // remove entry from _pending_notify set
+    _pending_notify.unset(stream_id)
+    if success then
+      // create _StreamState to place in _active_streams
+      let s = _StreamState(point_of_reference, point_of_reference,
+        _barrier_checkpoint_id)
+      _active_streams(stream_id) = s
     end
+    // send response either way
+    send_notify_ack(success, stream_id, point_of_reference)
 
   fun ref _to_error_state(source: (ConnectorSource[In] ref|None), msg: String): Bool
   =>
@@ -903,15 +865,28 @@ class ConnectorSourceNotify[In: Any val]
     """
     "[len=" + array.size().string() + ": " + ", ".join(array.values()) + "]"
 
-class SendNotifyAckFulfill is Fulfill[(Bool, U64), None]
-  let _stream_id: U64
-  let _stream_name: String
+class val NotifyResult
+  let source: ConnectorSource[In] tag
+  let session_tag: USize
+  let success: Bool
+  let last_acked: U64
+  let last_seen: U64
 
-  new create(stream_id: U64, stream_name: String) =>
-    _stream_id = stream_id
-    _stream_name = stream_name
-
-  fun apply(t: (source: ConnectorSource[In] ref, success: Bool,
-    last_acked: U64))
+  new val create(source': ConnectorSource[In] tag, session_tag': USize,
+    success': Bool, last_acked': U64, last_seen': U64)
   =>
-    t._1.send_notify_ack(t._2, _stream_id, _stream_name, t._3)
+    source = source'
+    session_tag = session_tag'
+    success = success'
+    last_acked = last_acked'
+    last_seen = last_seen'
+
+class NotifyResultFulfill is Fulfill[NotifyResult]
+  let stream_id: U64
+
+  new create(stream_id': U64, stream_name: String) =>
+    stream_id = stream_id'
+
+  fun apply(t: NotifyResponse) =>
+    t.source.stream_notify_result(t.session_tag, t.success,
+      stream_id, t.last_acked, t.last_seen)

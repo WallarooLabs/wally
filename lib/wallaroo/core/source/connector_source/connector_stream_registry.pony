@@ -211,12 +211,13 @@ class GlobalConnectorStreamRegistry
       end
     end
 
-  fun ref request_stream_id(stream_id: U64,
+  fun ref stream_notify(session_tag: USize, stream_id: U64,
     request_id: ConnectorStreamIdRequest, promise: Promise[Bool])
   =>
-    _request_stream_id(stream_id, request_id, promise)
+    _stream_notify(session_tag, stream_id, request_id, promise)
 
-  fun ref _request_stream_id(stream_id: U64,
+  // TODO [source-migration][nisan]: Continue from here. add session tag.
+  fun ref _stream_notify(session_tag: USize, stream_id: U64,
     request_id: ConnectorStreamIdRequest, promise: Promise[Bool])
   =>
     if _is_leader then
@@ -360,42 +361,42 @@ class GlobalConnectorStreamRegistry
       consume source_addr_map_copy)
 
 class LocalConnectorStreamRegistry[In: Any val]
+  var global_registry: GlobalConnectorStreamRegistry
+
   // (stream_name, connector_source, last_acked_por, last_seen_por)
-  let _active_streams: Map[U64, (String, Any tag, U64, U64)] =
-    _active_streams.create()
+  let active_streams: Map[U64, (String, Any tag, U64, U64)] =
+    active_streams.create()
+
+  new create(global: GlobalConnectorStreamRegistry[In] ref) =>
+    global_registry = global
 
   fun ref stream_is_present(stream_id: U64): Bool =>
-    _active_streams.contains(stream_id)
+    active_streams.contains(stream_id)
 
+  // TODO [source-migration] put session tag back in here?
+  // and thread it throughout all the way back to response from leader
   fun ref stream_notify(session_tag: USize,
-    stream_id: U64, stream_name: String, point_of_reference: U64,
-    connector_source: ConnectorSource[In] tag,
-    listener: ConnectorSourceListener[In] tag)
+    stream_id: U64, request_id: ConnectorStreamIdRequest,
+    promise: Promise[NotifyResult], connector_source: ConectorSource[In] tag)
   =>
-    ifdef "trace" then
-      @printf[I32]("TRACE: %s.%s(%lu, %lu, ...)\n".cstring(),
-        __loc.type_name().cstring(), __loc.method_name().cstring(),
-        stream_id, point_of_reference)
-    end
-
-    // stream_id in _active_streams.contains()?
+    // stream_id in active_streams.contains()?
     try
-      (let stream_name': String, let tag_or_none: Any tag,
-       let last_acked: U64, let last_seen: U64) = _active_streams(stream_id)?
-      // connector_source == _active_streams(stream_id).connector_source?
+      (let stream_name: String, let tag_or_none: Any tag,
+       let last_acked: U64, let last_seen: U64) = active_streams(stream_id)?
+      // connector_source == active_streams(stream_id).connector_source?
       if tag_or_none == connector_source then
         // accept: already owned by requesting source
-          _active_streams(stream_id) =
-            (stream_name, connector_source, last_acked, last_seen)
-          connector_source.stream_notify_result(session_tag, true,
-            stream_id, last_acked, last_seen)
+        promise(NotifyResult(connector_source, session_tag, true,
+          last_acked, last_seen))
       else
         // reject: owned by another source in this registry
-          connector_source.stream_notify_result(session_tag, true,
-            stream_id, last_acked, last_seen)
+        promise(NotifyResult(connector_source, session_tag, false,
+          last_acked, last_seen))
       end
     else
       // defer to global
+      global_registry.stream_notify(session_tag, stream_id, request_id,
+        promise)
     end
 
 
@@ -407,7 +408,7 @@ class LocalConnectorStreamRegistry[In: Any val]
       true
     else
       try
-        if _active_streams(stream_id)?._2 is None then
+        if active_streams(stream_id)?._2 is None then
           false
         else
           true
@@ -429,8 +430,8 @@ class LocalConnectorStreamRegistry[In: Any val]
     end
 
     if update then
-      let stream_name = try _active_streams(stream_id)?._1 else Fail(); "" end
-      _active_streams(stream_id) =
+      let stream_name = try active_streams(stream_id)?._1 else Fail(); "" end
+      active_streams(stream_id) =
         (stream_name, connector_source, last_acked_por, last_seen_por)
     end
 

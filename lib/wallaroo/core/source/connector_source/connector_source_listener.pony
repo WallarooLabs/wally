@@ -353,10 +353,11 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       None
     end
 
-  be request_stream_id(stream_id: U64, request_id: ConnectorStreamIdRequest,
-    promise: Promise[Bool])
+  be stream_notify(stream_id: U64, request_id: ConnectorStreamIdRequest,
+    promise: Promise[Bool], connector_source: ConnectorSource[In] tag)
   =>
-    _global_stream_registry.request_stream_id(stream_id, request_id, promise)
+    _local_stream_registry.stream_notify(stream_id, request_id, promise,
+      conector_source)
 
   fun ref _process_add_source_addr_msg(msg: ConnectorStreamAddSourceAddrMsg) =>
     _global_stream_registry.add_source_address(msg.worker_name, msg.host,
