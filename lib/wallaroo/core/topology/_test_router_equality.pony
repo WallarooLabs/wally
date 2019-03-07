@@ -220,23 +220,23 @@ actor _TestRouterEquality is TestList
 //     RouterRegistry(auth, "", _DataReceiversGenerator(env, auth),
 //       _ConnectionsGenerator(env, auth),
 //       _DummyRecoveryFileCleaner, 0,
-//       false, "", _BarrierInitiatorGenerator(env, auth),
+//       false, "", _BarrierCoordinatorGenerator(env, auth),
 //       _CheckpointInitiatorGenerator(env, auth),
 //       _AutoscaleInitiatorGenerator(env, auth))
 
-// primitive _BarrierInitiatorGenerator
-//   fun apply(env: Env, auth: AmbientAuth): BarrierInitiator =>
-//     BarrierInitiator(auth, "w", _ConnectionsGenerator(env, auth),
+// primitive _BarrierCoordinatorGenerator
+//   fun apply(env: Env, auth: AmbientAuth): BarrierCoordinator =>
+//     BarrierCoordinator(auth, "w", _ConnectionsGenerator(env, auth),
 //       "init")
 
 // primitive _AutoscaleInitiatorGenerator
 //   fun apply(env: Env, auth: AmbientAuth): AutoscaleInitiator =>
-//     AutoscaleInitiator("w", _BarrierInitiatorGenerator(env, auth))
+//     AutoscaleInitiator("w", _BarrierCoordinatorGenerator(env, auth))
 
 // primitive _CheckpointInitiatorGenerator
 //   fun apply(env: Env, auth: AmbientAuth): CheckpointInitiator =>
 //     CheckpointInitiator(auth, "", "", _ConnectionsGenerator(env, auth), 1,
-//       EventLog("w1"), _BarrierInitiatorGenerator(env, auth), "", false)
+//       EventLog("w1"), _BarrierCoordinatorGenerator(env, auth), "", false)
 
 // primitive _DataReceiversGenerator
 //   fun apply(env: Env, auth: AmbientAuth): DataReceivers =>

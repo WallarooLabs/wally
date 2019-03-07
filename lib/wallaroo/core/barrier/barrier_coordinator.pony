@@ -30,43 +30,43 @@ use "wallaroo_labs/mort"
 use "wallaroo_labs/string_set"
 
 
-actor BarrierInitiator is Initializable
+actor BarrierCoordinator is Initializable
   """
-  The BarrierInitiator is used to trigger a barrier protocol starting from
+  The BarrierCoordinator is used to trigger a barrier protocol starting from
   all Sources in the system and moving down to the Sinks, which will each ack
-  the BarrierInitiator actor local to its worker.
+  the BarrierCoordinator actor local to its worker.
 
   Once a Step or Sink receives a barrier, it will block on the input it
   received it on. Once it has received barriers over all inputs, it will
   forward the barrier downstream.
 
   The details of the barrier protocol depend on the BarrierToken and are
-  opaque to the BarrierInitiator. That means it can be used as part of
+  opaque to the BarrierCoordinator. That means it can be used as part of
   different protocols if they require general barrier processing behavior
   (for example, the checkpointing protocol and the protocol checking that all
   in flight messages have been processed).
 
   Phases:
-    1) _InitialBarrierInitiatorPhase: Waiting for constructor to complete, at
-       which point we transition either to _NormalBarrierInitiatorPhase or
-       _RecoveringBarrierInitiatorPhase, depending on if we're recovering
-    2) _NormalBarrierInitiatorPhase: Normal barrier processing.
-    3) _RecoveringBarrierInitiatorPhase: Indicates we started in recovery
+    1) _InitialBarrierCoordinatorPhase: Waiting for constructor to complete, at
+       which point we transition either to _NormalBarrierCoordinatorPhase or
+       _RecoveringBarrierCoordinatorPhase, depending on if we're recovering
+    2) _NormalBarrierCoordinatorPhase: Normal barrier processing.
+    3) _RecoveringBarrierCoordinatorPhase: Indicates we started in recovery
        mode. We drop all barrier tokens that are not
        CheckpointRollbackBarrierToken.
-    4) _SourcePendingBarrierInitiatorPhase: This phase is initiated if we
+    4) _SourcePendingBarrierCoordinatorPhase: This phase is initiated if we
        pull a pending new source off the pending queue. In this phase, we
        queue new barriers and wait to inject them until after the pending
        source has registered with its downstreams.
-    5) _BlockingBarrierInitiatorPhase: While processing a "blocking barrier",
+    5) _BlockingBarrierCoordinatorPhase: While processing a "blocking barrier",
        we queue all incoming barriers.
-    6) _RollbackBarrierInitiatorPhase: We transition to this phase in response
+    6) _RollbackBarrierCoordinatorPhase: We transition to this phase in response
        to the injection of a CheckpointRollbackBarrierToken. During this phase,
        we queue all incoming barriers.
   """
   let _auth: AmbientAuth
   let _worker_name: String
-  var _phase: _BarrierInitiatorPhase = _InitialBarrierInitiatorPhase
+  var _phase: _BarrierCoordinatorPhase = _InitialBarrierCoordinatorPhase
 
   var _pending: Array[_Pending] = _pending.create()
   let _active_barriers: ActiveBarriers = ActiveBarriers
@@ -99,9 +99,9 @@ actor BarrierInitiator is Initializable
     _connections = connections
     _primary_worker = primary_worker
     if is_recovering then
-      _phase = _RecoveringBarrierInitiatorPhase(this)
+      _phase = _RecoveringBarrierCoordinatorPhase(this)
     else
-      _phase = _NormalBarrierInitiatorPhase(this)
+      _phase = _NormalBarrierCoordinatorPhase(this)
     end
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
@@ -138,7 +138,7 @@ actor BarrierInitiator is Initializable
   be add_worker(w: String) =>
     if not _disposed then
       ifdef "checkpoint_trace" then
-        @printf[I32]("BarrierInitiator: add_worker %s\n".cstring(),
+        @printf[I32]("BarrierCoordinator: add_worker %s\n".cstring(),
           w.cstring())
       end
       if _active_barriers.barrier_in_progress() then
@@ -152,7 +152,7 @@ actor BarrierInitiator is Initializable
   be remove_worker(w: String) =>
     if not _disposed then
       ifdef "checkpoint_trace" then
-        @printf[I32]("BarrierInitiator: remove_worker %s\n".cstring(),
+        @printf[I32]("BarrierCoordinator: remove_worker %s\n".cstring(),
           w.cstring())
       end
 
@@ -177,7 +177,7 @@ actor BarrierInitiator is Initializable
     end
 
   fun ref _initialize_source(s: Source) =>
-    _phase = _SourcePendingBarrierInitiatorPhase(this)
+    _phase = _SourcePendingBarrierCoordinatorPhase(this)
     let promise = Promise[Source]
     promise.next[None](recover this~source_registration_complete() end)
     s.register_downstreams(promise)
@@ -187,7 +187,7 @@ actor BarrierInitiator is Initializable
 
   fun ref source_pending_complete(s: Source) =>
     if not _disposed then
-      _phase = _NormalBarrierInitiatorPhase(this)
+      _phase = _NormalBarrierCoordinatorPhase(this)
       next_token()
     end
 
@@ -222,7 +222,7 @@ actor BarrierInitiator is Initializable
           // it.
           if _phase.higher_priority(srt) then
             _clear_barriers()
-            _phase = _RollbackBarrierInitiatorPhase(this, srt)
+            _phase = _RollbackBarrierCoordinatorPhase(this, srt)
           end
         | let srrt: CheckpointRollbackResumeBarrierToken =>
           // Check if this rollback token is higher priority than a current
@@ -230,12 +230,15 @@ actor BarrierInitiator is Initializable
           // it.
           if _phase.higher_priority(srrt) then
             _clear_barriers()
-            _phase = _NormalBarrierInitiatorPhase(this)
+            _phase = _NormalBarrierCoordinatorPhase(this)
           end
         end
 
         _phase.initiate_barrier(barrier_token, result_promise)
       else
+        ifdef debug then
+          Invariant(not _pending_promises.contains(barrier_token))
+        end
         _pending_promises(barrier_token) = result_promise
         try
           let msg = ChannelMsgEncoder.forward_inject_barrier(barrier_token,
@@ -279,7 +282,7 @@ actor BarrierInitiator is Initializable
 
         //!TODO!: We need to make sure this gets queued if we're in rollback
         //mode
-        _phase = _BlockingBarrierInitiatorPhase(this, barrier_token,
+        _phase = _BlockingBarrierCoordinatorPhase(this, barrier_token,
           wait_for_token)
         _phase.initiate_barrier(barrier_token, result_promise)
       else
@@ -383,10 +386,10 @@ actor BarrierInitiator is Initializable
           _clear_barriers()
           pending_acks = _phase.pending_rollback_barrier_acks()
           ifdef "checkpoint_trace" then
-            @printf[I32]("Switching to _RollbackBarrierInitiatorPhase for %s\n"
+            @printf[I32]("Switching to _RollbackBarrierCoordinatorPhase for %s\n"
               .cstring(), srt.string().cstring())
           end
-          _phase = _RollbackBarrierInitiatorPhase(this, srt)
+          _phase = _RollbackBarrierCoordinatorPhase(this, srt)
         end
       | let srrt: CheckpointRollbackResumeBarrierToken =>
         // Check if this rollback token is higher priority than a current
@@ -394,7 +397,7 @@ actor BarrierInitiator is Initializable
         // it.
         if _phase.higher_priority(srrt) then
           _clear_barriers()
-          _phase = _NormalBarrierInitiatorPhase(this)
+          _phase = _NormalBarrierCoordinatorPhase(this)
         end
       end
 
@@ -488,7 +491,7 @@ actor BarrierInitiator is Initializable
     their inputs.
     """
     ifdef "checkpoint_trace" then
-      @printf[I32]("BarrierInitiator: ack_barrier on %s\n".cstring(),
+      @printf[I32]("BarrierCoordinator: ack_barrier on %s\n".cstring(),
         _phase.name().cstring())
     end
     _phase.ack_barrier(s, barrier_token, _active_barriers)
@@ -599,7 +602,7 @@ actor BarrierInitiator is Initializable
 
   fun ref next_token() =>
     if not _disposed then
-      _phase = _NormalBarrierInitiatorPhase(this)
+      _phase = _NormalBarrierCoordinatorPhase(this)
       if _pending.size() > 0 then
         try
           let next = _pending.shift()?
@@ -631,5 +634,5 @@ actor BarrierInitiator is Initializable
     end
 
   be dispose() =>
-    @printf[I32]("Shutting down BarrierInitiator\n".cstring())
+    @printf[I32]("Shutting down BarrierCoordinator\n".cstring())
     _disposed = true

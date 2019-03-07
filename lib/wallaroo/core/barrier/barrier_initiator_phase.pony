@@ -22,7 +22,7 @@ use "wallaroo/core/source"
 use "wallaroo_labs/mort"
 
 
-trait _BarrierInitiatorPhase
+trait _BarrierCoordinatorPhase
   fun name(): String
 
   fun ref pending_rollback_barrier_acks(): PendingRollbackBarrierAcks =>
@@ -43,7 +43,7 @@ trait _BarrierInitiatorPhase
 
   fun higher_priority(t: BarrierToken): Bool =>
     """
-    If this is called on any phase other than RollbackBarrierInitiatorPhase,
+    If this is called on any phase other than RollbackBarrierCoordinatorPhase,
     then this is the only rollback token being processed and it is thus
     higher priority than any other tokens in progress.
     """
@@ -77,17 +77,17 @@ trait _BarrierInitiatorPhase
     @printf[I32]("Invalid call on barrier initiator phase %s\n".cstring(),
       name().cstring())
 
-class _InitialBarrierInitiatorPhase is _BarrierInitiatorPhase
-  fun name(): String => "_InitialBarrierInitiatorPhase"
+class _InitialBarrierCoordinatorPhase is _BarrierCoordinatorPhase
+  fun name(): String => "_InitialBarrierCoordinatorPhase"
 
-class _NormalBarrierInitiatorPhase is _BarrierInitiatorPhase
-  let _initiator: BarrierInitiator ref
+class _NormalBarrierCoordinatorPhase is _BarrierCoordinatorPhase
+  let _coordinator: BarrierCoordinator ref
 
-  new create(initiator: BarrierInitiator ref) =>
+  new create(initiator: BarrierCoordinator ref) =>
     _initiator = initiator
 
   fun name(): String =>
-    "_NormalBarrierInitiatorPhase"
+    "_NormalBarrierCoordinatorPhase"
 
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
@@ -100,16 +100,16 @@ class _NormalBarrierInitiatorPhase is _BarrierInitiatorPhase
   fun ref barrier_fully_acked(token: BarrierToken) =>
     _initiator.next_token()
 
-class _RecoveringBarrierInitiatorPhase is _BarrierInitiatorPhase
-  let _initiator: BarrierInitiator ref
+class _RecoveringBarrierCoordinatorPhase is _BarrierCoordinatorPhase
+  let _coordinator: BarrierCoordinator ref
   let _pending_rollback_barrier_acks: PendingRollbackBarrierAcks =
     _pending_rollback_barrier_acks.create()
 
-  new create(initiator: BarrierInitiator ref) =>
+  new create(initiator: BarrierCoordinator ref) =>
     _initiator = initiator
 
   fun name(): String =>
-    "_RecoveringBarrierInitiatorPhase"
+    "_RecoveringBarrierCoordinatorPhase"
 
   fun ref pending_rollback_barrier_acks(): PendingRollbackBarrierAcks =>
     _pending_rollback_barrier_acks
@@ -161,18 +161,18 @@ class _RecoveringBarrierInitiatorPhase is _BarrierInitiatorPhase
   fun ready_for_next_token(): Bool =>
     true
 
-class _SourcePendingBarrierInitiatorPhase is _BarrierInitiatorPhase
+class _SourcePendingBarrierCoordinatorPhase is _BarrierCoordinatorPhase
   """
   In this phase, we queue new barriers and wait to inject them until after
   the pending source has registered with its downstreams.
   """
-  let _initiator: BarrierInitiator ref
+  let _coordinator: BarrierCoordinator ref
 
-  new create(initiator: BarrierInitiator ref) =>
+  new create(initiator: BarrierCoordinator ref) =>
     _initiator = initiator
 
   fun name(): String =>
-    "_SourcePendingBarrierInitiatorPhase"
+    "_SourcePendingBarrierCoordinatorPhase"
 
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
@@ -182,12 +182,12 @@ class _SourcePendingBarrierInitiatorPhase is _BarrierInitiatorPhase
   fun ref source_registration_complete(s: Source) =>
     _initiator.source_pending_complete(s)
 
-class _BlockingBarrierInitiatorPhase is _BarrierInitiatorPhase
-  let _initiator: BarrierInitiator ref
+class _BlockingBarrierCoordinatorPhase is _BarrierCoordinatorPhase
+  let _coordinator: BarrierCoordinator ref
   let _initial_token: BarrierToken
   let _wait_for_token: BarrierToken
 
-  new create(initiator: BarrierInitiator ref, token: BarrierToken,
+  new create(initiator: BarrierCoordinator ref, token: BarrierToken,
     wait_for_token: BarrierToken)
   =>
     _initiator = initiator
@@ -195,7 +195,7 @@ class _BlockingBarrierInitiatorPhase is _BarrierInitiatorPhase
     _wait_for_token = wait_for_token
 
   fun name(): String =>
-    "_BlockingBarrierInitiatorPhase"
+    "_BlockingBarrierCoordinatorPhase"
 
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
@@ -225,16 +225,16 @@ class _BlockingBarrierInitiatorPhase is _BarrierInitiatorPhase
       _initiator.next_token()
     end
 
-class _RollbackBarrierInitiatorPhase is _BarrierInitiatorPhase
-  let _initiator: BarrierInitiator ref
+class _RollbackBarrierCoordinatorPhase is _BarrierCoordinatorPhase
+  let _coordinator: BarrierCoordinator ref
   let _token: BarrierToken
 
-  new create(initiator: BarrierInitiator ref, token: BarrierToken) =>
+  new create(initiator: BarrierCoordinator ref, token: BarrierToken) =>
     _initiator = initiator
     _token = token
 
   fun name(): String =>
-    "_RollbackBarrierInitiatorPhase"
+    "_RollbackBarrierCoordinatorPhase"
 
   fun higher_priority(t: BarrierToken): Bool =>
     t > _token

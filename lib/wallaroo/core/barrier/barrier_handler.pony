@@ -72,7 +72,7 @@ trait BarrierHandler
 
 class PendingBarrierHandler is BarrierHandler
   let _worker_name: String
-  let _initiator: BarrierInitiator ref
+  let _coordinator: BarrierCoordinator ref
   let _barrier_token: BarrierToken
   let _sinks: SetIs[Sink] = _sinks.create()
   let _acked_sinks: SetIs[Sink] = _acked_sinks.create()
@@ -83,7 +83,7 @@ class PendingBarrierHandler is BarrierHandler
   // Did we start this barrier?
   let _primary_worker: String
 
-  new create(worker_name: String, i: BarrierInitiator ref,
+  new create(worker_name: String, i: BarrierCoordinator ref,
     barrier_token: BarrierToken, sinks: SetIs[Sink] box,
     ws: StringSet box, result_promise: BarrierResultPromise,
     primary_worker: String)
@@ -178,7 +178,7 @@ class PendingBarrierHandler is BarrierHandler
 
 class InProgressPrimaryBarrierHandler is BarrierHandler
   let _worker_name: String
-  let _initiator: BarrierInitiator ref
+  let _coordinator: BarrierCoordinator ref
   let _barrier_token: BarrierToken
   let _sinks: SetIs[Sink] = _sinks.create()
   let _acked_sinks: SetIs[Sink] = _acked_sinks.create()
@@ -186,7 +186,7 @@ class InProgressPrimaryBarrierHandler is BarrierHandler
   let _workers: SetIs[String] = _workers.create()
   let _workers_acked: SetIs[String] = _workers_acked.create()
 
-  new create(worker_name: String, i: BarrierInitiator ref,
+  new create(worker_name: String, i: BarrierCoordinator ref,
     barrier_token: BarrierToken, acked_sinks: SetIs[Sink] box,
     acked_ws: SetIs[String] box, sinks: SetIs[Sink] box,
     ws: StringSet box, result_promise: BarrierResultPromise)
@@ -246,13 +246,13 @@ class InProgressPrimaryBarrierHandler is BarrierHandler
     end
 
 class InProgressSecondaryBarrierHandler is BarrierHandler
-  let _initiator: BarrierInitiator ref
+  let _coordinator: BarrierCoordinator ref
   let _barrier_token: BarrierToken
   let _sinks: SetIs[Sink] = _sinks.create()
   let _acked_sinks: SetIs[Sink] = _acked_sinks.create()
   let _primary_worker: String
 
-  new create(i: BarrierInitiator ref, barrier_token: BarrierToken,
+  new create(i: BarrierCoordinator ref, barrier_token: BarrierToken,
     acked_sinks: SetIs[Sink] box, sinks: SetIs[Sink] box,
     primary_worker: String)
   =>
@@ -299,13 +299,13 @@ class InProgressSecondaryBarrierHandler is BarrierHandler
     end
 
 class WorkerAcksBarrierHandler is BarrierHandler
-  let _initiator: BarrierInitiator ref
+  let _coordinator: BarrierCoordinator ref
   let _barrier_token: BarrierToken
   let _workers: SetIs[String] = _workers.create()
   let _acked_workers: SetIs[String] = _acked_workers.create()
   let _result_promise: BarrierResultPromise
 
-  new create(i: BarrierInitiator ref, ifa_id: BarrierToken,
+  new create(i: BarrierCoordinator ref, ifa_id: BarrierToken,
     ws: StringSet box, ws_acked: SetIs[String] val,
     result_promise: BarrierResultPromise)
   =>

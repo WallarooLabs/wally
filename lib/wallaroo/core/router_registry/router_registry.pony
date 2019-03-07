@@ -55,7 +55,7 @@ actor RouterRegistry
   let _worker_name: WorkerName
   let _connections: Connections
   let _recovery_file_cleaner: RecoveryFileCleaner
-  let _barrier_initiator: BarrierInitiator
+  let _barrier_coordinator: BarrierCoordinator
   let _checkpoint_initiator: CheckpointInitiator
   let _autoscale_initiator: AutoscaleInitiator
   var _data_router: DataRouter
@@ -165,7 +165,7 @@ actor RouterRegistry
     data_receivers: DataReceivers, c: Connections,
     recovery_file_cleaner: RecoveryFileCleaner, stop_the_world_pause: U64,
     is_joining: Bool, initializer_name: WorkerName,
-    barrier_initiator: BarrierInitiator,
+    barrier_coordinator: BarrierCoordinator,
     checkpoint_initiator: CheckpointInitiator,
     autoscale_initiator: AutoscaleInitiator,
     contacted_worker: (WorkerName | None) = None)
@@ -175,7 +175,7 @@ actor RouterRegistry
     _data_receivers = data_receivers
     _connections = c
     _recovery_file_cleaner = recovery_file_cleaner
-    _barrier_initiator = barrier_initiator
+    _barrier_coordinator = barrier_coordinator
     _checkpoint_initiator = checkpoint_initiator
     _autoscale_initiator = autoscale_initiator
     _stop_the_world_pause = stop_the_world_pause
@@ -266,7 +266,7 @@ actor RouterRegistry
     _producers.set(source)
     _sources(source_id) = source
     _source_ids(digestof source) = source_id
-    _barrier_initiator.register_source(source, source_id)
+    _barrier_coordinator.register_source(source, source_id)
 
     if not _stop_the_world_in_process and _application_ready_to_work then
       source.unmute(_dummy_consumer)
@@ -279,7 +279,7 @@ actor RouterRegistry
       _unregister_producer(source)
       _sources.remove(source_id)?
       _source_ids.remove(digestof source)?
-      _barrier_initiator.unregister_source(source, source_id)
+      _barrier_coordinator.unregister_source(source, source_id)
        _connections.register_disposable(source)
       // _connections.notify_cluster_of_source_leaving(source_id)
     else
@@ -1035,9 +1035,9 @@ actor RouterRegistry
   be initiate_join_migration(target_workers: Array[WorkerName] val,
     next_checkpoint_id: CheckpointId)
   =>
-    // Update BarrierInitiator about new workers
+    // Update BarrierCoordinator about new workers
     for w in target_workers.values() do
-      _barrier_initiator.add_worker(w)
+      _barrier_coordinator.add_worker(w)
     end
 
     // Inform other current workers to begin migration
@@ -1454,7 +1454,7 @@ actor RouterRegistry
   fun ref all_leaving_workers_finished(leaving_workers: Array[WorkerName] val)
   =>
     for w in leaving_workers.values() do
-      _barrier_initiator.remove_worker(w)
+      _barrier_coordinator.remove_worker(w)
       _checkpoint_initiator.remove_worker(w)
       // !TODO!: Do we need this ??
       _unmute_request(w)

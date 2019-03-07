@@ -81,7 +81,7 @@ actor ConnectorSink is Sink
   """
   let _env: Env
   var _message_processor: SinkMessageProcessor = EmptySinkMessageProcessor
-  let _barrier_initiator: BarrierInitiator
+  let _barrier_coordinator: BarrierCoordinator
   var _barrier_acker: (BarrierSinkAcker | None) = None
   let _checkpoint_initiator: CheckpointInitiator
   // Steplike
@@ -143,7 +143,7 @@ actor ConnectorSink is Sink
   new create(sink_id: RoutingId, sink_name: String, event_log: EventLog,
     recovering: Bool, env: Env, encoder_wrapper: ConnectorEncoderWrapper,
     metrics_reporter: MetricsReporter iso,
-    barrier_initiator: BarrierInitiator, checkpoint_initiator: CheckpointInitiator,
+    barrier_coordinator: BarrierCoordinator, checkpoint_initiator: CheckpointInitiator,
     host: String, service: String, initial_msgs: Array[Array[ByteSeq] val] val,
     from: String = "", init_size: USize = 64, max_size: USize = 16384,
     reconnect_pause: U64 = 10_000_000_000)
@@ -159,7 +159,7 @@ actor ConnectorSink is Sink
     _recovering = recovering
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
-    _barrier_initiator = barrier_initiator
+    _barrier_coordinator = barrier_coordinator
     _checkpoint_initiator = checkpoint_initiator
     _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
@@ -172,7 +172,7 @@ actor ConnectorSink is Sink
     _from = from
     _connect_count = 0
     _message_processor = NormalSinkMessageProcessor(this)
-    _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_initiator)
+    _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_coordinator)
     _mute_upstreams()
 
   //
@@ -276,7 +276,7 @@ actor ConnectorSink is Sink
   be register_producer(id: RoutingId, producer: Producer) =>
     // If we have at least one input, then we are involved in checkpointing.
     if _inputs.size() == 0 then
-      _barrier_initiator.register_sink(this)
+      _barrier_coordinator.register_sink(this)
       _event_log.register_resilient(_sink_id, this)
     end
 
@@ -301,7 +301,7 @@ actor ConnectorSink is Sink
 
       // If we have no inputs, then we are not involved in checkpointing.
       if _inputs.size() == 0 then
-        _barrier_initiator.unregister_sink(this)
+        _barrier_coordinator.unregister_sink(this)
         _event_log.unregister_resilient(_sink_id, this)
       end
     end

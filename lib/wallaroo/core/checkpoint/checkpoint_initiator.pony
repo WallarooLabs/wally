@@ -44,7 +44,7 @@ actor CheckpointInitiator is Initializable
   var _is_active: Bool
   var _time_between_checkpoints: U64
   let _event_log: EventLog
-  let _barrier_initiator: BarrierInitiator
+  let _barrier_coordinator: BarrierCoordinator
   var _recovery: (Recovery | None) = None
 
   // Used as a way to identify outdated timer-based initiate_checkpoint calls
@@ -71,7 +71,7 @@ actor CheckpointInitiator is Initializable
   new create(auth: AmbientAuth, worker_name: WorkerName,
     primary_worker: WorkerName, connections: Connections,
     time_between_checkpoints: U64, event_log: EventLog,
-    barrier_initiator: BarrierInitiator, checkpoint_ids_file: String,
+    barrier_coordinator: BarrierCoordinator, checkpoint_ids_file: String,
     the_journal: SimpleJournal, do_local_file_io: Bool,
     is_active: Bool = true, is_recovering: Bool = false)
   =>
@@ -81,7 +81,7 @@ actor CheckpointInitiator is Initializable
     _is_active = is_active
     _time_between_checkpoints = time_between_checkpoints
     _event_log = event_log
-    _barrier_initiator = barrier_initiator
+    _barrier_coordinator = barrier_coordinator
     _connections = connections
     _checkpoint_id_file = checkpoint_ids_file
     _the_journal = the_journal
@@ -216,7 +216,7 @@ actor CheckpointInitiator is Initializable
         barrier_promise.next[None](
           recover this~checkpoint_barrier_complete() end,
           recover this~abort_checkpoint(_current_checkpoint_id) end)
-        _barrier_initiator.inject_barrier(token, barrier_promise)
+        _barrier_coordinator.inject_barrier(token, barrier_promise)
 
         _phase = _CheckpointingPhase(token, repeating, this)
       end
@@ -232,7 +232,7 @@ actor CheckpointInitiator is Initializable
         let promise = Promise[BarrierToken]
         promise.next[None]({(t: BarrierToken) =>
           _self.initiate_checkpoint(_checkpoint_group)})
-        _barrier_initiator.inject_barrier(
+        _barrier_coordinator.inject_barrier(
           CheckpointRollbackResumeBarrierToken(_last_rollback_id,
             _last_complete_checkpoint_id), promise)
         _ignoring_checkpoints = false
@@ -430,7 +430,7 @@ actor CheckpointInitiator is Initializable
         })
         let resume_token = CheckpointRollbackResumeBarrierToken(rollback_id,
           _last_complete_checkpoint_id)
-        _barrier_initiator.inject_blocking_barrier(token, barrier_promise,
+        _barrier_coordinator.inject_blocking_barrier(token, barrier_promise,
           resume_token)
       else
         try
