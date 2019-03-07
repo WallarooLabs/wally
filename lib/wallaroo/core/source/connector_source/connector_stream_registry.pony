@@ -72,12 +72,28 @@ class GlobalConnectorStreamRegistry
     request_id: ConnectorStreamIdRequest)
   =>
     if _is_leader then
-      let can_use: Bool = not _active_stream_map.contains(stream_id)
+      (let can_use: Bool, last_por: U64) = try
+        // stream is known and inactive (allow)
+        (true, _inactive_stream_map.remove(stream_id)?._2)
+      else
+        if _active_stream_map.contains(stream_id) then
+          // stream is known and active (deny)
+          (false, 0)
+        else
+          // stream is new (allow)
+          (true, 0)
+        end
+      end
+      // send response to requesting worker
       _connections.respond_to_stream_id_request(worker_name, _source_name,
-        stream_id, request_id, can_use)
+        stream_id, point_of_reference, request_id, can_use)
+      if can_use then
+        _active_stream_map.update(stream_id, worker_name)
+      end
     else
-      // TODO [source-migration-3]: should the message be forwarded to the
+      // TODO [source-migration]: should the message be forwarded to the
       // leader if we're not the leader?
+      // TODO [source-migration]: log a message, possibly only in debug mode
       None
     end
 
@@ -205,6 +221,9 @@ class GlobalConnectorStreamRegistry
   =>
     if _is_leader then
       let can_use = not _active_stream_map.contains(stream_id)
+      if can_use then
+        _active_stream_map.update(stream_id, _worker_name)
+      end
       promise(can_use)
     else
       _pending_id_requests_promises(request_id) = promise
@@ -243,7 +262,7 @@ class GlobalConnectorStreamRegistry
   =>
     try
       let promise = _pending_id_requests_promises(request_id)?
-      promise(can_use)
+      promise(can_use, point_of_reference)
     end
 
   fun ref process_relinquish_response(

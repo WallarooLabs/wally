@@ -573,11 +573,12 @@ primitive ChannelMsgEncoder
       request_id), auth)?
 
   fun connector_stream_request_response(source_name: String, stream_id: U64,
-    request_id: ConnectorStreamIdRequest, can_use: Bool,
+    point_of_reference: U64, request_id: ConnectorStreamIdRequest,
+    can_use: Bool,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(ConnectorStreamIdRequestResponseMsg(source_name, stream_id,
-      request_id, can_use), auth)?
+      point_of_reference, request_id, can_use), auth)?
 
   fun connector_relinquish_stream_id(worker_name: String, source_name: String,
     stream_id: U64, last_acked_msg: U64,
@@ -824,14 +825,17 @@ class val ConnectorStreamIdRequestMsg is SourceListenerMsg
 class val ConnectorStreamIdRequestResponseMsg is SourceListenerMsg
   let _source_name: String
   let stream_id: U64
+  let point_of_reference: U64
   let request_id: ConnectorStreamIdRequest
   let can_use: Bool
 
   new val create(source_name': String, stream_id': U64,
-    request_id': ConnectorStreamIdRequest, can_use': Bool)
+    point_of_reference': U64, request_id': ConnectorStreamIdRequest,
+    can_use': Bool)
   =>
     _source_name = source_name'
     stream_id = stream_id'
+    point_of_reference = point_of_reference'
     request_id = request_id'
     can_use = can_use'
 
