@@ -535,13 +535,17 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
       ifdef "checkpoint_trace" then
         match state_wrapper
         | let s: Stringablike =>
-          (let sec', let ns') = Time.now()
-          let us' = ns' / 1000
-          let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." +
-            us'.string())
-          @printf[I32]("SERIALIZE (%s): %s on step %s with tag %s\n"
-            .cstring(), ts'.cstring(), s.string().cstring(),
-            _step_id.string().cstring(), (digestof this).string().cstring())
+          try
+            (let sec', let ns') = Time.now()
+            let us' = ns' / 1000
+            let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." +
+            us'.string())?
+            @printf[I32]("SERIALIZE (%s): %s on step %s with tag %s\n"
+              .cstring(), ts'.cstring(), s.string().cstring(),
+              _step_id.string().cstring(), (digestof this).string().cstring())
+          else
+            Fail()
+          end
         end
         @printf[I32]("SERIALIZING KEY %s\n".cstring(), k.cstring())
       end

@@ -213,11 +213,15 @@ actor CheckpointInitiator is Initializable
       _current_checkpoint_id = _current_checkpoint_id + 1
 
       ifdef "checkpoint_trace" then
-        (let s, let ns) = Time.now()
-        let us = ns / 1000
-        let ts = PosixDate(s, ns).format("%Y-%m-%d %H:%M:%S." + us.string())
-        @printf[I32]("Initiating checkpoint %s at %s\n".cstring(),
-          _current_checkpoint_id.string().cstring(), ts.string().cstring())
+        try
+          (let s, let ns) = Time.now()
+          let us = ns / 1000
+          let ts = PosixDate(s, ns).format("%Y-%m-%d %H:%M:%S." + us.string())?
+          @printf[I32]("Initiating checkpoint %s at %s\n".cstring(),
+            _current_checkpoint_id.string().cstring(), ts.string().cstring())
+        else
+          Fail()
+        end
       end
 
       let event_log_promise = Promise[CheckpointId]
