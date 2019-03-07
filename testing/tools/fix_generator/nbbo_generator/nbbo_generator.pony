@@ -22,6 +22,7 @@ use "buffered"
 use "collections"
 use "wallaroo_labs/fix"
 use "wallaroo_labs/fix_generator_utils"
+use "wallaroo_labs/mort"
 use "random"
 use "ini"
 use "time"
@@ -157,7 +158,12 @@ actor NbboFilesGenerator
     try
       var output_file = File(FilePath(_auth, _output_path)?)
       let date = PosixDate(_time._1 + sec.i64(), _time._2)
-      let utc_timestamp = date.format("%Y%m%d-%H:%M:%S.000")
+      var utc_timestamp = "0"
+      try
+        utc_timestamp = date.format("%Y%m%d-%H:%M:%S.000")?
+      else
+        Fail()
+      end
       for x in Range[U64](0, _output_msgs_per_sec) do
         output_file = check_output_file_size(output_file)?
         generate_nbbo(utc_timestamp)?

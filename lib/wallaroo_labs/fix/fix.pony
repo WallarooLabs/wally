@@ -52,8 +52,8 @@ primitive  FixParser
     FixNbboMessage(
       symbol
       , i("60")?
-      , i("132")?.f64()
-      , i("133")?.f64()
+      , i("132")?.f64()?
+      , i("133")?.f64()?
       )
 
   fun _order(i: Map[String, String]): FixOrderMessage val ? =>
@@ -74,8 +74,8 @@ primitive  FixParser
       , account
       , i("11")?
       , symbol
-      , i("38")?.f64()
-      , i("44")?.f64()
+      , i("38")?.f64()?
+      , i("44")?.f64()?
       , i("60")?
       )
 
