@@ -158,15 +158,17 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     @printf[I32]((pipeline_name + " source will listen (but not yet) on "
       + host + ":" + service + "\n").cstring())
 
-    for i in Range(0, _limit) do
-      let source_name = _worker_name + _pipeline_name + i.string()
-      let source_id = try _routing_id_gen(source_name)? else Fail(); 0 end
-      let notify = ConnectorSourceNotify[In](source_id, _pipeline_name,
-        _env, _auth, _handler, _runner_builder, _partitioner_builder, _router,
+    let noitfy_parameters = ConnectorSourceNotifyParameters[In](_pipeline_name,
+      _env, _auth, _handler, _runner_builder, _partitioner_builder, _router,
         _metrics_reporter.clone(), _event_log, _target_router, _cookie,
         _max_credits, _refill_credits, _host, _service)
+
+    for i in Range(0, _limit) do
+      // TODO [source-migration] can this be pushed to connector_source?
+      let source_name = _worker_name + _pipeline_name + i.string()
+      let source_id = try _routing_id_gen(source_name)? else Fail(); 0 end
       let source = ConnectorSource[In](source_id, _auth, this,
-        consume notify, _event_log, _router,
+         notify_parameters, _event_log, _router,
         _outgoing_boundary_builders, _layout_initializer,
         _metrics_reporter.clone(), _router_registry)
       source.mute(this)
