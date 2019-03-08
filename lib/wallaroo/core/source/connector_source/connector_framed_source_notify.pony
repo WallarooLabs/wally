@@ -772,7 +772,7 @@ class ConnectorSourceNotify[In: Any val]
     promise.next[None](recover NotifyResultFulfill(stream_id) end)
 
     // send request to take ownership of this stream id
-    let request_id = ConnectorStreamIdRequest(stream_id, source.session_id)
+    let request_id = ConnectorStreamNotify(stream_id, source.session_id)
     try
       (_listener as ConnectorSourceListener[In])
         .stream_notify(stream_id, request_id, _session_tag, promise)

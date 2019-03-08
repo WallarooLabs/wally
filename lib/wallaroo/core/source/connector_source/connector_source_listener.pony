@@ -309,13 +309,13 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     // we only care for messages that belong to this source name
     if (msg.source_name() == _pipeline_name) then
       match msg
-      |  let m: ConnectorStreamIdRequestMsg =>
+      |  let m: ConnectorStreamNotifyMsg =>
         _process_stream_id_request(m)
-      | let m: ConnectorStreamIdRequestResponseMsg =>
+      | let m: ConnectorStreamNotifyResponseMsg =>
         _maybe_process_pending_request(m)
-      | let m: ConnectorStreamIdRelinquishMsg =>
+      | let m: ConnectorStreamRelinquishMsg =>
         _relinquish_stream_id_msg(m)
-      | let m: ConnectorStreamIdRelinquishResponseMsg =>
+      | let m: ConnectorStreamRelinquishResponseMsg =>
         _process_relinquish_stream_id_ack_msg(m)
       | let m: ConnectorStreamRegRelinquishLeadershipMsg =>
         _process_relinquish_leadership_msg(m)

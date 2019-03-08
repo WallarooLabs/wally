@@ -36,6 +36,16 @@ use "wallaroo/core/messages"
 use "wallaroo/core/network"
 use "wallaroo_labs/mort"
 
+class val StreamTuple
+  let stream_name: String
+  let stream_id: U64
+  let last_acked: U64
+
+  new val create(name: String, id: U64, point_of_reference: U64) =>
+    stream_name = name
+    stream_id = id
+    last_acked = point_of_reference
+
 class GlobalConnectorStreamRegistry
   var _worker_name: String
   let _source_name: String
@@ -44,16 +54,16 @@ class GlobalConnectorStreamRegistry
   var _is_leader: Bool = false
   var _leader_name: String = "Initializer"
   var _active_stream_map: Map[U64, WorkerName] = _active_stream_map.create()
-  var _inactive_stream_map: Map[U64, U64] =  _inactive_stream_map.create()
+  var _inactive_stream_map: Map[U64, StreamTuple] =  _inactive_stream_map.create()
   var _source_addr_map: Map[WorkerName, (String, String)] =
     _source_addr_map.create()
   let _workers_set: Set[WorkerName] = _workers_set.create()
-  let _pending_id_requests_promises:
-    Map[ConnectorStreamIdRequest, Promise[Bool]] =
-      _pending_id_requests_promises.create()
-  let _pending_id_reqlinquish_promises:
-    Map[ConnectorRelinquishStreamIdRequest, Promise[Bool]] =
-      _pending_id_reqlinquish_promises.create()
+  let _pending_notify_promises:
+    Map[ConnectorStreamNotify, Promise[Bool]] =
+      _pending_notify_promises.create()
+  let _pending_relinquish_promises:
+    Map[ConnectorStreamRelinquish, Promise[Bool]] =
+      _pending_relinquish_promises.create()
 
   new create(worker_name: WorkerName, source_name: String,
     connections: Connections, host: String, service: String,
@@ -68,8 +78,8 @@ class GlobalConnectorStreamRegistry
     end
     _elect_leader()
 
-  fun ref process_stream_id_request(worker_name: String, stream_id: U64,
-    request_id: ConnectorStreamIdRequest)
+  fun ref process_stream_notify(worker_name: String, stream_id: U64,
+    request_id: ConnectorStreamNotify)
   =>
     if _is_leader then
       (let can_use: Bool, last_por: U64) = try
@@ -97,9 +107,9 @@ class GlobalConnectorStreamRegistry
       None
     end
 
-  fun ref process_relinquish_stream_id_request(worker_name: WorkerName,
+  fun ref process_stream_relinquish(worker_name: WorkerName,
     stream_id: U64, last_acked_msg: U64,
-    request_id: ConnectorRelinquishStreamIdRequest)
+    request_id: ConnectorStreamRelinquish)
   =>
     if _is_leader then
       var relinquished = false
@@ -212,28 +222,35 @@ class GlobalConnectorStreamRegistry
     end
 
   fun ref stream_notify(session_tag: USize, stream_id: U64,
-    request_id: ConnectorStreamIdRequest, promise: Promise[Bool])
+    request_id: ConnectorStreamNotify, promise: Promise[Bool])
   =>
     _stream_notify(session_tag, stream_id, request_id, promise)
 
   // TODO [source-migration][nisan]: Continue from here. add session tag.
   fun ref _stream_notify(session_tag: USize, stream_id: U64,
-    request_id: ConnectorStreamIdRequest, promise: Promise[Bool])
+    request_id: ConnectorStreamNotify, promise: Promise[Bool])
   =>
     if _is_leader then
+      try
+        // stream_id is known and unclaimed
+        let last_ack = _inactive_stream_map.remove(stream_id)?
+        // mark it as claimed by self in _active_stream_map
+        _active_stream_map(stream_id) = _worker_name
+        // respond to local registry immediately
+        
       let can_use = not _active_stream_map.contains(stream_id)
       if can_use then
         _active_stream_map.update(stream_id, _worker_name)
       end
       promise(can_use)
     else
-      _pending_id_requests_promises(request_id) = promise
+      _pending_notify_promises(request_id) = promise
       _connections.request_stream_id(_leader_name, _worker_name,
         _source_name, stream_id, request_id)
     end
 
-  fun ref relinquish_stream_id(stream_id: U64, last_acked_msg: U64,
-    request_id: ConnectorRelinquishStreamIdRequest, promise: Promise[Bool])
+  fun ref stream_relinquish(stream_id: U64, last_acked_msg: U64,
+    request_id: ConnectorStreamRelinquish, promise: Promise[Bool])
   =>
     if _is_leader then
       try
@@ -245,33 +262,33 @@ class GlobalConnectorStreamRegistry
         None
       end
     else
-      _pending_id_reqlinquish_promises(request_id) = promise
+      _pending_relinquish_promises(request_id) = promise
       _connections.relinquish_stream_id(_leader_name, _worker_name,
         _source_name, stream_id, last_acked_msg, request_id)
     end
 
-  fun ref contains_request(request_id: ConnectorStreamIdRequest): Bool =>
-    _pending_id_requests_promises.contains(request_id)
+  fun ref contains_request(request_id: ConnectorStreamNotify): Bool =>
+    _pending_notify_promises.contains(request_id)
 
   fun ref contains_relinquish_request(
-    request_id: ConnectorRelinquishStreamIdRequest): Bool
+    request_id: ConnectorStreamRelinquish): Bool
   =>
-    _pending_id_reqlinquish_promises.contains(request_id)
+    _pending_relinquish_promises.contains(request_id)
 
-  fun ref process_request_response(request_id: ConnectorStreamIdRequest,
+  fun ref process_stream_notify_response(request_id: ConnectorStreamNotify,
     can_use: Bool)
   =>
     try
-      let promise = _pending_id_requests_promises(request_id)?
+      let promise = _pending_notify_promises(request_id)?
       promise(can_use, point_of_reference)
     end
 
-  fun ref process_relinquish_response(
-    request_id: ConnectorRelinquishStreamIdRequest,
+  fun ref process_stream_relinquish_response(
+    request_id: ConnectorStreamRelinquish,
     relinquish: Bool)
   =>
     try
-      let promise = _pending_id_reqlinquish_promises(request_id)?
+      let promise = _pending_relinquish_promises(request_id)?
       promise(relinquish)
     end
 
@@ -312,7 +329,7 @@ class GlobalConnectorStreamRegistry
     _is_leader = true
     _leader_name = _worker_name
     _active_stream_map = Map[U64, WorkerName]()
-    _inactive_stream_map = Map[U64, U64]()
+    _inactive_stream_map = Map[U64, StreamTuple]()
     _source_addr_map = Map[WorkerName, (String, String)]()
     _source_addr_map(_worker_name) = (_source_addr._1, _source_addr._2)
 
@@ -376,7 +393,7 @@ class LocalConnectorStreamRegistry[In: Any val]
   // TODO [source-migration] put session tag back in here?
   // and thread it throughout all the way back to response from leader
   fun ref stream_notify(session_tag: USize,
-    stream_id: U64, request_id: ConnectorStreamIdRequest,
+    stream_id: U64, request_id: ConnectorStreamNotify,
     promise: Promise[NotifyResult], connector_source: ConectorSource[In] tag)
   =>
     // stream_id in active_streams.contains()?
@@ -399,6 +416,15 @@ class LocalConnectorStreamRegistry[In: Any val]
         promise)
     end
 
+  fun ref stream_notify_result(session_tag: USize, stream_id: U64,
+    promise: Promise[NotiyResult], connector_source: ConnectorSource[in] tag,
+    success: Bool, last_acked: U64)
+  =>
+    if success then
+      // double check it's safe to update locally
+      Invariant(not active_streams.contains(steam_id))
+      // update local data
+      active_streams(stream_id) = (
 
   fun ref stream_update(stream_id: U64, checkpoint_id: CheckpointId,
     last_acked_por: U64, last_seen_por: U64,
@@ -436,7 +462,7 @@ class LocalConnectorStreamRegistry[In: Any val]
     end
 
 
-class val ConnectorStreamIdRequest is Equatable[ConnectorStreamIdRequest]
+class val ConnectorStreamNotify is Equatable[ConnectorStreamNotify]
   let stream_id: U64
   let session_id: RoutingId
 
@@ -444,7 +470,7 @@ class val ConnectorStreamIdRequest is Equatable[ConnectorStreamIdRequest]
     stream_id = stream_id'
     session_id = session_id'
 
-  fun eq(that: ConnectorStreamIdRequest box): Bool =>
+  fun eq(that: ConnectorStreamNotify box): Bool =>
      """
     Returns true if the request is for the same session and stream.
     """
@@ -454,8 +480,8 @@ class val ConnectorStreamIdRequest is Equatable[ConnectorStreamIdRequest]
     session_id.hash() xor stream_id.hash()
 
 
-class val ConnectorRelinquishStreamIdRequest is
-    Equatable[ConnectorRelinquishStreamIdRequest]
+class val ConnectorStreamRelinquish is
+    Equatable[ConnectorRelinquishStreamRequest]
   let stream_id: U64
   let session_id: RoutingId
 
@@ -464,7 +490,7 @@ class val ConnectorRelinquishStreamIdRequest is
     session_id = session_id'
 
 
-  fun eq(that: ConnectorRelinquishStreamIdRequest box): Bool =>
+  fun eq(that: ConnectorStreamRelinquish box): Bool =>
      """
     Returns true if the request is for the same session and stream.
     """

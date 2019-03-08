@@ -565,34 +565,34 @@ primitive ChannelMsgEncoder
   =>
     _encode(UnregisterProducerMsg(sender, source_id, target_id), auth)?
 
-  fun connector_stream_request(worker_name: WorkerName, source_name: String,
-    stream_id: U64, request_id: ConnectorStreamIdRequest,
+  fun connector_stream_notify(worker_name: WorkerName, source_name: String,
+    stream_id: U64, request_id: ConnectorStreamNotify,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(ConnectorStreamIdRequestMsg(worker_name, source_name, stream_id,
+    _encode(ConnectorStreamNotifyMsg(worker_name, source_name, stream_id,
       request_id), auth)?
 
-  fun connector_stream_request_response(source_name: String, stream_id: U64,
-    point_of_reference: U64, request_id: ConnectorStreamIdRequest,
+  fun connector_stream_notify_response(source_name: String, stream_id: U64,
+    point_of_reference: U64, request_id: ConnectorStreamNotify,
     can_use: Bool,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(ConnectorStreamIdRequestResponseMsg(source_name, stream_id,
+    _encode(ConnectorStreamNotifyResponseMsg(source_name, stream_id,
       point_of_reference, request_id, can_use), auth)?
 
-  fun connector_relinquish_stream_id(worker_name: String, source_name: String,
+  fun connector_stream_relinquish(worker_name: String, source_name: String,
     stream_id: U64, last_acked_msg: U64,
-    request_id: ConnectorRelinquishStreamIdRequest,
+    request_id: ConnectorStreamRelinquish,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(ConnectorStreamIdRelinquishMsg(worker_name, source_name, stream_id,
+    _encode(ConnectorStreamRelinquishMsg(worker_name, source_name, stream_id,
       last_acked_msg, request_id), auth)?
 
-  fun connector_relinquish_stream_request_response(source_name: String,
-    request_id: ConnectorRelinquishStreamIdRequest, relinquished: Bool,
+  fun connector_stream_relinquish_response(source_name: String,
+    request_id: ConnectorStreamRelinquish, relinquished: Bool,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(ConnectorStreamIdRelinquishResponseMsg(source_name, request_id,
+    _encode(ConnectorStreamRelinquishResponseMsg(source_name, request_id,
       relinquished), auth)?
 
   fun add_connector_stream_source_addr(worker_name: WorkerName,
@@ -770,16 +770,16 @@ class val ConnectorStreamRegRelinquishLeadershipMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
-class val ConnectorStreamIdRelinquishMsg is SourceListenerMsg
+class val ConnectorStreamRelinquishMsg is SourceListenerMsg
   let worker_name: String
   let _source_name: String
   let stream_id: U64
   let last_acked_msg: U64
-  let request_id: ConnectorRelinquishStreamIdRequest
+  let request_id: ConnectorStreamRelinquish
 
   new val create(worker_name': WorkerName, source_name': String,
     stream_id': U64,  last_acked_msg': U64,
-    request_id': ConnectorRelinquishStreamIdRequest)
+    request_id': ConnectorStreamRelinquish)
   =>
     worker_name = worker_name'
     _source_name = source_name'
@@ -790,13 +790,13 @@ class val ConnectorStreamIdRelinquishMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
-class val ConnectorStreamIdRelinquishResponseMsg is SourceListenerMsg
+class val ConnectorStreamRelinquishResponseMsg is SourceListenerMsg
   let _source_name: String
-  let request_id: ConnectorRelinquishStreamIdRequest
+  let request_id: ConnectorStreamRelinquish
   let relinquished: Bool
 
   new val create(source_name': String,
-    request_id':ConnectorRelinquishStreamIdRequest, relinquished': Bool)
+    request_id':ConnectorStreamRelinquish, relinquished': Bool)
   =>
     _source_name = source_name'
     request_id = request_id'
@@ -805,14 +805,14 @@ class val ConnectorStreamIdRelinquishResponseMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
-class val ConnectorStreamIdRequestMsg is SourceListenerMsg
+class val ConnectorStreamNotifyMsg is SourceListenerMsg
   let worker_name: WorkerName
   let _source_name: String
   let stream_id: U64
-  let request_id: ConnectorStreamIdRequest
+  let request_id: ConnectorStreamNotify
 
   new val create(worker_name': WorkerName, source_name': String,
-    stream_id': U64, request_id': ConnectorStreamIdRequest)
+    stream_id': U64, request_id': ConnectorStreamNotify)
   =>
     worker_name = worker_name'
     _source_name = source_name'
@@ -822,15 +822,15 @@ class val ConnectorStreamIdRequestMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
-class val ConnectorStreamIdRequestResponseMsg is SourceListenerMsg
+class val ConnectorStreamNotifyResponseMsg is SourceListenerMsg
   let _source_name: String
   let stream_id: U64
   let point_of_reference: U64
-  let request_id: ConnectorStreamIdRequest
+  let request_id: ConnectorStreamNotify
   let can_use: Bool
 
   new val create(source_name': String, stream_id': U64,
-    point_of_reference': U64, request_id': ConnectorStreamIdRequest,
+    point_of_reference': U64, request_id': ConnectorStreamNotify,
     can_use': Bool)
   =>
     _source_name = source_name'
