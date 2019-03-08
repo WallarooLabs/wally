@@ -96,9 +96,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   let _local_stream_registry: LocalConnectorStreamRegistry[In] =
     _local_stream_registry.create()
 
-   // Global Stream Registry
-   let _global_stream_registry: GlobalConnectorStreamRegistry
-
   new create(env: Env, worker_name: WorkerName, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
     router: Router, metrics_conn: MetricsSink,
@@ -145,6 +142,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     _init_size = init_size
     _max_size = max_size
 
+    // TODO [source-migration] move this to Local Reigstry new create
     _global_stream_registry = GlobalConnectorStreamRegistry(_worker_name,
       _pipeline_name, _connections, _host, _service, workers_list)
 
@@ -295,16 +293,21 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   /////////////////////////////
   // Multiple Active Sources
   /////////////////////////////
+  // TODO [source-migration] move this to registry.pony inside local registry
   be add_worker(worker: WorkerName) =>
     // TODO: Update global registry map
     _global_stream_registry.add_worker(worker)
     None
 
+  // TODO [source-migration] move this to registry.pony inside local registry
   be remove_worker(worker: WorkerName) =>
     // TODO: Update global registry map
     _global_stream_registry.remove_worker(worker)
     None
 
+  // TODO [source-migration] move this to registry.pony inside local registry
+  // Keep the behaviour, just forward the message to a
+  // fun ref handle_listener_msg() in local registry
   be receive_msg(msg: SourceListenerMsg) =>
     // we only care for messages that belong to this source name
     if (msg.source_name() == _pipeline_name) then
@@ -332,18 +335,22 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
         .cstring())
     end
 
+  // TODO [source-migration] move this to registry.pony inside local registry
   fun ref _process_reg_leader_state_received_msg(
     msg: ConnectorStreamRegLeaderStateReceivedAckMsg)
   =>
     _global_stream_registry.complete_leader_state_relinquish(msg.leader_name)
 
+  // TODO [source-migration] move this to registry.pony inside local registry
   fun ref _process_new_reg_leader_msg(msg: ConnectorStreamRegNewLeaderMsg) =>
     _global_stream_registry.update_leader(msg.leader_name)
 
+  // TODO [source-migration] move this to registry.pony inside local registry
   fun ref _process_stream_id_request(msg: ConnectorStreamIdRequestMsg) =>
     _global_stream_registry.process_stream_id_request(msg.worker_name,
       msg.stream_id, msg.request_id)
 
+  // TODO [source-migration] move this to registry.pony inside local registry
   fun ref _maybe_process_pending_request(m: ConnectorStreamIdRequestResponseMsg) =>
     if _global_stream_registry.contains_request(m.request_id) then
       _global_stream_registry.process_request_response(m.request_id, m.can_use)
@@ -353,16 +360,18 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       None
     end
 
-  be stream_notify(stream_id: U64, request_id: ConnectorStreamIdRequest,
+  be stream_notify(stream_id: StreamId, request_id: ConnectorStreamIdRequest,
     promise: Promise[Bool], connector_source: ConnectorSource[In] tag)
   =>
     _local_stream_registry.stream_notify(stream_id, request_id, promise,
       conector_source)
 
+  // TODO [source-migration] move this to registry.pony inside local registry
   fun ref _process_add_source_addr_msg(msg: ConnectorStreamAddSourceAddrMsg) =>
     _global_stream_registry.add_source_address(msg.worker_name, msg.host,
       msg.service)
 
+  // TODO [source-migration] move this to registry.pony inside local registry
   fun ref _process_relinquish_stream_id_ack_msg(
     msg: ConnectorStreamIdRelinquishResponseMsg)
   =>
@@ -375,13 +384,16 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       None
     end
 
-  // be relinquish_stream_id(stream_id: U64, last_acked_msg: U64) =>
+  // be relinquish_stream_id(stream_id: StreamId, last_acked_msg:
+  // PointOfReference) =>
   //   _global_stream_registry.
 
+  // TODO [source-migration] move this to registry.pony inside local registry
   fun ref _relinquish_stream_id_msg(msg: ConnectorStreamIdRelinquishMsg) =>
     _global_stream_registry.process_relinquish_stream_id_request(
       msg.worker_name, msg.stream_id, msg.last_acked_msg, msg.request_id)
 
+  // TODO [source-migration] move this to registry.pony inside local registry
   fun ref _process_relinquish_leadership_msg(
     msg: ConnectorStreamRegRelinquishLeadershipMsg)
   =>
@@ -390,14 +402,15 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       msg.source_addr_map)
 
   be stream_notify(session_tag: USize,
-    stream_id: U64, stream_name: String, point_of_reference: U64,
+    stream_id: StreamId, stream_name: String,
+    point_of_reference: PointOfReference,
     connector_source: ConnectorSource[In] tag)
   =>
     _local_stream_registry.stream_notify(session_tag, stream_id,
       stream_name, point_of_reference, connector_source)
 
-  be stream_update(stream_id: U64, checkpoint_id: CheckpointId,
-    last_acked_por: U64, last_seen_por: U64,
+  be stream_update(stream_id: StreamId, checkpoint_id: CheckpointId,
+    last_acked_por: PointOfReference, last_seen_por: PointOfReference,
     connector_source: (ConnectorSource[In] tag|None))
   =>
     _local_stream_registry.stream_update(stream_id, checkpoint_id,

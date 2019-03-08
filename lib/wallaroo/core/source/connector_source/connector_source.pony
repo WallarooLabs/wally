@@ -58,6 +58,23 @@ use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 use @pony_asio_event_set_writeable[None](event: AsioEventID, writeable: Bool)
 
+
+// Connector Types
+type StreamId is U64
+type PointOfReference is U64
+
+class val StreamState
+  let last_seen_por: StreamId  // last seen message id
+  let last_acked_por: PointOfReference // last message id that was checkpointed
+  let last_checkpoint_id: CheckpointId // last checkpoint id
+
+  new val create(last_seen_por': StreamId,
+    last_acked_por': PointOfReference, last_checkpoint_id': CheckpointId)
+=>
+  last_seen_por = last_seen_por'
+  last_acked_por = last_acked_por'
+  last_checkpoint_id = last_checkpoint_id'
+
 actor ConnectorSource[In: Any val] is Source
   """
   # ConnectorSource
@@ -1009,7 +1026,8 @@ actor ConnectorSource[In: Any val] is Source
     _expect = _notify.expect(this, qty)
 
   be stream_notify_result(session_tag: USize, success: Bool,
-    stream_id: U64, point_of_reference: U64, last_message_id: U64) =>
+    stream_id: StreamId, point_of_reference: PointOfReference,
+    last_message_id: PointOfReference) =>
     ifdef "trace" then
       @printf[I32]("TRACE: %s.%s(%s, %lu, %lu, %lu)\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring(),
