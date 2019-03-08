@@ -50,17 +50,56 @@ primitive _ProtoFsmError
 primitive _ProtoFsmDisconnected
   fun apply(): U8 => 5
 
+
 class _StreamState
-  var last_seen_por: U64  // last seen message id
-  var last_acked_por: U64 // last message id that was checkpointed
+  """
+  A mutable SteamState class for local state management
+  For sendable versions going outside of the notifier,
+  use streamstate(): StreamState
+  """
+  var last_seen_por: StreamId  // last seen message id
+  var last_acked_por: PointOfReference // last message id that was checkpointed
   var last_checkpoint_id: CheckpointId // last checkpoint id
 
-  new ref create(last_seen_por': U64,
-    last_acked_por': U64, last_checkpoint_id': CheckpointId)
+  new ref create(last_seen_por': PointOfReference,
+    last_acked_por': PointOfReference, last_checkpoint_id': CheckpointId)
 =>
   last_seen_por = last_seen_por'
   last_acked_por = last_acked_por'
   last_checkpoint_id = last_checkpoint_id'
+
+  fun val streamstate(): StreamState =>
+    StreamState(last_een_por, last_acked_por, last_checkpoint_id)
+
+class val NotifyResult
+  """
+  The type to use with Promise objects used to manage responses for the async
+  parts of the stream_notify sequence
+  """
+  let source: ConnectorSource[In] tag
+  let session_tag: USize
+  let success: Bool
+  let last_acked: PointOfReference
+  let last_seen: PointOfReference
+
+  new val create(source': ConnectorSource[In] tag, session_tag': USize,
+    success': Bool, last_acked': PointOfReference, last_seen': PointOfReferenc)
+  =>
+    source = source'
+    session_tag = session_tag'
+    success = success'
+    last_acked = last_acked'
+    last_seen = last_seen'
+
+class NotifyResultFulfill is Fulfill[NotifyResult]
+  let stream_id: StreamId
+
+  new create(stream_id': StreamId, stream_name: String) =>
+    stream_id = stream_id'
+
+  fun apply(t: NotifyResponse) =>
+    t.source.stream_notify_result(t.session_tag, t.success,
+      stream_id, t.last_acked, t.last_seen)
 
 class ConnectorSourceNotify[In: Any val]
   let source_id: RoutingId
@@ -88,10 +127,10 @@ class ConnectorSourceNotify[In: Any val]
   var service: String
 
   // stream state management
-  var _active_streams: Map[U64, _StreamState]= _active_steams.create()
-  var _pending_notify: Set[U64] = _pending_notify.create()
-  var _pending_close: Map[U64, _StreamState] = _pending_close.create()
-  var _pending_relinquish: Map[U64, _StreamState] = _pending_relinquish.create()
+  var _active_streams: Map[StreamId, _StreamState]= _active_steams.create()
+  var _pending_notify: Set[StreamId] = _pending_notify.create()
+  var _pending_close: Map[StreamId, _StreamState] = _pending_close.create()
+  var _pending_relinquish: Map[StreamId, _StreamState] = _pending_relinquish.create()
 
   var _session_active: Bool = false
   var _session_tag: USize = 0
@@ -471,7 +510,7 @@ class ConnectorSourceNotify[In: Any val]
       end
 
     match message_id
-    | let m_id: U64 =>
+    | let m_id: PointOfReference =>
       if not (cwm.Ephemeral.is_set(flags) or
         cwm.UnstableReference.is_set(flags)) then
         s.last_message_id = m_id
@@ -721,7 +760,7 @@ class ConnectorSourceNotify[In: Any val]
 
       // TODO [source-migration]: loop over _pending_close, update them in
       // registry, then use fun ref _relinquish_stream on them
-      let to_relinquish = recover ref Array[(U64, _StreamState)] end
+      let to_relinquish = recover ref Array[(StreamId, _StreamState)] end
 
       for (stream_id, s) in _pending_close.pairs() do
         ifdef "trace" then
@@ -761,8 +800,8 @@ class ConnectorSourceNotify[In: Any val]
       end
     end
 
-  fun ref _process_notify(source: ConnectorSource[In] ref, stream_id: U64,
-    stream_name: String, point_of_reference: U64)
+  fun ref _process_notify(source: ConnectorSource[In] ref, stream_id: StreamId,
+    stream_name: String, point_of_reference: PointOfReference)
   =>
     // add to _pending_notify
     _pending_notify.set(m.stream_id)
@@ -779,7 +818,7 @@ class ConnectorSourceNotify[In: Any val]
     end
 
   fun ref stream_notify_result(session_tag: USize, success: Bool,
-    stream_id: U64, point_of_reference: U64)
+    stream_id: StreamId, point_of_reference: PointOfReference)
   =>
     if (session_tag != _session_tag) or (not _session_active) then
       // This is a reply from a query that we'd sent in a prior TCP
@@ -816,8 +855,8 @@ class ConnectorSourceNotify[In: Any val]
     try (source as ConnectorSource[In] ref).close() else Fail() end
     _continue_perhaps2()
 
-  fun ref send_notify_ack(success: Bool, stream_id: U64,
-    point_of_reference: U64)
+  fun ref send_notify_ack(success: Bool, stream_id: StreamId,
+    point_of_reference: PointOfReference)
   =>
     let m = cwm.NotifyAckMsg(success, stream_id, point_of_reference)
     _send_reply(_connector_source, m)
@@ -864,29 +903,3 @@ class ConnectorSourceNotify[In: Any val]
     error messages.
     """
     "[len=" + array.size().string() + ": " + ", ".join(array.values()) + "]"
-
-class val NotifyResult
-  let source: ConnectorSource[In] tag
-  let session_tag: USize
-  let success: Bool
-  let last_acked: U64
-  let last_seen: U64
-
-  new val create(source': ConnectorSource[In] tag, session_tag': USize,
-    success': Bool, last_acked': U64, last_seen': U64)
-  =>
-    source = source'
-    session_tag = session_tag'
-    success = success'
-    last_acked = last_acked'
-    last_seen = last_seen'
-
-class NotifyResultFulfill is Fulfill[NotifyResult]
-  let stream_id: U64
-
-  new create(stream_id': U64, stream_name: String) =>
-    stream_id = stream_id'
-
-  fun apply(t: NotifyResponse) =>
-    t.source.stream_notify_result(t.session_tag, t.success,
-      stream_id, t.last_acked, t.last_seen)

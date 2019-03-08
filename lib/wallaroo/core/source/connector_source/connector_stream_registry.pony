@@ -377,9 +377,12 @@ class GlobalConnectorStreamRegistry
       consume active_stream_map_copy, consume inactive_stream_map_copy,
       consume source_addr_map_copy)
 
-class LocalConnectorStreamRegistry[In: Any val]
-  var global_registry: GlobalConnectorStreamRegistry
 
+class LocalConnectorStreamRegistry[In: Any val]
+   // Global Stream Registry
+  let _global_registry: GlobalConnectorStreamRegistry
+
+  // Local stream registry
   // (stream_name, connector_source, last_acked_por, last_seen_por)
   let active_streams: Map[U64, (String, Any tag, U64, U64)] =
     active_streams.create()
