@@ -101,6 +101,46 @@ class NotifyResultFulfill is Fulfill[NotifyResult]
     t.source.stream_notify_result(t.session_tag, t.success,
       stream_id, t.last_acked, t.last_seen)
 
+class ConnectorSourceNotifyParameters[In: Any val]
+  let pipeline_name: String
+  let env: Env
+  let auth: AmbientAuth
+  let handler: FramedSourceHandler[In] val
+  let runner_builder: RunnerBuilder
+  let partition_builder: PartitionBuilder
+  let router: Router
+  let metrics_reporter: MetricsReporter val
+  let event_log: EventLog
+  let target_router: Router
+  let cookie: String
+  let max_credits: U32
+  let refill_credits: U32
+  let host: String
+  let service: String
+
+  new val create(pipeline_name': String, env': Env,
+    auth': AmbientAuth, handler': FramedSourceHandler[In] val,
+    runner_builder': RunnerBuilder, partitioner_builder': PartitionerBuilder,
+    router': Router, metrics_reporter': MetricsReporter val,
+    event_log': EventLog, target_router': Router, cookie': String,
+    max_credits': U32, refill_credits': U32, host': String, service': String)
+  =>
+    pipeline_name = pipeline_name'
+    env = env'
+    auth = auth'
+    handler = handler'
+    runner_builder = runner_builder'
+    partition_builder = partition_builder'
+    router = router'
+    metrics_reporter = metrics_reporter'
+    event_log = event_log'
+    target_router = target_router'
+    cookie = cookie'
+    max_credits = max_credits'
+    refill_credits = refill_credits'
+    host = host'
+    service = service'
+
 class ConnectorSourceNotify[In: Any val]
   let source_id: RoutingId
   let _env: Env
@@ -114,9 +154,8 @@ class ConnectorSourceNotify[In: Any val]
   var _router: Router
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
-  // TODO [source-migration] conflate both as _listener
-  var _active_stream_registry: (None|ConnectorSourceListener[In]) = None
-  var _connector_source: (None|ConnectorSource[In] ref) = None
+  var _listener: ConnectorSourceListener[In]
+  var _connector_source: ConnectorSource[In] ref
 
   // Barrier/checkpoint id tracking
   var _barrier_ongoing: Bool = false
@@ -148,32 +187,33 @@ class ConnectorSourceNotify[In: Any val]
   // policies
   var _watermark_ts: U64 = 0
 
-  new iso create(source_id': RoutingId, pipeline_name: String, env: Env,
-    auth: AmbientAuth, handler: FramedSourceHandler[In] val,
-    runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
-    router': Router, metrics_reporter: MetricsReporter iso,
-    event_log: EventLog, target_router: Router, cookie: String,
-    max_credits: U32, refill_credits: U32, host': String, service': String)
+  new iso create(source_id': RoutingId,
+    parameters: ConnectorSourceNotifyParamaters[In],
+    listener': ConnectorSourceListener[In], source': ConnectorSource[In] ref)
   =>
     source_id = source_id'
-    _pipeline_name = pipeline_name
-    _source_name = pipeline_name + " source"
-    _env = env
-    _auth = auth
-    _handler = handler
-    _runner = runner_builder(event_log, auth, None,
-      target_router, partitioner_builder)
-    _router = router'
-    _metrics_reporter = consume metrics_reporter
+    _pipeline_name = parameters.pipeline_name
+    _source_name = parameters.pipeline_name + " source"
+    _env = parameters.env
+    _auth = parameters.auth
+    _handler = parameters.handler
+    _runner = parameters.runner_builder(parameters.event_log, _auth, None,
+      parameters.target_router, parameters.partitioner_builder)
+    _router = parameters.router
+    _metrics_reporter = recover iso parameters.metrics_reporter.clone() end
     _header_size = _handler.header_length()
-    _cookie = cookie
-    _max_credits = max_credits
-    _refill_credits = refill_credits
-    host = host'
-    service = service'
+    _cookie = parameters.cookie
+    _max_credits = parameters.max_credits
+    _refill_credits = parameters.refill_credits
+    host = parameters.host
+    service = parameters.service
+
+    _listener = listener'
+    _connector_source = source'
 
     ifdef "trace" then
-      @printf[I32]("%s: max_credits = %lu, refill_credits = %lu\n".cstring(), __loc.type_name().cstring(), max_credits, refill_credits)
+      @printf[I32]("%s: max_credits = %lu, refill_credits = %lu\n".cstring(),
+      __loc.type_name().cstring(), _max_credits, _refill_credits)
     end
 
   fun routes(): Map[RoutingId, Consumer] val =>
@@ -646,13 +686,10 @@ class ConnectorSourceNotify[In: Any val]
     end
     _active_streams.clear()
 
-  fun ref set_stream_registries(
-    listener: ConnectorSourceListener[In],
-    connector_source: ConnectorSource[In] ref) =>
-    ifdef "trace" then
-      @printf[I32]("TRACE: %s.%s\n".cstring(), __loc.type_name().cstring(), __loc.method_name().cstring())
-    end
+  fun ref set_listener(listener: ConnectorSourceListener[In]) =>
     _stream_registry = listener
+
+  fun ref set_source(connector_source: ConnectorSource[In] ref) =>
     _connector_source = connector_source
 
   fun create_checkpoint_state(): Array[ByteSeq val] val =>

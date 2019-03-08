@@ -150,7 +150,8 @@ actor ConnectorSource[In: Any val] is Source
   var session_id: RoutingId = 0
 
   new create(source_id: RoutingId, auth: AmbientAuth,
-    listen: ConnectorSourceListener[In], notify: ConnectorSourceNotify[In] iso,
+    listen: ConnectorSourceListener[In],
+    notify_parameters: ConnectorSourceNotifyParameters[In],
     event_log: EventLog, router': Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
@@ -165,7 +166,8 @@ actor ConnectorSource[In: Any val] is Source
     _event_log = event_log
     _metrics_reporter = consume metrics_reporter'
     _listen = listen
-    _notify = consume notify
+    _notify = ConnectorSourceNotify[In](source_id, notify_parameters,
+      _listen, this)
     _layout_initializer = layout_initializer
     _router_registry = router_registry
 
@@ -181,7 +183,6 @@ actor ConnectorSource[In: Any val] is Source
 
     _router = router'
     _update_router(router')
-    _notify.set_stream_registries(_listen, this)
 
     _notify.update_boundaries(_outgoing_boundaries)
 
