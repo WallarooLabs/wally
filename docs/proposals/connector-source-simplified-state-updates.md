@@ -109,3 +109,39 @@ notifier
 
 
 At the end of a recovery, local_registry relinquishes any streams that don't have a connector_source associated with them
+
+
+## Listener checkpoint logic
+
+_This part is preparation for when John's barrier protocol updates are ready_
+
+
+State hierarchy:
+
+Listener
+  - local registry
+    - global registry
+    -< active sources
+      - notifiers
+
+Communication order:
+
+notifier -> source -> listener -> local registry -> global registry or other active sources
+
+
+Creating a checkpoint (return Array[ByteSeq]):
+
+listener.create_checkpoint()
+  -> local_registry.create_checkpoint()
+    -> serialize local () +
+       serialize global()
+       // + length encoding or whatever's needed
+
+       /* This part will be used in some fashion when john's work is done:
+          /* we currently save this state in the notifier, so it's not necessary here */
+       + sources.get_checkpoints()
+       */
+
+listener.rollback(payload; Array[U8], ...)
+  ->
+    deserialize and save local and global states
