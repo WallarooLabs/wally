@@ -92,9 +92,8 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   let _connected_sources: SetIs[ConnectorSource[In]] = _connected_sources.create()
   let _available_sources: Array[ConnectorSource[In]] = _available_sources.create()
 
-  // Active Stream Registry
-  let _local_stream_registry: LocalConnectorStreamRegistry[In] =
-    _local_stream_registry.create()
+  // Stream Registry for managing updates to local and global stream state
+  let _stream_registry: LocalConnectorStreamRegistry[In]
 
   new create(env: Env, worker_name: WorkerName, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
@@ -142,8 +141,9 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     _init_size = init_size
     _max_size = max_size
 
-    // TODO [source-migration] move this to Local Reigstry new create
-    _global_stream_registry = GlobalConnectorStreamRegistry(_worker_name,
+    // Pass LocalConnectorStreamRegistry the parameters it needs to create
+    // its own instance of the GlobalConnectorStreamRegistry
+    _stream_registry.create(_worker_name,
       _pipeline_name, _connections, _host, _service, workers_list)
 
     match router
@@ -164,7 +164,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
         _max_credits, _refill_credits, _host, _service)
 
     for i in Range(0, _limit) do
-      // TODO [source-migration] can this be pushed to connector_source?
       let source_name = _worker_name + _pipeline_name + i.string()
       let source_id = try _routing_id_gen(source_name)? else Fail(); 0 end
       let source = ConnectorSource[In](source_id, _auth, this,
@@ -292,132 +291,38 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       _accept()
     end
 
-  /////////////////////////////
-  // Multiple Active Sources
-  /////////////////////////////
-  // TODO [source-migration] move this to registry.pony inside local registry
+  ///////////////////////
+  // Inter-worker actions
+  ///////////////////////
   be add_worker(worker: WorkerName) =>
-    // TODO: Update global registry map
-    _global_stream_registry.add_worker(worker)
-    None
+    _stream_registry.add_worker(worker)
 
-  // TODO [source-migration] move this to registry.pony inside local registry
   be remove_worker(worker: WorkerName) =>
-    // TODO: Update global registry map
-    _global_stream_registry.remove_worker(worker)
-    None
+    _stream_registry.remove_worker(worker)
 
-  // TODO [source-migration] move this to registry.pony inside local registry
-  // Keep the behaviour, just forward the message to a
-  // fun ref handle_listener_msg() in local registry
   be receive_msg(msg: SourceListenerMsg) =>
-    // we only care for messages that belong to this source name
-    if (msg.source_name() == _pipeline_name) then
-      match msg
-      |  let m: ConnectorStreamNotifyMsg =>
-        _process_stream_id_request(m)
-      | let m: ConnectorStreamNotifyResponseMsg =>
-        _maybe_process_pending_request(m)
-      | let m: ConnectorStreamRelinquishMsg =>
-        _relinquish_stream_id_msg(m)
-      | let m: ConnectorStreamRelinquishResponseMsg =>
-        _process_relinquish_stream_id_ack_msg(m)
-      | let m: ConnectorStreamRegRelinquishLeadershipMsg =>
-        _process_relinquish_leadership_msg(m)
-      | let m: ConnectorStreamAddSourceAddrMsg =>
-        _process_add_source_addr_msg(m)
-      | let m: ConnectorStreamRegNewLeaderMsg =>
-        _process_new_reg_leader_msg(m)
-      | let m: ConnectorStreamRegLeaderStateReceivedAckMsg =>
-        _process_reg_leader_state_received_msg(m)
-      end
-    else
-      @printf[I32](("**Dropping message** _pipeline_name: " +
-         _pipeline_name +  " =/= source_name: " + msg.source_name() + " \n")
-        .cstring())
-    end
+    _stream_registry.listener_msg_received(msg)
 
-  // TODO [source-migration] move this to registry.pony inside local registry
-  fun ref _process_reg_leader_state_received_msg(
-    msg: ConnectorStreamRegLeaderStateReceivedAckMsg)
-  =>
-    _global_stream_registry.complete_leader_state_relinquish(msg.leader_name)
+  ////////////////////////////////////////
+  // Asynchronous stream registry actions
+  ////////////////////////////////////////
+  be stream_relinquish(stream_id: StreamId, last_acked: PointOfReference) =>
+    _stream_registry.stream_relinquish(stream_id, last_acked)
 
-  // TODO [source-migration] move this to registry.pony inside local registry
-  fun ref _process_new_reg_leader_msg(msg: ConnectorStreamRegNewLeaderMsg) =>
-    _global_stream_registry.update_leader(msg.leader_name)
-
-  // TODO [source-migration] move this to registry.pony inside local registry
-  fun ref _process_stream_id_request(msg: ConnectorStreamIdRequestMsg) =>
-    _global_stream_registry.process_stream_id_request(msg.worker_name,
-      msg.stream_id, msg.request_id)
-
-  // TODO [source-migration] move this to registry.pony inside local registry
-  fun ref _maybe_process_pending_request(m: ConnectorStreamIdRequestResponseMsg) =>
-    if _global_stream_registry.contains_request(m.request_id) then
-      _global_stream_registry.process_request_response(m.request_id, m.can_use)
-    else
-      // TODO [source-migration]: Figure out what should be done here
-      // Received request_id for a request not in map
-      None
-    end
-
-  be stream_notify(stream_id: StreamId, request_id: ConnectorStreamIdRequest,
-    promise: Promise[Bool], connector_source: ConnectorSource[In] tag)
-  =>
-    _local_stream_registry.stream_notify(stream_id, request_id, promise,
-      conector_source)
-
-  // TODO [source-migration] move this to registry.pony inside local registry
-  fun ref _process_add_source_addr_msg(msg: ConnectorStreamAddSourceAddrMsg) =>
-    _global_stream_registry.add_source_address(msg.worker_name, msg.host,
-      msg.service)
-
-  // TODO [source-migration] move this to registry.pony inside local registry
-  fun ref _process_relinquish_stream_id_ack_msg(
-    msg: ConnectorStreamIdRelinquishResponseMsg)
-  =>
-    if _global_stream_registry.contains_relinquish_request(msg.request_id) then
-      _global_stream_registry.process_relinquish_response(msg.request_id,
-        msg.relinquished)
-    else
-      // TODO [source-migration]: Figure out what should be done here
-      // Received request_id for a request not in map
-      None
-    end
-
-  // be relinquish_stream_id(stream_id: StreamId, last_acked_msg:
-  // PointOfReference) =>
-  //   _global_stream_registry.
-
-  // TODO [source-migration] move this to registry.pony inside local registry
-  fun ref _relinquish_stream_id_msg(msg: ConnectorStreamIdRelinquishMsg) =>
-    _global_stream_registry.process_relinquish_stream_id_request(
-      msg.worker_name, msg.stream_id, msg.last_acked_msg, msg.request_id)
-
-  // TODO [source-migration] move this to registry.pony inside local registry
-  fun ref _process_relinquish_leadership_msg(
-    msg: ConnectorStreamRegRelinquishLeadershipMsg)
-  =>
-    _global_stream_registry.process_relinquish_leadership_request(
-      msg.worker_name, msg.active_stream_map, msg.inactive_stream_map,
-      msg.source_addr_map)
-
-  be stream_notify(session_tag: USize,
+  be stream_notify(session_tag: USize, request_id: ConnectorStreamIdRequest,
     stream_id: StreamId, stream_name: String,
-    point_of_reference: PointOfReference,
+    promise: Promise[NotifyResult],
     connector_source: ConnectorSource[In] tag)
   =>
-    _local_stream_registry.stream_notify(session_tag, stream_id,
-      stream_name, point_of_reference, connector_source)
+    _stream_registry.stream_notify(session_tag, request_id,
+      stream_id, stream_name, promise, connector_source)
 
   be stream_update(stream_id: StreamId, checkpoint_id: CheckpointId,
     last_acked_por: PointOfReference, last_seen_por: PointOfReference,
     connector_source: (ConnectorSource[In] tag|None))
   =>
-    _local_stream_registry.stream_update(stream_id, checkpoint_id,
+    _stream_registry.stream_update(stream_id, checkpoint_id,
       last_acked_por, last_seen_por, connector_source)
-
 
   ///////////////////////
   // Listener Connector

@@ -1027,13 +1027,13 @@ actor ConnectorSource[In: Any val] is Source
     _expect = _notify.expect(this, qty)
 
   be stream_notify_result(session_tag: USize, success: Bool,
-    stream_id: StreamId, point_of_reference: PointOfReference,
-    last_message_id: PointOfReference) =>
+    stream_id: StreamId, point_of_reference: PointOfReference)
+  =>
     ifdef "trace" then
       @printf[I32]("TRACE: %s.%s(%s, %lu, %lu, %lu)\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring(),
         success.string().cstring(), stream_id, point_of_reference,
         last_message_id)
     end
-    _notify.stream_notify_result(session_tag, success,
-      stream_id, point_of_reference, last_message_id)
+    _notify.stream_notify_result(session_tag, success, stream_id,
+      point_of_reference)
