@@ -566,19 +566,20 @@ primitive ChannelMsgEncoder
     _encode(UnregisterProducerMsg(sender, source_id, target_id), auth)?
 
   fun connector_stream_notify(worker_name: WorkerName, source_name: String,
-    stream_id: U64, request_id: ConnectorStreamNotify,
+    stream_id: StreamId, stream_name: String, point_of_ref: PointOfReference,
+    request_id: ConnectorStreamNotify,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(ConnectorStreamNotifyMsg(worker_name, source_name, stream_id,
-      request_id), auth)?
+      stream_name, point_of_ref, request_id), auth)?
 
-  fun connector_stream_notify_response(source_name: String, stream_id: U64,
+  fun connector_stream_notify_response(source_name: String,
+    success: Bool, stream_id: U64, stream_name: String,
     point_of_reference: U64, request_id: ConnectorStreamNotify,
-    can_use: Bool,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(ConnectorStreamNotifyResponseMsg(source_name, stream_id,
-      point_of_reference, request_id, can_use), auth)?
+    _encode(ConnectorStreamNotifyResponseMsg(source_name, success, stream_id,
+      stream_name, point_of_reference, request_id), auth)?
 
   fun connector_stream_relinquish(worker_name: String, source_name: String,
     stream_id: U64, last_acked_msg: U64,
@@ -808,15 +809,20 @@ class val ConnectorStreamRelinquishResponseMsg is SourceListenerMsg
 class val ConnectorStreamNotifyMsg is SourceListenerMsg
   let worker_name: WorkerName
   let _source_name: String
-  let stream_id: U64
+  let stream_id: StreamId
+  let stream_name: String
+  let point_of_reference: PointOfReference
   let request_id: ConnectorStreamNotify
 
   new val create(worker_name': WorkerName, source_name': String,
-    stream_id': U64, request_id': ConnectorStreamNotify)
+    stream_id': U64, stream_name': String, point_of_ref': PointOfReference,
+    request_id': ConnectorStreamNotify)
   =>
     worker_name = worker_name'
     _source_name = source_name'
     stream_id = stream_id'
+    stream_name = stream_name'
+    point_of_reference = point_of_ref'
     request_id = request_id'
 
   fun source_name(): String =>
@@ -824,20 +830,23 @@ class val ConnectorStreamNotifyMsg is SourceListenerMsg
 
 class val ConnectorStreamNotifyResponseMsg is SourceListenerMsg
   let _source_name: String
-  let stream_id: U64
-  let point_of_reference: U64
+  let stream_id: StreamId
+  let stream_name: String
+  let point_of_reference: PointOfReference
   let request_id: ConnectorStreamNotify
-  let can_use: Bool
+  let success: Bool
 
-  new val create(source_name': String, stream_id': U64,
-    point_of_reference': U64, request_id': ConnectorStreamNotify,
-    can_use': Bool)
+
+  new val create(source_name': String, success': Bool, stream_id': StreamId,
+    stream_name': String, point_of_reference': PointOfReference,
+    request_id': ConnectorStreamNotify)
   =>
     _source_name = source_name'
+    stream_name = stream_name'
     stream_id = stream_id'
     point_of_reference = point_of_reference'
+    success = success'
     request_id = request_id'
-    can_use = can_use'
 
   fun source_name(): String =>
     _source_name

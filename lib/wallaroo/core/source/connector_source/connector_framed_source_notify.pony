@@ -79,17 +79,15 @@ class val NotifyResult
   let source: ConnectorSource[In] tag
   let session_tag: USize
   let success: Bool
-  let last_acked: PointOfReference
-  let last_seen: PointOfReference
+  let resume_from: PointOfReference
 
   new val create(source': ConnectorSource[In] tag, session_tag': USize,
-    success': Bool, last_acked': PointOfReference, last_seen': PointOfReferenc)
+    success': Bool, resume_from': PointOfReference)
   =>
     source = source'
     session_tag = session_tag'
     success = success'
-    last_acked = last_acked'
-    last_seen = last_seen'
+    resume_from = resume_from'
 
 class NotifyResultFulfill is Fulfill[NotifyResult]
   let stream_id: StreamId
@@ -97,9 +95,9 @@ class NotifyResultFulfill is Fulfill[NotifyResult]
   new create(stream_id': StreamId, stream_name: String) =>
     stream_id = stream_id'
 
-  fun apply(t: NotifyResponse) =>
+  fun apply(t: NotifyResult) =>
     t.source.stream_notify_result(t.session_tag, t.success,
-      stream_id, t.last_acked, t.last_seen)
+      stream_id, t.resume_from)
 
 class ConnectorSourceNotifyParameters[In: Any val]
   let pipeline_name: String
@@ -166,7 +164,7 @@ class ConnectorSourceNotify[In: Any val]
   var service: String
 
   // stream state management
-  var _active_streams: Map[StreamId, _StreamState]= _active_steams.create()
+  var _active_streams: Map[StreamId, _StreamState]= _active_streams.create()
   var _pending_notify: Set[StreamId] = _pending_notify.create()
   var _pending_close: Map[StreamId, _StreamState] = _pending_close.create()
   var _pending_relinquish: Map[StreamId, _StreamState] = _pending_relinquish.create()
@@ -850,8 +848,7 @@ class ConnectorSourceNotify[In: Any val]
     // send request to take ownership of this stream id
     let request_id = ConnectorStreamNotify(stream_id, source.session_id)
     try
-      (_listener as ConnectorSourceListener[In])
-        .stream_notify(stream_id, request_id, _session_tag, promise)
+      _listener.stream_notify(stream_id, request_id, _session_tag, promise)
     end
 
   fun ref stream_notify_result(session_tag: USize, success: Bool,

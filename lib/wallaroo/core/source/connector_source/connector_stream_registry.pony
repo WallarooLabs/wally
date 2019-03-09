@@ -37,38 +37,44 @@ use "wallaroo/core/network"
 use "wallaroo_labs/mort"
 
 class val StreamTuple
-  let stream_name: String
-  let stream_id: U64
-  let last_acked: U64
+  let id: StreamId
+  let name: String
+  let last_acked: PointOfReference
 
-  new val create(name: String, id: U64, point_of_reference: U64) =>
-    stream_name = name
-    stream_id = id
-    last_acked = point_of_reference
+  new val create(stream_id: StreamId, stream_name: String,
+    point_of_ref: PointOfReference)
+  =>
+    name = stream_name
+    id = stream_id
+    last_acked = point_of_ref
 
-class GlobalConnectorStreamRegistry
+class GlobalConnectorStreamRegistry[In]
   var _worker_name: String
   let _source_name: String
   let _connections: Connections
   let _source_addr: (String, String)
   var _is_leader: Bool = false
   var _leader_name: String = "Initializer"
-  var _active_stream_map: Map[U64, WorkerName] = _active_stream_map.create()
-  var _inactive_stream_map: Map[U64, StreamTuple] =  _inactive_stream_map.create()
+  var _active_stream_map: Map[StreamId, WorkerName] = _active_stream_map.create()
+  var _inactive_stream_map: Map[StreamId, StreamTuple] =  _inactive_stream_map.create()
   var _source_addr_map: Map[WorkerName, (String, String)] =
     _source_addr_map.create()
   let _workers_set: Set[WorkerName] = _workers_set.create()
   let _pending_notify_promises:
-    Map[ConnectorStreamNotify, Promise[Bool]] =
+    Map[ConnectorStreamNotifyId, (Promise[NotifyResult], ConnectorSource[In])] =
       _pending_notify_promises.create()
   let _pending_relinquish_promises:
-    Map[ConnectorStreamRelinquish, Promise[Bool]] =
+    Map[ConnectorStreamRelinquishId, Promise[Bool]] =
       _pending_relinquish_promises.create()
+
+  let _local_registry: LocalConnectorStreamRegsitry[In]
 
   new create(worker_name: WorkerName, source_name: String,
     connections: Connections, host: String, service: String,
-    workers_list: Array[WorkerName] val)
+    workers_list: Array[WorkerName] val,
+    local_registry: LocalConnectorStreamRegistry[In])
   =>
+    _local_registry = local_registry
     _worker_name = worker_name
     _source_name = source_name
     _connections = connections
@@ -78,38 +84,9 @@ class GlobalConnectorStreamRegistry
     end
     _elect_leader()
 
-  fun ref process_stream_notify(worker_name: String, stream_id: U64,
-    request_id: ConnectorStreamNotify)
-  =>
-    if _is_leader then
-      (let can_use: Bool, last_por: U64) = try
-        // stream is known and inactive (allow)
-        (true, _inactive_stream_map.remove(stream_id)?._2)
-      else
-        if _active_stream_map.contains(stream_id) then
-          // stream is known and active (deny)
-          (false, 0)
-        else
-          // stream is new (allow)
-          (true, 0)
-        end
-      end
-      // send response to requesting worker
-      _connections.respond_to_stream_id_request(worker_name, _source_name,
-        stream_id, point_of_reference, request_id, can_use)
-      if can_use then
-        _active_stream_map.update(stream_id, worker_name)
-      end
-    else
-      // TODO [source-migration]: should the message be forwarded to the
-      // leader if we're not the leader?
-      // TODO [source-migration]: log a message, possibly only in debug mode
-      None
-    end
-
   fun ref process_stream_relinquish(worker_name: WorkerName,
-    stream_id: U64, last_acked_msg: U64,
-    request_id: ConnectorStreamRelinquish)
+    stream_id: StreamId, last_acked_msg: PointOfReference,
+    request_id: ConnectorStreamRelinquishId)
   =>
     if _is_leader then
       var relinquished = false
@@ -145,27 +122,27 @@ class GlobalConnectorStreamRegistry
     end
 
   fun ref process_relinquish_leadership_request(worker_name: WorkerName,
-    active_stream_map: Map[U64, WorkerName] val,
-    inactive_stream_map: Map[U64, U64] val,
+    active_stream_map: Map[StreamId, WorkerName] val,
+    inactive_stream_map: Map[StreamId, StreamTuple] val,
     source_addr_map: Map[WorkerName, (String, String)] val)
   =>
     _accept_leadership_state(worker_name, active_stream_map,
       inactive_stream_map, source_addr_map)
 
   fun ref _accept_leadership_state(worker_name: WorkerName,
-    active_stream_map: Map[U64, WorkerName] val,
-    inactive_stream_map: Map[U64, U64] val,
+    active_stream_map: Map[StreamId, WorkerName] val,
+    inactive_stream_map: Map[StreamId, StreamTuple] val,
     source_addr_map: Map[WorkerName, (String, String)] val)
   =>
     // update active stream map
-    let active_stream_map_copy = Map[U64, WorkerName]()
+    let active_stream_map_copy = Map[StreamId, WorkerName]()
     for (k,v) in active_stream_map.pairs() do
       active_stream_map_copy(k) = v
     end
     _active_stream_map = active_stream_map_copy
 
     // update inactive stream map
-    let inactive_stream_map_copy = Map[U64, U64]()
+    let inactive_stream_map_copy = Map[StreamId, StreamTuple]()
     for (k,v) in inactive_stream_map.pairs() do
       inactive_stream_map_copy(k) = v
     end
@@ -221,36 +198,130 @@ class GlobalConnectorStreamRegistry
       end
     end
 
-  fun ref stream_notify(session_tag: USize, stream_id: U64,
-    request_id: ConnectorStreamNotify, promise: Promise[Bool])
+  ////////////////
+  // STREAM_NOTIFY
+  ////////////////
+  fun ref stream_notify(session_tag: USize, request_id: ConnectorStreamNotifyId,
+    stream_id: StreamId, stream_name: String, point_of_ref: PointOfReference,
+    promise: Promise[NotifyResult], connector_source: ConectorSource[In] tag)
   =>
-    _stream_notify(session_tag, stream_id, request_id, promise)
-
-  // TODO [source-migration][nisan]: Continue from here. add session tag.
-  fun ref _stream_notify(session_tag: USize, stream_id: U64,
-    request_id: ConnectorStreamNotify, promise: Promise[Bool])
-  =>
+    """
+    local->global stream_notify
+    """
     if _is_leader then
-      try
-        // stream_id is known and unclaimed
-        let last_ack = _inactive_stream_map.remove(stream_id)?
-        // mark it as claimed by self in _active_stream_map
-        _active_stream_map(stream_id) = _worker_name
-        // respond to local registry immediately
-        
-      let can_use = not _active_stream_map.contains(stream_id)
-      if can_use then
-        _active_stream_map.update(stream_id, _worker_name)
+      // check active first
+      if _active_stream_map.contains(stream_id) then
+        // stream is already claimed by a source on another worker
+        // reject stream notify
+        _local_registry.stream_notify_global_result(session_tag, false,
+          stream_id, stream_name, 0,
+          promise, connector_source)
+      else
+        try
+          // stream_id is known and inactive
+          let stream = _inactive_stream_map.remove(stream_id)?
+          Invariant((stream_id == stream.id) and (stream_name == stream.name))
+          // mark it as claimed by self in _active_stream_map
+          _active_stream_map(stream_id) = _worker_name
+          // accept stream notify
+          _local_registry.stream_notify_global_result(session_tag, true,
+            stream.id, stream.name, stream.last_acked,
+            promise, connector_source)
+        else
+          // new stream
+          // set self as owner
+          _active_stream_map(stream_id) = _worker_name
+          // accept stream notify
+          _local_registry.stream_notify_global_result(session_tag, true,
+            stream_id, stream_name, point_of_ref,
+            promise, connector_source)
+        end
       end
-      promise(can_use)
     else
-      _pending_notify_promises(request_id) = promise
-      _connections.request_stream_id(_leader_name, _worker_name,
-        _source_name, stream_id, request_id)
+      // Not leader, go over conections to leader worker
+      _pending_notify_promises(request_id) = (promise, connector_source)
+      _connections.stream_notify(_leader_name, _worker_name,
+        _source_name, stream_id, stream_name, point_of_ref, request_id)
     end
 
-  fun ref stream_relinquish(stream_id: U64, last_acked_msg: U64,
-    request_id: ConnectorStreamRelinquish, promise: Promise[Bool])
+  fun ref process_stream_notify_msg(worker_name: String, stream_id: StreamId,
+    stream_name: String, point_of_ref: PointOfReference,
+    request_id: ConnectorStreamNotifyId)
+  =>
+    """
+    worker->leader stream_notify
+    """
+    if _is_leader then
+      // check active
+      if _active_stream_map.contains(stream_id) then
+        // reject
+        return _connections.respond_to_stream_notify(worker_name, _source_name,
+          false, stream_id, stream_name, point_of_ref, request_id)
+      else
+        // accept, but check inactive for up to date info
+        let success = true
+        let stream = try
+          // known inactive stream
+          _inactive_streams_map.remove(stream_id)?
+        else
+          // new stream
+          StreamTuple(stream_id, steam_name, point_of_ref)
+        end
+        // update _active_stream_map
+        _active_stream_map.update(stream_id, worker_name)
+        // send response to requesting worker
+        return _connections.respond_to_stream_notify(worker_name, _source_name,
+          success, stream.id, stream.name, stream.last_acked, request_id)
+      end
+    else
+      // TODO [source-migration]: should the message be forwarded to the
+      // leader if we're not the leader?
+      // [NH] maybe respond with error msg?
+      //      This does indicate that the sending worker has the wrong leader
+      //      info, which is a consistency violation... that should cause the
+      //      sending worker to fail (but not necessarily the receiving. For
+      //      example if the sending worker did not belong in the cluster why
+      //      should we fail the receiver?)
+      ifdef debug then
+        @printf[I32](("GlobalConnectorStreamRegistry is not leader but "
+          + "received a stream_notify message. Ignoring.\n").cstring())
+      end
+    end
+
+  fun ref process_stream_notify_response_msg(request_id: ConnectorStreamNotifyId,
+    success: Bool, stream_id: StreamId, stream_name: String,
+    point_of_ref: PointOfReference)
+  =>
+    """
+    leader->worker stream_notify_result
+    """
+    try
+      (let promise, let source) = _pending_notify_promises.remove(request_id)?
+      _local_registry.stream_notify_global_result(session_tag, success,
+        stream_id, stream_name, point_of_ref,
+        promise, source)
+    else
+      ifdef debug then
+        @printf[I32](("GlobalConnectorStreamRegistry received a stream_ "
+          + "notify reponse message for an unknown request."
+          +" Ignoring.\n").cstring())
+      end
+    end
+
+  ////////////////////
+  // STREAM RELINQUISH
+  ////////////////////
+  fun ref process_stream_relinquish_msg(msg: ConnectorStreamRelinquishMsg) =>
+    """
+    Process a stream relinquish message from another worker
+    """
+    // TODO [source-migration] implement this
+    None
+
+
+  fun ref stream_relinquish(stream_id: StreamId,
+    last_acked_msg: PointOfReference,
+    request_id: ConnectorStreamRelinquishId, promise: Promise[Bool])
   =>
     if _is_leader then
       try
@@ -267,24 +338,16 @@ class GlobalConnectorStreamRegistry
         _source_name, stream_id, last_acked_msg, request_id)
     end
 
-  fun ref contains_request(request_id: ConnectorStreamNotify): Bool =>
+  fun ref contains_notify_request(request_id: ConnectorStreamNotifyId): Bool =>
     _pending_notify_promises.contains(request_id)
 
   fun ref contains_relinquish_request(
-    request_id: ConnectorStreamRelinquish): Bool
+    request_id: ConnectorStreamRelinquishId): Bool
   =>
     _pending_relinquish_promises.contains(request_id)
 
-  fun ref process_stream_notify_response(request_id: ConnectorStreamNotify,
-    can_use: Bool)
-  =>
-    try
-      let promise = _pending_notify_promises(request_id)?
-      promise(can_use, point_of_reference)
-    end
-
   fun ref process_stream_relinquish_response(
-    request_id: ConnectorStreamRelinquish,
+    request_id: ConnectorStreamRelinquishId,
     relinquish: Bool)
   =>
     try
@@ -296,8 +359,8 @@ class GlobalConnectorStreamRegistry
     _relinquish_leader_state(new_leader_name)
 
   fun ref _relinquish_leader_state(new_leader_name: WorkerName) =>
-    _active_stream_map = Map[U64, WorkerName]()
-    _inactive_stream_map = Map[U64, U64]()
+    _active_stream_map = Map[StreamId, WorkerName]()
+    _inactive_stream_map = Map[StreamId, StreamTuple]()
     _source_addr_map = Map[WorkerName, (String, String)]()
     _is_leader = false
     _leader_name = new_leader_name
@@ -328,8 +391,8 @@ class GlobalConnectorStreamRegistry
   fun ref _initiate_leader_state() =>
     _is_leader = true
     _leader_name = _worker_name
-    _active_stream_map = Map[U64, WorkerName]()
-    _inactive_stream_map = Map[U64, StreamTuple]()
+    _active_stream_map = Map[StreamId, WorkerName]()
+    _inactive_stream_map = Map[StreamId, StreamTuple]()
     _source_addr_map = Map[WorkerName, (String, String)]()
     _source_addr_map(_worker_name) = (_source_addr._1, _source_addr._2)
 
@@ -357,11 +420,11 @@ class GlobalConnectorStreamRegistry
       _worker_name, _source_name, consume workers_list)
 
   fun ref _initiate_leadership_relinquishment(new_leader_name: WorkerName) =>
-    let active_stream_map_copy = recover trn Map[U64, WorkerName] end
+    let active_stream_map_copy = recover trn Map[StreamId, WorkerName] end
     for (k,v) in _active_stream_map.pairs() do
       active_stream_map_copy(k) = v
     end
-    let inactive_stream_map_copy = recover trn Map[U64, U64] end
+    let inactive_stream_map_copy = recover trn Map[StreamId, StreamTuple] end
     for (k,v) in _inactive_stream_map.pairs() do
       inactive_stream_map_copy(k) = v
     end
@@ -378,59 +441,142 @@ class GlobalConnectorStreamRegistry
       consume source_addr_map_copy)
 
 
+class ActiveStreamTuple
+  let id: StreamId
+  let name: String
+  var source: (Connectorsource[In] | None)
+  var last_acked: PointOfReference
+  var last_seen: PointOfReference
+
+  new create(stream_id': StreamId, stream_name': String,
+    last_acked': PointOfReference, last_seen': PointOfReference,
+    source': (ConnectorSource[In] | None))
+  =>
+    id = stream_id'
+    name = stream_name'
+    source = source'
+    last_acked = last_acked'
+    last_seen = last_seen'
+
 class LocalConnectorStreamRegistry[In: Any val]
    // Global Stream Registry
-  let _global_registry: GlobalConnectorStreamRegistry
+  let _global_registry: GlobalConnectorStreamRegistry[In]
 
   // Local stream registry
   // (stream_name, connector_source, last_acked_por, last_seen_por)
-  let active_streams: Map[U64, (String, Any tag, U64, U64)] =
-    active_streams.create()
+  let active_streams: Map[StreamId, ActiveStreamTuple] = active_streams.create()
 
-  new create(global: GlobalConnectorStreamRegistry[In] ref) =>
-    global_registry = global
+  new create(worker_name: WorkerName, source_name: String,
+    connections: Connections, host: String, service: String,
+    workers_list: Array[WorkerName] val)
+  =>
+    _global_registry = _global_registry.create(_worker_name,
+      _pipeline_name, _connections, _host, _service, workers_list, this)
 
-  fun ref stream_is_present(stream_id: U64): Bool =>
+  ///////////////////
+  // MESSAGE HANDLING
+  ///////////////////
+
+  fun ref listener_msg_received(msg: SourceListenerMsg) =>
+    // we only care for messages that belong to this source name
+    if (msg.source_name() == _pipeline_name) then
+      match msg
+      |  let m: ConnectorStreamNotifyMsg =>
+        _global_registry.process_stream_notify_msg(m)
+
+      | let m: ConnectorStreamNotifyResponseMsg =>
+        _global_registry.process_stream_notify_response_msg(m)
+
+      | let m: ConnectorStreamRelinquishMsg =>
+        _global_registry.process_stream_relinquish_msg(m)
+
+      | let m: ConnectorStreamRelinquishResponseMsg =>
+        _global_registry.process_stream_relinquish_msg(m)
+
+      | let m: ConnectorLeadershipRelinquishMsg =>
+        _global_registry.process_leadership_relinquish_msg(m)
+
+      | let m: ConnectorAddSourceAddrMsg =>
+        _global_registry.process_add_source_addr_msg(m)
+
+      | let m: ConnectorNewLeaderMsg =>
+        _global_registry.process_new_leader_msg(m)
+
+      | let m: ConnectorLeaderStateReceivedAckMsg =>
+        _global_registry.process_leader_state_received_msg(m)
+
+      end
+    else
+      @printf[I32](("**Dropping message** _pipeline_name: " +
+         _pipeline_name +  " =/= source_name: " + msg.source_name() + " \n")
+        .cstring())
+    end
+
+  /////////
+  // GLOBAL
+  /////////
+  fun ref add_worker(worker: WorkerName) =>
+    _global_registry.add_worker(worker)
+
+  fun ref remove_worker(worker: WorkerName) =>
+    _global_registry.remove_worker(worker)
+
+  /////////////
+  // LOCAL
+  /////////////
+
+  fun ref stream_is_present(stream_id: StreamId): Bool =>
     active_streams.contains(stream_id)
 
-  // TODO [source-migration] put session tag back in here?
-  // and thread it throughout all the way back to response from leader
-  fun ref stream_notify(session_tag: USize,
-    stream_id: U64, request_id: ConnectorStreamNotify,
+  fun ref stream_notify(session_tag: USize, request_id: ConnectorStreamNotify,
+    stream_id: StreamId, stream_name: String,
     promise: Promise[NotifyResult], connector_source: ConectorSource[In] tag)
   =>
     // stream_id in active_streams.contains()?
     try
-      (let stream_name: String, let tag_or_none: Any tag,
-       let last_acked: U64, let last_seen: U64) = active_streams(stream_id)?
+      let stream = active_streams(stream_id)?
       // connector_source == active_streams(stream_id).connector_source?
-      if tag_or_none == connector_source then
+      if stream.source == connector_source then
         // accept: already owned by requesting source
-        promise(NotifyResult(connector_source, session_tag, true,
-          last_acked, last_seen))
+        // Use last_seen as resume_from point
+        stream_notify_local_result(session_tag, true, stream_id,
+          stream.stream_name, stream.last_seen, promise, connector_source)
       else
         // reject: owned by another source in this registry
-        promise(NotifyResult(connector_source, session_tag, false,
-          last_acked, last_seen))
+        // use last_acked as resume_from point
+        // Note: this allows connectors to get info on streams owned by other
+        // connectors, and even keep tabs on their progress.
+        // Maybe this is exposing too much information... or maybe this could
+        // be useful, for example with a hot-standby connector
+        stream_notify_local_result(session_tag, false, stream_id,
+          stream.stream_name, stream.last_acked, promise, connector_source)
       end
     else
       // defer to global
-      global_registry.stream_notify(session_tag, stream_id, request_id,
-        promise)
+      global_registry.stream_notify(session_tag, request_id,
+        stream_id, stream_name, promise, connector_source)
     end
 
-  fun ref stream_notify_result(session_tag: USize, stream_id: U64,
-    promise: Promise[NotiyResult], connector_source: ConnectorSource[in] tag,
-    success: Bool, last_acked: U64)
+  fun ref stream_notify_local_result(session_tag: USize, success: Bool,
+    stream_id: StreamId, stream_name: String, resume_from: PointOfReference,
+    promise: Promise[NotifyResult], connector_source: ConnectorSource[In] tag)
+  =>
+    // No local state to update.
+    promise(NotifyResult(connector_source, session_tag, success, resume_from))
+
+  fun ref stream_notify_global_result(session_tag: USize, success: Bool,
+    stream_id: StreamId, stream_name: String, resume_from: PointOfReference,
+    promise: Promise[NotifyResult], connector_source: ConnectorSource[In] tag)
   =>
     if success then
-      // double check it's safe to update locally
-      Invariant(not active_streams.contains(steam_id))
-      // update local data
-      active_streams(stream_id) = (
+      // update locally
+      active_streams(stream_id) = ActiveStreamTuple(stream_id, stream_name,
+        resume_from, resume_from, connector_source)
+    end
+    promise(NotifyResult(connector_source, session_tag, success, resume_from))
 
-  fun ref stream_update(stream_id: U64, checkpoint_id: CheckpointId,
-    last_acked_por: U64, last_seen_por: U64,
+  fun ref stream_update(stream_id: StreamId, checkpoint_id: CheckpointId,
+    last_acked_por: PointOfReference, last_seen_por: PointOfReference,
     connector_source: (ConnectorSource[In] tag | None))
   =>
     let update = if connector_source is None then
@@ -465,15 +611,18 @@ class LocalConnectorStreamRegistry[In: Any val]
     end
 
 
-class val ConnectorStreamNotify is Equatable[ConnectorStreamNotify]
-  let stream_id: U64
+  fun ref stream_relinquish(stream_id: StreamId, last_acked: PointOfReference) =>
+    None
+
+class val ConnectorStreamNotifyId is Equatable[ConnectorStreamNotifyId]
+  let stream_id: StreamId
   let session_id: RoutingId
 
-  new val create(stream_id': U64, session_id': RoutingId) =>
+  new val create(stream_id': StreamId, session_id': RoutingId) =>
     stream_id = stream_id'
     session_id = session_id'
 
-  fun eq(that: ConnectorStreamNotify box): Bool =>
+  fun eq(that: ConnectorStreamNotifyId box): Bool =>
      """
     Returns true if the request is for the same session and stream.
     """
@@ -483,17 +632,17 @@ class val ConnectorStreamNotify is Equatable[ConnectorStreamNotify]
     session_id.hash() xor stream_id.hash()
 
 
-class val ConnectorStreamRelinquish is
-    Equatable[ConnectorRelinquishStreamRequest]
-  let stream_id: U64
+class val ConnectorStreamRelinquishId is
+    Equatable[ConnectorStreamRelinquishId]
+  let stream_id: StreamId
   let session_id: RoutingId
 
-  new val create(stream_id': U64, session_id': RoutingId) =>
+  new val create(stream_id': StreamId, session_id': RoutingId) =>
     stream_id = stream_id'
     session_id = session_id'
 
 
-  fun eq(that: ConnectorStreamRelinquish box): Bool =>
+  fun eq(that: ConnectorStreamRelinquishId box): Bool =>
      """
     Returns true if the request is for the same session and stream.
     """

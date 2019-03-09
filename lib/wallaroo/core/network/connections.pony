@@ -818,27 +818,30 @@ actor Connections is Cluster
     @printf[I32]("SLF: TODO Connections.update_worker_data_service: anything with _data_conns iteration & update?\n".cstring())
     // TODO ^^^^
 
-  be request_stream_id(leader: WorkerName, worker_name: WorkerName,
-    source_name: String, stream_id: U64, request_id: ConnectorStreamIdRequest)
+  be stream_notify(leader: WorkerName, worker_name: WorkerName,
+    source_name: String, stream_id: StreamId, stream_name: String,
+    point_of_ref: PointOfReference, request_id: ConnectorStreamIdRequest)
   =>
     try
-      let stream_id_request_msg = ChannelMsgEncoder.connector_stream_request(
-        worker_name, source_name, stream_id, request_id, _auth)?
-      _send_control(leader, stream_id_request_msg)
+      let stream_notify_msg = ChannelMsgEncoder.connector_stream_notify(
+        worker_name, source_name, stream_id, stream_name, point_of_ref,
+        request_id, _auth)?
+      _send_control(leader, stream_notify_msg)
     else
       Fail()
     end
 
-  be respond_to_stream_id_request(worker_name: WorkerName, source_name: String,
-    stream_id: U64, point_of_reference: U64,
-    request_id: ConnectorStreamIdRequest, can_use: Bool)
+  be respond_to_stream_notify(worker_name: WorkerName, source_name: String,
+    success: Bool, stream_id: StreamId, stream_name: String,
+    point_of_reference: PointOfReference, request_id: ConnectorStreamIdRequest)
   =>
     try
-      let stream_id_request_response_msg =
-        ChannelMsgEncoder.connector_stream_request_response(
-          source_name, stream_id, point_of_reference, request_id, can_use,
+      let stream_notify_response_msg =
+        ChannelMsgEncoder.connector_stream_notify_response(
+          source_name,
+          success, stream_id, stream_name, point_of_reference, request_id,
           _auth)?
-        _send_control(worker_name, stream_id_request_response_msg)
+        _send_control(worker_name, stream_notify_response_msg)
     else
       Fail()
     end
