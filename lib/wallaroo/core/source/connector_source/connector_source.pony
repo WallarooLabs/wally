@@ -199,7 +199,12 @@ actor ConnectorSource[In: Any val] is Source
     A new connection accepted on a server.
     """
     if not _disposed then
-      _notify.accepted(this)
+      // Purge pending requests on old session id
+      _listen.purge_pending_requests(session_id)
+      // Get new session id for new connection
+      session_id = _routing_id_gen()
+      // update notify's session value
+      _notify.accepted(this, session_id)
 
       _connect_count = 0
       _fd = fd
@@ -226,7 +231,6 @@ actor ConnectorSource[In: Any val] is Source
       _pending_sent = 0
       _pending_writev_total = 0
 
-      session_id = _routing_id_gen()
       _pending_reads()
     end
 
@@ -1026,14 +1030,8 @@ actor ConnectorSource[In: Any val] is Source
     // TODO: verify that removal of "in_sent" check is harmless
     _expect = _notify.expect(this, qty)
 
-  be stream_notify_result(session_tag: USize, success: Bool,
+  be stream_notify_result(session_id': RoutingId, success: Bool,
     stream_id: StreamId, point_of_reference: PointOfReference)
   =>
-    ifdef "trace" then
-      @printf[I32]("TRACE: %s.%s(%s, %lu, %lu, %lu)\n".cstring(),
-        __loc.type_name().cstring(), __loc.method_name().cstring(),
-        success.string().cstring(), stream_id, point_of_reference,
-        last_message_id)
-    end
-    _notify.stream_notify_result(session_tag, success, stream_id,
+    _notify.stream_notify_result(session_id', success, stream_id,
       point_of_reference)

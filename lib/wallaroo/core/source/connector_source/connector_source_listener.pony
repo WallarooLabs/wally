@@ -143,7 +143,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
 
     // Pass LocalConnectorStreamRegistry the parameters it needs to create
     // its own instance of the GlobalConnectorStreamRegistry
-    _stream_registry.create(_worker_name,
+    _stream_registry = _stream_registry.create(_worker_name,
       _pipeline_name, _connections, _host, _service, workers_list)
 
     match router
@@ -158,7 +158,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     @printf[I32]((pipeline_name + " source will listen (but not yet) on "
       + host + ":" + service + "\n").cstring())
 
-    let noitfy_parameters = ConnectorSourceNotifyParameters[In](_pipeline_name,
+    let notify_parameters = ConnectorSourceNotifyParameters[In](_pipeline_name,
       _env, _auth, _handler, _runner_builder, _partitioner_builder, _router,
         _metrics_reporter.clone(), _event_log, _target_router, _cookie,
         _max_credits, _refill_credits, _host, _service)
@@ -293,6 +293,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
 
   ///////////////////////
   // Inter-worker actions
+  // These are called via the connections or router actors (typically)
   ///////////////////////
   be add_worker(worker: WorkerName) =>
     _stream_registry.add_worker(worker)
@@ -305,16 +306,20 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
 
   ////////////////////////////////////////
   // Asynchronous stream registry actions
+  // These are called by a ConnectorSource (via it's notify class)
   ////////////////////////////////////////
+  be purge_pending_requests(session_id: RoutingId) =>
+    _stream_registry.pure_pending_requests(session_id)
+
   be stream_relinquish(stream_id: StreamId, last_acked: PointOfReference) =>
     _stream_registry.stream_relinquish(stream_id, last_acked)
 
-  be stream_notify(session_tag: USize, request_id: ConnectorStreamIdRequest,
+  be stream_notify(request_id: ConnectorStreamNotifyId,
     stream_id: StreamId, stream_name: String,
-    promise: Promise[NotifyResult],
+    promise: Promise[NotifyResult[In]],
     connector_source: ConnectorSource[In] tag)
   =>
-    _stream_registry.stream_notify(session_tag, request_id,
+    _stream_registry.stream_notify(request_id,
       stream_id, stream_name, promise, connector_source)
 
   be stream_update(stream_id: StreamId, checkpoint_id: CheckpointId,

@@ -24,6 +24,7 @@ use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/checkpoint"
 use "wallaroo/core/data_receiver"
+use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/partitioning"
@@ -57,55 +58,56 @@ class _StreamState
   For sendable versions going outside of the notifier,
   use streamstate(): StreamState
   """
-  var last_seen_por: StreamId  // last seen message id
-  var last_acked_por: PointOfReference // last message id that was checkpointed
+  var last_seen: PointOfReference  // last seen message id
+  var last_acked: PointOfReference // last message id that was checkpointed
   var last_checkpoint_id: CheckpointId // last checkpoint id
 
-  new ref create(last_seen_por': PointOfReference,
-    last_acked_por': PointOfReference, last_checkpoint_id': CheckpointId)
+  new ref create(last_seen': PointOfReference,
+    last_acked': PointOfReference, last_checkpoint_id': CheckpointId)
 =>
-  last_seen_por = last_seen_por'
-  last_acked_por = last_acked_por'
+  last_seen = last_seen'
+  last_acked = last_acked'
   last_checkpoint_id = last_checkpoint_id'
 
   fun val streamstate(): StreamState =>
-    StreamState(last_een_por, last_acked_por, last_checkpoint_id)
+    StreamState(last_seen, last_acked, last_checkpoint_id)
 
-class val NotifyResult
+class val NotifyResult[In]
   """
   The type to use with Promise objects used to manage responses for the async
   parts of the stream_notify sequence
   """
   let source: ConnectorSource[In] tag
-  let session_tag: USize
   let success: Bool
   let resume_from: PointOfReference
 
-  new val create(source': ConnectorSource[In] tag, session_tag': USize,
+  new val create(source': ConnectorSource[In] tag,
     success': Bool, resume_from': PointOfReference)
   =>
     source = source'
-    session_tag = session_tag'
     success = success'
     resume_from = resume_from'
 
-class NotifyResultFulfill is Fulfill[NotifyResult]
+class NotifyResultFulfill[In] is Fulfill[NotifyResult[In], None]
   let stream_id: StreamId
+  let session_id: RoutingId
 
-  new create(stream_id': StreamId, stream_name: String) =>
+  new create(stream_id': StreamId, stream_name: String, session_id': RoutingId)
+  =>
     stream_id = stream_id'
+    session_id = session_id'
 
-  fun apply(t: NotifyResult) =>
-    t.source.stream_notify_result(t.session_tag, t.success,
+  fun apply(t: NotifyResult[In]) =>
+    t.source.stream_notify_result(session_id, t.success,
       stream_id, t.resume_from)
 
-class ConnectorSourceNotifyParameters[In: Any val]
+class val ConnectorSourceNotifyParameters[In: Any val]
   let pipeline_name: String
   let env: Env
   let auth: AmbientAuth
   let handler: FramedSourceHandler[In] val
   let runner_builder: RunnerBuilder
-  let partition_builder: PartitionBuilder
+  let partitioner_builder: PartitionerBuilder
   let router: Router
   let metrics_reporter: MetricsReporter val
   let event_log: EventLog
@@ -128,7 +130,7 @@ class ConnectorSourceNotifyParameters[In: Any val]
     auth = auth'
     handler = handler'
     runner_builder = runner_builder'
-    partition_builder = partition_builder'
+    partitioner_builder = partitioner_builder'
     router = router'
     metrics_reporter = metrics_reporter'
     event_log = event_log'
@@ -167,10 +169,13 @@ class ConnectorSourceNotify[In: Any val]
   var _active_streams: Map[StreamId, _StreamState]= _active_streams.create()
   var _pending_notify: Set[StreamId] = _pending_notify.create()
   var _pending_close: Map[StreamId, _StreamState] = _pending_close.create()
-  var _pending_relinquish: Map[StreamId, _StreamState] = _pending_relinquish.create()
+  var _pending_relinquish: Map[StreamId, _StreamState] =
+    _pending_relinquish.create()
+  var _pending_acks: Array[(StreamId, PointOfReference)] =
+    _pending_acks.create()
 
   var _session_active: Bool = false
-  var _session_tag: USize = 0
+  var _session_id: USize = 0
   var _fsm_state: _ProtoFsmState = _ProtoFsmDisconnected
   let _cookie: String
   let _max_credits: U32
@@ -185,8 +190,8 @@ class ConnectorSourceNotify[In: Any val]
   // policies
   var _watermark_ts: U64 = 0
 
-  new iso create(source_id': RoutingId,
-    parameters: ConnectorSourceNotifyParamaters[In],
+  new create(source_id': RoutingId,
+    parameters: ConnectorSourceNotifyParameters[In],
     listener': ConnectorSourceListener[In], source': ConnectorSource[In] ref)
   =>
     source_id = source_id'
@@ -241,6 +246,8 @@ class ConnectorSourceNotify[In: Any val]
         ingest_ts, pipeline_time_spent)
     end
 
+  // TODO [source-migration]: Is this only ever used for rollback?
+  // should it be renamed to be more specific?
   fun ref received_connector_msg(source: ConnectorSource[In] ref,
     data: Array[U8] iso,
     latest_metrics_id: U16,
@@ -411,7 +418,7 @@ class ConnectorSourceNotify[In: Any val]
 
 
                 // TODO [source-migration]: move this to relinquish fun
-                (_active_stream_registry as ConnectorSourceListener[In])
+                _listener
                   .stream_update(stream_id, s.barrier_checkpoint_id,
                     s.barrier_last_message_id, msg_id, None)
               end
@@ -601,7 +608,7 @@ class ConnectorSourceNotify[In: Any val]
       end
     end
 
-  fun ref accepted(source: ConnectorSource[In] ref) =>
+  fun ref accepted(source: ConnectorSource[In] ref, session_id: RoutingId) =>
     @printf[I32]((_source_name + ": accepted a connection\n").cstring())
     if _fsm_state isnt _ProtoFsmDisconnected then
       @printf[I32]("ERROR: %s.connected: state is %d\n".cstring(),
@@ -612,11 +619,13 @@ class ConnectorSourceNotify[In: Any val]
     _fsm_state = _ProtoFsmConnected
     _header = true
     _session_active = true
-    _session_tag = _session_tag + 1
-    _pending_notify.clear()
-    _active_streams.clear()
-    _pending_close.clear()
-    _pending_relinquish.clear()
+    _session_id = session_id
+    // TODO [source-migration]: be careful about pushing state back to registry
+    _pending_notify.clear()  // have to be resent by external connector
+    _active_streams.clear()  // relinquish? should this be part of closed?
+    _pending_close.clear()   // should be part of closed
+    _pending_relinquish.clear()  // should be resent?
+
     _credits = _max_credits
     _prep_for_rollback = false
     source.expect(_header_size)
@@ -675,7 +684,7 @@ class ConnectorSourceNotify[In: Any val]
     // _relinquish (it's okay to double send here)
     for (stream_id, s) in _active_streams.pairs() do
       try
-        (_active_stream_registry as ConnectorSourceListener[In])
+        _listener
         .stream_update(stream_id, s.barrier_checkpoint_id,
           s.barrier_last_message_id, s.last_message_id, None)
       else
@@ -683,12 +692,6 @@ class ConnectorSourceNotify[In: Any val]
       end
     end
     _active_streams.clear()
-
-  fun ref set_listener(listener: ConnectorSourceListener[In]) =>
-    _stream_registry = listener
-
-  fun ref set_source(connector_source: ConnectorSource[In] ref) =>
-    _connector_source = connector_source
 
   fun create_checkpoint_state(): Array[ByteSeq val] val =>
     // recover val ["<{stand-in for state for ConnectorSource with routing id="; source_id.string(); "}>"] end
@@ -733,7 +736,7 @@ class ConnectorSourceNotify[In: Any val]
           @printf[I32]("TRACE: read = s-id %lu b-ckp-id %lu b-l-msg-id %lu l-msg-id %lu\n".cstring(),
           stream_id, barrier_checkpoint_id, barrier_last_message_id, last_message_id)
         end
-        (_active_stream_registry as ConnectorSourceListener[In])
+        _listener
         .stream_update(stream_id, barrier_checkpoint_id,
             barrier_last_message_id, last_message_id, None)
       end
@@ -749,7 +752,7 @@ class ConnectorSourceNotify[In: Any val]
     if _session_active then
       for s in _active_streams.values() do
         s.last_checkpoint_id = checkpoint_id
-        s.last_acked_por = s.last_seen_por
+        s.last_acked = s.last_seen
 
         ifdef "trace" then
           @printf[I32]("TRACE: %s.%s(%lu) _barrier_last_message_id = %lu\n".cstring(),
@@ -759,7 +762,7 @@ class ConnectorSourceNotify[In: Any val]
       end
       for s in _pending_close.values() do
         s.last_checkpoint_id = checkpoint_id
-        s.last_acked_por = s.last_seen_por
+        s.last_acked = s.last_seen
 
         ifdef "trace" then
           @printf[I32]("TRACE: %s.%s(%lu) _barrier_last_message_id = %lu\n".cstring(),
@@ -776,40 +779,29 @@ class ConnectorSourceNotify[In: Any val]
 
     if _session_active then
       for (stream_id, s) in _active_streams.pairs() do
-        ifdef "trace" then
-          @printf[I32]("TRACE: %s.%s(%lu) active last_acked_por = %lu, last_seen_por = %lu\n".cstring(),
-            __loc.type_name().cstring(), __loc.method_name().cstring(),
-            checkpoint_id, s.last_acked_por, s.last_seen_por)
-        end
-
         try
-          (_active_stream_registry as ConnectorSourceListener[In])
+          _listener
             .stream_update(
-              stream_id, s.last_checkpoint_id, s.last_acked_por,
-              s.last_seen_por,
-              (_connector_source as ConnectorSource[In]))
+              stream_id, s.last_checkpoint_id, s.last_acked,
+              s.last_seen,
+              _connector_source)
+          _pending_acks.push((stream_id, s.last_acked))
         else
           Fail()
         end
       end
 
-      // TODO [source-migration]: loop over _pending_close, update them in
-      // registry, then use fun ref _relinquish_stream on them
       let to_relinquish = recover ref Array[(StreamId, _StreamState)] end
 
+      // process acks for EOS/_pending_close streams
       for (stream_id, s) in _pending_close.pairs() do
-        ifdef "trace" then
-          @printf[I32]("TRACE: %s.%s(%lu) pending_close last_acked_por = %lu, last_seen_por = %lu\n".cstring(),
-              __loc.type_name().cstring(), __loc.method_name().cstring(),
-              checkpoint_id, s.last_acked_por, s.last_seen_por)
-        end
-
         try
-          (_active_stream_registry as ConnectorSourceListener[In])
+          _listener
             .stream_update(
-              stream_id, s.last_checkpoint_id, s.last_acked_por,
-              s.last_seen_por,
-              (_connector_source as ConnectorSource[In]))
+              stream_id, s.last_checkpoint_id, s.last_acked,
+              s.last_seen,
+              _connector_source)
+          _pending_acks.push((stream_id, s.last_acked))
           to_relinquish.push((stream_id, s))
         else
           Fail()
@@ -817,6 +809,7 @@ class ConnectorSourceNotify[In: Any val]
       end
       // clear _pending_close
       _pending_close.clear()
+      // process new stream relinquish requests
       _relinquish_streams(consume to_relinquish)
 
       if _fsm_state is _ProtoFsmStreaming then
@@ -835,26 +828,39 @@ class ConnectorSourceNotify[In: Any val]
       end
     end
 
+  fun ref _relinquish_streams(streams: Array[(StreamId, _StreamState)] val) =>
+    // add the stream to _pending_reliqnuish
+    for (sid, state) in streams.pairs() do
+      _pending_relinquish(sid) = state
+      _listener.stream_relinquish(sid, state.last_acked)
+    end
+
+  // TODO [source-migration]: implement this
+  fun ref stream_relinquish_result(session_id: RoutingId, success: Bool,
+    stream_id: StreamId, point_of_reference: PointOfReference)
+  =>
+    None
+
   fun ref _process_notify(source: ConnectorSource[In] ref, stream_id: StreamId,
     stream_name: String, point_of_reference: PointOfReference)
   =>
     // add to _pending_notify
-    _pending_notify.set(m.stream_id)
+    _pending_notify.set(stream_id)
 
     // create a promise for handling result
-    let promise = Promise[NotifyResult]
-    promise.next[None](recover NotifyResultFulfill(stream_id) end)
+    let promise = Promise[NotifyResult[In]]
+    promise.next[None](recover NotifyResultFulfill[In](stream_id, _session_id) end)
 
     // send request to take ownership of this stream id
-    let request_id = ConnectorStreamNotify(stream_id, source.session_id)
+    let request_id = ConnectorStreamNotifyId(stream_id, _session_id)
     try
-      _listener.stream_notify(stream_id, request_id, _session_tag, promise)
+      _listener.stream_notify(stream_id, request_id, promise)
     end
 
-  fun ref stream_notify_result(session_tag: USize, success: Bool,
+  fun ref stream_notify_result(session_id: RoutingId, success: Bool,
     stream_id: StreamId, point_of_reference: PointOfReference)
   =>
-    if (session_tag != _session_tag) or (not _session_active) then
+    if (session_id != _session_id) or (not _session_active) then
       // This is a reply from a query that we'd sent in a prior TCP
       // connection, or else the TCP connection is closed now,
       // so ignore it.
@@ -897,15 +903,10 @@ class ConnectorSourceNotify[In: Any val]
 
   fun ref _send_ack() =>
     let new_credits = _max_credits - _credits
-    let cs: Array[(cwm.StreamId, cwm.PointOfRef)] trn =
-      recover trn cs.create() end
-
-    // TODO [source-migration]: if stream.await_eos_ack, remove
-    // it from the _stream_map. Otherwise it stays
-    for (stream_id, s) in _stream_map.pairs() do
-      cs.push((stream_id, s.barrier_last_message_id))
-    end
-    _send_reply(_connector_source, cwm.AckMsg(new_credits, consume cs))
+    // destructively read the pending acks
+    // and send the ack to the connector
+    let acks = _pending_acks = _pending_acks.create()
+    _send_reply(_connector_source, cwm.AckMsg(new_credits, consume acks))
     _credits = _credits + new_credits
 
   fun ref _send_restart() =>
