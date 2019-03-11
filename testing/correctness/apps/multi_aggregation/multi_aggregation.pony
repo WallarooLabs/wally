@@ -122,6 +122,10 @@ primitive GetEventKey
   fun apply(e: Event): Key =>
     e.event_key
 
+primitive Const
+  fun apply(a: Any): Key =>
+    "0"
+
 primitive EventEncoder
   fun apply(e: Event, wb: Writer): Array[ByteSeq] val =>
     let scaled_ts = (e.event_time/1_000_000).u64()
