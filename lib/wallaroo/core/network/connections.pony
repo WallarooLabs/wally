@@ -818,35 +818,31 @@ actor Connections is Cluster
     @printf[I32]("SLF: TODO Connections.update_worker_data_service: anything with _data_conns iteration & update?\n".cstring())
     // TODO ^^^^
 
-  be stream_notify(leader: WorkerName, worker_name: WorkerName,
-    source_name: String, stream_id: StreamId, stream_name: String,
-    point_of_ref: PointOfReference, request_id: ConnectorStreamNotifyId)
+  be connector_stream_notify(leader: WorkerName, worker_name: WorkerName,
+    source_name: String, stream: StreamTuple,
+    request_id: ConnectorStreamNotifyId)
   =>
     try
       let stream_notify_msg = ChannelMsgEncoder.connector_stream_notify(
-        worker_name, source_name, stream_id, stream_name, point_of_ref,
-        request_id, _auth)?
+        worker_name, source_name, stream, request_id, _auth)?
       _send_control(leader, stream_notify_msg)
     else
       Fail()
     end
 
-  be respond_to_stream_notify(worker_name: WorkerName, source_name: String,
-    success: Bool, stream_id: StreamId, stream_name: String,
-    point_of_reference: PointOfReference, request_id: ConnectorStreamNotifyId)
+  be connector_respond_to_stream_notify(worker_name: WorkerName, source_name: String,
+    success: Bool, stream: StreamTuple, request_id: ConnectorStreamNotifyId)
   =>
     try
       let stream_notify_response_msg =
         ChannelMsgEncoder.connector_stream_notify_response(
-          source_name,
-          success, stream_id, stream_name, point_of_reference, request_id,
-          _auth)?
+          source_name, success, stream, request_id, _auth)?
         _send_control(worker_name, stream_notify_response_msg)
     else
       Fail()
     end
 
-  be stream_relinquish(leader: WorkerName, worker_name: WorkerName,
+  be connector_stream_relinquish(leader: WorkerName, worker_name: WorkerName,
     source_name: String, stream: StreamTuple,
     request_id: ConnectorStreamRelinquishId)
   =>
@@ -859,20 +855,19 @@ actor Connections is Cluster
       Fail()
     end
 
-  be respond_to_stream_relinquish(worker_name: WorkerName,
-    source_name: String, request_id: ConnectorStreamRelinquishId,
-    relinquished: Bool)
+  be connector_respond_to_stream_relinquish(worker_name: WorkerName,
+    source_name: String, request_id: ConnectorStreamRelinquishId)
   =>
     try
       let stream_relinquish_response_msg =
         ChannelMsgEncoder.connector_stream_relinquish_response(
-          source_name, request_id, relinquished, _auth)?
+          source_name, request_id, _auth)?
         _send_control(worker_name, stream_relinquish_response_msg)
     else
       Fail()
     end
 
-  be add_connector_source_addr(leader: WorkerName,
+  be connector_add_source_addr(leader: WorkerName,
     worker_name: WorkerName, source_name: String, host: String,
     service: String)
   =>
