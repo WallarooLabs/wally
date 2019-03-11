@@ -407,15 +407,30 @@ primitive ChannelMsgEncoder
   =>
   _encode(ForwardedInjectBarrierFullyAckedMsg(token), auth)?
 
+  fun forwarded_inject_barrier_aborted(token: BarrierToken,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+  _encode(ForwardedInjectBarrierAbortedMsg(token), auth)?
+
   fun remote_initiate_barrier(sender: WorkerName, token: BarrierToken,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(RemoteInitiateBarrierMsg(sender, token), auth)?
 
+  fun remote_abort_barrier(sender: WorkerName, token: BarrierToken,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(RemoteAbortBarrierMsg(sender, token), auth)?
+
   fun worker_ack_barrier(sender: WorkerName, token: BarrierToken,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(WorkerAckBarrierMsg(sender, token), auth)?
+
+  fun worker_abort_barrier(sender: WorkerName, token: BarrierToken,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(WorkerAbortBarrierMsg(sender, token), auth)?
 
   fun forward_barrier(target_step_id: RoutingId,
     origin_step_id: RoutingId, token: BarrierToken, seq_id: SeqId,
@@ -1227,6 +1242,12 @@ class val ForwardedInjectBarrierFullyAckedMsg is ChannelMsg
   new val create(token': BarrierToken) =>
     token = token'
 
+class val ForwardedInjectBarrierAbortedMsg is ChannelMsg
+  let token: BarrierToken
+
+  new val create(token': BarrierToken) =>
+    token = token'
+
 class val RemoteInitiateBarrierMsg is ChannelMsg
   let sender: WorkerName
   let token: BarrierToken
@@ -1235,7 +1256,23 @@ class val RemoteInitiateBarrierMsg is ChannelMsg
     sender = sender'
     token = token'
 
+class val RemoteAbortBarrierMsg is ChannelMsg
+  let sender: WorkerName
+  let token: BarrierToken
+
+  new val create(sender': WorkerName, token': BarrierToken) =>
+    sender = sender'
+    token = token'
+
 class val WorkerAckBarrierMsg is ChannelMsg
+  let sender: WorkerName
+  let token: BarrierToken
+
+  new val create(sender': WorkerName, token': BarrierToken) =>
+    sender = sender'
+    token = token'
+
+class val WorkerAbortBarrierMsg is ChannelMsg
   let sender: WorkerName
   let token: BarrierToken
 

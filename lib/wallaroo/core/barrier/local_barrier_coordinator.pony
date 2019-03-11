@@ -45,6 +45,11 @@ actor LocalBarrierCoordinator
   let _active_barriers: Map[BarrierToken, _SinkAckCount] =
     _active_barriers.create()
 
+  // When barriers are aborted, they're added to this array so that we know
+  // to ignore further acks/aborts for the barrier. We only keep the last
+  // 256 barriers around.
+  let _aborted_barriers: Array[BarrierToken] = Array[BarrierToken](256)
+
   var _barrier_sources: SetIs[BarrierSource] = _barrier_sources.create()
   let _sources: Map[RoutingId, Source] = _sources.create()
   let _sinks: SetIs[Sink] = _sinks.create()
@@ -81,14 +86,7 @@ actor LocalBarrierCoordinator
     end
 
   be inject_barrier(barrier_token: BarrierToken) =>
-    if not _disposed then
-      ifdef debug then
-        Invariant(not _active_barriers.contains(barrier_token))
-      end
-
-      let sink_ack_count = _SinkAckCount(barrier_token, _sinks, this)
-      _active_barriers(barrier_token) = sink_ack_count
-
+    if not _disposed and not _aborted_barriers.contains(barrier_token) then
       ifdef "checkpoint_trace" then
         @printf[I32]("Calling initiate_barrier at %s BarrierSources\n"
           .cstring(), _barrier_sources.size().string().cstring())
@@ -105,28 +103,76 @@ actor LocalBarrierCoordinator
         s.initiate_barrier(barrier_token)
       end
 
-      sink_ack_count.check_complete()
+      // It's possible we've already initiated this if a sink ack arrived
+      // before the inject message.
+      if not _active_barriers.contains(barrier_token) then
+        _initiate_barrier(barrier_token)
+      end
     end
+
+  fun ref _initiate_barrier(token: BarrierToken) =>
+    ifdef debug then
+      Invariant(not _active_barriers.contains(token))
+    end
+
+    let sink_ack_count = _SinkAckCount(token, _sinks, this)
+    _active_barriers(token) = sink_ack_count
+
+    sink_ack_count.check_complete()
 
   be ack_barrier(s: Sink, barrier_token: BarrierToken) =>
     """
     Called by sinks when they have received barrier barriers on all
     their inputs.
     """
-    try
-      _active_barriers(barrier_token)?.ack(s)
-    else
-      ifdef debug then
-        _unknown_barrier_for("ack_barrier", barrier_token)
+    if not _aborted_barriers.contains(barrier_token) then
+      // It's possible we haven't initiated this yet if a sink ack arrived
+      // before the inject message.
+      if not _active_barriers.contains(barrier_token) then
+        _initiate_barrier(barrier_token)
+      end
+
+      try
+        _active_barriers(barrier_token)?.ack(s)
+      else
+        Fail()
       end
     end
 
-  be abort_barrier(s: Sink, barrier_token: BarrierToken) =>
+  be abort_barrier(barrier_token: BarrierToken) =>
     """
     Called by a sink that determines a protocol underlying a barrier
     must be aborted.
     """
-    _clear_barrier(barrier_token)
+    if not _aborted_barriers.contains(barrier_token) then
+      _abort_barrier(barrier_token)
+      if _primary_worker == _worker_name then
+        _coordinator.worker_abort_barrier(_worker_name, barrier_token)
+      else
+        try
+          let msg = ChannelMsgEncoder.worker_abort_barrier(_worker_name,
+            barrier_token, _auth)?
+          _connections.send_control(_primary_worker, msg)
+        else
+          Fail()
+        end
+      end
+    end
+
+  be remote_abort_barrier(barrier_token: BarrierToken) =>
+    """
+    Called when another worker has aborted this barrier.
+    """
+    if not _aborted_barriers.contains(barrier_token) then
+      _abort_barrier(barrier_token)
+    end
+
+  fun ref _abort_barrier(barrier_token: BarrierToken) =>
+      _aborted_barriers.push(barrier_token)
+      if _aborted_barriers.size() > 254 then
+        try _aborted_barriers.shift()? end
+      end
+      _clear_barrier(barrier_token)
 
   fun ref all_sinks_acked(barrier_token: BarrierToken) =>
     """

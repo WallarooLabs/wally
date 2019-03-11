@@ -476,15 +476,30 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           else
             Fail()
           end
+        },
+        {() =>
+          try
+            let msg = ChannelMsgEncoder.forwarded_inject_barrier_aborted(
+              m.token, _auth)?
+            _connections.send_control(m.sender, msg)
+          else
+            Fail()
+          end
         })
         _barrier_coordinator.inject_blocking_barrier(m.token, promise,
           m.wait_for_token)
       | let m: ForwardedInjectBarrierFullyAckedMsg =>
         _barrier_coordinator.forwarded_inject_barrier_fully_acked(m.token)
+      | let m: ForwardedInjectBarrierAbortedMsg =>
+        _barrier_coordinator.forwarded_inject_barrier_aborted(m.token)
       | let m: RemoteInitiateBarrierMsg =>
         _barrier_coordinator.remote_initiate_barrier(m.sender, m.token)
+      | let m: RemoteAbortBarrierMsg =>
+        _barrier_coordinator.remote_abort_barrier(m.token)
       | let m: WorkerAckBarrierMsg =>
         _barrier_coordinator.worker_ack_barrier(m.sender, m.token)
+      | let m: WorkerAbortBarrierMsg =>
+        _barrier_coordinator.worker_abort_barrier(m.sender, m.token)
       | let m: BarrierFullyAckedMsg =>
         _barrier_coordinator.remote_barrier_fully_acked(m.token)
       | let m: AbortCheckpointMsg =>

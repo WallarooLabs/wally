@@ -296,6 +296,17 @@ actor BarrierCoordinator is Initializable
       end
     end
 
+  be forwarded_inject_barrier_aborted(barrier_token: BarrierToken) =>
+    try
+      let promise = _pending_promises.remove(barrier_token)?._2
+      promise.reject()
+    else
+      ifdef debug then
+        _unknown_barrier_for("forwarded_inject_barrier_fully_acked",
+          barrier_token)
+      end
+    end
+
   fun ref queue_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
   =>
@@ -411,8 +422,6 @@ actor BarrierCoordinator is Initializable
     _phase.worker_ack_barrier(w, barrier_token)
 
   fun ref _worker_ack_barrier(w: WorkerName, barrier_token: BarrierToken) =>
-    //!@
-    // _phase.worker_ack_barrier(w, barrier_token)
     try
       _active_barriers(barrier_token)?.ack(w)
     else
@@ -421,21 +430,31 @@ actor BarrierCoordinator is Initializable
       end
     end
 
-  //!@
-  // fun ref all_workers_acked(barrier_token: BarrierToken,
-  //   result_promise: BarrierResultPromise)
-  // =>
-  //   """
-  //   All in flight acks have been received. Revert to waiting state
-  //   and trigger the BarrierResultPromise.
-  //   """
-  //   try
-  //     barrier_fully_acked(barrier_token)
-  //   else
-  //     ifdef debug then
-  //       _unknown_barrier_for("all_workers_acked", barrier_token)
-  //     end
-  //   end
+  be worker_abort_barrier(worker: WorkerName, barrier_token: BarrierToken) =>
+    if _primary_worker == _worker_name then
+      try
+        @printf[I32]("Barrier %s aborted by worker %s!\n".cstring(),
+          barrier_token.string().cstring(), worker.cstring())
+        _pending_promises(barrier_token)?.reject()
+      else
+        ifdef debug then
+          _unknown_barrier_for("abort_barrier", barrier_token)
+        end
+      end
+      _clear_barrier(barrier_token)
+      try
+        let msg = ChannelMsgEncoder.remote_abort_barrier(_worker_name,
+          barrier_token, _auth)?
+        for w in _workers.values() do
+          if w != _worker_name then _connections.send_control(w, msg) end
+        end
+      else
+        Fail()
+      end
+    end
+
+  be remote_abort_barrier(barrier_token: BarrierToken) =>
+    _local_coordinator.remote_abort_barrier(barrier_token)
 
   fun ref barrier_fully_acked(barrier_token: BarrierToken) =>
     if not _disposed then
@@ -515,20 +534,12 @@ actor BarrierCoordinator is Initializable
   fun ref _ack_barrier(s: Sink, barrier_token: BarrierToken) =>
     _local_coordinator.ack_barrier(s, barrier_token)
 
-  be abort_barrier(s: Sink, barrier_token: BarrierToken) =>
+  be abort_barrier(barrier_token: BarrierToken) =>
     """
     Called by a sink that determines a protocol underlying a barrier
     must be aborted.
     """
-    try
-      _pending_promises(barrier_token)?.reject()
-    else
-      ifdef debug then
-        _unknown_barrier_for("abort_barrier", barrier_token)
-      end
-    end
-    _clear_barrier(barrier_token)
-    _local_coordinator.abort_barrier(s, barrier_token)
+    _local_coordinator.abort_barrier(barrier_token)
 
   //!@ Should we rename this to be clearer?
   be remote_barrier_fully_acked(barrier_token: BarrierToken) =>
