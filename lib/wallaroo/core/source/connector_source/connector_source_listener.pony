@@ -48,7 +48,7 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
-// TODO [source-migration] make this actor participate in checkpointing
+// TODO [post-source-migration] make this actor participate in checkpointing
 // and rollback, saving its local and global registries
 
 actor ConnectorSourceListener[In: Any val] is SourceListener

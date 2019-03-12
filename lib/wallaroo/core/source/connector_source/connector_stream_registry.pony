@@ -105,9 +105,10 @@ class GlobalConnectorStreamRegistry[In: Any val]
     if not _is_leader then
       _leader_name = msg.leader_name
     else
-      // TODO [source-migration-3]: is there a scenario where this can
-      // happen?
-      None
+      @printf[I32](("GlobalConnectorStreamRegistry leader received a new leader"
+        + " message from non-leader: %s.\n").cstring(),
+        msg.leader_name.cstring())
+      Fail()
     end
 
   fun ref process_leader_state_received_msg(
@@ -133,9 +134,9 @@ class GlobalConnectorStreamRegistry[In: Any val]
     if _is_leader then
       _initiate_leadership_relinquishment(new_leader_name)
     else
-      // TODO [source-migration-3]: should the message be forwarded to the
-      // leader if we're not the leader?
-      None
+      @printf[I32](("GlobalConnectorStreamRegistry received a relinquish " +
+        "leadership message, from %s but is not the current leader.\n")
+        .cstring(), new_leader_name.cstring())
     end
 
   fun ref process_leadership_relinquish_msg(
@@ -181,33 +182,28 @@ class GlobalConnectorStreamRegistry[In: Any val]
   =>
     if _is_leader then
       _source_addrs(msg.worker_name) = (msg.host, msg.service)
-      // TODO [source-migration-3]: we aren't acking here, primarily due
-      // to the fact that it's most likely that the source_addrs is no
-      // longer needed
     else
-      // TODO [source-migration-3]: should the message be forwarded to the
-      // leader if we're not the leader?
-      None
+      @printf[I32](("GlobalConnectorStreamRegistry received a add_source_addr "
+        + "message from %s but is not the current leader.\n").cstring(),
+        msg.worker_name.cstring())
     end
 
   fun ref add_worker(worker_name: WorkerName) =>
-    // TODO [source-migration-3]: we are lazily not re-electing leader on grow,
+    // TODO [post-source-migration-3]: we are lazily not re-electing leader on grow,
     // should we?
     _workers_set.set(worker_name)
 
   fun ref remove_worker(worker_name: WorkerName) =>
-    // TODO [source-migration-3]: it is assumed that if the registry belongs
-    // to the leaving worker, that streams would be relinquished in a different
-    // step in the migration process
+    // Relinquish streams should have happened before this is called
+    // by a departing worker
       _workers_set.unset(worker_name)
     if _is_leader and (worker_name == _worker_name) then
       try
         let new_leader_name = _leader_from_workers_list()?
         relinquish_leadership(new_leader_name)
       else
-        // TODO [source-migration-3]: what should happen to leader state, if a
-       // leader cannot be retrieved from the workers list?
-        None
+        @printf[I32](("GlobalConnectorStreamRegistry could not determine "
+        + "the new leader. Exiting.\n").cstring())
       end
     end
 
