@@ -67,9 +67,9 @@ actor BarrierCoordinator is Initializable
   let _auth: AmbientAuth
   let _worker_name: WorkerName
 
-  // The local coordinator is responsible for injecting barriers at the
+  // The injector-and-collector is responsible for injecting barriers at the
   // local sources and collecting acks for each barrier from the local sinks.
-  let _local_coordinator: LocalBarrierCoordinator
+  let _injector_collector: BarrierInjectorAndCollector
 
   var _phase: _BarrierCoordinatorPhase = _InitialBarrierCoordinatorPhase
 
@@ -103,7 +103,7 @@ actor BarrierCoordinator is Initializable
     _worker_name = worker_name
     _connections = connections
     _primary_worker = primary_worker
-    _local_coordinator = LocalBarrierCoordinator(auth, worker_name,
+    _injector_collector = BarrierInjectorAndCollector(auth, worker_name,
       _primary_worker, this, connections)
     if is_recovering then
       _phase = _RecoveringBarrierCoordinatorPhase(this)
@@ -331,10 +331,10 @@ actor BarrierCoordinator is Initializable
       _pending_promises(barrier_token) = result_promise
 
       //////
-      // Send barrier to LocalBarrierCoordinators on all workers including
+      // Send barrier to BarrierInjectorAndCollectors on all workers including
       // this one.
       //////
-      _local_coordinator.inject_barrier(barrier_token)
+      _injector_collector.inject_barrier(barrier_token)
       try
         let msg = ChannelMsgEncoder.remote_initiate_barrier(_worker_name,
           barrier_token, _auth)?
@@ -360,7 +360,7 @@ actor BarrierCoordinator is Initializable
     end
 
   fun ref _clear_barriers() =>
-    _local_coordinator.clear_barriers()
+    _injector_collector.clear_barriers()
     _clear_active_barriers()
     _clear_pending_barriers()
 
@@ -416,7 +416,7 @@ actor BarrierCoordinator is Initializable
       end
     end
 
-    _local_coordinator.inject_barrier(barrier_token)
+    _injector_collector.inject_barrier(barrier_token)
 
   be worker_ack_barrier(w: WorkerName, barrier_token: BarrierToken) =>
     _phase.worker_ack_barrier(w, barrier_token)
@@ -454,7 +454,7 @@ actor BarrierCoordinator is Initializable
     end
 
   be remote_abort_barrier(barrier_token: BarrierToken) =>
-    _local_coordinator.remote_abort_barrier(barrier_token)
+    _injector_collector.remote_abort_barrier(barrier_token)
 
   fun ref barrier_fully_acked(barrier_token: BarrierToken) =>
     if not _disposed then
@@ -472,7 +472,7 @@ actor BarrierCoordinator is Initializable
         end
       end
 
-      _local_coordinator.barrier_fully_acked(barrier_token)
+      _injector_collector.barrier_fully_acked(barrier_token)
 
       _clear_barrier(barrier_token)
       _phase.barrier_fully_acked(barrier_token)
@@ -503,26 +503,26 @@ actor BarrierCoordinator is Initializable
 
   be dispose() =>
     @printf[I32]("Shutting down BarrierCoordinator\n".cstring())
-    _local_coordinator.dispose()
+    _injector_collector.dispose()
     _disposed = true
 
   ////////////////////////////////
   // LOCAL BARRIER COORDINATOR
   ////////////////////////////////
   be register_sink(sink: Sink) =>
-    _local_coordinator.register_sink(sink)
+    _injector_collector.register_sink(sink)
 
   be unregister_sink(sink: Sink) =>
-    _local_coordinator.unregister_sink(sink)
+    _injector_collector.unregister_sink(sink)
 
   be register_barrier_source(b_source: BarrierSource) =>
-    _local_coordinator.register_barrier_source(b_source)
+    _injector_collector.register_barrier_source(b_source)
 
   be register_source(source: Source, source_id: RoutingId) =>
-    _local_coordinator.register_source(source, source_id)
+    _injector_collector.register_source(source, source_id)
 
   be unregister_source(source: Source, source_id: RoutingId) =>
-    _local_coordinator.unregister_source(source, source_id)
+    _injector_collector.unregister_source(source, source_id)
 
   be ack_barrier(s: Sink, barrier_token: BarrierToken) =>
     """
@@ -532,14 +532,14 @@ actor BarrierCoordinator is Initializable
     _phase.ack_barrier(s, barrier_token)
 
   fun ref _ack_barrier(s: Sink, barrier_token: BarrierToken) =>
-    _local_coordinator.ack_barrier(s, barrier_token)
+    _injector_collector.ack_barrier(s, barrier_token)
 
   be abort_barrier(barrier_token: BarrierToken) =>
     """
     Called by a sink that determines a protocol underlying a barrier
     must be aborted.
     """
-    _local_coordinator.abort_barrier(barrier_token)
+    _injector_collector.abort_barrier(barrier_token)
 
   //!@ Should we rename this to be clearer?
   be remote_barrier_fully_acked(barrier_token: BarrierToken) =>
@@ -548,7 +548,7 @@ actor BarrierCoordinator is Initializable
     message that this barrier is complete. We can now inform all local
     sources (for example, so they can ack messages up to a checkpoint).
     """
-    _local_coordinator.barrier_fully_acked(barrier_token)
+    _injector_collector.barrier_fully_acked(barrier_token)
 
 class _WorkerAckCount
   let _token: BarrierToken

@@ -29,7 +29,7 @@ use "wallaroo_labs/mort"
 use "wallaroo_labs/string_set"
 
 
-actor LocalBarrierCoordinator
+actor BarrierInjectorAndCollector
   let _auth: AmbientAuth
   let _worker_name: WorkerName
   // ASSUMPTION: We are currently assuming that the primary worker will never
@@ -221,7 +221,7 @@ actor LocalBarrierCoordinator
     _active_barriers.clear()
 
   be dispose() =>
-    @printf[I32]("Shutting down LocalBarrierCoordinator\n".cstring())
+    @printf[I32]("Shutting down BarrierInjectorAndCollector\n".cstring())
     _disposed = true
 
   fun ref _unknown_barrier_for(call_name: String, barrier_token: BarrierToken)
@@ -233,10 +233,10 @@ actor LocalBarrierCoordinator
 class _SinkAckCount
   let _token: BarrierToken
   let _sinks: SetIs[Sink] = _sinks.create()
-  let _coordinator: LocalBarrierCoordinator ref
+  let _coordinator: BarrierInjectorAndCollector ref
 
   new create(t: BarrierToken, sinks: SetIs[Sink],
-    lbc: LocalBarrierCoordinator ref)
+    lbc: BarrierInjectorAndCollector ref)
   =>
     _token = t
     for s in sinks.values() do
