@@ -309,7 +309,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   // These are called by a ConnectorSource (via it's notify class)
   ////////////////////////////////////////
   be purge_pending_requests(session_id: RoutingId) =>
-    _stream_registry.pure_pending_requests(session_id)
+    _stream_registry.purge_pending_requests(session_id)
 
   be stream_relinquish(stream_id: StreamId, last_acked: PointOfReference) =>
     _stream_registry.stream_relinquish(stream_id, last_acked)
