@@ -842,27 +842,14 @@ actor Connections is Cluster
       Fail()
     end
 
-  be connector_stream_relinquish(leader: WorkerName, worker_name: WorkerName,
-    source_name: String, stream: StreamTuple,
-    request_id: ConnectorStreamRelinquishId)
+  be connector_streams_relinquish(leader: WorkerName, worker_name: WorkerName,
+    source_name: String, streams: Array[StreamTuple] val)
   =>
     try
-      let stream_relinquish_msg =
-        ChannelMsgEncoder.connector_stream_relinquish(worker_name,
-          source_name, stream, request_id, _auth)?
-        _send_control(leader, stream_relinquish_msg)
-    else
-      Fail()
-    end
-
-  be connector_respond_to_stream_relinquish(worker_name: WorkerName,
-    source_name: String, request_id: ConnectorStreamRelinquishId)
-  =>
-    try
-      let stream_relinquish_response_msg =
-        ChannelMsgEncoder.connector_stream_relinquish_response(
-          source_name, request_id, _auth)?
-        _send_control(worker_name, stream_relinquish_response_msg)
+      let streams_relinquish_msg =
+        ChannelMsgEncoder.connector_streams_relinquish(worker_name,
+          source_name, streams, _auth)?
+        _send_control(leader, streams_relinquish_msg)
     else
       Fail()
     end
