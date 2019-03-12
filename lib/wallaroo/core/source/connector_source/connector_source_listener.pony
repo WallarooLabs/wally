@@ -316,18 +316,12 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
 
   be stream_notify(request_id: ConnectorStreamNotifyId,
     stream_id: StreamId, stream_name: String,
+    point_of_ref: PointOfRef = 0,
     promise: Promise[NotifyResult[In]],
     connector_source: ConnectorSource[In] tag)
   =>
     _stream_registry.stream_notify(request_id,
-      stream_id, stream_name, promise, connector_source)
-
-  be stream_update(stream_id: StreamId, checkpoint_id: CheckpointId,
-    last_acked_por: PointOfReference, last_seen_por: PointOfReference,
-    connector_source: (ConnectorSource[In] tag|None))
-  =>
-    _stream_registry.stream_update(stream_id, checkpoint_id,
-      last_acked_por, last_seen_por, connector_source)
+      stream_id, stream_name, point_of_ref, promise, connector_source)
 
   ///////////////////////
   // Listener Connector
