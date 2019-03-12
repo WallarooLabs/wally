@@ -595,8 +595,10 @@ class LocalConnectorStreamRegistry[In: Any val]
       end
     else
       // defer to global
+      let stream = recover val ActiveStreamTuple[In](stream_id, stream_name,
+        0, 0, connector_source) end
       _global_registry.stream_notify(request_id,
-        stream_id, stream_name, promise, connector_source)
+        consume stream, promise, connector_source)
     end
 
   fun ref stream_notify_local_result(success: Bool,
@@ -628,7 +630,7 @@ class LocalConnectorStreamRegistry[In: Any val]
       true
     else
       try
-        if active_streams(stream_id)?._2 is None then
+        if active_streams(stream_id)?.source is None then
           false
         else
           true
@@ -639,9 +641,13 @@ class LocalConnectorStreamRegistry[In: Any val]
     end
 
     if update then
-      let stream_name = try active_streams(stream_id)?._1 else Fail(); "" end
-      active_streams(stream_id) =
-        (stream_name, connector_source, last_acked_por, last_seen_por)
+      try
+        let stream = active_streams(stream_id)?
+        active_streams(stream_id) =
+        (stream.name, connector_source, last_acked_por, last_seen_por)
+      else
+        Fail()
+      end
     end
 
   fun ref stream_relinquish(stream_id: StreamId, last_acked: PointOfReference) =>
