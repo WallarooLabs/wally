@@ -58,19 +58,38 @@ class _StreamState
   For sendable versions going outside of the notifier,
   use streamstate(): StreamState
   """
-  var last_seen: PointOfReference  // last seen message id
+  let id: StreamId
+  let name: String
   var last_acked: PointOfReference // last message id that was checkpointed
-  var last_checkpoint_id: CheckpointId // last checkpoint id
+  var last_seen: PointOfReference  // last seen message id
+  var last_checkpoint: CheckpointId // last checkpoint id
 
-  new ref create(last_seen': PointOfReference,
-    last_acked': PointOfReference, last_checkpoint_id': CheckpointId)
+  new ref create(stream_id: StreamId, stream_name: String,
+    last_seen': PointOfReference,
+    last_acked': PointOfReference, last_checkpoint': CheckpointId)
 =>
+  id = stream_id
+  name = stream_name
   last_seen = last_seen'
   last_acked = last_acked'
-  last_checkpoint_id = last_checkpoint_id'
+  last_checkpoint = last_checkpoint'
 
-  fun val streamstate(): StreamState =>
-    StreamState(last_seen, last_acked, last_checkpoint_id)
+  fun serialize(wb: Writer = Writer): Writer =>
+    wb.u64_be(id)
+    wb.u16_be(name.size().u16())
+    wb.write(name)
+    wb.u64_be(last_acked)
+    wb.u64_be(last_seen)
+    wb.u64_be(last_checkpoint)
+    wb
+
+  new ref deserialize(rb: Reader) ? =>
+    id = rb.u64_be()?
+    let name_size = rb.u16_be()?.usize()
+    name = String.from_array(rb.block(name_size)?)
+    last_acked = rb.u64_be()?
+    last_seen = rb.u64_be()?
+    last_checkpoint = rb.u64_be()?
 
 class val NotifyResult[In: Any val]
   """
@@ -79,14 +98,14 @@ class val NotifyResult[In: Any val]
   """
   let source: ConnectorSource[In] tag
   let success: Bool
-  let resume_from: PointOfReference
+  let stream: StreamTuple
 
   new val create(source': ConnectorSource[In] tag,
-    success': Bool, resume_from': PointOfReference)
+    success': Bool, stream': StreamTuple)
   =>
     source = source'
     success = success'
-    resume_from = resume_from'
+    stream = stream'
 
 class NotifyResultFulfill[In: Any val] is
   Fulfill[NotifyResult[In], None]
@@ -100,8 +119,7 @@ class NotifyResultFulfill[In: Any val] is
     session_id = session_id'
 
   fun apply(t: NotifyResult[In]) =>
-    t.source.stream_notify_result(session_id, t.success,
-      stream_id, t.resume_from)
+    t.source.stream_notify_result(session_id, t.success, t.stream)
 
 class val ConnectorSourceNotifyParameters[In: Any val]
   let pipeline_name: String
@@ -157,7 +175,7 @@ class ConnectorSourceNotify[In: Any val]
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
   var _listener: ConnectorSourceListener[In]
-  var _connector_source: ConnectorSource[In] ref
+  var _connector_source: (ConnectorSource[In] ref | None) = None
 
   // Barrier/checkpoint id tracking
   var _barrier_ongoing: Bool = false
@@ -168,11 +186,10 @@ class ConnectorSourceNotify[In: Any val]
   var service: String
 
   // stream state management
-  var _active_streams: Map[StreamId, _StreamState]= _active_streams.create()
   var _pending_notify: Set[StreamId] = _pending_notify.create()
+  var _active_streams: Map[StreamId, _StreamState]= _active_streams.create()
   var _pending_close: Map[StreamId, _StreamState] = _pending_close.create()
-  var _pending_relinquish: Map[StreamId, _StreamState] =
-    _pending_relinquish.create()
+  var _pending_relinquish: Array[StreamTuple] = _pending_relinquish.create()
   var _pending_acks: Array[(StreamId, PointOfReference)] =
     _pending_acks.create()
 
@@ -194,7 +211,7 @@ class ConnectorSourceNotify[In: Any val]
 
   new create(source_id': RoutingId,
     parameters: ConnectorSourceNotifyParameters[In],
-    listener': ConnectorSourceListener[In], source': ConnectorSource[In] ref)
+    listener': ConnectorSourceListener[In])
   =>
     source_id = source_id'
     _pipeline_name = parameters.pipeline_name
@@ -214,12 +231,14 @@ class ConnectorSourceNotify[In: Any val]
     service = parameters.service
 
     _listener = listener'
-    _connector_source = source'
 
     ifdef "trace" then
       @printf[I32]("%s: max_credits = %lu, refill_credits = %lu\n".cstring(),
       __loc.type_name().cstring(), _max_credits, _refill_credits)
     end
+
+  fun ref set_connector_source(source': ConnectorSource[In] ref) =>
+    _connector_source = source'
 
   fun routes(): Map[RoutingId, Consumer] val =>
     _router.routes()
@@ -248,8 +267,6 @@ class ConnectorSourceNotify[In: Any val]
         ingest_ts, pipeline_time_spent)
     end
 
-  // TODO [source-migration]: Is this only ever used for rollback?
-  // should it be renamed to be more specific?
   fun ref received_connector_msg(source: ConnectorSource[In] ref,
     data: Array[U8] iso,
     latest_metrics_id: U16,
@@ -268,12 +285,14 @@ class ConnectorSourceNotify[In: Any val]
         (_fsm_state is _ProtoFsmStreaming) then
       // Our client's credits are running low and we haven't replenished
       // them after barrier_complete() processing.  Replenish now.
-      _send_ack()
+      _send_acks()
     end
 
     try
       let data': Array[U8] val = consume data
-      @printf[I32]("NH: decode data: %s\n".cstring(), _print_array[U8](data').cstring())
+      ifdef "trace" then
+        @printf[I32]("NH: decode data: %s\n".cstring(), _print_array[U8](data').cstring())
+      end
       let connector_msg = cwm.Frame.decode(consume data')?
       match connector_msg
       | let m: cwm.HelloMsg =>
@@ -317,7 +336,7 @@ class ConnectorSourceNotify[In: Any val]
         return _to_error_state(source, "Invalid message: ok")
 
       | let m: cwm.ErrorMsg =>
-        @printf[I32]("Client sent us ERROR msg: %s\n".cstring(),
+        @printf[I32]("Received ERROR msg from client: %s\n".cstring(),
           m.message.cstring())
         source.close()
         return _continue_perhaps(source)
@@ -333,8 +352,7 @@ class ConnectorSourceNotify[In: Any val]
 
         if _pending_notify.contains(m.stream_id) or
            _active_streams.contains(m.stream_id) or
-           _pending_close.contains(m.stream_id) or
-           _pending_relinquish.contains(m.stream_id)
+           _pending_close.contains(m.stream_id)
         then
           // This notifier is already handling this stream
           // So reject directly
@@ -351,9 +369,7 @@ class ConnectorSourceNotify[In: Any val]
         return _to_error_state(source, "Invalid message: notify_ack")
 
       | let m: cwm.MessageMsg =>
-        ifdef "trace" then
-          @printf[I32]("TRACE: got MessageMsg\n".cstring())
-        end
+        // check that we're in state that allows processing messages
         if _fsm_state isnt _ProtoFsmStreaming then
           return _to_error_state(source, "Bad protocol FSM state")
         end
@@ -361,133 +377,93 @@ class ConnectorSourceNotify[In: Any val]
           return _to_error_state(source, "Bad MessageMsg flags")
         end
 
-        let stream_id = m.stream_id
-        var s = _StreamState( 0, 0, 0) // Will be overwritten below
-
-        let decoded = if not _active_streams.contains(stream_id) then
-          return _to_error_state(source, "Bad stream_id " + stream_id.string())
+        // try to process message
+        if not _active_streams.contains(m.stream_id) then
+          return _to_error_state(source, "Bad stream_id " + m.stream_id.string())
         else
           try
-            s = _active_streams(stream_id)?
-            ifdef "trace" then
-              // TODO [source-migration]: Do we need to re-add pending_query to _StreamState?
-              @printf[I32]("TRACE: STREAM pending %s base-p-o-r %llu last-msg-id %llu barrier-last-msg-id %llu barrier-ckpt-id %llu\n".cstring(), s.pending_query.string().cstring(), s.base_point_of_reference, s.last_message_id, s.barrier_last_message_id, s.barrier_checkpoint_id)
-            end
-            // TODO [source-migration]: Do we need to re-add pending_query to _StreamState?
-            if s.pending_query then
-              return _to_error_state(source, "Duplicate stream_id " + stream_id.string())
-            end
-
-            let msg_id' = if m.message_id is None then "<None>" else (m.message_id as cwm.MessageId).string() end
-            let event_time' = if m.event_time is None then "<None>" else (m.event_time as cwm.EventTimeType).string() end
-            let key' = if m.key is None then "<None>" else _print_array[U8](m.key as cwm.KeyBytes) end
-            let message' = if m.message is None then "<None>" else _print_array[U8](m.message as cwm.MessageBytes) end
-            ifdef "trace" then
-              @printf[I32]("TRACE: MSG: stream-id %llu flags %u msg_id %s event_time %s key %s message %s\n".cstring(), stream_id, m.flags, msg_id'.cstring(), event_time'.cstring(), key'.cstring(), message'.cstring())
-            end
-
-            try
-              @printf[I32]("NH: processing body 1\n".cstring())
-              let msg_id = try
-                m.message_id as cwm.MessageId
-              else
-                0
-              end
-
-              @printf[I32]("NH: processing body 2\n".cstring())
-              if (msg_id > 0) and (msg_id <= s.last_message_id) then
-                ifdef "trace" then
-                  @printf[I32]("TRACE: MessageMsg: stale id in stream-id %llu flags %u msg_id %llu <= last_message_id %llu\n".cstring(), stream_id, m.flags, msg_id, s.last_message_id)
-                end
-                return _continue_perhaps(source)
-              end
-
-              @printf[I32]("NH: processing body 3\n".cstring())
-              if cwm.Eos.is_set(m.flags) then
-                @printf[I32]("NH: processing body 3: EOS\n".cstring())
-                // Process EOS
-                // 1. remove state from _active_streams
-                try _active_streams.remove(stream_id)? end
-                // 2. add state to _pending_close
-                _pending_close.update(stream_id, s)
-                // The rest happens asynchronously
-
-                // TODO [source-migration]: implement this in checkpoint handler
-                // 3. when checkpoint arrives, check if it acks up to
-                //    _SteamState.last_message_id
-                // 4. If not, go to 3 until next checkpoint, else continue
-                // 5. Once _StreamState.last_message_id is checkpointed,
-                //    start _relinquish behaviour
-
-
-                // TODO [source-migration]: move this to relinquish fun
-                _listener
-                  .stream_update(stream_id, s.barrier_checkpoint_id,
-                    s.barrier_last_message_id, msg_id, None)
-              end
-
-              @printf[I32]("NH: processing body 4\n".cstring())
-              if cwm.Boundary.is_set(m.flags) then
-                None
-              else
-                try
-                  let bytes = match (m.message as cwm.MessageBytes)
-                  | let str: String      => str.array()
-                  | let b: Array[U8] val => b
-                  end
-                  if cwm.Eos.is_set(m.flags) or (bytes.size() == 0) then
-                    None
-                  else
-                    _handler.decode(bytes)?
-                  end
-                else
-                  if m.message is None then
-                    return _to_error_state(source, "No message bytes and BOUNDARY not set")
-                  end
-                  @printf[I32](("Unable to decode message at " + _pipeline_name + " source\n").cstring())
-                  ifdef debug then
-                    Fail()
-                  end
-                  return _to_error_state(source, "Unable to decode message")
-                end
-              end
-
-              // TODO:
-              // 6. What did I forget?  See received_old_school() for hints:
-              //    it isn't perfect but it "works" at demo quality.
+            let s = _active_streams(m.stream_id)?
+            let msg_id = try
+              m.message_id as cwm.MessageId
             else
-              @printf[I32]("NH: processing body failed!\n".cstring())
-              Fail()
+              0
+            end
+
+            if (msg_id > 0) and (msg_id <= s.last_seen) then
+              // skip processing of an already seen message
+              return _continue_perhaps(source)
+            end
+
+            if cwm.Eos.is_set(m.flags) then
+              // Process EOS
+              @printf[I32](("ConnectorSource[%s] received EOS for stream_id"
+                + " %s\n").cstring(), _source_name.string().cstring(),
+                m.stream_id.string().cstring())
+              // 1. remove state from _active_streams
+              try _active_streams.remove(m.stream_id)? end
+              // 2. add state to _pending_close
+              _pending_close.update(m.stream_id, s)
+              return true
+            elseif cwm.Boundary.is_set(m.flags) then
+              // TODO [post-source-migration] what's supposed to happen here?
+              return true
+            else // not an EOS and not a boundary
+              // process message
+              try
+                // get bytes content of message
+                let bytes = match (m.message as cwm.MessageBytes)
+                | let str: String      => str.array()
+                | let b: Array[U8] val => b
+                end
+
+                // decode bytes using handler, if bytes not None
+                let decoded = if bytes.size() == 0 then
+                  None
+                else
+                  _handler.decode(bytes)?
+                end
+
+                ifdef "trace" then
+                  @printf[I32](("Msg decoded at " + _pipeline_name +
+                    " source\n").cstring())
+                end
+
+                // get message key
+                let key_string =
+                  match m.key
+                  | None =>
+                    ""
+                  | let str: String val =>
+                    str
+                  | let a: Array[U8] val =>
+                    let k' = recover trn String(a.size()) end
+                    for c in a.values() do
+                      k'.push(c)
+                    end
+                    consume k'
+                  end
+
+                // process message
+                return _run_and_subsequent_activity(latest_metrics_id, ingest_ts,
+                  pipeline_time_spent, key_string, source, decoded, s,
+                  m.message_id, m.flags)
+              else
+                // _handler.decode(bytes) failed
+                if m.message is None then
+                  // TODO [post-source-migration] revisit this error message
+                  return _to_error_state(source, "No message bytes and BOUNDARY not set")
+                end
+                @printf[I32](("Unable to decode message at " + _pipeline_name + " source\n").cstring())
+                ifdef debug then
+                  Fail()
+                end
+                return _to_error_state(source, "Unable to decode message")
+              end
             end
           else
             return _to_error_state(source, "Unknown StreamId")
           end
         end
-
-        ifdef "trace" then
-          @printf[I32](("Msg decoded at " + _pipeline_name +
-            " source\n").cstring())
-        end
-        // TODO [source-migration]: Do we need to re-add pending_query to _StreamState?
-        if s.pending_query then // assert sanity
-          Fail()
-        end
-        let key_string =
-          match m.key
-          | None =>
-            ""
-          | let str: String val =>
-            str
-          | let a: Array[U8] val =>
-            let k' = recover trn String(a.size()) end
-            for c in a.values() do
-              k'.push(c)
-            end
-            consume k'
-          end
-        _run_and_subsequent_activity(latest_metrics_id, ingest_ts,
-          pipeline_time_spent, key_string, source, decoded, s,
-          m.message_id, m.flags)
 
       | let m: cwm.AckMsg =>
         ifdef "trace" then
@@ -538,6 +514,11 @@ class ConnectorSourceNotify[In: Any val]
       if key_string isnt None then
         key_string
       else
+        // wat
+        // TODO [post-source-migration] should this be stream_id for messages that
+        // do not provide a key?
+        // What is a sane default here?
+        // What does it mean to use a unique key for each message?
         msg_uid.string()
       end
 
@@ -562,7 +543,7 @@ class ConnectorSourceNotify[In: Any val]
     | let m_id: PointOfReference =>
       if not (cwm.Ephemeral.is_set(flags) or
         cwm.UnstableReference.is_set(flags)) then
-        s.last_message_id = m_id
+        s.last_seen = m_id
       end
     end
 
@@ -584,8 +565,10 @@ class ConnectorSourceNotify[In: Any val]
     _continue_perhaps(source)
 
   fun ref _continue_perhaps(source: ConnectorSource[In] ref): Bool =>
-    @printf[I32]("NH: _continue_perhaps: %s\n".cstring(),
-      _header_size.string().cstring())
+    ifdef "trace" then
+      @printf[I32]("NH: _continue_perhaps: %s\n".cstring(),
+        _header_size.string().cstring())
+    end
     source.expect(_header_size)
     _header = true
     _continue_perhaps2()
@@ -624,12 +607,7 @@ class ConnectorSourceNotify[In: Any val]
     _header = true
     _session_active = true
     _session_id = session_id
-    // TODO [source-migration]: be careful about pushing state back to registry
-    _pending_notify.clear()  // have to be resent by external connector
-    _active_streams.clear()  // relinquish? should this be part of closed?
-    _pending_close.clear()   // should be part of closed
-    _pending_relinquish.clear()  // should be resent?
-
+    _clear_streams()
     _credits = _max_credits
     _prep_for_rollback = false
     source.expect(_header_size)
@@ -638,6 +616,30 @@ class ConnectorSourceNotify[In: Any val]
     @printf[I32]("ConnectorSource connection closed 0x%lx\n".cstring(), source)
     _session_active = false
     _fsm_state = _ProtoFsmDisconnected
+    // TODO [post-source-migration] When john's work is ready, this assumption
+    // becomes true:
+    // 1. we relinquish streams with last_seen value
+    // 2. on rollback (post-john's-work), global registry rolls back too.
+    // Streams become "owned" again at the source, and will get relinquished to
+    // the last_acked at the time of checkpoint.
+    // So a notify_ack after a rollback will have the correct last_acked
+    // and a notify_ack after an in-between-checkpoints-closed will have the
+    // correct last_seen as its last_acked.
+    //
+    // So the assumption here is the "last_seen" vs. "last_acked" discrepancy is
+    // corrected either:
+    //  1. at the next checkpoint, when last_seen becomes last_acked in the
+    //    checkpointed state
+    //  2. during a rollback, when the state rolls back to actual last_acked
+    //     and so will the registry
+    // https://github.com/WallarooLabs/wallaroo/issues/2807
+
+    for s_map in [_active_streams ; _pending_close].values() do
+      for s in s_map.values() do
+        _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_seen))
+      end
+    end
+    _relinquish_streams()
     _clear_streams()
 
   fun ref throttled(source: ConnectorSource[In] ref) =>
@@ -681,33 +683,17 @@ class ConnectorSourceNotify[In: Any val]
     qty
 
   fun ref _clear_streams() =>
-    // TODO [source-migration]: relinquish all streams, then clear them out
-    // _pending_notify
-    // _active_streams
-    // _pending_close
-    // _relinquish (it's okay to double send here)
-    for (stream_id, s) in _active_streams.pairs() do
-      try
-        _listener
-        .stream_update(stream_id, s.barrier_checkpoint_id,
-          s.barrier_last_message_id, s.last_message_id, None)
-      else
-        Fail()
-      end
-    end
+    _pending_notify.clear()
     _active_streams.clear()
+    _pending_close.clear()
+    _pending_relinquish.clear()
 
   fun create_checkpoint_state(): Array[ByteSeq val] val =>
-    // recover val ["<{stand-in for state for ConnectorSource with routing id="; source_id.string(); "}>"] end
-
-    // TODO [source-migration]: include the pending_close, pending_relinquish
-    // states as well
     let w: Writer = w.create()
-    for (stream_id, s) in _active_streams.pairs() do
-      w.u64_be(stream_id)
-      w.u64_be(s.barrier_checkpoint_id)
-      w.u64_be(s.barrier_last_message_id)
-      w.u64_be(s.last_message_id)
+    for s_map in [_active_streams ; _pending_close].values() do
+      for stream_state in s_map.values() do
+        stream_state.serialize(w)
+      end
     end
     w.done()
 
@@ -722,56 +708,46 @@ class ConnectorSourceNotify[In: Any val]
     end
 
   fun ref rollback(checkpoint_id: CheckpointId, payload: ByteSeq val) =>
-    ifdef "trace" then
-      @printf[I32]("TRACE: %s.%s(%lu)\n".cstring(), __loc.type_name().cstring(), __loc.method_name().cstring(), checkpoint_id)
-    end
+    @printf[I32]("ConnectorSource[%s] is rolling back to checkpoint_id %s\n"
+      .cstring(), _source_name.cstring(), checkpoint_id.string().cstring())
+    _barrier_checkpoint_id = checkpoint_id
 
-    // TODO [source-migration]: load pending_close, pending_relinquish states as
-    // well
-    let r = Reader
-    r.append(payload)
+    // After a rollback, all streams go directly to relinquish
+    // So we don't distinguish where they came from.
+    let rb: Reader ref = Reader
+    rb.append(payload)
     try
       while true do
-        let stream_id = r.u64_be()?
-        let barrier_checkpoint_id = r.u64_be()?
-        let barrier_last_message_id = r.u64_be()?
-        let last_message_id = r.u64_be()?
-        ifdef "trace" then
-          @printf[I32]("TRACE: read = s-id %lu b-ckp-id %lu b-l-msg-id %lu l-msg-id %lu\n".cstring(),
-          stream_id, barrier_checkpoint_id, barrier_last_message_id, last_message_id)
-        end
-        _listener
-        .stream_update(stream_id, barrier_checkpoint_id,
-            barrier_last_message_id, last_message_id, None)
+        let s = _StreamState.deserialize(rb)?
+        _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
       end
     end
+    _relinquish_streams()
+    rollback_complete(checkpoint_id)
+
+  fun ref rollback_complete(checkpoint_id: CheckpointId) =>
     _prep_for_rollback = false
     _send_restart()
 
   fun ref initiate_barrier(checkpoint_id: CheckpointId) =>
+    @printf[I32]("Initiate_barrier(%s) at %s\n".cstring(),
+      checkpoint_id.string().cstring(), WallClock.seconds().string().cstring())
     _barrier_ongoing = true
     Invariant(checkpoint_id > _barrier_checkpoint_id)
     _barrier_checkpoint_id = checkpoint_id
 
     if _session_active then
-      for s in _active_streams.values() do
-        s.last_checkpoint_id = checkpoint_id
-        s.last_acked = s.last_seen
-
-        ifdef "trace" then
-          @printf[I32]("TRACE: %s.%s(%lu) _barrier_last_message_id = %lu\n".cstring(),
-            __loc.type_name().cstring(), __loc.method_name().cstring(),
-            checkpoint_id, s.barrier_last_message_id)
-        end
-      end
-      for s in _pending_close.values() do
-        s.last_checkpoint_id = checkpoint_id
-        s.last_acked = s.last_seen
-
-        ifdef "trace" then
-          @printf[I32]("TRACE: %s.%s(%lu) _barrier_last_message_id = %lu\n".cstring(),
-            __loc.type_name().cstring(), __loc.method_name().cstring(),
-            checkpoint_id, s.barrier_last_message_id)
+      // update last_acked and last_checkpoint for all streams in
+      // _active_streams and _pending_close
+      for s_map in [_active_streams ; _pending_close].values() do
+        for s in s_map.values() do
+          ifdef "trace" then
+            @printf[I32]("%s ::: Updating stream_id %s last acked to %s\n"
+              .cstring(), WallClock.seconds().string().cstring(),
+              s.id.string().cstring(), s.last_seen.string().cstring())
+          end
+          s.last_checkpoint = checkpoint_id
+          s.last_acked = s.last_seen
         end
       end
     end
@@ -783,69 +759,37 @@ class ConnectorSourceNotify[In: Any val]
 
     if _session_active then
       for (stream_id, s) in _active_streams.pairs() do
-        try
-          _listener
-            .stream_update(
-              stream_id, s.last_checkpoint_id, s.last_acked,
-              s.last_seen,
-              _connector_source)
-          _pending_acks.push((stream_id, s.last_acked))
-        else
-          Fail()
-        end
+        _pending_acks.push((stream_id, s.last_acked))
       end
-
-      // TODO [source-migration]: _StreamState needs to be sendable if we're going to make this array sendable
-      let to_relinquish = recover iso Array[(StreamId, _StreamState)] end
 
       // process acks for EOS/_pending_close streams
       for (stream_id, s) in _pending_close.pairs() do
-        try
-          _listener
-            .stream_update(
-              stream_id, s.last_checkpoint_id, s.last_acked,
-              s.last_seen,
-              _connector_source)
-          _pending_acks.push((stream_id, s.last_acked))
-          to_relinquish.push((stream_id, s))
-        else
-          Fail()
+        ifdef "trace" then
+          @printf[I32]("%s ::: Processing ack for %s at %s\n".cstring(),
+            WallClock.seconds().string().cstring(),
+            stream_id.string().cstring(), s.last_acked.string().cstring())
         end
+        _pending_acks.push((stream_id, s.last_acked))
+        _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
       end
       // clear _pending_close
       _pending_close.clear()
-      // process new stream relinquish requests
-      _relinquish_streams(consume to_relinquish)
+      // process any stream relinquish requests
+      _relinquish_streams()
 
       if _fsm_state is _ProtoFsmStreaming then
         // Send an Ack message to replenish credits
-        _send_ack()
-      end
-
-      // SLF TODO: this if clause is for debugging purposes only
-      if _debug_disconnect and ((checkpoint_id % 5) == 4) then
-        // SLF TODO: the Python side of the world raises an exception when
-        // it gets an ErrorMsg, and the rest of the code is fragile when
-        // that exception is not caught.
-        // _to_error_state(_connector_source, "BYEBYE")
-
-        _send_restart()
+        _send_acks()
       end
     end
 
-  fun ref _relinquish_streams(streams: Array[(StreamId, _StreamState)] val) =>
-    // add the stream to _pending_reliqnuish
-    for (i, (sid, state)) in streams.pairs() do
-      // TODO [source-migration]: _StreamState is a val here and we need a ref for _pending_relinquish
-      _pending_relinquish(sid) = state
-      _listener.stream_relinquish(sid, state.last_acked)
+  fun ref _relinquish_streams() =>
+    let streams = recover iso Array[StreamTuple] end
+    for s in _pending_relinquish.values() do
+      streams.push(s)
     end
-
-  // TODO [source-migration]: implement this
-  fun ref stream_relinquish_result(session_id: RoutingId, success: Bool,
-    stream_id: StreamId, point_of_reference: PointOfReference)
-  =>
-    None
+    _pending_relinquish.clear()
+    _listener.streams_relinquish(consume streams)
 
   fun ref _process_notify(source: ConnectorSource[In] ref, stream_id: StreamId,
     stream_name: String, point_of_reference: PointOfReference)
@@ -859,13 +803,11 @@ class ConnectorSourceNotify[In: Any val]
 
     // send request to take ownership of this stream id
     let request_id = ConnectorStreamNotifyId(stream_id, _session_id)
-    try
-      // TODO [source-migration]: do we need the stream name here? currently required in the listener's stream_notify function
-      _listener.stream_notify(request_id, stream_id, promise)
-    end
+    _listener.stream_notify(request_id, stream_id, stream_name,
+      point_of_reference, promise, source)
 
   fun ref stream_notify_result(session_id: RoutingId, success: Bool,
-    stream_id: StreamId, point_of_reference: PointOfReference)
+    stream: StreamTuple)
   =>
     if (session_id != _session_id) or (not _session_active) then
       // This is a reply from a query that we'd sent in a prior TCP
@@ -876,23 +818,16 @@ class ConnectorSourceNotify[In: Any val]
       return
     end
 
-    ifdef "trace" then
-      @printf[I32]("TRACE: %s.%s(%s, %lu, p-o-r %lu)\n".cstring(),
-        __loc.type_name().cstring(), __loc.method_name().cstring(),
-        success.string().cstring(),
-        stream_id, point_of_reference)
-    end
-
     // remove entry from _pending_notify set
-    _pending_notify.unset(stream_id)
+    _pending_notify.unset(stream.id)
     if success then
       // create _StreamState to place in _active_streams
-      let s = _StreamState(point_of_reference, point_of_reference,
-        _barrier_checkpoint_id)
-      _active_streams(stream_id) = s
+      let s = _StreamState(stream.id, stream.name, stream.last_acked,
+        stream.last_acked, _barrier_checkpoint_id)
+      _active_streams(stream.id) = s
     end
     // send response either way
-    send_notify_ack(success, stream_id, point_of_reference)
+    send_notify_ack(success, stream.id, stream.last_acked)
 
   fun ref _to_error_state(source: (ConnectorSource[In] ref|None), msg: String): Bool
   =>
@@ -905,19 +840,33 @@ class ConnectorSourceNotify[In: Any val]
   fun ref send_notify_ack(success: Bool, stream_id: StreamId,
     point_of_reference: PointOfReference)
   =>
+    ifdef "trace" then
+      @printf[I32]("%s ::: send_notify_ack(%s, %s, %s)\n".cstring(),
+        WallClock.seconds().string().cstring(), success.string().cstring(),
+        stream_id.string().cstring(), point_of_reference.string().cstring())
+    end
     let m = cwm.NotifyAckMsg(success, stream_id, point_of_reference)
     _send_reply(_connector_source, m)
 
-  fun ref _send_ack() =>
+  fun ref _send_acks() =>
+    @printf[I32]("Sending acks for %s streams\n".cstring(),
+      _pending_acks.size().string().cstring())
     let new_credits = _max_credits - _credits
-    // destructively read the pending acks
-    // and send the ack to the connector
-    let acks = recover iso Array[(U64, U64)] end
-    for (i, v) in _pending_acks.pairs() do
+    let acks = recover iso Array[(StreamId, PointOfReference)] end
+    for v in _pending_acks.values() do
+      ifdef "trace" then
+        @printf[I32]("%s ::: Acking stream_id %s to por %s\n".cstring(),
+          WallClock.seconds().string().cstring(),
+          v._1.string().cstring(),
+          v._2.string().cstring())
+      end
       acks.push(v)
-      _pending_acks.remove(i, 1)
     end
-    _send_reply(_connector_source, cwm.AckMsg(new_credits, consume acks))
+    _pending_acks.clear()
+    // only send acks if there are new credits or new acks to send
+    if (new_credits > 0) or (acks.size() > 0) then
+      _send_reply(_connector_source, cwm.AckMsg(new_credits, consume acks))
+    end
     _credits = _credits + new_credits
 
   fun ref _send_restart() =>
@@ -926,11 +875,11 @@ class ConnectorSourceNotify[In: Any val]
         __loc.type_name().cstring(), __loc.method_name().cstring())
     end
     _send_reply(_connector_source, cwm.RestartMsg(host + ":" + service))
-    _connector_source.close()
+    try (_connector_source as ConnectorSource[In] ref).close() end
     // The .close() method ^^^ calls our closed() method which will
     // twiddle all of the appropriate state variables.
 
-  // TODO [source-migration]: why pass source here instead of using
+  // TODO [post-source-migration]: why pass source here instead of using
   // var _connector_source?
   fun _send_reply(source: (ConnectorSource[In] ref|None), msg: cwm.Message) =>
     match source
@@ -938,6 +887,10 @@ class ConnectorSourceNotify[In: Any val]
       // write the frame data and length encode it
       let w1: Writer = w1.create()
       let b1 = cwm.Frame.encode(msg, w1)
+      ifdef debug then
+        @printf[I32](("%s ::: sending reply:\n " + String.from_array(b1) + "\n")
+          .cstring(), WallClock.seconds().string().cstring())
+      end
       s.writev_final(Bytes.length_encode(b1))
     else
       Fail()

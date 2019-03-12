@@ -534,7 +534,12 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             message = None)
         logging.info("Sending End of Stream {}".format(msg))
         self.write(msg)
-        self._pending_eos[stream_id] = point_of_ref
+        # this isn't used currently.
+        # see connectors.py:MultiSourceConnector for an example implementing
+        # its own eos handler.
+        # perhaps we should push it down here and make stream_eos_ack its own
+        # method.
+        #self._pending_eos[stream_id] = point_of_ref
 
     ###########################
     # User extensible methods #

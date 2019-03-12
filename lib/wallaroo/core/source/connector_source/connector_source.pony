@@ -59,22 +59,6 @@ use @pony_asio_event_destroy[None](event: AsioEventID)
 use @pony_asio_event_set_writeable[None](event: AsioEventID, writeable: Bool)
 
 
-// Connector Types
-type StreamId is U64
-type PointOfReference is U64
-
-class val StreamState
-  let last_seen_por: StreamId  // last seen message id
-  let last_acked_por: PointOfReference // last message id that was checkpointed
-  let last_checkpoint_id: CheckpointId // last checkpoint id
-
-  new val create(last_seen_por': StreamId,
-    last_acked_por': PointOfReference, last_checkpoint_id': CheckpointId)
-=>
-  last_seen_por = last_seen_por'
-  last_acked_por = last_acked_por'
-  last_checkpoint_id = last_checkpoint_id'
-
 actor ConnectorSource[In: Any val] is Source
   """
   # ConnectorSource
@@ -102,7 +86,7 @@ actor ConnectorSource[In: Any val] is Source
 
   // Connector
   let _listen: ConnectorSourceListener[In]
-  let _notify: ConnectorSourceNotify[In]
+  let _notify: ConnectorSourceNotify[In] ref
   var _next_size: USize = 0
   var _max_size: USize = 0
   var _connect_count: U32 = 0
@@ -167,7 +151,7 @@ actor ConnectorSource[In: Any val] is Source
     _metrics_reporter = consume metrics_reporter'
     _listen = listen
     _notify = ConnectorSourceNotify[In](source_id, notify_parameters,
-      _listen, this)
+      _listen)
     _layout_initializer = layout_initializer
     _router_registry = router_registry
 
@@ -184,6 +168,7 @@ actor ConnectorSource[In: Any val] is Source
     _router = router'
     _update_router(router')
 
+    _notify.set_connector_source(this)
     _notify.update_boundaries(_outgoing_boundaries)
 
     // register resilient with event log
@@ -651,10 +636,10 @@ actor ConnectorSource[In: Any val] is Source
       @printf[I32]("DEBUG %s.%s when %s\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring(),
         token.string().cstring())
-      // TODO [source-migration]: this shouldn't actually fail, there are many
+      // TODO [post-source-migration]: this shouldn't actually fail, there are many
       // barrier token types for which it's safe to do nothing.
       // Bug john for documentation on this.
-      // TODO [source-migration]: Check with John on whether this is okay
+      // TODO [post-source-migration]: Check with John on whether this is okay
       None
     end
 
@@ -1031,7 +1016,6 @@ actor ConnectorSource[In: Any val] is Source
     _expect = _notify.expect(this, qty)
 
   be stream_notify_result(session_id': RoutingId, success: Bool,
-    stream_id: StreamId, point_of_reference: PointOfReference)
+    stream: StreamTuple)
   =>
-    _notify.stream_notify_result(session_id', success, stream_id,
-      point_of_reference)
+    _notify.stream_notify_result(session_id', success, stream)

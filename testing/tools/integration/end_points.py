@@ -677,10 +677,11 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
         self.position = pos
 
     def __next__(self):
-        # read header
-        self.position += 1
-        if self.position > self.stop:
+        # This has to be before the increment, otherwise point_of_ref()
+        # doesn't return the previous position!
+        if self.position >= self.stop:
             raise StopIteration
+        self.position += 1
         val, pos, key = (self.position, self.position, self.key)
         payload = struct.pack('>Q{}s'.format(len(key)), val, key)
         self.data.append(payload)
