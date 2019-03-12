@@ -59,22 +59,6 @@ use @pony_asio_event_destroy[None](event: AsioEventID)
 use @pony_asio_event_set_writeable[None](event: AsioEventID, writeable: Bool)
 
 
-// Connector Types
-type StreamId is U64
-type PointOfReference is U64
-
-class val StreamState
-  let last_seen_por: StreamId  // last seen message id
-  let last_acked_por: PointOfReference // last message id that was checkpointed
-  let last_checkpoint_id: CheckpointId // last checkpoint id
-
-  new val create(last_seen_por': StreamId,
-    last_acked_por': PointOfReference, last_checkpoint_id': CheckpointId)
-=>
-  last_seen_por = last_seen_por'
-  last_acked_por = last_acked_por'
-  last_checkpoint_id = last_checkpoint_id'
-
 actor ConnectorSource[In: Any val] is Source
   """
   # ConnectorSource

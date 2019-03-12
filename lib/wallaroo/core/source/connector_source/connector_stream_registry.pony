@@ -37,6 +37,10 @@ use "wallaroo/core/messages"
 use "wallaroo/core/network"
 use "wallaroo_labs/mort"
 
+// Connector Types
+type StreamId is U64
+type PointOfReference is U64
+
 class val StreamTuple
   let id: StreamId
   let name: String
@@ -497,11 +501,12 @@ class ActiveStreamTuple[In: Any val]
 
 class LocalConnectorStreamRegistry[In: Any val]
    // Global Stream Registry
-  let _global_registry: GlobalConnectorStreamRegistry[In]
+  let _global_registry: GlobalConnectorStreamRegistry[In] ref
 
   // Local stream registry
   // (stream_name, connector_source, last_acked_por, last_seen_por)
-  let active_streams: Map[StreamId, ActiveStreamTuple[In]] = active_streams.create()
+  let _active_streams: Map[StreamId, ActiveStreamTuple[In]] =
+    _active_streams.create()
   let _source_name: String
 
   new ref create(worker_name: WorkerName, source_name: String,
@@ -567,88 +572,44 @@ class LocalConnectorStreamRegistry[In: Any val]
   // LOCAL
   /////////////
 
-  fun ref stream_is_present(stream_id: StreamId): Bool =>
-    active_streams.contains(stream_id)
-
-  // TODO [source-migration]: pass in POR here so that when a new stream we don't default to a POR of 0
   fun ref stream_notify(request_id: ConnectorStreamNotifyId,
     stream_id: StreamId, stream_name: String,
-    promise: Promise[NotifyResult[In]], connector_source: ConnectorSource[In] tag)
+    point_of_ref: PointOfReference = 0,
+    promise: Promise[NotifyResult[In]],
+    connector_source: ConnectorSource[In] tag)
   =>
-    // stream_id in active_streams.contains()?
     try
-      let stream = active_streams(stream_id)?
-      // connector_source == active_streams(stream_id).connector_source?
-      if stream.source == connector_source then
-        // accept: already owned by requesting source
-        // Use last_seen as resume_from point
-        stream_notify_local_result(true, stream.last_seen, promise, connector_source)
-      else
-        // reject: owned by another source in this registry
-        // use last_acked as resume_from point
-        // Note: this allows connectors to get info on streams owned by other
-        // connectors, and even keep tabs on their progress.
-        // Maybe this is exposing too much information... or maybe this could
-        // be useful, for example with a hot-standby connector
-        stream_notify_local_result(false, stream.last_acked, promise,
+      // stream_id in _active_streams
+      let stream = _active_streams(stream_id)?
+        // reject: already owned by a source in this registry
+        stream_notify_local_result(false, 0, promise,
           connector_source)
       end
     else
-      // defer to global
-      let stream = recover val ActiveStreamTuple[In](stream_id, stream_name,
-        0, 0, connector_source) end
+      // No local knowledge of stream_id: defer to global
       _global_registry.stream_notify(request_id,
-        consume stream, promise, connector_source)
+        StreamTuple(stream_id, stream_name, point_of_ref), promise,
+        connector_source)
     end
 
   fun ref stream_notify_local_result(success: Bool,
     last_acked: PointOfReference,
-    promise: Promise[NotifyResult[In]], connector_source: ConnectorSource[In] tag)
+    promise: Promise[NotifyResult[In]],
+    connector_source: ConnectorSource[In] tag)
   =>
     // No local state to update.
     promise(NotifyResult[In](connector_source, success, last_acked))
 
-  fun ref stream_notify_global_result(success: Bool,
-    stream: StreamTuple,
-    promise: Promise[NotifyResult[In]], connector_source: ConnectorSource[In] tag)
+  fun ref stream_notify_global_result(success: Bool, stream: StreamTuple,
+    promise: Promise[NotifyResult[In]],
+    connector_source: ConnectorSource[In] tag)
   =>
     if success then
       // update locally
-      active_streams(stream.id) = ActiveStreamTuple[In](stream.id, stream.name,
+      _active_streams(stream.id) = ActiveStreamTuple[In](stream.id, stream.name,
         stream.last_acked, stream.last_acked, connector_source)
     end
     promise(NotifyResult[In](connector_source, success, stream.last_acked))
-
-  fun ref stream_update(stream_id: StreamId, checkpoint_id: CheckpointId,
-    last_acked_por: PointOfReference, last_seen_por: PointOfReference,
-    connector_source: (ConnectorSource[In] tag | None))
-  =>
-    // TODO [source-migration]: figure out what stream properties the local registry needs to keep track of.
-    // does this need to participate in the checkpoint? until it does, last acked vs last seen in terms of at least once processing will be impossible
-      // TODO [source-migration]: resume from here Nisan + Jonathan
-    let update = if connector_source is None then
-      true
-    else
-      try
-        if active_streams(stream_id)?.source is None then
-          false
-        else
-          true
-        end
-      else
-        false
-      end
-    end
-
-    if update then
-      try
-        let stream = active_streams(stream_id)?
-        active_streams(stream_id) =
-        (stream.name, connector_source, last_acked_por, last_seen_por)
-      else
-        Fail()
-      end
-    end
 
   fun ref stream_relinquish(stream_id: StreamId, last_acked: PointOfReference) =>
     None
