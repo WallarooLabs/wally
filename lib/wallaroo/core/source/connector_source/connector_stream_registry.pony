@@ -37,6 +37,10 @@ use "wallaroo/core/messages"
 use "wallaroo/core/network"
 use "wallaroo_labs/mort"
 
+// Connector Types
+type StreamId is U64
+type PointOfReference is U64
+
 class val StreamTuple
   let id: StreamId
   let name: String
@@ -65,19 +69,12 @@ class GlobalConnectorStreamRegistry[In: Any val]
   let _pending_notify_promises:
     Map[ConnectorStreamNotifyId, (Promise[NotifyResult[In]], ConnectorSource[In])] =
       _pending_notify_promises.create()
-  let _pending_relinquish_promises:
-  // TODO [source-migration]: update this promise signature everywhere else
-    Map[ConnectorStreamRelinquishId, Promise[None]] =
-      _pending_relinquish_promises.create()
-
-  let _local_registry: LocalConnectorStreamRegistry[In]
+  var _local_registry: (LocalConnectorStreamRegistry[In] | None ) = None
 
   new create(worker_name: WorkerName, source_name: String,
     connections: Connections, host: String, service: String,
-    workers_list: Array[WorkerName] val,
-    local_registry: LocalConnectorStreamRegistry[In] ref)
+    workers_list: Array[WorkerName] val)
   =>
-    _local_registry = local_registry
     _worker_name = worker_name
     _source_name = source_name
     _connections = connections
@@ -86,6 +83,9 @@ class GlobalConnectorStreamRegistry[In: Any val]
       _workers_set.set(worker)
     end
     _elect_leader()
+
+  fun ref set_local_registry(local_registry: LocalConnectorStreamRegistry[In] ref) =>
+    _local_registry = local_registry
 
   //////////////////////////
   // MANAGE PENDING REQUESTS
@@ -100,19 +100,15 @@ class GlobalConnectorStreamRegistry[In: Any val]
         try _pending_notify_promises.remove(req)? end
       end
     end
-    for req in _pending_relinquish_promises.keys() do
-      if req.session_id == session_id then
-        try _pending_relinquish_promises.remove(req)? end
-      end
-    end
 
   fun ref process_new_leader_msg(msg: ConnectorNewLeaderMsg) =>
     if not _is_leader then
       _leader_name = msg.leader_name
     else
-      // TODO [source-migration-3]: is there a scenario where this can
-      // happen?
-      None
+      @printf[I32](("GlobalConnectorStreamRegistry leader received a new leader"
+        + " message from non-leader: %s.\n").cstring(),
+        msg.leader_name.cstring())
+      Fail()
     end
 
   fun ref process_leader_state_received_msg(
@@ -124,7 +120,6 @@ class GlobalConnectorStreamRegistry[In: Any val]
       _active_streams.clear()
       _inactive_streams.clear()
       _source_addrs.clear()
-      _pending_relinquish_promises.clear()
       _pending_notify_promises.clear()
       _is_relinquishing = false
       @printf[I32](("Connector Leadership relinquish complete. New Leader: " +
@@ -139,9 +134,9 @@ class GlobalConnectorStreamRegistry[In: Any val]
     if _is_leader then
       _initiate_leadership_relinquishment(new_leader_name)
     else
-      // TODO [source-migration-3]: should the message be forwarded to the
-      // leader if we're not the leader?
-      None
+      @printf[I32](("GlobalConnectorStreamRegistry received a relinquish " +
+        "leadership message, from %s but is not the current leader.\n")
+        .cstring(), new_leader_name.cstring())
     end
 
   fun ref process_leadership_relinquish_msg(
@@ -187,33 +182,28 @@ class GlobalConnectorStreamRegistry[In: Any val]
   =>
     if _is_leader then
       _source_addrs(msg.worker_name) = (msg.host, msg.service)
-      // TODO [source-migration-3]: we aren't acking here, primarily due
-      // to the fact that it's most likely that the source_addrs is no
-      // longer needed
     else
-      // TODO [source-migration-3]: should the message be forwarded to the
-      // leader if we're not the leader?
-      None
+      @printf[I32](("GlobalConnectorStreamRegistry received a add_source_addr "
+        + "message from %s but is not the current leader.\n").cstring(),
+        msg.worker_name.cstring())
     end
 
   fun ref add_worker(worker_name: WorkerName) =>
-    // TODO [source-migration-3]: we are lazily not re-electing leader on grow,
+    // TODO [post-source-migration-3]: we are lazily not re-electing leader on grow,
     // should we?
     _workers_set.set(worker_name)
 
   fun ref remove_worker(worker_name: WorkerName) =>
-    // TODO [source-migration-3]: it is assumed that if the registry belongs
-    // to the leaving worker, that streams would be relinquished in a different
-    // step in the migration process
+    // Relinquish streams should have happened before this is called
+    // by a departing worker
       _workers_set.unset(worker_name)
     if _is_leader and (worker_name == _worker_name) then
       try
         let new_leader_name = _leader_from_workers_list()?
         relinquish_leadership(new_leader_name)
       else
-        // TODO [source-migration-3]: what should happen to leader state, if a
-       // leader cannot be retrieved from the workers list?
-        None
+        @printf[I32](("GlobalConnectorStreamRegistry could not determine "
+        + "the new leader. Exiting.\n").cstring())
       end
     end
 
@@ -264,8 +254,12 @@ class GlobalConnectorStreamRegistry[In: Any val]
           end
         end
       // respond to local registry
-      _local_registry.stream_notify_global_result(success,
-        stream', promise, connector_source)
+      try (_local_registry as LocalConnectorStreamRegistry[In])
+            .stream_notify_global_result(success,
+              stream', promise, connector_source)
+      else
+        Fail()
+      end
     else
       // Not leader, go over conections to leader worker
       _pending_notify_promises(request_id) = (promise, connector_source)
@@ -311,8 +305,12 @@ class GlobalConnectorStreamRegistry[In: Any val]
     try
       (let id, (let promise, let source)) =
         _pending_notify_promises.remove(msg.request_id)?
-      _local_registry.stream_notify_global_result(msg.success, msg.stream,
-        promise, source)
+      try (_local_registry as LocalConnectorStreamRegistry[In])
+        .stream_notify_global_result(msg.success, msg.stream,
+          promise, source)
+      else
+        Fail()
+      end
     else
       ifdef debug then
         @printf[I32](("GlobalConnectorStreamRegistry received a stream_ "
@@ -324,60 +322,39 @@ class GlobalConnectorStreamRegistry[In: Any val]
   ////////////////////
   // STREAM RELINQUISH
   ////////////////////
-  fun ref stream_relinquish(stream: StreamTuple,
-    request_id: ConnectorStreamRelinquishId, promise: Promise[None])
-  =>
+  fun ref streams_relinquish(streams: Array[StreamTuple] val) =>
     """
     Process a stream relinquish request from this worker
 
     local->global stream_relinquish
     """
     if _is_leader then
-      Invariant(_active_streams.get_or_else(stream.id, _worker_name) ==
-        _worker_name)
-      try
-        // assume active, try inactivate
-        _inactivate_stream(stream)?
-        promise(None)
-      else
-        // stream is either already inactive or unknown
-        // Only case when stream is unknown here is corrupt state
-        promise(None)
+      for stream in streams.values() do
+        Invariant(_active_streams.get_or_else(stream.id, _worker_name) ==
+          _worker_name)
+        try
+          // assume active, try inactivate
+          _inactivate_stream(stream)?
+        end
       end
     else
-      _pending_relinquish_promises(request_id) = promise
-      _connections.connector_stream_relinquish(_leader_name, _worker_name,
-        _source_name, stream, request_id)
+      _connections.connector_streams_relinquish(_leader_name, _worker_name,
+        _source_name, streams)
     end
 
-  fun ref process_stream_relinquish_msg(msg: ConnectorStreamRelinquishMsg) =>
+  fun ref process_streams_relinquish_msg(msg: ConnectorStreamsRelinquishMsg) =>
     """
     Process a stream relinquish message from another worker
 
     worker->leader.stream_relinquish
     """
     if _is_leader then
-      Invariant(_active_streams.get_or_else(msg.stream.id, msg.worker_name) ==
-        msg.worker_name)
-      try
-        _inactivate_stream(msg.stream)?
-      end
-      // send stream relinquish ack either way
-      _connections.connector_respond_to_stream_relinquish(msg.worker_name,
-        msg.source_name(), msg.request_id)
+      streams_relinquish(msg.streams)
     else
-      @printf[I32](("Non-leader worker received a stream relinquish request."
+      @printf[I32](("Non-leader worker received a streams relinquish request."
         + " This indicates an invalid leader state at " +
         msg.worker_name + "\n").cstring())
       Fail()
-    end
-
-  fun ref process_stream_relinquish_response_msg(
-    msg: ConnectorStreamRelinquishResponseMsg)
-  =>
-    try
-      let promise = _pending_relinquish_promises(msg.request_id)?
-      promise(None)
     end
 
   //////////////////////
@@ -385,11 +362,6 @@ class GlobalConnectorStreamRegistry[In: Any val]
   //////////////////////
   fun ref contains_notify_request(request_id: ConnectorStreamNotifyId): Bool =>
     _pending_notify_promises.contains(request_id)
-
-  fun ref contains_relinquish_request(
-    request_id: ConnectorStreamRelinquishId): Bool
-  =>
-    _pending_relinquish_promises.contains(request_id)
 
   fun ref complete_leader_state_relinquish(new_leader_name: WorkerName) =>
     _relinquish_leader_state(new_leader_name)
@@ -497,11 +469,12 @@ class ActiveStreamTuple[In: Any val]
 
 class LocalConnectorStreamRegistry[In: Any val]
    // Global Stream Registry
-  let _global_registry: GlobalConnectorStreamRegistry[In]
+  let _global_registry: GlobalConnectorStreamRegistry[In] ref
 
   // Local stream registry
   // (stream_name, connector_source, last_acked_por, last_seen_por)
-  let active_streams: Map[StreamId, ActiveStreamTuple[In]] = active_streams.create()
+  let _active_streams: Map[StreamId, ActiveStreamTuple[In]] =
+    _active_streams.create()
   let _source_name: String
 
   new ref create(worker_name: WorkerName, source_name: String,
@@ -510,7 +483,8 @@ class LocalConnectorStreamRegistry[In: Any val]
   =>
     _source_name = source_name
     _global_registry = _global_registry.create(worker_name,
-      source_name, connections, host, service, workers_list, this)
+      source_name, connections, host, service, workers_list)
+    _global_registry.set_local_registry(this)
 
   ///////////////////
   // MESSAGE HANDLING
@@ -526,11 +500,8 @@ class LocalConnectorStreamRegistry[In: Any val]
       | let m: ConnectorStreamNotifyResponseMsg =>
         _global_registry.process_stream_notify_response_msg(m)
 
-      | let m: ConnectorStreamRelinquishMsg =>
-        _global_registry.process_stream_relinquish_msg(m)
-
-      | let m: ConnectorStreamRelinquishResponseMsg =>
-        _global_registry.process_stream_relinquish_response_msg(m)
+      | let m: ConnectorStreamsRelinquishMsg =>
+        _global_registry.process_streams_relinquish_msg(m)
 
       | let m: ConnectorLeadershipRelinquishMsg =>
         _global_registry.process_leadership_relinquish_msg(m)
@@ -567,91 +538,49 @@ class LocalConnectorStreamRegistry[In: Any val]
   // LOCAL
   /////////////
 
-  fun ref stream_is_present(stream_id: StreamId): Bool =>
-    active_streams.contains(stream_id)
-
-  // TODO [source-migration]: pass in POR here so that when a new stream we don't default to a POR of 0
   fun ref stream_notify(request_id: ConnectorStreamNotifyId,
     stream_id: StreamId, stream_name: String,
-    promise: Promise[NotifyResult[In]], connector_source: ConnectorSource[In] tag)
+    point_of_ref: PointOfReference = 0,
+    promise: Promise[NotifyResult[In]],
+    connector_source: ConnectorSource[In] tag)
   =>
-    // stream_id in active_streams.contains()?
     try
-      let stream = active_streams(stream_id)?
-      // connector_source == active_streams(stream_id).connector_source?
-      if stream.source == connector_source then
-        // accept: already owned by requesting source
-        // Use last_seen as resume_from point
-        stream_notify_local_result(true, stream.last_seen, promise, connector_source)
-      else
-        // reject: owned by another source in this registry
-        // use last_acked as resume_from point
-        // Note: this allows connectors to get info on streams owned by other
-        // connectors, and even keep tabs on their progress.
-        // Maybe this is exposing too much information... or maybe this could
-        // be useful, for example with a hot-standby connector
-        stream_notify_local_result(false, stream.last_acked, promise,
-          connector_source)
-      end
+      // stream_id in _active_streams
+      let stream = _active_streams(stream_id)?
+        // reject: already owned by a source in this registry
+        stream_notify_local_result(false, StreamTuple(stream_id, stream_name,
+          point_of_ref), promise, connector_source)
     else
-      // defer to global
-      let stream = recover val ActiveStreamTuple[In](stream_id, stream_name,
-        0, 0, connector_source) end
+      // No local knowledge of stream_id: defer to global
       _global_registry.stream_notify(request_id,
-        consume stream, promise, connector_source)
+        StreamTuple(stream_id, stream_name, point_of_ref), promise,
+        connector_source)
     end
 
   fun ref stream_notify_local_result(success: Bool,
-    last_acked: PointOfReference,
-    promise: Promise[NotifyResult[In]], connector_source: ConnectorSource[In] tag)
+    stream: StreamTuple,
+    promise: Promise[NotifyResult[In]],
+    connector_source: ConnectorSource[In] tag)
   =>
     // No local state to update.
-    promise(NotifyResult[In](connector_source, success, last_acked))
+    promise(NotifyResult[In](connector_source, success, stream))
 
-  fun ref stream_notify_global_result(success: Bool,
-    stream: StreamTuple,
-    promise: Promise[NotifyResult[In]], connector_source: ConnectorSource[In] tag)
+  fun ref stream_notify_global_result(success: Bool, stream: StreamTuple,
+    promise: Promise[NotifyResult[In]],
+    connector_source: ConnectorSource[In] tag)
   =>
     if success then
       // update locally
-      active_streams(stream.id) = ActiveStreamTuple[In](stream.id, stream.name,
+      _active_streams(stream.id) = ActiveStreamTuple[In](stream.id, stream.name,
         stream.last_acked, stream.last_acked, connector_source)
     end
-    promise(NotifyResult[In](connector_source, success, stream.last_acked))
+    promise(NotifyResult[In](connector_source, success, stream))
 
-  fun ref stream_update(stream_id: StreamId, checkpoint_id: CheckpointId,
-    last_acked_por: PointOfReference, last_seen_por: PointOfReference,
-    connector_source: (ConnectorSource[In] tag | None))
-  =>
-    // TODO [source-migration]: figure out what stream properties the local registry needs to keep track of.
-    // does this need to participate in the checkpoint? until it does, last acked vs last seen in terms of at least once processing will be impossible
-      // TODO [source-migration]: resume from here Nisan + Jonathan
-    let update = if connector_source is None then
-      true
-    else
-      try
-        if active_streams(stream_id)?.source is None then
-          false
-        else
-          true
-        end
-      else
-        false
-      end
+  fun ref streams_relinquish(streams: Array[StreamTuple] val) =>
+    for stream in streams.values() do
+      try _active_streams.remove(stream.id)? end
     end
-
-    if update then
-      try
-        let stream = active_streams(stream_id)?
-        active_streams(stream_id) =
-        (stream.name, connector_source, last_acked_por, last_seen_por)
-      else
-        Fail()
-      end
-    end
-
-  fun ref stream_relinquish(stream_id: StreamId, last_acked: PointOfReference) =>
-    None
+    _global_registry.streams_relinquish(streams)
 
 class val ConnectorStreamNotifyId is Equatable[ConnectorStreamNotifyId]
   let stream_id: StreamId
@@ -662,24 +591,6 @@ class val ConnectorStreamNotifyId is Equatable[ConnectorStreamNotifyId]
     session_id = session_id'
 
   fun eq(that: ConnectorStreamNotifyId box): Bool =>
-     """
-    Returns true if the request is for the same session and stream.
-    """
-    (session_id == that.session_id) and (stream_id == that.stream_id)
-
-  fun hash(): USize =>
-    session_id.hash() xor stream_id.hash()
-
-class val ConnectorStreamRelinquishId is
-    Equatable[ConnectorStreamRelinquishId]
-  let stream_id: StreamId
-  let session_id: RoutingId
-
-  new val create(stream_id': StreamId, session_id': RoutingId) =>
-    stream_id = stream_id'
-    session_id = session_id'
-
-  fun eq(that: ConnectorStreamRelinquishId box): Bool =>
      """
     Returns true if the request is for the same session and stream.
     """

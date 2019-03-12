@@ -48,7 +48,7 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
-// TODO [source-migration] make this actor participate in checkpointing
+// TODO [post-source-migration] make this actor participate in checkpointing
 // and rollback, saving its local and global registries
 
 actor ConnectorSourceListener[In: Any val] is SourceListener
@@ -311,23 +311,17 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   be purge_pending_requests(session_id: RoutingId) =>
     _stream_registry.purge_pending_requests(session_id)
 
-  be stream_relinquish(stream_id: StreamId, last_acked: PointOfReference) =>
-    _stream_registry.stream_relinquish(stream_id, last_acked)
+  be streams_relinquish(streams: Array[StreamTuple] val) =>
+    _stream_registry.streams_relinquish(streams)
 
   be stream_notify(request_id: ConnectorStreamNotifyId,
     stream_id: StreamId, stream_name: String,
+    point_of_ref: PointOfReference = 0,
     promise: Promise[NotifyResult[In]],
     connector_source: ConnectorSource[In] tag)
   =>
     _stream_registry.stream_notify(request_id,
-      stream_id, stream_name, promise, connector_source)
-
-  be stream_update(stream_id: StreamId, checkpoint_id: CheckpointId,
-    last_acked_por: PointOfReference, last_seen_por: PointOfReference,
-    connector_source: (ConnectorSource[In] tag|None))
-  =>
-    _stream_registry.stream_update(stream_id, checkpoint_id,
-      last_acked_por, last_seen_por, connector_source)
+      stream_id, stream_name, point_of_ref, promise, connector_source)
 
   ///////////////////////
   // Listener Connector
