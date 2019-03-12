@@ -577,20 +577,12 @@ primitive ChannelMsgEncoder
   =>
     _encode(ConnectorStreamNotifyResponseMsg(source_name, success, stream, request_id), auth)?
 
-  fun connector_stream_relinquish(worker_name: String, source_name: String,
-    stream: StreamTuple,
-    request_id: ConnectorStreamRelinquishId,
+  fun connector_streams_relinquish(worker_name: String, source_name: String,
+    streams: Array[StreamTuple] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(ConnectorStreamRelinquishMsg(worker_name, source_name, stream,
-      request_id), auth)?
-
-  fun connector_stream_relinquish_response(source_name: String,
-    request_id: ConnectorStreamRelinquishId,
-    auth: AmbientAuth): Array[ByteSeq] val ?
-  =>
-    _encode(ConnectorStreamRelinquishResponseMsg(source_name, request_id),
-     auth)?
+    _encode(ConnectorStreamsRelinquishMsg(worker_name, source_name, streams),
+      auth)?
 
   fun connector_add_source_addr(worker_name: WorkerName,
     source_name: String, host: String, service: String,
@@ -766,33 +758,17 @@ class val ConnectorLeadershipRelinquishMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
-class val ConnectorStreamRelinquishMsg is SourceListenerMsg
+class val ConnectorStreamsRelinquishMsg is SourceListenerMsg
   let worker_name: String
   let _source_name: String
-  let stream: StreamTuple
-  let request_id: ConnectorStreamRelinquishId
+  let streams: Array[StreamTuple] val
 
   new val create(worker_name': WorkerName, source_name': String,
-    stream': StreamTuple,
-    request_id': ConnectorStreamRelinquishId)
+    streams': Array[StreamTuple] val)
   =>
     worker_name = worker_name'
     _source_name = source_name'
-    stream = stream'
-    request_id = request_id'
-
-  fun source_name(): String =>
-    _source_name
-
-class val ConnectorStreamRelinquishResponseMsg is SourceListenerMsg
-  let _source_name: String
-  let request_id: ConnectorStreamRelinquishId
-
-  new val create(source_name': String,
-    request_id':ConnectorStreamRelinquishId)
-  =>
-    _source_name = source_name'
-    request_id = request_id'
+    streams = streams'
 
   fun source_name(): String =>
     _source_name

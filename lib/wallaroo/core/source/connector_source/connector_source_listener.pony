@@ -311,12 +311,12 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   be purge_pending_requests(session_id: RoutingId) =>
     _stream_registry.purge_pending_requests(session_id)
 
-  be stream_relinquish(stream_id: StreamId, last_acked: PointOfReference) =>
-    _stream_registry.stream_relinquish(stream_id, last_acked)
+  be streams_relinquish(streams: Array[StreamTuple] val) =>
+    _stream_registry.streams_relinquish(streams)
 
   be stream_notify(request_id: ConnectorStreamNotifyId,
     stream_id: StreamId, stream_name: String,
-    point_of_ref: PointOfRef = 0,
+    point_of_ref: PointOfReference = 0,
     promise: Promise[NotifyResult[In]],
     connector_source: ConnectorSource[In] tag)
   =>
