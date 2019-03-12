@@ -808,20 +808,6 @@ class val ConnectorStreamNotifyResponseMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
-// TODO [source-migration]: Rename to "ConnectorRegistryUpdateMsg"
-class val ConnectorUpdateRegistryMsg is SourceListenerMsg
-  let _source_name: String
-  var registry: Map[WorkerName, Set[U64]] val
-
-  new val create(source_name': String,
-    registry': Map[WorkerName, Set[U64]] val)
-  =>
-    _source_name = source_name'
-    registry =  registry'
-
-  fun source_name(): String =>
-    _source_name
-
 class val CreateDataChannelListener is ChannelMsg
   let workers: Array[String] val
 

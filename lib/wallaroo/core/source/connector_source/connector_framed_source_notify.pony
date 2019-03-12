@@ -267,8 +267,6 @@ class ConnectorSourceNotify[In: Any val]
         ingest_ts, pipeline_time_spent)
     end
 
-  // TODO [source-migration]: Is this only ever used for rollback?
-  // should it be renamed to be more specific?
   fun ref received_connector_msg(source: ConnectorSource[In] ref,
     data: Array[U8] iso,
     latest_metrics_id: U16,
@@ -287,12 +285,14 @@ class ConnectorSourceNotify[In: Any val]
         (_fsm_state is _ProtoFsmStreaming) then
       // Our client's credits are running low and we haven't replenished
       // them after barrier_complete() processing.  Replenish now.
-      _send_ack()
+      _send_acks()
     end
 
     try
       let data': Array[U8] val = consume data
-      @printf[I32]("NH: decode data: %s\n".cstring(), _print_array[U8](data').cstring())
+      ifdef "trace" then
+        @printf[I32]("NH: decode data: %s\n".cstring(), _print_array[U8](data').cstring())
+      end
       let connector_msg = cwm.Frame.decode(consume data')?
       match connector_msg
       | let m: cwm.HelloMsg =>
@@ -336,7 +336,7 @@ class ConnectorSourceNotify[In: Any val]
         return _to_error_state(source, "Invalid message: ok")
 
       | let m: cwm.ErrorMsg =>
-        @printf[I32]("Client sent us ERROR msg: %s\n".cstring(),
+        @printf[I32]("Received ERROR msg from client: %s\n".cstring(),
           m.message.cstring())
         source.close()
         return _continue_perhaps(source)
@@ -383,20 +383,17 @@ class ConnectorSourceNotify[In: Any val]
         else
           try
             let s = _active_streams(m.stream_id)?
-            @printf[I32]("NH: processing body 1\n".cstring())
             let msg_id = try
               m.message_id as cwm.MessageId
             else
               0
             end
 
-            @printf[I32]("NH: processing body 2\n".cstring())
             if (msg_id > 0) and (msg_id <= s.last_seen) then
               // skip processing of an already seen message
               return _continue_perhaps(source)
             end
 
-            @printf[I32]("NH: processing body 3\n".cstring())
             if cwm.Eos.is_set(m.flags) then
               // Process EOS
               @printf[I32](("ConnectorSource[%s] received EOS for stream_id"
@@ -408,7 +405,7 @@ class ConnectorSourceNotify[In: Any val]
               _pending_close.update(m.stream_id, s)
               return true
             elseif cwm.Boundary.is_set(m.flags) then
-              // TODO [source-migration] what's supposed to happen here?
+              // TODO [post-source-migration] what's supposed to happen here?
               return true
             else // not an EOS and not a boundary
               // process message
@@ -453,7 +450,7 @@ class ConnectorSourceNotify[In: Any val]
               else
                 // _handler.decode(bytes) failed
                 if m.message is None then
-                  // TODO [source-migration] revisit this error message
+                  // TODO [post-source-migration] revisit this error message
                   return _to_error_state(source, "No message bytes and BOUNDARY not set")
                 end
                 @printf[I32](("Unable to decode message at " + _pipeline_name + " source\n").cstring())
@@ -518,7 +515,7 @@ class ConnectorSourceNotify[In: Any val]
         key_string
       else
         // wat
-        // TODO [source-migration] should this be stream_id for messages that
+        // TODO [post-source-migration] should this be stream_id for messages that
         // do not provide a key?
         // What is a sane default here?
         // What does it mean to use a unique key for each message?
@@ -568,8 +565,10 @@ class ConnectorSourceNotify[In: Any val]
     _continue_perhaps(source)
 
   fun ref _continue_perhaps(source: ConnectorSource[In] ref): Bool =>
-    @printf[I32]("NH: _continue_perhaps: %s\n".cstring(),
-      _header_size.string().cstring())
+    ifdef "trace" then
+      @printf[I32]("NH: _continue_perhaps: %s\n".cstring(),
+        _header_size.string().cstring())
+    end
     source.expect(_header_size)
     _header = true
     _continue_perhaps2()
@@ -617,7 +616,7 @@ class ConnectorSourceNotify[In: Any val]
     @printf[I32]("ConnectorSource connection closed 0x%lx\n".cstring(), source)
     _session_active = false
     _fsm_state = _ProtoFsmDisconnected
-    // TODO [source-migration] When john's work is ready, this assumption
+    // TODO [post-source-migration] When john's work is ready, this assumption
     // becomes true:
     // 1. we relinquish streams with last_seen value
     // 2. on rollback (post-john's-work), global registry rolls back too.
@@ -633,7 +632,7 @@ class ConnectorSourceNotify[In: Any val]
     //    checkpointed state
     //  2. during a rollback, when the state rolls back to actual last_acked
     //     and so will the registry
-    // TODO [source-migration] open an issue for above to keep track of this
+    // https://github.com/WallarooLabs/wallaroo/issues/2807
 
     for s_map in [_active_streams ; _pending_close].values() do
       for s in s_map.values() do
@@ -731,6 +730,8 @@ class ConnectorSourceNotify[In: Any val]
     _send_restart()
 
   fun ref initiate_barrier(checkpoint_id: CheckpointId) =>
+    @printf[I32]("Initiate_barrier(%s) at %s\n".cstring(),
+      checkpoint_id.string().cstring(), WallClock.seconds().string().cstring())
     _barrier_ongoing = true
     Invariant(checkpoint_id > _barrier_checkpoint_id)
     _barrier_checkpoint_id = checkpoint_id
@@ -740,6 +741,11 @@ class ConnectorSourceNotify[In: Any val]
       // _active_streams and _pending_close
       for s_map in [_active_streams ; _pending_close].values() do
         for s in s_map.values() do
+          ifdef "trace" then
+            @printf[I32]("%s ::: Updating stream_id %s last acked to %s\n"
+              .cstring(), WallClock.seconds().string().cstring(),
+              s.id.string().cstring(), s.last_seen.string().cstring())
+          end
           s.last_checkpoint = checkpoint_id
           s.last_acked = s.last_seen
         end
@@ -758,6 +764,11 @@ class ConnectorSourceNotify[In: Any val]
 
       // process acks for EOS/_pending_close streams
       for (stream_id, s) in _pending_close.pairs() do
+        ifdef "trace" then
+          @printf[I32]("%s ::: Processing ack for %s at %s\n".cstring(),
+            WallClock.seconds().string().cstring(),
+            stream_id.string().cstring(), s.last_acked.string().cstring())
+        end
         _pending_acks.push((stream_id, s.last_acked))
         _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
       end
@@ -768,7 +779,7 @@ class ConnectorSourceNotify[In: Any val]
 
       if _fsm_state is _ProtoFsmStreaming then
         // Send an Ack message to replenish credits
-        _send_ack()
+        _send_acks()
       end
     end
 
@@ -829,19 +840,33 @@ class ConnectorSourceNotify[In: Any val]
   fun ref send_notify_ack(success: Bool, stream_id: StreamId,
     point_of_reference: PointOfReference)
   =>
+    ifdef "trace" then
+      @printf[I32]("%s ::: send_notify_ack(%s, %s, %s)\n".cstring(),
+        WallClock.seconds().string().cstring(), success.string().cstring(),
+        stream_id.string().cstring(), point_of_reference.string().cstring())
+    end
     let m = cwm.NotifyAckMsg(success, stream_id, point_of_reference)
     _send_reply(_connector_source, m)
 
-  fun ref _send_ack() =>
+  fun ref _send_acks() =>
+    @printf[I32]("Sending acks for %s streams\n".cstring(),
+      _pending_acks.size().string().cstring())
     let new_credits = _max_credits - _credits
-    // destructively read the pending acks
-    // and send the ack to the connector
-    let acks = recover iso Array[(U64, U64)] end
-    for (i, v) in _pending_acks.pairs() do
+    let acks = recover iso Array[(StreamId, PointOfReference)] end
+    for v in _pending_acks.values() do
+      ifdef "trace" then
+        @printf[I32]("%s ::: Acking stream_id %s to por %s\n".cstring(),
+          WallClock.seconds().string().cstring(),
+          v._1.string().cstring(),
+          v._2.string().cstring())
+      end
       acks.push(v)
-      _pending_acks.remove(i, 1)
     end
-    _send_reply(_connector_source, cwm.AckMsg(new_credits, consume acks))
+    _pending_acks.clear()
+    // only send acks if there are new credits or new acks to send
+    if (new_credits > 0) or (acks.size() > 0) then
+      _send_reply(_connector_source, cwm.AckMsg(new_credits, consume acks))
+    end
     _credits = _credits + new_credits
 
   fun ref _send_restart() =>
@@ -854,7 +879,7 @@ class ConnectorSourceNotify[In: Any val]
     // The .close() method ^^^ calls our closed() method which will
     // twiddle all of the appropriate state variables.
 
-  // TODO [source-migration]: why pass source here instead of using
+  // TODO [post-source-migration]: why pass source here instead of using
   // var _connector_source?
   fun _send_reply(source: (ConnectorSource[In] ref|None), msg: cwm.Message) =>
     match source
@@ -862,6 +887,10 @@ class ConnectorSourceNotify[In: Any val]
       // write the frame data and length encode it
       let w1: Writer = w1.create()
       let b1 = cwm.Frame.encode(msg, w1)
+      ifdef debug then
+        @printf[I32](("%s ::: sending reply:\n " + String.from_array(b1) + "\n")
+          .cstring(), WallClock.seconds().string().cstring())
+      end
       s.writev_final(Bytes.length_encode(b1))
     else
       Fail()

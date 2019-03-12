@@ -133,7 +133,7 @@ type EventTimeType is I64
 type MessageId is U64
 type MessageBytes is ByteSeq
 type KeyBytes is ByteSeq
-// TODO [source-migration]: deprecate these types
+// TODO [post-source-migration]: deprecate these types
 type SourceName is String
 type SourceAddress is String
 type SourceList is Array[(SourceName, SourceAddress)] val
