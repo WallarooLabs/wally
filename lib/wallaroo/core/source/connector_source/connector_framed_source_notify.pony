@@ -402,7 +402,14 @@ class ConnectorSourceNotify[In: Any val]
               // 1. remove state from _active_streams
               try _active_streams.remove(m.stream_id)? end
               // 2. add state to _pending_close
-              _pending_close.update(m.stream_id, s)
+              ifdef "resilience" then
+                _pending_close.update(m.stream_id, s)
+              else
+                // respond immediately
+                _send_reply(source, cwm.AckMsg(0, [(s.id, s.last_seen)]))
+                _listener.streams_relinquish([StreamTuple(s.id, s.name,
+                  s.last_seen)])
+              end
               return true
             elseif cwm.Boundary.is_set(m.flags) then
               // TODO [post-source-migration] what's supposed to happen here?
