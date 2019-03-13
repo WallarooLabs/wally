@@ -843,6 +843,9 @@ actor LocalTopologyInitializer is LayoutInitializer
                 // pass in list of workers
                 let sl_builder_builder =
                   source_data.source_listener_builder_builder()
+                // TODO [source-migration]: add an existing-worker name
+                // That isn't currently joining (e.g. either initializer at
+                // startup or any one of the "non-joining" workers in a join)
                 let sl_builder = sl_builder_builder(_worker_name,
                   source_name, source_runner_builder, partitioner_builder,
                   out_router, _metrics_conn, consume source_reporter,
