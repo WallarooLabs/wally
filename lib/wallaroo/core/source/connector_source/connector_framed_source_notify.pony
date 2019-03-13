@@ -796,7 +796,11 @@ class ConnectorSourceNotify[In: Any val]
       streams.push(s)
     end
     _pending_relinquish.clear()
-    _listener.streams_relinquish(consume streams)
+    if streams.size() > 0 then
+      @printf[I32]("ConnectorSource relinquishing %s streams\n".cstring(),
+        _pending_relinquish.size().string().cstring())
+      _listener.streams_relinquish(consume streams)
+    end
 
   fun ref _process_notify(source: ConnectorSource[In] ref, stream_id: StreamId,
     stream_name: String, point_of_reference: PointOfReference)
@@ -856,8 +860,6 @@ class ConnectorSourceNotify[In: Any val]
     _send_reply(_connector_source, m)
 
   fun ref _send_acks() =>
-    @printf[I32]("Sending acks for %s streams\n".cstring(),
-      _pending_acks.size().string().cstring())
     let new_credits = _max_credits - _credits
     let acks = recover iso Array[(StreamId, PointOfReference)] end
     for v in _pending_acks.values() do
@@ -872,6 +874,8 @@ class ConnectorSourceNotify[In: Any val]
     _pending_acks.clear()
     // only send acks if there are new credits or new acks to send
     if (new_credits > 0) or (acks.size() > 0) then
+      @printf[I32]("Sending acks for %s streams\n".cstring(),
+        _pending_acks.size().string().cstring())
       _send_reply(_connector_source, cwm.AckMsg(new_credits, consume acks))
     end
     _credits = _credits + new_credits
@@ -894,10 +898,6 @@ class ConnectorSourceNotify[In: Any val]
       // write the frame data and length encode it
       let w1: Writer = w1.create()
       let b1 = cwm.Frame.encode(msg, w1)
-      ifdef debug then
-        @printf[I32](("%s ::: sending reply:\n " + String.from_array(b1) + "\n")
-          .cstring(), WallClock.seconds().string().cstring())
-      end
       s.writev_final(Bytes.length_encode(b1))
     else
       Fail()

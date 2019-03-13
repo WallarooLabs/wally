@@ -109,6 +109,7 @@ class val TCPSourceListenerBuilderBuilder[In: Any val] is
     worker_source_config: WorkerSourceConfig,
     connections: Connections,
     workers_list: Array[WorkerName] val,
+    is_joining: Bool,
     target_router: Router = EmptyRouter):
     TCPSourceListenerBuilder[In]
   =>

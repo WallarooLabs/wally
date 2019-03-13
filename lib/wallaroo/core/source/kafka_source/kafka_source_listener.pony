@@ -61,6 +61,7 @@ class val KafkaSourceListenerBuilderBuilder[In: Any val] is
     worker_source_config: WorkerSourceConfig,
     connections: Connections,
     workers_list: Array[WorkerName] val,
+    is_joining: Bool,
     target_router: Router = EmptyRouter):
     KafkaSourceListenerBuilder[In]
   =>
@@ -225,6 +226,9 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     end
 
   be start_listening() =>
+    _start_listening()
+
+  fun ref _start_listening() =>
     // create kafka client
     _kc = match KafkaConfigFactory(_ksco, _env.out)
     | let kc: KafkaConfig val =>
@@ -392,3 +396,18 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
 
   be receive_msg(msg: SourceListenerMsg) =>
     None
+
+  // Application startup lifecycle events
+  be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    initializer.report_created(this)
+
+  be application_created(initializer: LocalTopologyInitializer) =>
+    initializer.report_initialized(this)
+
+  be application_initialized(initializer: LocalTopologyInitializer) =>
+    _start_listening()
+    initializer.report_ready_to_work(this)
+
+  be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
+

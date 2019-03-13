@@ -16,12 +16,8 @@ To run it:
 2. Start the feed:
 
     ```sh
-    ./at_least_once_feed \
-        --application-module celsius \
-        --connector celsius_feed \
-        --celsius_feed-host 127.0.0.1 \
-        --celsius_feed-port 7100 \
-        --celsius_feed-filenames celsius.msg,celsius.msg.2,celsius.msg.3
+    export PYTHONPATH="$PYTHONPATH:/home/nisan/wallaroo-tutorial/wallaroo/machida/lib/:/home/nisan/wallaroo-tutorial/wallaroo/testing/tools"
+    ./at_least_once_feed
     ```
 """
 
