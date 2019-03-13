@@ -714,7 +714,13 @@ actor ConnectorSink is Sink
     ifdef "checkpoint_trace" then
       @printf[I32]("Prepare for checkpoint rollback at ConnectorSink %s\n".cstring(), _sink_id.string().cstring())
     end
-    _prepare_for_rollback()
+    //// TODO: _clear_barriers() will put a normal message processor
+    ////       in place, and if a message arrives at process_message()
+    ////       before we get the rollback() message, then we can send
+    ////       bogus data that will be thrown away by the connector
+    ////       and/or confused the connector sink and perhaps trigger
+    ////       further 2PC phase 1 aborts.
+    //// _prepare_for_rollback()
 
   fun ref _prepare_for_rollback() =>
     _clear_barriers()

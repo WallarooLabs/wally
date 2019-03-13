@@ -71,7 +71,9 @@ def decode_feed(data):
 @wallaroo.experimental.octet_message_encoder
 def encode_conversion(data):
     # Let's make line-oriented output
-    return (str(data) + '\n').encode('utf-8')
+    x = (str(data) + '\n').encode('utf-8')
+    print('DBG: sink encode: {}'.format(x))
+    return x
 
 
 @wallaroo.experimental.stream_message_decoder
