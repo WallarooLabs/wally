@@ -356,7 +356,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             pass
 
     def stream_acked(self, stream):
-        logging.info("MultiSourceConnector acked {}".format(stream.point_of_ref))
+        logging.info("MultiSourceConnector acked {}".format(stream))
         source, acked = self.sources.get(stream.id, (None, None))
         if source:
             # check if there's an eos pending this ack
