@@ -36,6 +36,7 @@ use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/network"
 use "wallaroo_labs/mort"
+use "wallaroo_labs/time"
 
 // Connector Types
 type StreamId is U64
@@ -211,6 +212,13 @@ class GlobalConnectorStreamRegistry[In: Any val]
   // INTERNAL STATE MANAGEMENT
   ////////////////////////////
   fun ref _inactivate_stream(stream: StreamTuple) ? =>
+    ifdef debug then
+      @printf[I32](("%s ::: GlobalConnectorStreamRegistry._inactivate_stream("
+        + "StreamTuple(%s, %s, %s))\n").cstring(),
+        WallClock.seconds().string().cstring(),
+        stream.id.string().cstring(), stream.name.cstring(),
+        stream.last_acked.string().cstring())
+    end
     // fail if not already active
     _active_streams.remove(stream.id)?
     _inactive_streams(stream.id) = stream
