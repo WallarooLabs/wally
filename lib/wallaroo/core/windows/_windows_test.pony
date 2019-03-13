@@ -52,6 +52,8 @@ actor _WindowTests is TestList
     test(_TestSlidingWindowsSequence)
     test(_TestCountWindows)
     test(_TestStaggerIsSane)
+    test(_TestStaggerDoesNotUnderflow)
+    test(_TestZeroIsAValidEventTime)
 
 class iso _TestTumblingWindowsTimeoutTrigger is UnitTest
   fun name(): String => "windows/_TestTumblingWindowsTimeoutTrigger"
@@ -891,6 +893,33 @@ class iso _TestStaggerIsSane is UnitTest
       h.assert_array_eq[USize]([0;0;1], _ForceArray(res._1)?)
     end
 
+class iso _TestStaggerDoesNotUnderflow is UnitTest
+  fun name(): String => "windows/_TestStaggerDoesNotUnderflow"
+
+  fun apply(h: TestHelper) ? =>
+    let range: U64 = Seconds(1)
+    let slide = range
+    let delay: U64 = Seconds(1)
+    var tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+        delay, _Ones)
+        .>apply(1, Milliseconds(999), Milliseconds(999))
+
+    var res = tw(2, Seconds(2)+1, Seconds(2)+1)
+    h.assert_array_eq[USize]([1], _ForceArray(res._1)?)
+
+class iso _TestZeroIsAValidEventTime is UnitTest
+  fun name(): String => "windows/_TestZeroIsAValidEventTime"
+
+  fun apply(h: TestHelper) ? =>
+    let range: U64 = 1
+    let slide = range
+    let delay: U64 = 0
+    var tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+        delay, _Zeros)
+        .>apply(1, 0, 0)
+    var res = tw(2, 1, 1)
+    h.assert_array_eq[USize]([1], _ForceArray(res._1)?)
+
 
 class _Total is State
   var v: USize = 0
@@ -1017,3 +1046,7 @@ primitive _TumblingWindow
 class _Zeros is Random
   new ref create(x: U64 val = 0, y: U64 val = 0) => None
   fun ref next(): U64 => 0
+
+class _Ones is Random
+  new ref create(x: U64 val = 0, y: U64 val = 0) => None
+  fun ref next(): U64 => 1
