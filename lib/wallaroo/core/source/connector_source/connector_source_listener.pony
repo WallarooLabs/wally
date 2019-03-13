@@ -95,6 +95,10 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   // Stream Registry for managing updates to local and global stream state
   let _stream_registry: LocalConnectorStreamRegistry[In]
 
+  // TODO [source-migration]: Add worker_name to query for leader name
+  // TODO [source-migration]: Add new message + handling for requesting
+  //  the leader name, and updating the local based on the response
+  //  before completing startup?
   new create(env: Env, worker_name: WorkerName, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
     router: Router, metrics_conn: MetricsSink,

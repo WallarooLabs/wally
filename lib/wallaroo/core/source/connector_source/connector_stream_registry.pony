@@ -54,6 +54,12 @@ class val StreamTuple
     id = stream_id
     last_acked = point_of_ref
 
+// TODO [source-migration]: Add _request_leader() function to get existing
+// leader during a join
+// TODO [source-migration]: Either get a list of "existing" workers to query for
+// request_leader, or ask ALL workers and currently-joining workers do not
+// respond. or something else?
+// TODO [source-migration]: add var _is_joining: Bool to determine above logic
 class GlobalConnectorStreamRegistry[In: Any val]
   var _worker_name: String
   let _source_name: String
