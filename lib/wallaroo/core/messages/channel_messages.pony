@@ -613,6 +613,19 @@ primitive ChannelMsgEncoder
       relinquishing_leader_name, source_name, active_stream_map,
       inactive_stream_map, source_addr_map), auth)?
 
+  fun connector_leader_name_request(requesting_worker_name: WorkerName,
+    source_name: String, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(ConnectorLeaderNameRequestMsg(requesting_worker_name,
+      source_name), auth)?
+
+  fun connector_leader_name_response(leader_name: WorkerName,
+    source_name: String, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(ConnectorLeaderNameResponseMsg(leader_name, source_name),
+      auth)?
+
+
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg =>
     try
@@ -804,6 +817,28 @@ class val ConnectorStreamNotifyResponseMsg is SourceListenerMsg
     stream = stream'
     success = success'
     request_id = request_id'
+
+  fun source_name(): String =>
+    _source_name
+
+class val ConnectorLeaderNameRequestMsg is SourceListenerMsg
+  let _source_name: String
+  let worker_name: WorkerName
+
+  new val create(worker_name': WorkerName, source_name': String) =>
+    _source_name = source_name'
+    worker_name = worker_name'
+
+  fun source_name(): String =>
+    _source_name
+
+class val ConnectorLeaderNameResponseMsg is SourceListenerMsg
+  let _source_name: String
+  let leader_name: WorkerName
+
+  new val create(leader_name': WorkerName, source_name': String) =>
+    _source_name = source_name'
+    leader_name = leader_name'
 
   fun source_name(): String =>
     _source_name

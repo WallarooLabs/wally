@@ -851,7 +851,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   out_router, _metrics_conn, consume source_reporter,
                   _router_registry, _outgoing_boundary_builders, _event_log,
                   _auth, this, _recovering, worker_source_config, _connections,
-                  t.worker_names)
+                  t.worker_names, _is_joining)
                 sl_builders.push(sl_builder)
               else
                 Fail()
@@ -869,6 +869,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         end
         for b in sl_builders.values() do
           let ba = b.apply(_env)
+          initializables.set(ba)
           sl_actors.push(ba)
         end
 
@@ -1045,7 +1046,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _phase.report_initialized(initializable)
 
   fun ref _application_initialized(initializables: Initializables) =>
-    _spin_up_source_listeners()
+    // _spin_up_source_listeners()
     _phase = _ApplicationInitializedPhase(this, initializables)
 
   be report_ready_to_work(initializable: Initializable) =>
@@ -1089,7 +1090,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   fun ref application_ready_to_work(initializables: Initializables) =>
     _phase = _ApplicationReadyToWorkPhase(this, initializables)
-    _start_sources()
+    // _start_sources()
 
     if _is_initializer then
       match _cluster_initializer

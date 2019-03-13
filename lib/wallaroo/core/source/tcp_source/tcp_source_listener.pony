@@ -84,6 +84,10 @@ actor TCPSourceListener[In: Any val] is SourceListener
   let _connected_sources: SetIs[TCPSource[In]] = _connected_sources.create()
   let _available_sources: Array[TCPSource[In]] = _available_sources.create()
 
+  // Lifecycle
+  var _initializer: (LocalTopologyInitializer | None) = None
+  var _initialized: Bool = false
+
   new create(env: Env, worker_name: WorkerName, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
     router: Router, metrics_conn: MetricsSink,
@@ -165,6 +169,9 @@ actor TCPSourceListener[In: Any val] is SourceListener
     end
 
   be start_listening() =>
+    _start_listening()
+
+  fun ref _start_listening() =>
     if _valid then
       _event = @pony_os_listen_tcp[AsioEventID](this,
         _host.cstring(), _service.cstring())
@@ -355,3 +362,18 @@ actor TCPSourceListener[In: Any val] is SourceListener
       @pony_os_socket_close[None](_fd)
       _fd = -1
     end
+
+  // Application startup lifecycle events
+  be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    initializer.report_created(this)
+
+  be application_created(initializer: LocalTopologyInitializer) =>
+    initializer.report_initialized(this)
+
+  be application_initialized(initializer: LocalTopologyInitializer) =>
+    _start_listening()
+    initializer.report_ready_to_work(this)
+
+  be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    _start_sources()
+
