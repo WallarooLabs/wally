@@ -75,8 +75,10 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     _panes = Array[(Acc | EmptyPane)](pane_count)
     _panes_start_ts = Array[U64](pane_count)
     _earliest_window_idx = 0
-    var pane_start: U64 = ((watermark_ts - _delay) - window_alignment_offset)
 
+    var pane_start: U64 = (watermark_ts - _delay) - window_alignment_offset
+    // Make sure we don't underflow, creating a pane start way off in the future
+    if pane_start > watermark_ts then pane_start = 0 end
     for i in Range(0, pane_count) do
       _panes.push(EmptyPane)
       _panes_start_ts.push(pane_start)
@@ -161,12 +163,13 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   =>
     let outs = recover iso Array[(Out, U64)] end
     var output_watermark_ts: U64 = 0
+    let range_delay = _range + _delay
 
     let effective_watermark_ts =
       if input_watermark_ts == TimeoutWatermark() then
         // Set it at a point at which we know it will trigger
         // all windows that could contain messages.
-        _highest_seen_event_ts + (_range + _delay)
+        _highest_seen_event_ts + range_delay
       else
         input_watermark_ts
       end
@@ -176,8 +179,12 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
         (_earliest_window_idx + (_panes_start_ts.size() - 1)) %
           _panes_start_ts.size()
       let last_pane_start_ts = _panes_start_ts(last_pane_idx)?
-      let lowest_possible_new_start_ts =
-        (effective_watermark_ts - _range - _delay)
+
+      var lowest_possible_new_start_ts = effective_watermark_ts - range_delay
+      if lowest_possible_new_start_ts > effective_watermark_ts then
+        lowest_possible_new_start_ts = 0
+      end
+
       let trigger_diff =
         if lowest_possible_new_start_ts > last_pane_start_ts then
           lowest_possible_new_start_ts - last_pane_start_ts
@@ -249,7 +256,6 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   fun ref _expand_windows(event_ts: U64, end_ts: U64) ? =>
     let new_pane_count = _ExpandSlidingWindow.new_pane_count(event_ts,
       end_ts, _panes.size(), _pane_size, _panes_per_slide)
-
     let expanded_panes: Array[(Acc | EmptyPane)] =
       Array[(Acc | EmptyPane)](new_pane_count)
     let old_panes = (_panes = expanded_panes)
@@ -268,6 +274,11 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       working_idx = (working_idx + 1) % old_panes_size
     end
 
+    ifdef debug then
+      // We should never create an unreasonable amount of frames
+      // this particular number is up for debate.
+      Invariant(new_pane_count < 1000)
+    end
     // Add the new panes
     pane_start = pane_start + _pane_size
     for i in Range(old_panes_size, new_pane_count) do
@@ -296,7 +307,12 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     (_earliest_window_idx + pane_idx_offset) % _panes.size()
 
   fun _should_trigger(window_start_ts: U64, watermark_ts: U64): Bool =>
-    (window_start_ts + (_range - 1)) < (watermark_ts - _delay)
+    let end_bound = (watermark_ts - _delay)
+    if end_bound > watermark_ts then
+      false // Underflow! It's too early to trigger.
+    else
+      (window_start_ts + (_range - 1)) < end_bound
+    end
 
   fun _panes_are_contiguous(): Bool =>
     try
