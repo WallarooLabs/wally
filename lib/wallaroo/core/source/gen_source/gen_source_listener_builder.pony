@@ -93,6 +93,7 @@ class val GenSourceListenerBuilderBuilder[In: Any val]
     worker_source_config: WorkerSourceConfig,
     connections: Connections,
     workers_list: Array[WorkerName] val,
+    is_joining: Bool,
     target_router: Router = EmptyRouter):
     GenSourceListenerBuilder[In]
   =>

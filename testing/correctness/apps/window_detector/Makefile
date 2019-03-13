@@ -86,42 +86,48 @@ window_detector_tumbling_alo_source_test_python:
 	integration_test \
 		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
 		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
+		--alo-sequence-sender key_0 '(100,200]' "'window detector'" \
+		--alo-sequence-sender key_1 '(100,200]' "'window detector'" \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module window_detector --source alo --window-type tumbling $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-await-key key_0 100 \
-		--sink-await-key key_1 100
+		--sink-await-key key_0 200 \
+		--sink-await-key key_1 200
 
 window_detector_sliding_alo_source_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
 		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
 		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
+		--alo-sequence-sender key_0 '(100,200]' "'window detector'" \
+		--alo-sequence-sender key_1 '(100,200]' "'window detector'" \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module window_detector --source alo --window-type sliding $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type sliding --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-await-key key_0 100 \
-		--sink-await-key key_1 100
+		--sink-await-key key_0 200 \
+		--sink-await-key key_1 200
 
 window_detector_counting_alo_source_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
 		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
 		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
+		--alo-sequence-sender key_0 '(100,200]' "'window detector'" \
+		--alo-sequence-sender key_1 '(100,200]' "'window detector'" \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module window_detector --source alo --window-type counting $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type counting --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-await-key key_0 100 \
-		--sink-await-key key_1 100
+		--sink-await-key key_0 200 \
+		--sink-await-key key_1 200
 
 window_detector_tumbling_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
@@ -207,42 +213,48 @@ window_detector_tumbling_alo_source_test_python3:
 	integration_test \
 		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
 		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
+		--alo-sequence-sender key_0 '(100, 200]' "'window detector'" \
+		--alo-sequence-sender key_1 '(100, 200]' "'window detector'" \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module window_detector --source alo --window-type tumbling $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-await-key key_0 100 \
-		--sink-await-key key_1 100
+		--sink-await-key key_0 200 \
+		--sink-await-key key_1 200
 
 window_detector_sliding_alo_source_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
 		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
 		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
+		--alo-sequence-sender key_0 '(100, 200]' "'window detector'" \
+		--alo-sequence-sender key_1 '(100, 200]' "'window detector'" \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module window_detector --source alo --window-type sliding $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type sliding --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-await-key key_0 100 \
-		--sink-await-key key_1 100
+		--sink-await-key key_0 200 \
+		--sink-await-key key_1 200
 
 window_detector_counting_alo_source_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
 		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
 		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
+		--alo-sequence-sender key_0 '(100, 200]' "'window detector'" \
+		--alo-sequence-sender key_1 '(100, 200]' "'window detector'" \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module window_detector --source alo --window-type counting $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type counting --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
 		--workers 5 \
-		--sink-await-key key_0 100 \
-		--sink-await-key key_1 100
+		--sink-await-key key_0 200 \
+		--sink-await-key key_1 200
 
 window_detector_tumbling_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
