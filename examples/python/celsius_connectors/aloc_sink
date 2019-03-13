@@ -224,7 +224,7 @@ class AsyncServer(asynchat.async_chat, object):
             # As of 2019-03-04, Wallaroo's connector sink is not managing
             # credits and will rely solely on TCP backpressure for its
             # own backpressure signalling.
-            ok = cwm.Ok(500, self._streams.values())
+            ok = cwm.Ok(500, self._streams.values(), [])
             self.write(ok)
         elif isinstance(msg, cwm.Notify):
             if msg.stream_id != 1:
