@@ -78,7 +78,8 @@ trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
 // SourceManager, since its role is to manage local sources, but not
 // necessarily listen (e.g. if it's pull-based). When this is renamed, we
 // also need to rename `start_listening`
-trait tag SourceListener is (DisposableActor & BoundaryUpdatable)
+trait tag SourceListener is (DisposableActor & BoundaryUpdatable &
+  Initializable)
   be start_listening()
   be start_sources()
   be recovery_protocol_complete()

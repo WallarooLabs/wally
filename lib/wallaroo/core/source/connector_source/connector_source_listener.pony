@@ -95,6 +95,10 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   // Stream Registry for managing updates to local and global stream state
   let _stream_registry: LocalConnectorStreamRegistry[In]
 
+  var _is_joining: Bool
+
+  var _initializer: (LocalTopologyInitializer | None) = None
+
   // TODO [source-migration]: Add worker_name to query for leader name
   // TODO [source-migration]: Add new message + handling for requesting
   //  the leader name, and updating the local based on the response
@@ -108,6 +112,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     layout_initializer: LayoutInitializer,
     recovering: Bool, target_router: Router = EmptyRouter,
     connections: Connections, workers_list: Array[WorkerName] val,
+    is_joining: Bool,
     parallelism: USize,
     handler: FramedSourceHandler[In] val,
     host: String, service: String, cookie: String,
@@ -134,6 +139,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     _recovering = recovering
     _target_router = target_router
     _connections = connections
+    _is_joining = is_joining
     _parallelism = parallelism
     _handler = handler
     _host = host
@@ -147,8 +153,8 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
 
     // Pass LocalConnectorStreamRegistry the parameters it needs to create
     // its own instance of the GlobalConnectorStreamRegistry
-    _stream_registry = _stream_registry.create(_worker_name,
-      _pipeline_name, _connections, _host, _service, workers_list)
+    _stream_registry = _stream_registry.create(this, _worker_name,
+      _pipeline_name, _connections, _host, _service, workers_list, _is_joining)
 
     match router
     | let pr: StatePartitionRouter =>
@@ -190,6 +196,9 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     end
 
   be start_listening() =>
+    _start_listening()
+
+  fun ref _start_listening() =>
     _event = @pony_os_listen_tcp[AsioEventID](this,
       _host.cstring(), _service.cstring())
     _fd = @pony_asio_event_fd(_event)
@@ -404,3 +413,35 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       @pony_os_socket_close[None](_fd)
       _fd = -1
     end
+
+  // Application startup lifecycle events
+  be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    initializer.report_created(this)
+
+  be application_created(initializer: LocalTopologyInitializer) =>
+    // Hold onto initializer so we can report initialized once the global
+    // registry receives the leader name
+    _initializer = initializer
+    @printf[I32]("ConnectorSourceListener for: %s created.\n".cstring(), _pipeline_name.cstring())
+    if not _is_joining then
+      report_initialized()
+    end
+
+  be application_initialized(initializer: LocalTopologyInitializer) =>
+    _start_listening()
+    initializer.report_ready_to_work(this)
+
+  be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    _start_sources()
+
+  be report_initialized() =>
+    @printf[I32]("ConnectorSourceListener for: %s reporting initialized.\n".cstring(), _pipeline_name.cstring())
+    _is_joining = false
+    try
+      (_initializer as LocalTopologyInitializer).report_initialized(this)
+    else
+      Fail()
+    end
+
+
+
