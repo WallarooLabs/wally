@@ -163,13 +163,13 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   =>
     let outs = recover iso Array[(Out, U64)] end
     var output_watermark_ts: U64 = 0
-    let range_delay = _range + _delay
+    let trigger_offset = _range + _delay
 
     let effective_watermark_ts =
       if input_watermark_ts == TimeoutWatermark() then
         // Set it at a point at which we know it will trigger
         // all windows that could contain messages.
-        _highest_seen_event_ts + range_delay
+        _highest_seen_event_ts + trigger_offset
       else
         input_watermark_ts
       end
@@ -180,7 +180,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
           _panes_start_ts.size()
       let last_pane_start_ts = _panes_start_ts(last_pane_idx)?
 
-      var lowest_possible_new_start_ts = effective_watermark_ts - range_delay
+      var lowest_possible_new_start_ts = effective_watermark_ts - trigger_offset
       if lowest_possible_new_start_ts > effective_watermark_ts then
         lowest_possible_new_start_ts = 0
       end
@@ -274,11 +274,6 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       working_idx = (working_idx + 1) % old_panes_size
     end
 
-    ifdef debug then
-      // We should never create an unreasonable amount of frames
-      // this particular number is up for debate.
-      Invariant(new_pane_count < 1000)
-    end
     // Add the new panes
     pane_start = pane_start + _pane_size
     for i in Range(old_panes_size, new_pane_count) do
