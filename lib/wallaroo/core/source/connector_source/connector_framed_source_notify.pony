@@ -39,7 +39,7 @@ use "wallaroo_labs/time"
 
 type _ProtoFsmState is (_ProtoFsmConnected | _ProtoFsmHandshake |
                         _ProtoFsmStreaming | _ProtoFsmError |
-                        _ProtoFsmDisconnected)
+                        _ProtoFsmDisconnected | _ProtoFsmShrinking)
 primitive _ProtoFsmConnected
   fun apply(): U8 => 1
 primitive _ProtoFsmHandshake
@@ -50,6 +50,8 @@ primitive _ProtoFsmError
   fun apply(): U8 => 4
 primitive _ProtoFsmDisconnected
   fun apply(): U8 => 5
+primitive _ProtoFsmShrinking
+  fun apply(): U8 => 6
 
 
 class _StreamState
@@ -240,9 +242,6 @@ class ConnectorSourceNotify[In: Any val]
   fun ref set_connector_source(source': ConnectorSource[In] ref) =>
     _connector_source = source'
 
-  fun routes(): Map[RoutingId, Consumer] val =>
-    _router.routes()
-
   fun ref received(source: ConnectorSource[In] ref, data: Array[U8] iso): Bool =>
     if _header then
       try
@@ -267,6 +266,10 @@ class ConnectorSourceNotify[In: Any val]
         ingest_ts, pipeline_time_spent)
     end
 
+  /////////////////////////////
+  // Connector Message Handling
+  /////////////////////////////
+
   fun ref received_connector_msg(source: ConnectorSource[In] ref,
     data: Array[U8] iso,
     latest_metrics_id: U16,
@@ -276,7 +279,7 @@ class ConnectorSourceNotify[In: Any val]
     if _prep_for_rollback then
       // Anything that the connector sends us is ignored while we wait
       // for the rollback to finish.  Tell the connector to restart later.
-      _send_restart()
+      send_restart()
       return _continue_perhaps(source)
     end
 
@@ -588,6 +591,12 @@ class ConnectorSourceNotify[In: Any val]
       false
     end
 
+  ///////////////////
+  // Wallaroo Routing
+  ///////////////////
+  fun routes(): Map[RoutingId, Consumer] val =>
+    _router.routes()
+
   fun ref update_router(router': Router) =>
     _router = router'
 
@@ -603,6 +612,9 @@ class ConnectorSourceNotify[In: Any val]
       end
     end
 
+  //////////////////////////////
+  // Connection State Management
+  //////////////////////////////
   fun ref accepted(source: ConnectorSource[In] ref, session_id: RoutingId) =>
     @printf[I32]((_source_name + ": accepted a connection\n").cstring())
     if _fsm_state isnt _ProtoFsmDisconnected then
@@ -641,14 +653,7 @@ class ConnectorSourceNotify[In: Any val]
     //  2. during a rollback, when the state rolls back to actual last_acked
     //     and so will the registry
     // https://github.com/WallarooLabs/wallaroo/issues/2807
-
-    for s_map in [_active_streams ; _pending_close].values() do
-      for s in s_map.values() do
-        _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_seen))
-      end
-    end
-    _relinquish_streams()
-    _clear_streams()
+    _clear_and_relinquish_all()
 
   fun ref throttled(source: ConnectorSource[In] ref) =>
     @printf[I32]("%s.throttled: %s Experiencing backpressure!\n".cstring(),
@@ -690,11 +695,15 @@ class ConnectorSourceNotify[In: Any val]
     """
     qty
 
-  fun ref _clear_streams() =>
-    _pending_notify.clear()
-    _active_streams.clear()
-    _pending_close.clear()
-    _pending_relinquish.clear()
+  fun ref shrink() =>
+    _fsm_state = _ProtoFsmShrinking
+    _process_acks_for_active()
+    _process_acks_for_pending_close()
+    _clear_and_relinquish_all()
+
+  ///////////////////////////////////
+  // Checkpoint / Rollback // Barrier
+  ///////////////////////////////////
 
   fun create_checkpoint_state(): Array[ByteSeq val] val =>
     let w: Writer = w.create()
@@ -734,7 +743,7 @@ class ConnectorSourceNotify[In: Any val]
 
   fun ref rollback_complete(checkpoint_id: CheckpointId) =>
     _prep_for_rollback = false
-    _send_restart()
+    send_restart()
 
   fun ref initiate_barrier(checkpoint_id: CheckpointId) =>
     @printf[I32]("Initiate_barrier(%s) at %s\n".cstring(),
@@ -765,29 +774,39 @@ class ConnectorSourceNotify[In: Any val]
     Invariant(checkpoint_id == _barrier_checkpoint_id)
 
     if _session_active then
-      for (stream_id, s) in _active_streams.pairs() do
-        _pending_acks.push((stream_id, s.last_acked))
-      end
+      _process_acks_for_active()
 
       // process acks for EOS/_pending_close streams
-      for (stream_id, s) in _pending_close.pairs() do
-        ifdef "trace" then
-          @printf[I32]("%s ::: Processing ack for %s at %s\n".cstring(),
-            WallClock.seconds().string().cstring(),
-            stream_id.string().cstring(), s.last_acked.string().cstring())
-        end
-        _pending_acks.push((stream_id, s.last_acked))
-        _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
-      end
-      // clear _pending_close
-      _pending_close.clear()
+      _process_acks_for_pending_close()
       // process any stream relinquish requests
       _relinquish_streams()
+    end
 
-      if _fsm_state is _ProtoFsmStreaming then
-        // Send an Ack message to replenish credits
-        _send_acks()
+  /////////////////////////
+  // Local state management
+  /////////////////////////
+  fun ref _process_acks_for_active() =>
+    for (stream_id, s) in _active_streams.pairs() do
+      _pending_acks.push((stream_id, s.last_acked))
+    end
+    if _fsm_state is (_ProtoFsmStreaming | _ProtoFsmShrinking) then
+      _send_acks()
+    end
+
+  fun ref _process_acks_for_pending_close() =>
+    for (stream_id, s) in _pending_close.pairs() do
+      ifdef "trace" then
+        @printf[I32]("%s ::: Processing ack for %s at %s\n".cstring(),
+          WallClock.seconds().string().cstring(),
+          stream_id.string().cstring(), s.last_acked.string().cstring())
       end
+      _pending_acks.push((stream_id, s.last_acked))
+      _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
+    end
+    // clear _pending_close
+    _pending_close.clear()
+    if _fsm_state is (_ProtoFsmStreaming | _ProtoFsmShrinking) then
+      _send_acks()
     end
 
   fun ref _relinquish_streams() =>
@@ -801,6 +820,25 @@ class ConnectorSourceNotify[In: Any val]
         _pending_relinquish.size().string().cstring())
       _listener.streams_relinquish(consume streams)
     end
+
+  fun ref _clear_streams() =>
+    _pending_notify.clear()
+    _active_streams.clear()
+    _pending_close.clear()
+    _pending_relinquish.clear()
+
+  fun ref _clear_and_relinquish_all() =>
+    for s_map in [_active_streams ; _pending_close].values() do
+      for s in s_map.values() do
+        _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_seen))
+      end
+    end
+    _relinquish_streams()
+    _clear_streams()
+
+  /////////
+  // Notify
+  /////////
 
   fun ref _process_notify(source: ConnectorSource[In] ref, stream_id: StreamId,
     stream_name: String, point_of_reference: PointOfReference)
@@ -840,14 +878,6 @@ class ConnectorSourceNotify[In: Any val]
     // send response either way
     send_notify_ack(success, stream.id, stream.last_acked)
 
-  fun ref _to_error_state(source: (ConnectorSource[In] ref|None), msg: String): Bool
-  =>
-    _send_reply(source, cwm.ErrorMsg(msg))
-
-    _fsm_state = _ProtoFsmError
-    try (source as ConnectorSource[In] ref).close() else Fail() end
-    _continue_perhaps2()
-
   fun ref send_notify_ack(success: Bool, stream_id: StreamId,
     point_of_reference: PointOfReference)
   =>
@@ -858,6 +888,17 @@ class ConnectorSourceNotify[In: Any val]
     end
     let m = cwm.NotifyAckMsg(success, stream_id, point_of_reference)
     _send_reply(_connector_source, m)
+
+  //////////////////
+  // Sending Replies
+  //////////////////
+  fun ref _to_error_state(source: (ConnectorSource[In] ref|None), msg: String): Bool
+  =>
+    _send_reply(source, cwm.ErrorMsg(msg))
+
+    _fsm_state = _ProtoFsmError
+    try (source as ConnectorSource[In] ref).close() else Fail() end
+    _continue_perhaps2()
 
   fun ref _send_acks() =>
     let new_credits = _max_credits - _credits
@@ -880,7 +921,7 @@ class ConnectorSourceNotify[In: Any val]
     end
     _credits = _credits + new_credits
 
-  fun ref _send_restart() =>
+  fun ref send_restart() =>
     ifdef "trace" then
       @printf[I32]("TRACE: %s.%s()\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring())
