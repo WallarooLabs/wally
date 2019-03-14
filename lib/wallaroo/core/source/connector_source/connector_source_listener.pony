@@ -443,5 +443,17 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       Fail()
     end
 
+  //////////////
+  // AUTOSCALE
+  /////////////
+  be begin_join_migration(joining_workers: Array[WorkerName] val) =>
+    // TODO [source-migration]: should leader election or leader notification
+    // for joining workers be done here?
+    _router_registry.source_listener_migration_complete(this)
 
+  be begin_shrink_migration(leaving_workers: Array[WorkerName] val) =>
+    // this gets called on both remaining and leaving workers
+    _stream_registry.begin_shrink(leaving_workers)
 
+  be complete_shrink_migration() =>
+    _router_registry.source_listener_migration_complete(this)

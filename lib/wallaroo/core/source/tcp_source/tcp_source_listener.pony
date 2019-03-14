@@ -377,3 +377,11 @@ actor TCPSourceListener[In: Any val] is SourceListener
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     _start_sources()
 
+  //////////////
+  // AUTOSCALE
+  /////////////
+  be begin_join_migration(joining_workers: Array[WorkerName] val) =>
+    _router_registry.source_listener_migration_complete(this)
+
+  be begin_shrink_migration(leaving_workers: Array[WorkerName] val) =>
+    _router_registry.source_listener_migration_complete(this)

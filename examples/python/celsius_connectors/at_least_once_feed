@@ -60,23 +60,23 @@ client = MultiSourceConnector(version, cookie, program_name, instance_name,
 
 
 client2 = MultiSourceConnector(version, cookie, program_name, instance_name,
-                              '127.0.0.1', '7100')
+                              '127.0.0.1', '7101')
 
 
 sender1 = Sender(client)
-#sender2 = Sender(client2)
+sender2 = Sender(client2)
 
 sender1.start()
-#sender2.start()
+sender2.start()
 
 client.add_source(FramedFileReader(filename = 'celsius.msg'))
-#client2.add_source(FramedFileReader(filename = 'celsius.msg.2'))
+client2.add_source(FramedFileReader(filename = 'celsius.msg.2'))
 
 
 sender1.join()
-#sender2.join()
+sender2.join()
 
 # Rely on the iterator method of our connector subclass
 print("Reached the end of all files. Shutting down.")
 print(client._sent)
-#print(client2._sent)
+print(client2._sent)

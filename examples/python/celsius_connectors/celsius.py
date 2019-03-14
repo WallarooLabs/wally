@@ -24,27 +24,28 @@ import wallaroo.experimental
 
 
 def application_setup(args):
-    #out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
+    out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
+    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     celsius_feed = wallaroo.experimental.SourceConnectorConfig(
         "celsius_feed",
         encoder=encode_feed,
         decoder=decode_feed,
-        port=7100,
+        host=in_host,
+        port=in_port,
         cookie="Dragons Love Tacos!",
         max_credits=10,
         refill_credits=8)
-    fahrenheit_conversion = wallaroo.experimental.SinkConnectorConfig(
-        "fahrenheit_conversion",
-        encoder=encode_conversion,
-        decoder=decode_conversion,
-        port=7200)
-    #sink_config = wallaroo.TCPSinkConfig(out_host, out_port, encode_conversion)
+    #sink_config = wallaroo.experimental.SinkConnectorConfig(
+    #    "fahrenheit_conversion",
+    #    encoder=encode_conversion,
+    #    decoder=decode_conversion,
+    #    port=7200)
+    sink_config = wallaroo.TCPSinkConfig(out_host, out_port, encode_conversion)
     pipeline = (
         wallaroo.source("convert temperature readings", celsius_feed)
         .to(multiply)
         .to(add)
-        .to_sink(fahrenheit_conversion)
-        #.to_sink(sink_config)
+        .to_sink(sink_config)
     )
     return wallaroo.build_application("Celsius to Fahrenheit", pipeline)
 
