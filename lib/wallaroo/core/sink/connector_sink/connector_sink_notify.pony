@@ -274,6 +274,8 @@ class ConnectorSinkNotify
           @printf[I32]("2PC: aborted %d stale transactions but DEBUGDEBUGDEBUG %d @ %s\n".cstring(),
             mi.txn_ids.size(), state, txn_id.cstring())
 
+          // The 2PC intro dance has finished.  We can permit the rest
+          // of the sink's operation to resume.
           twopc_intro_done = true
           unthrottled(conn)
           if _connection_count == 1 then
@@ -283,9 +285,8 @@ class ConnectorSinkNotify
               Fail()
             end
             None
-          else
-            try (conn as ConnectorSink ref).twopc_intro_done() else Fail() end
           end
+          try (conn as ConnectorSink ref).twopc_intro_done() else Fail() end
         | let mi: cp.TwoPCReplyMsg =>
           @printf[I32]("2PC: reply for txn_id %s was %s\n".cstring(), mi.txn_id.cstring(), mi.commit.string().cstring())
           try (conn as ConnectorSink ref).twopc_phase1_reply(
