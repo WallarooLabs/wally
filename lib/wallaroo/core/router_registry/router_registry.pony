@@ -129,6 +129,12 @@ actor RouterRegistry
   // Keys migrated out and waiting for acknowledgement
   let _key_waiting_list: StringSet = _key_waiting_list.create()
 
+  // TODO: Add management of pending source listeners to Autoscale protocol
+  // class
+  // Source Listeners migrated out and waiting for acknowledgment
+    let _source_listeners_waiting_list: SetIs[SourceListener] =
+    _source_listeners_waiting_list.create()
+
   // Workers in running cluster that have been stopped for stop the world
   let _stopped_worker_waiting_list: StringSet =
     _stopped_worker_waiting_list.create()
@@ -802,9 +808,11 @@ actor RouterRegistry
     end
 
   fun ref try_to_resume_processing_immediately() =>
-    if _key_waiting_list.size() == 0 then
+    if ((_key_waiting_list.size() == 0) and
+        (_source_listeners_waiting_list.size() == 0))
+    then
       try
-        (_autoscale as Autoscale).all_key_migration_complete()
+        (_autoscale as Autoscale).all_migration_complete()
       else
         Fail()
       end
@@ -1080,6 +1088,10 @@ actor RouterRegistry
         had_steps_to_migrate = true
       end
     end
+    for source_listener in _source_listeners.values() do
+      _source_listeners_waiting_list.set(source_listener)
+      source_listener.begin_join_migration(target_workers)
+    end
     if not had_steps_to_migrate then
       try_to_resume_processing_immediately()
     end
@@ -1090,9 +1102,25 @@ actor RouterRegistry
     """
     if _key_waiting_list.size() > 0 then
       _key_waiting_list.unset(key)
-      if (_key_waiting_list.size() == 0) then
+      if ((_key_waiting_list.size() == 0) and
+          (_source_listeners_waiting_list.size() == 0))
+      then
         try
-          (_autoscale as Autoscale).all_key_migration_complete()
+          (_autoscale as Autoscale).all_migration_complete()
+        else
+          Fail()
+        end
+      end
+    end
+
+  be source_listener_migration_complete(source_listener: SourceListener) =>
+    if _source_listeners_waiting_list.size() > 0 then
+      _source_listeners_waiting_list.unset(source_listener)
+      if ((_key_waiting_list.size() == 0) and
+          (_source_listeners_waiting_list.size() == 0))
+      then
+        try
+          (_autoscale as Autoscale).all_migration_complete()
         else
           Fail()
         end
@@ -1330,6 +1358,10 @@ actor RouterRegistry
       _distribute_stateless_partition_router(new_router)
       _stateless_partition_routers(p_id) = new_router
     end
+    // Inform remaining source listeners of shrink
+    for listener in _source_listeners.values() do
+      listener.begin_shrink_migration(leaving_workers)
+    end
 
   be prepare_leaving_migration(remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
@@ -1353,11 +1385,18 @@ actor RouterRegistry
       Fail()
     end
 
+    for source_listener in _source_listeners.values() do
+      _source_listeners_waiting_list.set(source_listener)
+      source_listener.begin_shrink_migration(leaving_workers)
+    end
+
     _leaving_workers = leaving_workers
-    if _partition_routers.size() == 0 then
+    if ((_partition_routers.size() == 0) and
+        (_source_listeners_waiting_list.size() == 0))
+    then
       @printf[I32](("No partitions to migrate.\n").cstring())
       try
-        (_autoscale as Autoscale).all_key_migration_complete()
+        (_autoscale as Autoscale).all_migration_complete()
       else
         Fail()
       end
