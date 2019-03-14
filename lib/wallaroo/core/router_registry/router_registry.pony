@@ -1086,8 +1086,10 @@ actor RouterRegistry
         had_steps_to_migrate = true
       end
     end
-    let source_listeners = _source_listeners.values()
-    _source_listeners_waiting_list.union(source_listeners)
+    for source_listener in _source_listeners.values() do
+      _source_listeners_waiting_list.set(source_listener)
+      source_listener.begin_leaving_migration(leaving_workers)
+    end
     if not had_steps_to_migrate then
       try_to_resume_processing_immediately()
     end
@@ -1377,8 +1379,10 @@ actor RouterRegistry
       Fail()
     end
 
-    let source_listeners = _source_listeners.values()
-    _source_listeners_waiting_list.union(source_listeners)
+    for source_listener in _source_listeners.values() do
+      _source_listeners_waiting_list.set(source_listener)
+      source_listener.begin_leaving_migration(leaving_workers)
+    end
 
     _leaving_workers = leaving_workers
     if ((_partition_routers.size() == 0) and
