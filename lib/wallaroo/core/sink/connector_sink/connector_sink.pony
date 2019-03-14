@@ -621,6 +621,8 @@ actor ConnectorSink is Sink
         end
         @printf[I32]("2PC: sent phase 1 for txn_id %s\n".cstring(), txn_id.cstring())
 
+        // SLF TODO: buggy position? checkpoint_state(sbt.id)
+
         _twopc_state = cp.TwoPCFsm1Precommit
         _twopc_txn_id = txn_id
         _twopc_barrier_token = sbt
@@ -650,16 +652,18 @@ actor ConnectorSink is Sink
         Fail()
       end
 
-      checkpoint_state(sbt.id)
+      checkpoint_state(sbt.id) // SLF TODO: not buggy position?
 
-      let cpoint_id = "5"
+      let cpoint_id = "impossible-5" // SLF TODO: change to "5" => BUG!
       let drop_phase2_msg = try if _twopc_txn_id.split("=")(1)? == cpoint_id then true else false end else false end
       if _twopc_txn_id != "" then
         if not drop_phase2_msg then
           _send_phase2(this, _twopc_txn_id, true)
         end
       end
+
       _twopc_last_offset = _twopc_current_offset
+      _notify.twopc_txn_id_last_committed = _twopc_txn_id
       _reset_2pc_state()
 
       @printf[I32]("WWWW: 1 _message_processor = NormalSinkMessageProcessor\n".cstring())
@@ -726,6 +730,7 @@ actor ConnectorSink is Sink
     Serialize hard state (i.e., can't afford to lose it) and send
     it to the local event log and reset 2PC state.
     """
+    ////if not (_twopc_state is cp.TwoPCFsmStart) then // SLF TODO: buggy what?
     if not (_twopc_state is cp.TwoPCFsm2Commit) then
       @printf[I32]("2PC: ERROR: _twopc_state = %d\n".cstring(), _twopc_state())
       Fail()
@@ -738,6 +743,8 @@ actor ConnectorSink is Sink
     let wb: Writer = wb.create()
     wb.u64_be(_twopc_current_offset.u64())
     wb.u64_be(_notify.acked_point_of_ref)
+    wb.u16_be(_notify.twopc_txn_id_last_committed.size().u16())
+    wb.write(_notify.twopc_txn_id_last_committed)
     let bs = wb.done()
 
     _event_log.checkpoint_state(_sink_id, checkpoint_id,
@@ -773,16 +780,6 @@ actor ConnectorSink is Sink
       @printf[I32]("Rollback to %s at ConnectorSink %s\n".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring())
     end
 
-    let r = Reader
-    r.append(payload)
-    _twopc_current_offset = try r.u64_be()?.usize() else Fail(); 0 end
-    _twopc_last_offset = _twopc_current_offset
-    _notify.acked_point_of_ref = try r.u64_be()? else Fail(); 0 end
-    _notify.message_id = _twopc_last_offset.u64()
-    @printf[I32]("2PC: Rollback: _twopc_last_offset %lu _twopc_current_offset %lu acked_point_of_ref %lu at ConnectorSink %s\n".cstring(), _twopc_last_offset, _twopc_current_offset, _notify.acked_point_of_ref, _sink_id.string().cstring())
-
-    event_log.ack_rollback(_sink_id)
-
     @printf[I32]("2PC: Rollback: twopc_state %d txn_id %s.\n".cstring(), _twopc_state(), _twopc_txn_id.cstring())
     if _twopc_txn_id != "" then
       // Phase 1 decision was abort + we haven't been disconnected.
@@ -793,6 +790,17 @@ actor ConnectorSink is Sink
       _send_phase2(this, _twopc_txn_id, false)
     end
     _reset_2pc_state()
+
+    let r = Reader
+    r.append(payload)
+    _twopc_current_offset = try r.u64_be()?.usize() else Fail(); 0 end
+    _twopc_last_offset = _twopc_current_offset
+    _notify.acked_point_of_ref = try r.u64_be()? else Fail(); 0 end
+    _notify.message_id = _twopc_last_offset.u64()
+    _notify.twopc_txn_id_last_committed = try String.from_array(r.block(r.u16_be()?.usize())?) else Fail(); "" end
+    @printf[I32]("2PC: Rollback: _twopc_last_offset %lu _twopc_current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s\n".cstring(), _twopc_last_offset, _twopc_current_offset, _notify.acked_point_of_ref, _notify.twopc_txn_id_last_committed.cstring(), _sink_id.string().cstring())
+
+    event_log.ack_rollback(_sink_id)
 
   ///////////////
   // Connector

@@ -44,6 +44,7 @@ class ConnectorSinkNotify
   // 2PC
   var _rtag: U64 = 77777
   var twopc_intro_done: Bool = false
+  var twopc_txn_id_last_committed: String = ""
 
   new create(sink_id: RoutingId, worker_name: WorkerName,
     protocol_version: String, cookie: String,
@@ -264,7 +265,9 @@ class ConnectorSinkNotify
             for txn_id in mi.txn_ids.values() do
               @printf[I32]("TRACE: rtag %lu txn_id %s\n".cstring(), mi.rtag,
                 txn_id.cstring())
-              let abort = cp.TwoPCEncode.phase2(txn_id, false)
+              let do_commit = if txn_id == twopc_txn_id_last_committed then
+                true else false end
+              let abort = cp.TwoPCEncode.phase2(txn_id, do_commit)
               let abort_msg =
                 cp.MessageMsg(0, cp.Ephemeral(), 0, 0, None, [abort])?
               send_msg(conn, abort_msg)
