@@ -161,13 +161,15 @@ class Collect(wallaroo.Aggregation):
         return []
 
     def update(self, msg, accumulator):
-        print("!@ Collect.update: append '", msg.key, "':", str(msg.value), "... appended to ", accumulator)
+        print("!@ Collect.update: append {!r}:{!r} appended to {!r}"
+              .format(msg.key, msg.value, accumulator))
         # tag data key, then add it to accumulator
         accumulator.append(Message(msg.key + ".Collect", msg.value))
 
     def combine(self, accumulator1, accumulator2):
         new_acc = accumulator1 + accumulator2
-        print("!@ Collect.combine:", accumulator1, " + ", accumulator2, " == ", new_acc)
+        print("!@ Collect.combine: {!r} + {!r} == {!r}"
+              .format(accumulator1, accumulator2, new_acc))
         # return accumulator1 + accumulator2
         return new_acc
 
@@ -175,10 +177,11 @@ class Collect(wallaroo.Aggregation):
         keys = set(m.key for m in accumulator)
         values = tuple(m.value for m in accumulator)
         ts = time.time()
-        print("Collect.output", ts, key, [str(m) for m in accumulator])
+        print("Collect.output ({!r}, {!r}, {!r})"
+              .format(ts, key, [str(m) for m in accumulator]))
         assert(len(keys) <= 1)
         try:
-            print("key = {}".format(key))
+            print("Collect.output.key = {!r}".format(key))
             assert(keys.pop().split(".")[0] == key)
         except KeyError: # key set is empty because accumulator is empty
             return None
@@ -193,7 +196,7 @@ def split_accumulated(data):
 
 @wallaroo.encoder
 def encoder(msg):
-    print("encoder", time.time(), msg)
+    print("encoder({!r}) at {!r}".format(msg, time.time()))
     s = json.dumps({'key': msg[0], 'value': msg[1], 'ts': msg[2]}).encode()
     return struct.pack(">I{}s".format(len(s)), len(s), s)
 
@@ -207,7 +210,7 @@ def base_decoder(bs):
     # Expecting a 64-bit unsigned int in big endian followed by a string
     val, key = struct.unpack(">Q", bs[:8])[0], bs[8:]
     key = key.decode("utf-8")  # python3 compat in downstream string concat
-    print("decoder", key, val, time.time())
+    print("decoder: {!r}:{!r} at {!r}".format(key, val, time.time()))
     return Message(key, val)
 
 
