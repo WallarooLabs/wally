@@ -91,5 +91,5 @@ trait tag SourceListener is (DisposableActor & BoundaryUpdatable &
   be add_worker(worker: WorkerName)
   be remove_worker(worker: WorkerName)
   be receive_msg(msg: SourceListenerMsg)
-  be begin_grow_migration(joining_workers: Array[WorkerName] val)
+  be begin_join_migration(joining_workers: Array[WorkerName] val)
   be begin_shrink_migration(leaving_workers: Array[WorkerName] val)

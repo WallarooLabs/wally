@@ -75,8 +75,8 @@ class GlobalConnectorStreamRegistry[In: Any val]
   var _inactive_streams: Map[StreamId, StreamTuple] =  _inactive_streams.create()
   var _source_addrs: Map[WorkerName, (String, String)] =
     _source_addrs.create()
-  let _source_addrs_reallocation: Map[WorkerName, (String, String)]
-    _leaving_address_reallocation.create()
+  let _source_addrs_reallocation: Map[WorkerName, (String, String)] =
+    _source_addrs_reallocation.create()
   let _workers_set: Set[WorkerName] = _workers_set.create()
   let _pending_notify_promises:
     Map[ConnectorStreamNotifyId, (Promise[NotifyResult[In]], ConnectorSource[In])] =
@@ -143,6 +143,12 @@ class GlobalConnectorStreamRegistry[In: Any val]
       _is_relinquishing = false
       @printf[I32](("Connector Leadership relinquish complete. New Leader: " +
       msg.leader_name + "\n").cstring())
+      if _is_shrinking then
+        try
+          (let host, let service) = _source_addrs_reallocation(_worker_name)?
+          _local_shrink_complete(host, service)
+        end
+      end
     else
       @printf[I32](("Not a Connector leader but received a " +
         "ConnectorLeaderStateReceivedAckMsg from " + msg.leader_name +
@@ -244,29 +250,31 @@ class GlobalConnectorStreamRegistry[In: Any val]
       _connections.connector_leader_name_request(_worker_name, _source_name,
         "Initializer")
     else
-      try
-        let leader_name = _leader_from_workers_list()?
-        if (leader_name == _worker_name) then
-          _initiate_leader_state()
-          _source_addrs(_worker_name) = _source_addr
-        else
-          _leader_name = leader_name
-          _send_source_address_to_leader()
-        end
+      let leader_name = _leader_from_workers_list()
+      if (leader_name == _worker_name) then
+        _initiate_leader_state()
+        _source_addrs(_worker_name) = _source_addr
       else
-        // unable to elect a leader
-        Fail()
+        _leader_name = leader_name
+        _send_source_address_to_leader()
       end
     end
 
-  fun ref _leader_from_workers_list(): WorkerName ? =>
+  fun _leader_from_workers_list(): WorkerName =>
     let workers_list = Array[WorkerName]
     for worker in _workers_set.values() do
       workers_list.push(worker)
     end
     let sorted_worker_names =
       Sort[Array[WorkerName], WorkerName](workers_list)
-    sorted_worker_names(0)?
+    try
+      sorted_worker_names(0)?
+    else
+      @printf[I32](("GlobalConnectorStreamRegistry could not determine "
+      + "the new leader. Exiting.\n").cstring())
+      Fail()
+      ""
+    end
 
   fun ref _initiate_leader_state() =>
     _is_leader = true
@@ -333,24 +341,14 @@ class GlobalConnectorStreamRegistry[In: Any val]
     // by a departing worker
       _workers_set.unset(worker_name)
     if _is_leader and (worker_name == _worker_name) then
-      try
-        let new_leader_name = _leader_from_workers_list()?
-        relinquish_leadership(new_leader_name)
-      else
-        @printf[I32](("GlobalConnectorStreamRegistry could not determine "
-        + "the new leader. Exiting.\n").cstring())
-      end
+      let new_leader_name = _leader_from_workers_list()
+      relinquish_leadership(new_leader_name)
     end
 
   fun ref _send_source_address_to_leader() =>
-    try
-      let leader_name = _leader_from_workers_list()?
-      _connections.connector_add_source_addr(leader_name, _worker_name,
-        _source_name, _source_addr._1, _source_addr._2)
-    else
-      // Could not retrieve a leader
-      Fail()
-    end
+    let leader_name = _leader_from_workers_list()
+    _connections.connector_add_source_addr(leader_name, _worker_name,
+      _source_name, _source_addr._1, _source_addr._2)
 
   ////////////////////////////
   // INTERNAL STATE MANAGEMENT
@@ -519,22 +517,50 @@ class GlobalConnectorStreamRegistry[In: Any val]
   /////////////////
 
   fun ref begin_shrink(leaving: Array[WorkerName] val) =>
-    _is_shrinking = true
-    _source_addrs_reallocation.clear()
-    // remove leaving workers from the source address map
-    for worker in leaving.values() do
-      try _sources_addrs.remove(worker)? end
+    if leaving.contains(_worker_name) then
+      _is_shrinking = true
     end
-    // Create array of worker names (ordered, dense, indexed)
-    let remaining = Array[(String, String)]
-    for source_addr in _source_addrs.values() do
-      remaining.push(source_addr)
+    if _is_leader then
+      // clear any previously set source addr reallocation data
+      _source_addrs_reallocation.clear()
+      // clear any previously pending shrink ids
+      _pending_shrink.clear()
+      // set streams pending shrink
+      for (id, name) in _active_streams.pairs() do
+        if leaving.contains(name) then
+          _pending_shrink.set(id)
+        end
+      end
+      // remove leaving workers from the source address map
+      for worker in leaving.values() do
+        try _source_addrs.remove(worker)? end
+        _workers_set.unset(worker)
+      end
+      // Create array of worker names (ordered, dense, indexed)
+      let remaining = Array[(String, String)]
+      for source_addr in _source_addrs.values() do
+        remaining.push(source_addr)
+      end
+      // Create the reallocation map to use when sending restart messages
+      let rem_size = remaining.size()
+      for (idx, worker) in leaving.pairs() do
+        try
+          _source_addrs_reallocation(worker) = remaining(idx % rem_size)?
+        end
+      end
     end
-    // Create the reallocation map to use when sending restart messages
-    let rem_size = remaining.size()
-    for (idx, worker) in leaving.pairs() do
-      try
-        _sources_addrs_reallocation(worker) = remaining(idx % rem_size)?
+
+  fun ref _maybe_shrink_if_leader() =>
+    if _is_leader then
+      if _pending_shrink.size() == 0 then
+        if _is_shrinking then
+          // relinquish leadership
+          let new_leader_name = _leader_from_workers_list()
+          relinquish_leadership(new_leader_name)
+        else
+          // shrink complete and leader is not shrinking/relinquishing
+          _listener.complete_shrink_migration()
+        end
       end
     end
 
@@ -551,6 +577,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
         try
           // assume active, try deactivate
           _deactivate_stream(stream)?
+          _pending_shrink.unset(stream.id)
         end
       end
     else
@@ -560,6 +587,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
       _connections.connector_streams_shrink(_leader_name, _worker_name,
         _source_name, streams)
     end
+    _maybe_shrink_if_leader()
 
   fun ref process_streams_shrink_msg(msg: ConnectorStreamsShrinkMsg) =>
     """
@@ -569,8 +597,11 @@ class GlobalConnectorStreamRegistry[In: Any val]
     """
     if _is_leader then
       streams_shrink(msg.streams)
-      connections.connector_respond_to_streams_shrink(msg.worker_name,
-      msg.source_name(), msg.streams, host, service)
+      try
+        (let host, let service) = _source_addrs_reallocation(msg.worker_name)?
+        _connections.connector_respond_to_streams_shrink(msg.worker_name,
+          msg.source_name(), msg.streams, host, service)
+      end
     else
       @printf[I32](("Non-leader worker received a streams relinquish request."
         + " This indicates an invalid leader state at " +
@@ -586,16 +617,20 @@ class GlobalConnectorStreamRegistry[In: Any val]
         _pending_shrink.unset(stream.id)
       end
       if _pending_shrink.size() == 0 then
-        try
-          (_local_registry as LocalConnectorStreamRegistry[In])
-            .shrink_complete(msg.host, msg.service)
-        end
+        _local_shrink_complete(msg.host, msg.service)
       end
     else
       @printf[I32](("Received a shrink response while not in a shrinking" +
         "state.\n").cstring())
       ifdef debug then Fail() end
     end
+
+  fun ref _local_shrink_complete(host: String, service: String) =>
+    try
+      (_local_registry as LocalConnectorStreamRegistry[In])
+        .complete_shrink(host, service)
+    end
+
 
 class ActiveStreamTuple[In: Any val]
   let id: StreamId
@@ -622,11 +657,12 @@ class LocalConnectorStreamRegistry[In: Any val]
   // (stream_name, connector_source, last_acked_por, last_seen_por)
   let _active_streams: Map[StreamId, ActiveStreamTuple[In]] =
     _active_streams.create()
+  let _worker_name: WorkerName
   let _source_name: String
   var _is_joining: Bool
   var _is_shrinking: Bool = false
   // So global can tell local to tell the sources to complete shrink
-  var _shrinking_sources: Set[ConnectorSource[In] tag] =
+  var _shrinking_sources: SetIs[ConnectorSource[In]] =
     _shrinking_sources.create()
 
   // ConnectorSourceListener
@@ -638,6 +674,7 @@ class LocalConnectorStreamRegistry[In: Any val]
     workers_list: Array[WorkerName] val, is_joining: Bool)
   =>
     _listener = listener
+    _worker_name = worker_name
     _source_name = source_name
     _is_joining = is_joining
     _global_registry = _global_registry.create(_listener, worker_name,
@@ -703,23 +740,25 @@ class LocalConnectorStreamRegistry[In: Any val]
     _global_registry.purge_pending_requests(session_id)
 
   fun ref begin_shrink(leaving: Array[WorkerName] val) =>
-  // TODO [source-migration] check if shrinking?
-    @printf[I32]("Starting shrink migration\n.".cstring())
-    _is_shrinking = true
     _global_registry.begin_shrink(leaving)
-    // for each source, call shrink
-    for stream in _active_streams.values() do
-      if not _shrinking_sources.contains(stream.source) then
-        _shrinking_sources.set(stream.source)
-        stream.source.begin_shrink()
+    if leaving.contains(_worker_name) then
+      @printf[I32]("Starting shrink migration\n.".cstring())
+      _is_shrinking = true
+      // for each source, call shrink
+      for stream in _active_streams.values() do
+        if not _shrinking_sources.contains(stream.source) then
+          _shrinking_sources.set(stream.source)
+          stream.source.begin_shrink()
+        end
       end
     end
 
   fun ref complete_shrink(host: String, service: String) =>
     // tell each source to complete shrink and send a RESTART
     for source in _shrinking_sources.values() do
-      source.complete_shrink(host, servce)
+      source.complete_shrink(host, service)
     end
+    _listener.complete_shrink_migration()
 
   /////////////
   // LOCAL

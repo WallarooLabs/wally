@@ -789,7 +789,8 @@ class ConnectorSourceNotify[In: Any val]
     for (stream_id, s) in _active_streams.pairs() do
       _pending_acks.push((stream_id, s.last_acked))
     end
-    if _fsm_state is (_ProtoFsmStreaming | _ProtoFsmShrinking) then
+    if (_fsm_state is _ProtoFsmStreaming) or
+       (_fsm_state is _ProtoFsmShrinking) then
       _send_acks()
     end
 
@@ -805,7 +806,8 @@ class ConnectorSourceNotify[In: Any val]
     end
     // clear _pending_close
     _pending_close.clear()
-    if _fsm_state is (_ProtoFsmStreaming | _ProtoFsmShrinking) then
+    if (_fsm_state is _ProtoFsmStreaming) or
+       (_fsm_state is _ProtoFsmShrinking) then
       _send_acks()
     end
 

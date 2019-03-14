@@ -223,7 +223,7 @@ actor GenSourceListener[In: Any val] is SourceListener
   //////////////
   // AUTOSCALE
   /////////////
-  be begin_grow_migration(joining_workers: Array[WorkerName] val) =>
+  be begin_join_migration(joining_workers: Array[WorkerName] val) =>
     _router_registry.source_listener_migration_complete(this)
 
   be begin_shrink_migration(leaving_workers: Array[WorkerName] val) =>
