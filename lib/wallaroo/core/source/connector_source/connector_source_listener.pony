@@ -317,13 +317,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   be receive_msg(msg: SourceListenerMsg) =>
     _stream_registry.listener_msg_received(msg)
 
-  be begin_shrink_migration(leaving: Array[WorkerName] val) =>
-    if leaving.contains(_worker_name) then
-      @printf[I32]("ConnectorSourceListener starting shrink migration\n."
-        .cstring())
-      _stream_registry.shrink(leaving)
-    end
-
   ////////////////////////////////////////
   // Asynchronous stream registry actions
   // These are called by a ConnectorSource (via it's notify class)
@@ -454,10 +447,14 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   // AUTOSCALE
   /////////////
   be begin_grow_migration(joining_workers: Array[WorkerName] val) =>
+    // TODO [source-migration]: should leader election or leader notification
+    // for joining workers be done here?
     _router_registry.source_listener_migration_complete(this)
 
   be begin_shrink_migration(leaving_workers: Array[WorkerName] val) =>
-    // TODO [source-migration]: we should only notify the registry that
-    // migration is complete once we've relinquished any active streams and
-    // leader state if we're the global leader
+    _stream_registry.begin_shrink(leaving_workers)
+
+  be complete_shrink_migration() =>
     _router_registry.source_listener_migration_complete(this)
+
+  be leader_begin_shrink_migration

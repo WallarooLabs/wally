@@ -75,6 +75,8 @@ class GlobalConnectorStreamRegistry[In: Any val]
   var _inactive_streams: Map[StreamId, StreamTuple] =  _inactive_streams.create()
   var _source_addrs: Map[WorkerName, (String, String)] =
     _source_addrs.create()
+  let _source_addrs_reallocation: Map[WorkerName, (String, String)]
+    _leaving_address_reallocation.create()
   let _workers_set: Set[WorkerName] = _workers_set.create()
   let _pending_notify_promises:
     Map[ConnectorStreamNotifyId, (Promise[NotifyResult[In]], ConnectorSource[In])] =
@@ -488,7 +490,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
         Invariant(_active_streams.get_or_else(stream.id, _worker_name) ==
           _worker_name)
         try
-          // assume active, try inactivate
+          // assume active, try deactivate
           _deactivate_stream(stream)?
         end
       end
@@ -512,6 +514,88 @@ class GlobalConnectorStreamRegistry[In: Any val]
       Fail()
     end
 
+  /////////////////
+  // Streams Shrink
+  /////////////////
+
+  fun ref begin_shrink(leaving: Array[WorkerName] val) =>
+    _is_shrinking = true
+    _source_addrs_reallocation.clear()
+    // remove leaving workers from the source address map
+    for worker in leaving.values() do
+      try _sources_addrs.remove(worker)? end
+    end
+    // Create array of worker names (ordered, dense, indexed)
+    let remaining = Array[(String, String)]
+    for source_addr in _source_addrs.values() do
+      remaining.push(source_addr)
+    end
+    // Create the reallocation map to use when sending restart messages
+    let rem_size = remaining.size()
+    for (idx, worker) in leaving.pairs() do
+      try
+        _sources_addrs_reallocation(worker) = remaining(idx % rem_size)?
+      end
+    end
+
+  fun ref streams_shrink(streams: Array[StreamTuple] val) =>
+    """
+    Process a stream shrink request from this worker
+
+    local->global stream_relinquish
+    """
+    if _is_leader then
+      for stream in streams.values() do
+        Invariant(_active_streams.get_or_else(stream.id, _worker_name) ==
+          _worker_name)
+        try
+          // assume active, try deactivate
+          _deactivate_stream(stream)?
+        end
+      end
+    else
+      for stream in streams.values() do
+        _pending_shrink.set(stream.id)
+      end
+      _connections.connector_streams_shrink(_leader_name, _worker_name,
+        _source_name, streams)
+    end
+
+  fun ref process_streams_shrink_msg(msg: ConnectorStreamsShrinkMsg) =>
+    """
+    Process a stream shrink message from another worker
+
+    worker->leader.stream_shrink
+    """
+    if _is_leader then
+      streams_shrink(msg.streams)
+      connections.connector_respond_to_streams_shrink(msg.worker_name,
+      msg.source_name(), msg.streams, host, service)
+    else
+      @printf[I32](("Non-leader worker received a streams relinquish request."
+        + " This indicates an invalid leader state at " +
+        msg.worker_name + "\n").cstring())
+      Fail()
+    end
+
+  fun ref process_streams_shrink_response_msg(
+    msg: ConnectorStreamsShrinkResponseMsg)
+  =>
+    if _is_shrinking then
+      for stream in msg.streams.values() do
+        _pending_shrink.unset(stream.id)
+      end
+      if _pending_shrink.size() == 0 then
+        try
+          (_local_registry as LocalConnectorStreamRegistry[In])
+            .shrink_complete(msg.host, msg.service)
+        end
+      end
+    else
+      @printf[I32](("Received a shrink response while not in a shrinking" +
+        "state.\n").cstring())
+      ifdef debug then Fail() end
+    end
 
 class ActiveStreamTuple[In: Any val]
   let id: StreamId
@@ -618,18 +702,20 @@ class LocalConnectorStreamRegistry[In: Any val]
   fun ref purge_pending_requests(session_id: RoutingId) =>
     _global_registry.purge_pending_requests(session_id)
 
-  fun ref shrink(leaving: Array[WorkerName] val) =>
+  fun ref begin_shrink(leaving: Array[WorkerName] val) =>
+  // TODO [source-migration] check if shrinking?
+    @printf[I32]("Starting shrink migration\n.".cstring())
     _is_shrinking = true
+    _global_registry.begin_shrink(leaving)
     // for each source, call shrink
     for stream in _active_streams.values() do
       if not _shrinking_sources.contains(stream.source) then
         _shrinking_sources.set(stream.source)
-        stream.source.shrink()
+        stream.source.begin_shrink()
       end
     end
-    _global_registry.begin_shrink(leaving)
 
-  fun ref shrink_complete(host: String, service: String) =>
+  fun ref complete_shrink(host: String, service: String) =>
     // tell each source to complete shrink and send a RESTART
     for source in _shrinking_sources.values() do
       source.complete_shrink(host, servce)

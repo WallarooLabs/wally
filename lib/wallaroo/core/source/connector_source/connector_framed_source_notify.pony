@@ -830,7 +830,9 @@ class ConnectorSourceNotify[In: Any val]
   fun ref _clear_and_relinquish_all() =>
     for s_map in [_active_streams ; _pending_close].values() do
       for s in s_map.values() do
-        _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_seen))
+        // This should never happen, but you never know
+        Invariant(s.last_seen == s.last_acked)
+        _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
       end
     end
     _relinquish_streams()
