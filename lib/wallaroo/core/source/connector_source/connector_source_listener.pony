@@ -443,5 +443,14 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       Fail()
     end
 
+  //////////////
+  // AUTOSCALE
+  /////////////
+  be begin_grow_migration(joining_workers: Array[WorkerName] val) =>
+    _router_registry.source_listener_migration_complete(this)
 
-
+  be begin_shrink_migration(leaving_workers: Array[WorkerName] val) =>
+    // TODO [source-migration]: we should only notify the registry that
+    // migration is complete once we've relinquished any active streams and
+    // leader state if we're the global leader
+    _router_registry.source_listener_migration_complete(this)
