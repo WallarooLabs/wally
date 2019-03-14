@@ -49,13 +49,16 @@ primitive InitialBarrierToken is BarrierToken
 class val AutoscaleBarrierToken is BarrierToken
   let _worker: String
   let _id: AutoscaleId
+  let _joining_workers: Array[WorkerName] val
   let _leaving_workers: Array[WorkerName] val
 
   new val create(worker': String, id': AutoscaleId,
+    joining_workers': Array[WorkerName] val,
     leaving_workers': Array[WorkerName] val)
   =>
     _worker = worker'
     _id = id'
+    _joining_workers = joining_workers'
     _leaving_workers = leaving_workers'
 
   fun eq(that: box->BarrierToken): Bool =>
@@ -71,6 +74,9 @@ class val AutoscaleBarrierToken is BarrierToken
 
   fun id(): AutoscaleId =>
     _id
+
+  fun joining_workers(): Array[WorkerName] val =>
+    _joining_workers
 
   fun leaving_workers(): Array[WorkerName] val =>
     _leaving_workers

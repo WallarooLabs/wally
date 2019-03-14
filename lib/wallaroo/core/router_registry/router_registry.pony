@@ -659,7 +659,8 @@ actor RouterRegistry
     let promise = Promise[None]
     promise.next[None]({(_: None) =>
       _self.join_autoscale_barrier_complete()})
-    _autoscale_initiator.initiate_autoscale(promise)
+    _autoscale_initiator.initiate_autoscale(promise
+      where joining_workers = new_workers)
 
   fun ref stop_the_world_for_grow_migration(
     new_workers: Array[WorkerName] val)
@@ -698,7 +699,8 @@ actor RouterRegistry
     let promise = Promise[None]
     promise.next[None]({(_: None) =>
       _self.shrink_autoscale_barrier_complete()})
-    _autoscale_initiator.initiate_autoscale(promise, leaving_workers)
+    _autoscale_initiator.initiate_autoscale(promise
+      where leaving_workers = leaving_workers)
 
   fun ref stop_the_world_for_shrink_migration(
     remaining_workers: Array[WorkerName] val,
