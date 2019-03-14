@@ -1015,7 +1015,23 @@ actor ConnectorSource[In: Any val] is Source
     // TODO: verify that removal of "in_sent" check is harmless
     _expect = _notify.expect(this, qty)
 
+  ///////////////////////////////////////
+  // pass through behaviour to the notify
+  ///////////////////////////////////////
   be stream_notify_result(session_id': RoutingId, success: Bool,
     stream: StreamTuple)
   =>
     _notify.stream_notify_result(session_id', success, stream)
+
+  be begin_shrink() =>
+    _notify.shrink()
+
+  be complete_shrink(host: String, service: String) =>
+    """
+    Send a RESTART message with the (host,service) data that the connector
+    should reconnect to.
+    """
+    _notify.host = host
+    _notify.service = service
+    _notify.send_restart()
+    // send_restart calls connector_source.close() at the end

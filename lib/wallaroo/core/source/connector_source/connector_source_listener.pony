@@ -317,6 +317,13 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   be receive_msg(msg: SourceListenerMsg) =>
     _stream_registry.listener_msg_received(msg)
 
+  be begin_shrink_migration(leaving: Array[WorkerName] val) =>
+    if leaving.contains(_worker_name) then
+      @printf[I32]("ConnectorSourceListener starting shrink migration\n."
+        .cstring())
+      _stream_registry.shrink(leaving)
+    end
+
   ////////////////////////////////////////
   // Asynchronous stream registry actions
   // These are called by a ConnectorSource (via it's notify class)
