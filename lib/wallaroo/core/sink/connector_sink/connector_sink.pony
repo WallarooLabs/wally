@@ -456,13 +456,23 @@ actor ConnectorSink is Sink
     (_twopc_state(), _twopc_txn_id)
 
   fun ref twopc_intro_done() =>
+    """
+    This callback is used by ConnectorSinkNotify when the 2PC intro
+    part of the connector sink protocol has finished.
+
+    We use _twopc_barrier_token_at_close to determine if we were
+    disconnected during a round of 2PC.  If so, we assume that we
+    lost the phase1 reply from the connector sink, so we make the
+    pessimistic assumption that the connector sink voted rollback/abort.
+    """
     if _twopc_barrier_token_at_close != _twopc_barrier_token_initial then
-      @printf[I32]("2PC: Wallaroo local abort for txn_id %s barrier %s\n".cstring(), _twopc_txn_id_at_close.cstring(), _twopc_barrier_token_at_close.string().cstring())
 
       _abort_decision("TCP connection closed during 2PC",
         _twopc_txn_id_at_close, _twopc_barrier_token_at_close)
+      @printf[I32]("2PC: Wallaroo local abort for txn_id %s barrier %s\n".cstring(), _twopc_txn_id_at_close.cstring(), _twopc_barrier_token_at_close.string().cstring())
+
       _reset_2pc_state()
-      // expected 2PC state when CheckpointRollbackBarrierToken arrives
+      // Set expected 2PC state when CheckpointRollbackBarrierToken arrives
       _twopc_state = cp.TwoPCFsm2Abort
       _twopc_txn_id_at_close = ""
       _twopc_barrier_token_at_close = _twopc_barrier_token_initial
@@ -756,7 +766,15 @@ actor ConnectorSink is Sink
 
     event_log.ack_rollback(_sink_id)
 
-    _send_phase2(this, _twopc_txn_id, false)
+    @printf[I32]("2PC: Rollback: twopc_state %d txn_id %s.\n".cstring(), _twopc_state(), _twopc_txn_id.cstring())
+    if _twopc_txn_id != "" then
+      // Phase 1 decision was abort + we haven't been disconnected.
+      // If we were disconnected + perform a local abort, then we
+      // arrive here with _twopc_txn_id="".  The last transaction,
+      // named by _twopc_txn_id_at_close, has already been aborted
+      // during the twopc_intro portion of the connector sink protocol.
+      _send_phase2(this, _twopc_txn_id, false)
+    end
     _reset_2pc_state()
 
   ///////////////
