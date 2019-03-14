@@ -423,6 +423,9 @@ actor ConnectorSink is Sink
 
     _twopc_phase1_commit = commit
     if commit then
+      // NOTE: TwoPCFsm2Commit means that our connector sink has
+      // voted to commit, and that it does not mean that we know
+      // the status of the global Wallaroo checkpoint protocol.
       _twopc_state = cp.TwoPCFsm2Commit
       @printf[I32]("2PC: txn_id %s was %s\n".cstring(), txn_id.cstring(), commit.string().cstring())
 
@@ -648,14 +651,28 @@ actor ConnectorSink is Sink
       end
 
       checkpoint_state(sbt.id)
+
+      let cpoint_id = "5"
+      let drop_phase2_msg = try if _twopc_txn_id.split("=")(1)? == cpoint_id then true else false end else false end
       if _twopc_txn_id != "" then
-        _send_phase2(this, _twopc_txn_id, true)
+        if not drop_phase2_msg then
+          _send_phase2(this, _twopc_txn_id, true)
+        end
       end
       _twopc_last_offset = _twopc_current_offset
       _reset_2pc_state()
 
       @printf[I32]("WWWW: 1 _message_processor = NormalSinkMessageProcessor\n".cstring())
       _resume_processing_messages()
+
+      if drop_phase2_msg then
+        // Because we're using TCP, we get message loss only when
+        // the TCP connection is closed.  It doesn't matter why the
+        // connection is closed.  We have direct control over the
+        // timing here, so close it now.
+        _hard_close()
+        _schedule_reconnect()
+      end
     | let rbrt: CheckpointRollbackBarrierToken =>
       if (not (_twopc_state is cp.TwoPCFsm2Abort)) or
          _twopc_phase1_commit
