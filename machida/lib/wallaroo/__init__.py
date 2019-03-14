@@ -292,7 +292,7 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
             class C(base_cls):
                 def encode(self, data, event_time=0, key=None):
                     encoded = func(data)
-                    if isinstance(event_time, dt.datetime):
+                    if isinstance(event_time, datetime.datetime):
                         # We'll assume naive datetime values should be treated as
                         # UTC. Python's brain-dead datetime package is mostly
                         # useless for fixing this without a mountain of caveats
