@@ -250,8 +250,8 @@ class Autoscale
     // entire protocol.
     _router_registry.stop_the_world_for_grow_migration(joining_workers)
 
-  fun ref all_key_migration_complete() =>
-    _phase.all_key_migration_complete()
+  fun ref all_migration_complete() =>
+    _phase.all_migration_complete()
 
   fun ref send_migration_batch_complete(joining_workers: Array[WorkerName] val,
     is_coordinator: Bool)
@@ -394,7 +394,7 @@ trait _AutoscalePhase
     _invalid_call()
     Fail()
 
-  fun ref all_key_migration_complete() =>
+  fun ref all_migration_complete() =>
     _invalid_call()
     Fail()
 
@@ -788,7 +788,7 @@ class _WaitingForJoinMigration is _AutoscalePhase
 
   fun name(): String => "WaitingForJoinMigration"
 
-  fun ref all_key_migration_complete() =>
+  fun ref all_migration_complete() =>
     @printf[I32]("--Sending migration batch complete msg to new workers\n"
       .cstring())
     _autoscale.send_migration_batch_complete(_joining_workers, _is_coordinator)
@@ -964,7 +964,7 @@ class _WaitingForLeavingMigration is _AutoscalePhase
   fun ref leaving_worker_finished_migration(worker: WorkerName) =>
     None
 
-  fun ref all_key_migration_complete() =>
+  fun ref all_migration_complete() =>
     _autoscale.wait_for_leaving_migration_acks(_remaining_workers)
 
 class _WaitingForLeavingMigrationAcks is _AutoscalePhase
