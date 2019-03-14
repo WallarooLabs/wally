@@ -1088,7 +1088,7 @@ actor RouterRegistry
     end
     for source_listener in _source_listeners.values() do
       _source_listeners_waiting_list.set(source_listener)
-      source_listener.begin_leaving_migration(leaving_workers)
+      source_listener.begin_join_migration(target_workers)
     end
     if not had_steps_to_migrate then
       try_to_resume_processing_immediately()
@@ -1356,6 +1356,10 @@ actor RouterRegistry
       _distribute_stateless_partition_router(new_router)
       _stateless_partition_routers(p_id) = new_router
     end
+    // Inform remaining source listeners of shrink
+    for listener in _source_listeners.values() do
+      listener.begin_shrink_migration(leaving_workers)
+    end
 
   be prepare_leaving_migration(remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
@@ -1381,7 +1385,7 @@ actor RouterRegistry
 
     for source_listener in _source_listeners.values() do
       _source_listeners_waiting_list.set(source_listener)
-      source_listener.begin_leaving_migration(leaving_workers)
+      source_listener.begin_shrink_migration(leaving_workers)
     end
 
     _leaving_workers = leaving_workers

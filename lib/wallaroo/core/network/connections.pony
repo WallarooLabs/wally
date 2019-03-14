@@ -934,6 +934,32 @@ actor Connections is Cluster
       Fail()
     end
 
+  be connector_streams_shrink(leader_name: WorkerName,
+    worker_name: WorkerName, source_name: String,
+    streams: Array[StreamTuple] val)
+  =>
+    try
+      let connector_streams_shrink_msg =
+        ChannelMsgEncoder.connector_streams_shrink(worker_name,
+          source_name, streams, _auth)?
+      _send_control(leader_name, connector_streams_shrink_msg)
+    else
+      Fail()
+    end
+
+  be connector_respond_to_streams_shrink(worker_name: WorkerName,
+    source_name: String, streams: Array[StreamTuple] val, host: String,
+    service: String)
+  =>
+    try
+      let connector_streams_shrink_response_msg =
+        ChannelMsgEncoder.connector_streams_shrink_response(source_name,
+          streams, host, service, _auth)?
+      _send_control(worker_name, connector_streams_shrink_response_msg)
+    else
+      Fail()
+    end
+
 // Ensures that the cluster shuts down, even if there are straggler actors.
 class _ExitTimerNotify is TimerNotify
   fun ref apply(timer: Timer, count: U64): Bool =>

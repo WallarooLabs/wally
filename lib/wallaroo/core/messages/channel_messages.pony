@@ -584,6 +584,19 @@ primitive ChannelMsgEncoder
     _encode(ConnectorStreamsRelinquishMsg(worker_name, source_name, streams),
       auth)?
 
+  fun connector_streams_shrink(worker_name: String, source_name: String,
+    streams: Array[StreamTuple] val, auth: AmbientAuth) : Array[ByteSeq] val ?
+  =>
+    _encode(ConnectorStreamsShrinkMsg(worker_name, source_name, streams),
+      auth)?
+
+  fun connector_streams_shrink_response(source_name: String,
+    streams: Array[StreamTuple] val, host: String, service: String,
+    auth: AmbientAuth) : Array[ByteSeq] val ?
+  =>
+    _encode(ConnectorStreamsShrinkResponseMsg(source_name, streams, host,
+      service), auth)?
+
   fun connector_add_source_addr(worker_name: WorkerName,
     source_name: String, host: String, service: String,
     auth: AmbientAuth) : Array[ByteSeq] val ?
@@ -772,7 +785,7 @@ class val ConnectorLeadershipRelinquishMsg is SourceListenerMsg
     _source_name
 
 class val ConnectorStreamsRelinquishMsg is SourceListenerMsg
-  let worker_name: String
+  let worker_name: WorkerName
   let _source_name: String
   let streams: Array[StreamTuple] val
 
@@ -782,6 +795,38 @@ class val ConnectorStreamsRelinquishMsg is SourceListenerMsg
     worker_name = worker_name'
     _source_name = source_name'
     streams = streams'
+
+  fun source_name(): String =>
+    _source_name
+
+class val ConnectorStreamsShrinkMsg is SourceListenerMsg
+  let worker_name: WorkerName
+  let _source_name: String
+  let streams: Array[StreamTuple] val
+
+  new val create(worker_name': WorkerName, source_name': String,
+    streams': Array[StreamTuple] val)
+  =>
+    worker_name = worker_name'
+    _source_name = source_name'
+    streams = streams'
+
+  fun source_name(): String =>
+    _source_name
+
+class val ConnectorStreamsShrinkResponseMsg is SourceListenerMsg
+  let _source_name: String
+  let streams: Array[StreamTuple] val
+  let host: String
+  let service: String
+
+  new val create(source_name': String, streams': Array[StreamTuple] val,
+    host': String, service': String)
+  =>
+    _source_name = source_name'
+    streams = streams'
+    host = host'
+    service = service'
 
   fun source_name(): String =>
     _source_name
