@@ -409,6 +409,7 @@ class ConnectorSourceNotify[In: Any val]
                 _send_reply(source, cwm.AckMsg(0, [(s.id, s.last_seen)]))
                 _listener.streams_relinquish([StreamTuple(s.id, s.name,
                   s.last_seen)])
+                // TODO [source-migration] remove stream from active
               end
               return true
             elseif cwm.Boundary.is_set(m.flags) then
@@ -707,7 +708,6 @@ class ConnectorSourceNotify[In: Any val]
   fun ref prepare_for_rollback() =>
     if _session_active then
       _clear_streams()
-      _send_restart()
       _prep_for_rollback = true
       ifdef "trace" then
         @printf[I32]("TRACE: %s.%s\n".cstring(), __loc.type_name().cstring(), __loc.method_name().cstring())

@@ -224,6 +224,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     else
       Fail()
     end
+    _send_source_address_to_leader()
     _listener.report_initialized()
 
   fun ref add_worker(worker_name: WorkerName) =>
@@ -431,9 +432,10 @@ class GlobalConnectorStreamRegistry[In: Any val]
         let leader_name = _leader_from_workers_list()?
         if (leader_name == _worker_name) then
           _initiate_leader_state()
+          _source_addrs(_worker_name) = _source_addr
         else
           _leader_name = leader_name
-          _send_leader_source_address()
+          _send_source_address_to_leader()
         end
       else
         // unable to elect a leader
@@ -458,7 +460,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     _source_addrs = Map[WorkerName, (String, String)]()
     _source_addrs(_worker_name) = (_source_addr._1, _source_addr._2)
 
-  fun ref _send_leader_source_address() =>
+  fun ref _send_source_address_to_leader() =>
     try
       let leader_name = _leader_from_workers_list()?
       _connections.connector_add_source_addr(leader_name, _worker_name,
