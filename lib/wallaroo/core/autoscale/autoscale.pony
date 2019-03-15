@@ -857,6 +857,7 @@ class _JoiningWorker is _AutoscalePhase
     None
 
   fun ref autoscale_complete() =>
+    @printf[I32]("[jb]_JoiningWorker: Calling autoscale_complete\n".cstring())
     _autoscale.mark_autoscale_complete()
 
 /////////////////////////////////////////////////
@@ -1038,4 +1039,5 @@ class _WaitingForResumeTheWorld is _AutoscalePhase
         Fail()
       end
     end
+        @printf[I32]("[jb]_WaitingForResumeTheWorld: Calling autoscale_complete\n".cstring())
     _autoscale.mark_autoscale_complete()
