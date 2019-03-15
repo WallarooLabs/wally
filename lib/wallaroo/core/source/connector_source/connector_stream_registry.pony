@@ -70,7 +70,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
   var _is_relinquishing: Bool = false
   var _is_joining: Bool
   var _is_shrinking: Bool = false
-  var _leader_name: String = "Initializer"
+  var _leader_name: String = "initializer"
   var _active_streams: Map[StreamId, WorkerName] = _active_streams.create()
   var _inactive_streams: Map[StreamId, StreamTuple] =  _inactive_streams.create()
   var _source_addrs: Map[WorkerName, (String, String)] =
@@ -208,7 +208,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     // !TODO! [post-source-migration]: We should only process this message on
     // the Initializer. This should be updated once the Initializer
     // loses "special" status.
-    if _worker_name == "Initializer" then
+    if _worker_name == "initializer" then
       _connections.connector_leader_name_response(msg.worker_name,
         _leader_name, msg.source_name())
     else
@@ -247,8 +247,8 @@ class GlobalConnectorStreamRegistry[In: Any val]
       // the Initializer due to the fact that it still holds "special" status.
       // This should be updated to request from a non-joining worker via a
       // different protocol in the near future.
-      _connections.connector_leader_name_request(_worker_name, _source_name,
-        "Initializer")
+      _connections.connector_leader_name_request(_worker_name, "initializer",
+        _source_name)
     else
       let leader_name = _leader_from_workers_list()
       if (leader_name == _worker_name) then
