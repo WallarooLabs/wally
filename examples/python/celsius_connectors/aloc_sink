@@ -86,13 +86,21 @@ def look_for_orphaned_s3_phase2_data(path):
                     ## The first txn commit may be start=end=0.
                     ## We don't write an S3 object for 0 bytes,
                     ## so we don't include this case in orphaned.
-                    if not (start_por == 0 and end_por == 0):
-                        orphaned[txn_id] = (txn_id, start_por, end_por)
+                    if (start_por == 0 and end_por == 0):
+                        ## Pretend that we've seen the 2-ok for 0 & 0.
+                        ## Then it will be filtered by the list comprehension
+                        ## at the end of this func.
+                        orphaned[txn_id] = (txn_id, start_por, end_por, True)
+                    else:
+                        orphaned[txn_id] = (txn_id, start_por, end_por, False)
                 elif op == '2-ok':
-                    if not (txn_id in orphaned) and \
-                            not (start_por == 0 and end_por == 0):
+                    if not (txn_id in orphaned):
                         print('FATAL ERROR: Expected txn_id {} in {}'.format(txn_id, l))
                         sys.exit(66)
+                    print('DBG: 2-ok l = {}'.format(l))
+                    print('DBG: blah = {}'.format(orphaned[txn_id]))
+                    q = orphaned[txn_id]
+                    orphaned[txn_id] = (q[0], q[1], q[2], True)
                 elif op == '2-s3-ok':
                     try:
                         del orphaned[txn_id]
@@ -100,7 +108,7 @@ def look_for_orphaned_s3_phase2_data(path):
                         None # Should only happen in debugging/testing scenarios
     except FileNotFoundError:
         None
-    return list(orphaned.values())
+    return list(x for x in orphaned.values() if x[3] == False)
 
 def read_chunk(path, start_offset, end_offset):
     """
@@ -182,9 +190,9 @@ class AsyncServer(asynchat.async_chat, object):
             print('FATAL ERROR: expected max 1 orphaned item: {}'.format(orphaned))
             sys.exit(66)
         else:
-            (txn_id, start_por, end_por) = orphaned[0]
+            (txn_id, start_por, end_por, _) = orphaned[0]
             chunk = read_chunk(self._out_path, start_por, end_por)
-            self.write_to_s3_and_log(start_por, chunk, txn_id)
+            self.write_to_s3_and_log(start_por, chunk, txn_id, 'orphaned')
 
     def collect_incoming_data(self, data):
         """Buffer the data"""
@@ -391,7 +399,7 @@ class AsyncServer(asynchat.async_chat, object):
                 if msg2.commit and phase1_status and \
                         (self._s3 is not None) and (self._s3_chunk != b''):
                     self.write_to_s3_and_log(self._s3_chunk_offset,
-                        self._s3_chunk, msg2.txn_id)
+                        self._s3_chunk, msg2.txn_id, 'normal')
 
                 del self._txn_state[msg2.txn_id]
                 print('2PC: Phase 2 post txn_state = {}'.format(self._txn_state))
@@ -491,7 +499,7 @@ class AsyncServer(asynchat.async_chat, object):
         self._txn_log.write(bytes("{}\n".format(log).encode('utf-8')))
         self.flush_fsync(self._txn_log)
 
-    def write_to_s3_and_log(self, chunk_offset, chunk, txn_id):
+    def write_to_s3_and_log(self, chunk_offset, chunk, txn_id, why):
         name = '%s%016d' % (self._s3_prefix, chunk_offset)
         while True:
             try:
@@ -505,7 +513,7 @@ class AsyncServer(asynchat.async_chat, object):
             except Exception as e:
                 print('S3: ERROR: put res = {}'.format(e))
                 time.sleep(2.0)
-        self.log_it(['2-s3-ok', txn_id, name])
+        self.log_it(['2-s3-ok', txn_id, name, why])
         # Debugging alternative:
         #short_id = txn_id.split(':')[1]
         #global HACK
