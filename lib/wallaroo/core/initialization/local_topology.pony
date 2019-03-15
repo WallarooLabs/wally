@@ -1037,6 +1037,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 // INITIALIZATION PHASES
 //////////////////////////
   be report_created(initializable: Initializable) =>
+    _register_source_listeners()
     _phase.report_created(initializable)
 
   fun ref _application_created(initializables: Initializables) =>
@@ -1046,7 +1047,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _phase.report_initialized(initializable)
 
   fun ref _application_initialized(initializables: Initializables) =>
-    // _spin_up_source_listeners()
+    // _register_source_listeners()
     _phase = _ApplicationInitializedPhase(this, initializables)
 
   be report_ready_to_work(initializable: Initializable) =>
@@ -1102,9 +1103,9 @@ actor LocalTopologyInitializer is LayoutInitializer
       end
     end
 
-  fun ref _spin_up_source_listeners() =>
+  fun ref _register_source_listeners() =>
     for sl in sl_actors.values() do
-      sl.start_listening()
+      // sl.start_listening()
       _router_registry.register_source_listener(sl)
     end
 

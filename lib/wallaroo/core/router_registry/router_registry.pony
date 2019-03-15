@@ -218,6 +218,8 @@ actor RouterRegistry
     Called when Recovery is finished. If we're not recovering, that's right
     away.
     """
+    // TODO [source-migration]: Ask John if we still want to start sources here
+    // given that source listeners are now initializable
     if not _recovery_protocol_complete then
       for sl in _source_listeners.values() do
         sl.start_sources()
@@ -302,9 +304,6 @@ actor RouterRegistry
     _source_listeners.set(source_listener)
     _connections.register_disposable(source_listener)
 
-    if _sources_started then
-      source_listener.start_sources()
-    end
 
   be register_data_channel_listener(dchl: DataChannelListener) =>
     _data_channel_listeners.set(dchl)
@@ -757,6 +756,7 @@ actor RouterRegistry
     """
     A remote worker requests that we mute all sources and data channel.
     """
+
     _mute_request(originating_worker)
 
   fun ref _mute_request(originating_worker: WorkerName) =>
@@ -1070,7 +1070,13 @@ actor RouterRegistry
     """
     Begin partition migration to joining workers
     """
-    if _partition_routers.size() == 0 then
+    for source_listener in _source_listeners.values() do
+      _source_listeners_waiting_list.set(source_listener)
+      source_listener.begin_join_migration(target_workers)
+    end
+    if ((_partition_routers.size() == 0) and
+        (_source_listeners_waiting_list.size() == 0))
+    then
       //no steps have been migrated
       @printf[I32](("Resuming message processing immediately. No partitions " +
         "to migrate.\n").cstring())
@@ -1087,10 +1093,6 @@ actor RouterRegistry
       if had_steps_to_migrate_for_this_state then
         had_steps_to_migrate = true
       end
-    end
-    for source_listener in _source_listeners.values() do
-      _source_listeners_waiting_list.set(source_listener)
-      source_listener.begin_join_migration(target_workers)
     end
     if not had_steps_to_migrate then
       try_to_resume_processing_immediately()
