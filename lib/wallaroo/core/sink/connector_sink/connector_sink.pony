@@ -466,9 +466,6 @@ actor ConnectorSink is Sink
     end
     @printf[I32]("2PC: sent phase 2 commit=%s for txn_id %s\n".cstring(), commit.string().cstring(), txn_id.cstring())
 
-  fun ref what_yer_status(): (U8, String) =>
-    (_twopc_state(), _twopc_txn_id)
-
   fun ref twopc_intro_done() =>
     """
     This callback is used by ConnectorSinkNotify when the 2PC intro
@@ -605,6 +602,12 @@ actor ConnectorSink is Sink
       end
 
       if _twopc_state is cp.TwoPCFsmStart then
+        let txn_id = _make_txn_id_string(sbt.id)
+        _twopc_txn_id = txn_id
+        // Correctness of the barrier protocol requires us to write
+        // checkpoint state here, not in barrier_fully_acked()
+        checkpoint_state(sbt.id)
+
         if (_twopc_current_offset > 0) and
            (_twopc_current_offset == _twopc_last_offset)
         then
@@ -619,8 +622,6 @@ actor ConnectorSink is Sink
           return
         end
 
-        let checkpoint_id = sbt.id
-        let txn_id = _make_txn_id_string(checkpoint_id)
         let where_list: cp.WhereList =
           [(1, _twopc_last_offset.u64(), _twopc_current_offset.u64())]
         let b = cp.TwoPCEncode.phase1(txn_id, where_list)
@@ -631,10 +632,6 @@ actor ConnectorSink is Sink
           Fail()
         end
         @printf[I32]("2PC: sent phase 1 for txn_id %s\n".cstring(), txn_id.cstring())
-
-        // Correctness of the barrier protocol requires us to write
-        // checkpoint state here, not in barrier_fully_acked()
-        checkpoint_state(sbt.id)
 
         _twopc_state = cp.TwoPCFsm1Precommit
         _twopc_txn_id = txn_id
