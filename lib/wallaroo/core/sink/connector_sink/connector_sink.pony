@@ -415,6 +415,7 @@ actor ConnectorSink is Sink
     _notify.stream_name + ":c_id=" + checkpoint_id.string()
 
   fun ref _reset_2pc_state() =>
+    @printf[I32]("2PC: reset 2PC state\n".cstring())
     _twopc_state = cp.TwoPCFsmStart
     _twopc_txn_id = ""
     _twopc_barrier_token = CheckpointBarrierToken(0)
@@ -524,16 +525,9 @@ actor ConnectorSink is Sink
         Fail()
       end
     | let sbt: CheckpointBarrierToken =>
-      if not ((_twopc_state is cp.TwoPCFsmStart) or
-              (_twopc_state is cp.TwoPCFsm1Precommit)) then
-        @printf[I32]("2PC: ERROR: _twopc_state = %d\n".cstring(), _twopc_state())
-        Fail()
-      end
-
       if _message_processor.barrier_in_progress() then
         _message_processor.receive_barrier(input_id, producer, barrier_token
-          , false)
-          ////where ack_barrier_if_complete = false)
+          where ack_barrier_if_complete = false)
       else
         try
           @printf[I32]("WWWW: 1 _message_processor = BarrierSinkMessageProcessor\n".cstring())
@@ -640,6 +634,7 @@ actor ConnectorSink is Sink
         _twopc_txn_id = txn_id
         _twopc_barrier_token = sbt
       else
+        @printf[I32]("2PC: ERROR: _twopc_state = %d\n".cstring(), _twopc_state())
         Fail()
       end
     end
@@ -690,8 +685,9 @@ actor ConnectorSink is Sink
         _schedule_reconnect()
       end
     | let rbrt: CheckpointRollbackBarrierToken =>
-      if (not (_twopc_state is cp.TwoPCFsm2Abort)) or
-         _twopc_phase1_commit
+      if (not ((_twopc_state is cp.TwoPCFsmStart) or
+               (_twopc_state is cp.TwoPCFsm2Abort)))
+         or _twopc_phase1_commit
        then
         @printf[I32]("RRRR: _twopc_state %d _twopc_phase1_commit %s\n".cstring(), _twopc_state(), _twopc_phase1_commit.string().cstring())
         Unreachable()
