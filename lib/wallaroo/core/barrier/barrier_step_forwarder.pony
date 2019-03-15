@@ -50,6 +50,7 @@ class BarrierStepForwarder
   fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
+    @printf[I32]("[JB]receive_new_barrier\n".cstring())
     _barrier_token = barrier_token
     receive_barrier(step_id, producer, barrier_token)
 
@@ -58,20 +59,24 @@ class BarrierStepForwarder
   =>
     // If this new token is a higher priority token, then the forwarder should
     // have already been cleared to make way for it.
+    @printf[I32]("[JB]barrier_token: %s _barrier_token: %s\n".cstring(), barrier_token.string().cstring(), _barrier_token.string().cstring())
     ifdef debug then
+      @printf[I32]("[JB]is barrier_token > _barrier_token\n".cstring())
       if barrier_token > _barrier_token then
         @printf[I32]("Invariant violation: received barrier %s is greater than current barrier %s at Step %s\n".cstring(), barrier_token.string().cstring(), _barrier_token.string().cstring(), _step_id.string().cstring())
       end
-
       Invariant(not (barrier_token > _barrier_token))
     end
 
+
     // If we're processing a rollback token which is higher priority than
     // this new one, then we need to drop this new one.
+    @printf[I32]("[JB]is _barrier_token > barrier_token\n".cstring())
     if _barrier_token > barrier_token then
       return
     end
 
+    @printf[I32]("[JB]is barrier_token != _barrier_token\n".cstring())
     if barrier_token != _barrier_token then
       @printf[I32]("Received %s when still processing %s at step %s\n"
         .cstring(), barrier_token.string().cstring(),
@@ -135,6 +140,7 @@ class BarrierStepForwarder
     end
 
   fun ref clear() =>
+    @printf[I32]("[JB]clear\n".cstring())
     _inputs_blocking.clear()
     _removed_inputs.clear()
     _barrier_token = InitialBarrierToken
