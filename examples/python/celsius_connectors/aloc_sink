@@ -421,6 +421,7 @@ class AsyncServer(asynchat.async_chat, object):
                         .format(regexp, bs))
 
         if msg.message_id != None:
+            print('DBG: msg.message_id = {}'.format(msg.message_id))
             if self._out_offset == msg.message_id:
                 ret1 = self._out.write(bs)
                 if len(bs) != ret1:
@@ -437,7 +438,9 @@ class AsyncServer(asynchat.async_chat, object):
                     self._next_txn_force_abort_written = True
                     self.log_it(['next-txn-force-abort', m])
             elif self._out_offset > msg.message_id:
-                print('ERROR: duplicate data: self._out_offset {} > msg.message_id {}'.format(self._out_offset, msg.message_id))
+                print('NOTICE: duplicate data: self._out_offset {} > msg.message_id {}'.format(self._out_offset, msg.message_id))
+                ## Deduplication case: we've already seen this, so
+                ## we don't take any further action.
         else:
             print('FATAL ERROR: message has no message_id')
             sys.exit(66)
