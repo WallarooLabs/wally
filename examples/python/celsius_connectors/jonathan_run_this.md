@@ -8,6 +8,11 @@ data_receiver --ponythreads=1 --ponynoblock --listen 127.0.0.1:7200
 
 ### machida:
 
+build with
+```
+make PONYCFLAGS="-Dcheckpoint_trace"  build-machida debug=true resilience=on
+```
+
 Initializer
 ```bash
 export PYTHONPATH="$PYTHONPATH:/home/nisan/wallaroo-tutorial/wallaroo/machida/lib/:/home/nisan/wallaroo-tutorial/wallaroo/testing/tools"
