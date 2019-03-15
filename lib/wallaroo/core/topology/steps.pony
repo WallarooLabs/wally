@@ -107,6 +107,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     _recovery_replayer.register_step(this)
     _router_registry = router_registry
     _id = id
+    @printf[I32](("[JB]Step ID: " + _id.string() + "\n").cstring())
 
     for (worker, boundary) in outgoing_boundaries.pairs() do
       _outgoing_boundaries(worker) = boundary

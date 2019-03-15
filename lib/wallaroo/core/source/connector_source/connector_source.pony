@@ -174,6 +174,9 @@ actor ConnectorSource[In: Any val] is Source
     // register resilient with event log
     _event_log.register_resilient_source(_source_id, this)
 
+    @printf[I32](("[JB]ConnectorSource ID: " + _source_id.string() + "\n")
+      .cstring())
+
     _mute()
     ifdef "resilience" then
       _mute_local()

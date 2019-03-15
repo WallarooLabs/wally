@@ -213,6 +213,7 @@ actor BarrierInitiator is Initializable
           end
         end
 
+        @printf[I32]("[JB]Phase name: %s\n".cstring(), _phase.name().cstring())
         _phase.initiate_barrier(barrier_token, result_promise)
       else
         _pending_promises(barrier_token) = result_promise
