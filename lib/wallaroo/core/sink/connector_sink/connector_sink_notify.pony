@@ -75,7 +75,6 @@ class ConnectorSinkNotify
     _throttled = false
     twopc_intro_done = false
     twopc_uncommitted_list = None
-    twopc_txn_id_last_committed = None // SLF: TODO is this right??
     _connection_count = _connection_count + 1
     // Apply runtime throttle until we're done with initial 2PC ballet.
     throttled(conn)
