@@ -167,12 +167,22 @@ class ConnectorSinkNotify
   fun ref sent(conn: WallarooOutgoingNetworkActor ref, data: (String val | Array[U8 val] val))
     : (String val | Array[U8 val] val)
   =>
+    """
+    All 2PC messages are sent via this class's send_msg(), which uses
+    conn._write_final(), which does *not* filter its data through the
+    sent() callback.  As a result, this function should be unreachable.
+    """
     Unreachable()
     data
 
   fun ref sentv(conn: WallarooOutgoingNetworkActor ref,
     data: ByteSeqIter): ByteSeqIter
   =>
+    """
+    All non-2PC data is written to the ConnectorSink via writev(),
+    thus all non-2PC data (i.e., all Wallaroo app data that is sent
+    to the sink) is filtered by this callback.
+    """
     @printf[I32]("Sink sentv\n".cstring())
     for x in data.values() do
       @printf[I32]("Sink sentv: %s\n".cstring(), _print_array[U8](x).cstring())
@@ -206,7 +216,9 @@ class ConnectorSinkNotify
     w2.write(b)
 
     let b2 = recover trn w2.done() end
-    try (conn as ConnectorSink ref)._writev(consume b2, None) else Fail() end
+    for item in b2.values() do
+      try (conn as ConnectorSink ref)._write_final(item, None) else Fail() end
+    end
 
   fun ref _process_connector_sink_v2_data(
     conn: WallarooOutgoingNetworkActor ref, data: Array[U8] val): None ?
