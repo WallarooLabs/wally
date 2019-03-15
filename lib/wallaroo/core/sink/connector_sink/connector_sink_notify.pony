@@ -44,7 +44,8 @@ class ConnectorSinkNotify
   // 2PC
   var _rtag: U64 = 77777
   var twopc_intro_done: Bool = false
-  var twopc_txn_id_last_committed: String = ""
+  var twopc_txn_id_last_committed: (None|String) = None
+  var twopc_uncommitted_list: (None|Array[String] val) = None
 
   new create(sink_id: RoutingId, worker_name: WorkerName,
     protocol_version: String, cookie: String,
@@ -73,6 +74,8 @@ class ConnectorSinkNotify
     _connected = true
     _throttled = false
     twopc_intro_done = false
+    twopc_uncommitted_list = None
+    twopc_txn_id_last_committed = None // SLF: TODO is this right??
     _connection_count = _connection_count + 1
     // Apply runtime throttle until we're done with initial 2PC ballet.
     throttled(conn)
@@ -125,6 +128,7 @@ class ConnectorSinkNotify
     _connected = false
     _throttled = false
     twopc_intro_done = false
+    twopc_uncommitted_list = None
     throttled(conn)
 
   fun ref dispose() =>
@@ -262,23 +266,16 @@ class ConnectorSinkNotify
           ifdef "trace" then
             @printf[I32]("TRACE: uncommitted txns = %d\n".cstring(),
               mi.txn_ids.size())
-            for txn_id in mi.txn_ids.values() do
-              @printf[I32]("TRACE: rtag %lu txn_id %s\n".cstring(), mi.rtag,
-                txn_id.cstring())
-              let do_commit = if txn_id == twopc_txn_id_last_committed then
-                true else false end
-              let abort = cp.TwoPCEncode.phase2(txn_id, do_commit)
-              let abort_msg =
-                cp.MessageMsg(0, cp.Ephemeral(), 0, 0, None, [abort])?
-              send_msg(conn, abort_msg)
-            end
+            twopc_uncommitted_list = mi.txn_ids
+            process_uncommitted_list(conn as ConnectorSink ref)
           end
           (let state, let txn_id) = (conn as ConnectorSink ref).what_yer_status()
-          @printf[I32]("2PC: aborted %d stale transactions but DEBUGDEBUGDEBUG %d @ %s\n".cstring(),
-            mi.txn_ids.size(), state, txn_id.cstring())
 
           // The 2PC intro dance has finished.  We can permit the rest
-          // of the sink's operation to resume.
+          // of the sink's operation to resume.  The txns in the
+          // twopc_uncommitted_list will be committed/aborted as soon
+          // as we have all the relevant information is available (and
+          // may already have been done).
           twopc_intro_done = true
           unthrottled(conn)
           if _connection_count == 1 then
@@ -354,6 +351,37 @@ class ConnectorSinkNotify
       end
       conn.close()
     end
+
+  fun ref process_uncommitted_list(conn: ConnectorSink ref) =>
+    """
+    In case of a Wallaroo failure, we need to do two things that can
+    happen in either order: 1. get list of uncommitted transactions,
+    2. get the initial rollback() message + payload blob of state.
+    After both have happened, then we need to commit/abort any
+    uncommitted txns outstanding at the connector sink.
+    """
+
+    match (twopc_txn_id_last_committed, twopc_uncommitted_list)
+    | (let last_committed: String, let uncommitted: Array[String] val) =>
+      @printf[I32]("2PC: process_uncommitted_list processing %d items, last_committed = %s\n".cstring(), uncommitted.size(), last_committed.cstring())
+      for txn_id in uncommitted.values() do
+        let do_commit = if txn_id == last_committed then true else false end
+        @printf[I32]("2PC: uncommitted txn_id %s commit=%s\n".cstring(), txn_id.cstring(), do_commit.string().cstring())
+        let abort = cp.TwoPCEncode.phase2(txn_id, do_commit)
+        try
+          let abort_msg =
+            cp.MessageMsg(0, cp.Ephemeral(), 0, 0, None, [abort])?
+          send_msg(conn, abort_msg)
+        else
+          Fail()
+        end
+      end
+      twopc_uncommitted_list = []
+    else
+      @printf[I32]("2PC: process_uncommitted_list waiting\n".cstring())
+      None
+    end
+
 
   fun ref _error_and_close(conn: WallarooOutgoingNetworkActor ref,
     msg: String)

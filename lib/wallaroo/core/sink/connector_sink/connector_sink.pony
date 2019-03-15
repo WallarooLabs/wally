@@ -206,16 +206,27 @@ actor ConnectorSink is Sink
   //
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    @printf[I32]("AAAA: %s\n".cstring(), __loc.method_name().cstring())
     _initializer = initializer
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer) =>
+    @printf[I32]("AAAA: %s\n".cstring(), __loc.method_name().cstring())
     initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
+    @printf[I32]("AAAA: %s\n".cstring(), __loc.method_name().cstring())
     _initial_connect()
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    @printf[I32]("AAAA: %s\n".cstring(), __loc.method_name().cstring())
+    if _notify.twopc_txn_id_last_committed is None then
+      // There hasn't been a rollback() as part of our startup, so we
+      // are starting for the first time.  There is no prior committed
+      // txn_id.
+      _notify.twopc_txn_id_last_committed = ""
+      _notify.process_uncommitted_list(this)
+    end
     None
 
   fun ref _initial_connect() =>
@@ -396,6 +407,9 @@ actor ConnectorSink is Sink
   ///////////////
   // 2PC
   ///////////////
+
+  fun _make_txn_id_string(checkpoint_id: CheckpointId): String =>
+    _notify.stream_name + ":c_id=" + checkpoint_id.string()
 
   fun ref _reset_2pc_state() =>
     _twopc_state = cp.TwoPCFsmStart
@@ -606,7 +620,7 @@ actor ConnectorSink is Sink
         end
 
         let checkpoint_id = sbt.id
-        let txn_id = _notify.stream_name + ":c_id=" + checkpoint_id.string()
+        let txn_id = _make_txn_id_string(checkpoint_id)
         let where_list: cp.WhereList =
           [(1, _twopc_last_offset.u64(), _twopc_current_offset.u64())]
         let b = cp.TwoPCEncode.phase1(txn_id, where_list)
@@ -618,7 +632,9 @@ actor ConnectorSink is Sink
         end
         @printf[I32]("2PC: sent phase 1 for txn_id %s\n".cstring(), txn_id.cstring())
 
-        // SLF TODO: buggy position? checkpoint_state(sbt.id)
+        // Correctness of the barrier protocol requires us to write
+        // checkpoint state here, not in barrier_fully_acked()
+        checkpoint_state(sbt.id)
 
         _twopc_state = cp.TwoPCFsm1Precommit
         _twopc_txn_id = txn_id
@@ -633,7 +649,8 @@ actor ConnectorSink is Sink
     The BarrierInitiator has determined that the barrier protocol
     for this autoscale/checkpoint/rollback/whatever event has
     completed successfully, including all other 2PC protocol rounds
-    executed by other sinks for this checkpoint.
+    executed by other sinks for this checkpoint *and* also all
+    resilients have written their state to the EventLog.
     We may now advance.
     """
     ifdef "checkpoint_trace" then
@@ -648,8 +665,6 @@ actor ConnectorSink is Sink
         @printf[I32]("2PC: DBG: _twopc_state = %s, _twopc_phase1_commit %s\n".cstring(), _twopc_state().string().cstring(), _twopc_phase1_commit.string().cstring())
         Fail()
       end
-
-      checkpoint_state(sbt.id) // SLF TODO: not buggy position?
 
       let cpoint_id = "impossible-5" // SLF TODO: change to "5" => BUG!
       let drop_phase2_msg = try if _twopc_txn_id.split("=")(1)? == cpoint_id then true else false end else false end
@@ -724,8 +739,7 @@ actor ConnectorSink is Sink
     Serialize hard state (i.e., can't afford to lose it) and send
     it to the local event log and reset 2PC state.
     """
-    ////if not (_twopc_state is cp.TwoPCFsmStart) then // SLF TODO: buggy what?
-    if not (_twopc_state is cp.TwoPCFsm2Commit) then
+    if not (_twopc_state is cp.TwoPCFsmStart) then
       @printf[I32]("2PC: ERROR: _twopc_state = %d\n".cstring(), _twopc_state())
       Fail()
     end
@@ -737,8 +751,6 @@ actor ConnectorSink is Sink
     let wb: Writer = wb.create()
     wb.u64_be(_twopc_current_offset.u64())
     wb.u64_be(_notify.acked_point_of_ref)
-    wb.u16_be(_notify.twopc_txn_id_last_committed.size().u16())
-    wb.write(_notify.twopc_txn_id_last_committed)
     let bs = wb.done()
 
     _event_log.checkpoint_state(_sink_id, checkpoint_id,
@@ -748,13 +760,12 @@ actor ConnectorSink is Sink
     ifdef "checkpoint_trace" then
       @printf[I32]("Prepare for checkpoint rollback at ConnectorSink %s\n".cstring(), _sink_id.string().cstring())
     end
-    //// TODO: _clear_barriers() will put a normal message processor
-    ////       in place, and if a message arrives at process_message()
-    ////       before we get the rollback() message, then we can send
-    ////       bogus data that will be thrown away by the connector
-    ////       and/or confused the connector sink and perhaps trigger
-    ////       further 2PC phase 1 aborts.
-    //// _prepare_for_rollback()
+    //// _clear_barriers() will put a normal message processor
+    //// in place, and if a message arrives at process_message()
+    //// before we get the rollback() message, then we can send
+    //// bogus data that will be thrown away by the connector
+    //// and/or confused the connector sink and perhaps trigger
+    //// further 2PC phase 1 aborts.
 
   fun ref _prepare_for_rollback() =>
     _clear_barriers()
@@ -770,6 +781,12 @@ actor ConnectorSink is Sink
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
   =>
+    """
+    If we're here, it's implicit that Wallaroo has determinted
+    the global status of this checkpoint_id: it was committed.
+    We may need to re-send phase2=commit for this checkpoint_id.
+    (But that's async from our point of view, beware tricksy bugs....)
+    """
     ifdef "checkpoint_trace" then
       @printf[I32]("Rollback to %s at ConnectorSink %s\n".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring())
     end
@@ -791,8 +808,16 @@ actor ConnectorSink is Sink
     _twopc_last_offset = _twopc_current_offset
     _notify.acked_point_of_ref = try r.u64_be()? else Fail(); 0 end
     _notify.message_id = _twopc_last_offset.u64()
-    _notify.twopc_txn_id_last_committed = try String.from_array(r.block(r.u16_be()?.usize())?) else Fail(); "" end
-    @printf[I32]("2PC: Rollback: _twopc_last_offset %lu _twopc_current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s\n".cstring(), _twopc_last_offset, _twopc_current_offset, _notify.acked_point_of_ref, _notify.twopc_txn_id_last_committed.cstring(), _sink_id.string().cstring())
+
+    // The EventLog's payload's data doesn't include the last
+    // committed txn_id because at the time that payload was created,
+    // we didn't know if the txn-in-progress had committed globally.
+    // When rollback() is called here, we now know the global txn
+    // commit status: commit for checkpoint_id, all greater are invalid.
+    _notify.twopc_txn_id_last_committed = _make_txn_id_string(checkpoint_id)
+    _notify.process_uncommitted_list(this)
+
+    @printf[I32]("2PC: Rollback: _twopc_last_offset %lu _twopc_current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s\n".cstring(), _twopc_last_offset, _twopc_current_offset, _notify.acked_point_of_ref, try (_notify.twopc_txn_id_last_committed as String).cstring() else "<<<None>>>".string() end, _sink_id.string().cstring())
 
     event_log.ack_rollback(_sink_id)
 
@@ -913,9 +938,14 @@ actor ConnectorSink is Sink
   fun ref report_ready_to_work() =>
     match _initializer
     | let initializer: LocalTopologyInitializer =>
+      @printf[I32]("AAAA: %s\n".cstring(), __loc.method_name().cstring())
       initializer.report_ready_to_work(this)
       _initializer = None
     end
+//    todo left off here: send phase2 commit/abort (move from notify??)?
+//    wait, that won't work for non-crash rollback because non-crash
+//      rollback would never call report_ready_for_work() ... except that
+//      non-crash rollback doesn't lose state the state that we're worried about??
 
   fun ref _writev(data: ByteSeqIter, tracking_id: (SeqId | None))
   =>
