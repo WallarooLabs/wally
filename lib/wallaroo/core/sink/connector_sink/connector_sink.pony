@@ -488,7 +488,7 @@ actor ConnectorSink is Sink
 
       _reset_2pc_state()
       // Set expected 2PC state when CheckpointRollbackBarrierToken arrives
-      _twopc_state = cp.TwoPCFsm2Abort
+      //TODO delete this line & comment ^^^: _twopc_state = cp.TwoPCFsm2Abort
       _twopc_txn_id_at_close = ""
       _twopc_barrier_token_at_close = _twopc_barrier_token_initial
     end
