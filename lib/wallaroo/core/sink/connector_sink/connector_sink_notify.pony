@@ -269,13 +269,13 @@ class ConnectorSinkNotify
             twopc_uncommitted_list = mi.txn_ids
             process_uncommitted_list(conn as ConnectorSink ref)
           end
-          (let state, let txn_id) = (conn as ConnectorSink ref).what_yer_status()
 
           // The 2PC intro dance has finished.  We can permit the rest
           // of the sink's operation to resume.  The txns in the
           // twopc_uncommitted_list will be committed/aborted as soon
           // as we have all the relevant information is available (and
-          // may already have been done).
+          // may already have been done by the process_uncommitted_list()
+          // call above).
           twopc_intro_done = true
           unthrottled(conn)
           if _connection_count == 1 then
