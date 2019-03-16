@@ -193,6 +193,7 @@ class AsyncServer(asynchat.async_chat, object):
         else:
             (txn_id, start_por, end_por, _) = orphaned[0]
             chunk = read_chunk(self._out_path, start_por, end_por)
+            self.log_it(['orphaned', (txn_id, start_por, end_por)])
             self.write_to_s3_and_log(start_por, chunk, txn_id, 'orphaned')
 
     def collect_incoming_data(self, data):
@@ -487,7 +488,7 @@ class AsyncServer(asynchat.async_chat, object):
                       for sid, sn, mid in self._streams.values())))
         super(AsyncServer, self).close()
         self.log_it(['connection-closed', True])
-        ### self._out.write(b'<DEBUG-ONLY-CONNECTION-CLOSED>\n')
+        self.flush_fsync(self._out)
 
     def flush_fsync(self, file):
         """
@@ -522,14 +523,6 @@ class AsyncServer(asynchat.async_chat, object):
                 print('S3: ERROR: put res = {}'.format(e))
                 time.sleep(2.0)
         self.log_it(['2-s3-ok', txn_id, name, why])
-        # Debugging alternative:
-        #short_id = txn_id.split(':')[1]
-        #global HACK
-        #if short_id == 'c_id=7' and HACK == 0:
-        #    HACK = HACK + 1
-        #    self.log_it(['2-s3-NOPENOPE', txn_id, name])
-        #else:
-        #    self.log_it(['2-s3-ok', txn_id, name])
 
 class EchoServer(asyncore.dispatcher):
 
