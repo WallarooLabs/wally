@@ -46,6 +46,7 @@ class ConnectorSinkNotify
   var twopc_intro_done: Bool = false
   var twopc_txn_id_last_committed: (None|String) = None
   var twopc_uncommitted_list: (None|Array[String] val) = None
+  let twopc_reconnect_buffer: Array[(String val | Array[U8] val)] = twopc_reconnect_buffer.create()
 
   new create(sink_id: RoutingId, worker_name: WorkerName,
     protocol_version: String, cookie: String,
@@ -170,7 +171,11 @@ class ConnectorSinkNotify
     """
     All 2PC messages are sent via this class's send_msg(), which uses
     conn._write_final(), which does *not* filter its data through the
-    sent() callback.  As a result, this function should be unreachable.
+    sent() callback.
+    Also, all Wallaroo data that is buffered in twopc_reconnect_buffer
+    and later sent after we are unthrottled uses conn._write_final().
+
+    As a result, this function should be unreachable.
     """
     Unreachable()
     data
@@ -183,11 +188,19 @@ class ConnectorSinkNotify
     thus all non-2PC data (i.e., all Wallaroo app data that is sent
     to the sink) is filtered by this callback.
     """
-    @printf[I32]("Sink sentv\n".cstring())
-    for x in data.values() do
-      @printf[I32]("Sink sentv: %s\n".cstring(), _print_array[U8](x).cstring())
+    if _connected and (not _throttled) then
+      @printf[I32]("Sink sentv\n".cstring())
+      for x in data.values() do
+        @printf[I32]("Sink sentv: %s\n".cstring(), _print_array[U8](x).cstring())
+      end
+      data
+    else
+      @printf[I32]("Sink sentv: not connected or throttled: buffering\n".cstring())
+      for d in data.values() do
+        twopc_reconnect_buffer.push(d)
+      end
+      []
     end
-    data
 
   fun ref throttled(conn: WallarooOutgoingNetworkActor ref) =>
     if (not _throttled) or (not twopc_intro_done) then
@@ -204,6 +217,11 @@ class ConnectorSinkNotify
       @printf[I32](("ConnectorSink is no longer experiencing" +
         " back pressure, connected = %s\n").cstring(),
       _connected.string().cstring())
+      for d in twopc_reconnect_buffer.values() do
+        @printf[I32]("DBG: unthrottled: writing buffered %d bytes\n".cstring(), d.size())
+        try (conn as ConnectorSink ref)._write_final(d, None) else Fail() end
+      end
+      twopc_reconnect_buffer.clear()
     end
 
   fun send_msg(conn: WallarooOutgoingNetworkActor ref, msg: cp.Message) =>
