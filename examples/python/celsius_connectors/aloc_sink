@@ -21,6 +21,8 @@ import boto3
 
 from wallaroo.experimental import connector_wire_messages as cwm
 
+TXN_COUNT = 0
+
 def parse_abort_rules(path):
     a = []
     try:
@@ -147,7 +149,6 @@ class AsyncServer(asynchat.async_chat, object):
         self._using_2pc = True
         self._txn_state = {}
         self._txn_stream_content = []
-        self._txn_local_count = 0
         self._next_txn_force_abort_written = False
         if s3_scheme == 'fake-s3':
             self._s3 = boto3.resource('s3', endpoint_url='http://localhost:4569',
@@ -303,15 +304,16 @@ class AsyncServer(asynchat.async_chat, object):
                         .format(end_por, self._out.tell()))
 
             # Check local debugging/testing abort rules
-            self._txn_local_count += 1
+            global TXN_COUNT
+            TXN_COUNT += 1
             close_before = False
             close_after = False
             for r in self._abort_rules:
                 if r[0] == 'local-txn':
-                    if self._txn_local_count == r[1]:
+                    if TXN_COUNT == r[1]:
                         self._txn_commit_next = False
                         print('2PC: abort next transaction: local txn count {}'
-                            .format(self._txn_local_count))
+                            .format(TXN_COUNT))
                         try:
                             success = r[2]
                             close_before = r[3]
