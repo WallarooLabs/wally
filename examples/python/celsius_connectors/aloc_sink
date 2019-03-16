@@ -511,7 +511,7 @@ class AsyncServer(asynchat.async_chat, object):
             try:
                 res = self._s3.put_object(
                     ACL='private',
-                    Body=self._s3_chunk,
+                    Body=chunk,
                     Bucket=self._s3_bucket,
                     Key=name)
                 print('S3: put res = {}'.format(res))
