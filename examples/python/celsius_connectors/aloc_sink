@@ -276,7 +276,7 @@ class AsyncServer(asynchat.async_chat, object):
         msg2 = cwm.TwoPCFrame.decode(msg.message)
         if isinstance(msg2, cwm.ListUncommitted):
             uncommitted = list(self._txn_state.keys())
-            uncommitted.append("doesnt.exist.txn.aborting-wont-hurt.-----0-0")
+            # DEBUG only: uncommitted.append("doesnt.exist.txn.aborting-wont-hurt.-----0-0")
             reply = cwm.ReplyUncommitted(msg2.rtag, uncommitted)
             reply_bytes = cwm.TwoPCFrame.encode(reply)
             msg = cwm.Message(0, cwm.Message.Ephemeral, None, None, None, reply_bytes)
