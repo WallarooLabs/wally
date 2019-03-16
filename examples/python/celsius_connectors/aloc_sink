@@ -431,6 +431,9 @@ class AsyncServer(asynchat.async_chat, object):
                 self._streams[msg.stream_id][2] = msg.message_id
                 print('DBG: _out_offset is now {}'.format(self._out_offset))
             elif self._out_offset < msg.message_id:
+                # TODO: After the bugfix in commit 88e4cdca2, this
+                # case should be impossible, and we ought to make this
+                # a fatal error.
                 m = 'ERROR: MISSING DATA: self._out_offset {} < msg.message_id {}'.format(self._out_offset, msg.message_id)
                 self._txn_commit_next = False
                 if not self._next_txn_force_abort_written:
