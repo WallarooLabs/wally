@@ -661,7 +661,7 @@ actor ConnectorSink is Sink
         Fail()
       end
 
-      let cpoint_id = "5" // SLF TODO: change to "5" => BUG!
+      let cpoint_id = "impossible-5"
       let drop_phase2_msg = try if _twopc_txn_id.split("=")(1)? == cpoint_id then true else false end else false end
       if _twopc_txn_id != "" then
         if not drop_phase2_msg then
