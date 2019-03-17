@@ -477,7 +477,9 @@ class GlobalConnectorStreamRegistry[In: Any val]
   // STREAM RELINQUISH
   ////////////////////
 
-  fun ref streams_relinquish(streams: Array[StreamTuple] val) =>
+  fun ref streams_relinquish(streams: Array[StreamTuple] val,
+    worker_name: WorkerName)
+  =>
     """
     Process a stream relinquish request from this worker
 
@@ -486,7 +488,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     if _is_leader then
       for stream in streams.values() do
         Invariant(_active_streams.get_or_else(stream.id, _worker_name) ==
-          _worker_name)
+          worker_name)
         try
           // assume active, try deactivate
           _deactivate_stream(stream)?
@@ -504,7 +506,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     worker->leader.stream_relinquish
     """
     if _is_leader then
-      streams_relinquish(msg.streams)
+      streams_relinquish(msg.streams, msg.worker_name)
     else
       @printf[I32](("Non-leader worker received a streams relinquish request."
         + " This indicates an invalid leader state at " +
@@ -564,7 +566,9 @@ class GlobalConnectorStreamRegistry[In: Any val]
       end
     end
 
-  fun ref streams_shrink(streams: Array[StreamTuple] val) =>
+  fun ref streams_shrink(streams: Array[StreamTuple] val,
+    worker_name: WorkerName)
+  =>
     """
     Process a stream shrink request from this worker
 
@@ -573,7 +577,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     if _is_leader then
       for stream in streams.values() do
         Invariant(_active_streams.get_or_else(stream.id, _worker_name) ==
-          _worker_name)
+          worker_name)
         try
           // assume active, try deactivate
           _deactivate_stream(stream)?
@@ -596,7 +600,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     worker->leader.stream_shrink
     """
     if _is_leader then
-      streams_shrink(msg.streams)
+      streams_shrink(msg.streams, msg.worker_name)
       try
         (let host, let service) = _source_addrs_reallocation(msg.worker_name)?
         _connections.connector_respond_to_streams_shrink(msg.worker_name,
@@ -809,9 +813,9 @@ class LocalConnectorStreamRegistry[In: Any val]
       try _active_streams.remove(stream.id)? end
     end
     if _is_shrinking then
-      _global_registry.streams_shrink(streams)
+      _global_registry.streams_shrink(streams, _worker_name)
     else
-      _global_registry.streams_relinquish(streams)
+      _global_registry.streams_relinquish(streams, _worker_name)
     end
 
 class val ConnectorStreamNotifyId is Equatable[ConnectorStreamNotifyId]
