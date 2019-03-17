@@ -85,6 +85,10 @@ class val LocalTopology
     step_group_routing_ids = step_group_routing_ids'
     barrier_source_id = barrier_source_id'
 
+  fun new_barrier_source_id(barrier_source_id': RoutingId): LocalTopology =>
+    LocalTopology(_app_name, _worker_name, _graph, _routing_ids,
+      worker_names, non_shrinkable, step_group_routing_ids, barrier_source_id')
+
   fun routing_ids(): Map[U128, SetIs[RoutingId] val] val =>
     _routing_ids
 

@@ -79,6 +79,7 @@ actor Startup
 
   var _connections: (Connections | None) = None
   var _router_registry: (RouterRegistry | None) = None
+  let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
 
   let _disposables: SetIs[DisposableActor] = _disposables.create()
   var _is_joining: Bool = false
@@ -591,7 +592,11 @@ actor Startup
           _external_host.cstring(), _external_service.cstring())
       end
 
-      local_topology_initializer.update_topology(m.local_topology)
+      // Add create a new barrier source id here tm.local_topology,
+      // to avoid multi-worker conflicts
+      let new_local_topology = m.local_topology.new_barrier_source_id(
+        _routing_id_gen())
+      local_topology_initializer.update_topology(new_local_topology)
       local_topology_initializer.create_data_channel_listener(m.worker_names,
         _startup_options.my_d_host, _startup_options.my_d_service)
 
