@@ -34,7 +34,8 @@ machida --application-module celsius --in 127.0.0.1:7101 --out 127.0.0.1:7200 --
 
 Shrink
 ```
-./external_sender ...
+export PATH=$PATH:/home/nisan/wallaroo-tutorial/wallaroo/utils/cluster_shrinker
+cluster_shrinker --external 127.0.0.1:6000 --count 1
 ```
 
 ### Sender:
