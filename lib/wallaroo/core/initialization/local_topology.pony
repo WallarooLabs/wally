@@ -85,6 +85,10 @@ class val LocalTopology
     step_group_routing_ids = step_group_routing_ids'
     barrier_source_id = barrier_source_id'
 
+  fun new_barrier_source_id(barrier_source_id': RoutingId): LocalTopology =>
+    LocalTopology(_app_name, _worker_name, _graph, _routing_ids,
+      worker_names, non_shrinkable, step_group_routing_ids, barrier_source_id')
+
   fun routing_ids(): Map[U128, SetIs[RoutingId] val] val =>
     _routing_ids
 
@@ -1274,7 +1278,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     match _topology
     | let t: LocalTopology =>
       let current_worker_count = t.worker_names.size()
-      let new_t = t.add_new_worker(joining_worker_name)
+      let new_t = local_topology_for_joining_worker(joining_worker_name)
       _router_registry.worker_join(conn, joining_worker_name,
         joining_worker_count, new_t, current_worker_count)
     else
@@ -1493,6 +1497,22 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
     _outgoing_boundaries = consume bs
     _outgoing_boundary_builders = consume bbs
+
+  fun ref local_topology_for_joining_worker(
+    joining_worker_name: String): LocalTopology
+  =>
+    match _topology
+    | let t: LocalTopology =>
+      t.add_new_worker(joining_worker_name)
+        .new_barrier_source_id(_routing_id_gen())
+    else
+      Unreachable()
+      LocalTopology("", "", recover val Dag[StepInitializer] end,
+        recover val Map[U128, SetIs[RoutingId] val] end,
+        recover val Array[WorkerName] end, recover val SetIs[WorkerName] end,
+        recover val Map[RoutingId, Map[WorkerName, RoutingId] val] end,
+        0)
+    end
 
 
 ///////////////////////
