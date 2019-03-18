@@ -32,22 +32,23 @@ use "buffered"
 use "collections"
 use "net"
 use "time"
-use "wallaroo/core/boundary"
-use "wallaroo/core/common"
-use "wallaroo/core/sink"
 use "wallaroo/core/barrier"
-use "wallaroo/core/data_receiver"
-use "wallaroo/core/network"
-use "wallaroo/core/recovery"
+use "wallaroo/core/boundary"
 use "wallaroo/core/checkpoint"
+use "wallaroo/core/common"
+use "wallaroo/core/data_receiver"
 use cp = "wallaroo_labs/connector_protocol"
-use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
+use "wallaroo/core/network"
+use "wallaroo/core/recovery"
 use "wallaroo/core/routing"
+use "wallaroo/core/sink"
 use "wallaroo/core/topology"
+use "wallaroo_labs/mort"
+use "wallaroo_labs/time"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
@@ -365,6 +366,7 @@ actor ConnectorSink is Sink
     // If we have at least one input, then we are involved in checkpointing.
     if _inputs.size() == 0 then
       _barrier_coordinator.register_sink(this)
+      _checkpoint_initiator.register_sink(this)
       _event_log.register_resilient(_sink_id, this)
     end
 
@@ -390,6 +392,7 @@ actor ConnectorSink is Sink
       // If we have no inputs, then we are not involved in checkpointing.
       if _inputs.size() == 0 then
         _barrier_coordinator.unregister_sink(this)
+        _checkpoint_initiator.unregister_sink(this)
         _event_log.unregister_resilient(_sink_id, this)
       end
     end
@@ -710,6 +713,10 @@ actor ConnectorSink is Sink
         qb.inject_barrier(this)
       end
     end
+
+  be checkpoint_complete(checkpoint_id: CheckpointId) =>
+    //SLF TODO
+    None
 
   fun ref _clear_barriers() =>
     try

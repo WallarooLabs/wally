@@ -296,6 +296,8 @@ actor RouterRegistry
     _source_listeners.set(source_listener)
     _connections.register_disposable(source_listener)
 
+    _checkpoint_initiator.register_source_listener(source_listener)
+
     if _sources_started then
       source_listener.start_sources()
     end
@@ -1456,9 +1458,6 @@ actor RouterRegistry
     for w in leaving_workers.values() do
       _barrier_coordinator.remove_worker(w)
       _checkpoint_initiator.remove_worker(w)
-      for source_listener in _source_listeners.values() do
-        source_listener.remove_worker(w)
-      end
       // !TODO!: Do we need this ??
       _unmute_request(w)
     end

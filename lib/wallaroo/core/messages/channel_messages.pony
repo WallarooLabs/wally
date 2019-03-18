@@ -440,11 +440,6 @@ primitive ChannelMsgEncoder
     _encode(ForwardBarrierMsg(target_step_id, origin_step_id, token,
       seq_id), auth)?
 
-  fun barrier_fully_acked(token: BarrierToken, auth: AmbientAuth):
-    Array[ByteSeq] val ?
-  =>
-    _encode(BarrierFullyAckedMsg(token), auth)?
-
   fun abort_checkpoint(checkpoint_id: CheckpointId, sender: WorkerName,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -1491,13 +1486,6 @@ class val ForwardBarrierMsg is ChannelMsg
     origin_id = origin_id'
     token = token'
     seq_id = seq_id'
-
-class val BarrierFullyAckedMsg is ChannelMsg
-  let token: BarrierToken
-
-  new val create(token': BarrierToken)
-  =>
-    token = token'
 
 class val AbortCheckpointMsg is ChannelMsg
   let checkpoint_id: CheckpointId

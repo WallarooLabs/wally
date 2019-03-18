@@ -194,20 +194,6 @@ actor BarrierInjectorAndCollector
       end
     end
 
-  be barrier_fully_acked(barrier_token: BarrierToken)
-  =>
-    if not _disposed then
-      for b_source in _barrier_sources.values() do
-        b_source.barrier_fully_acked(barrier_token)
-      end
-      for s in _sources.values() do
-        s.barrier_fully_acked(barrier_token)
-      end
-      for s in _sinks.values() do
-        s.barrier_fully_acked(barrier_token)
-      end
-    end
-
   fun ref _clear_barrier(token: BarrierToken) =>
     try
       _active_barriers.remove(token)?

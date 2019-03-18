@@ -500,8 +500,6 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _barrier_coordinator.worker_ack_barrier(m.sender, m.token)
       | let m: WorkerAbortBarrierMsg =>
         _barrier_coordinator.worker_abort_barrier(m.sender, m.token)
-      | let m: BarrierFullyAckedMsg =>
-        _barrier_coordinator.remote_barrier_fully_acked(m.token)
       | let m: AbortCheckpointMsg =>
         _checkpoint_initiator.abort_checkpoint(m.checkpoint_id)
       | let m: EventLogInitiateCheckpointMsg =>
@@ -541,8 +539,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _checkpoint_initiator.event_log_id_written(m.sender,
           m.checkpoint_id)
       | let m: CommitCheckpointIdMsg =>
-        _checkpoint_initiator.commit_checkpoint_id(m.checkpoint_id, m.rollback_id,
-          m.sender)
+        _checkpoint_initiator.commit_checkpoint_id(m.checkpoint_id,
+          m.rollback_id, m.sender)
       | let m: RecoveryInitiatedMsg =>
         _recovery.recovery_initiated_at_worker(m.sender, m.token)
       | let m: AckRecoveryInitiatedMsg =>

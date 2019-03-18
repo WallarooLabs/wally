@@ -18,21 +18,22 @@ Copyright 2017 The Wallaroo Authors.
 
 use "collections"
 use "wallaroo/core/boundary"
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
-use "wallaroo/core/partitioning"
 use "wallaroo/core/data_receiver"
 use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
 use "wallaroo/core/initialization"
 use "wallaroo/core/metrics"
 use "wallaroo/core/network"
+use "wallaroo/core/partitioning"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
 
 interface val SourceListenerBuilder
-  fun apply(env: Env /***SLF, the_journal: SimpleJournal, do_local_file_io: Bool ***/): SourceListener
+  fun apply(env: Env): SourceListener
 
 interface val SourceListenerBuilderBuilder
   fun apply(worker_name: String,
