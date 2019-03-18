@@ -22,17 +22,17 @@ use "net"
 use "pony-kafka"
 use "pony-kafka/customlogger"
 use "time"
+use "wallaroo/core/barrier"
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
-use "wallaroo/core/routing"
-use "wallaroo/core/topology"
-use "wallaroo/core/sink"
-use "wallaroo/core/barrier"
 use "wallaroo/core/recovery"
-use "wallaroo/core/checkpoint"
+use "wallaroo/core/routing"
+use "wallaroo/core/sink"
+use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
 
@@ -245,6 +245,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     // If we have at least one input, then we are involved in checkpointing.
     if _inputs.size() == 0 then
       _barrier_coordinator.register_sink(this)
+      _checkpoint_initiator.register_sink(this)
       _event_log.register_resilient(_sink_id, this)
     end
 
@@ -270,6 +271,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
       // If we have no inputs, then we are not involved in checkpointing.
       if _inputs.size() == 0 then
         _barrier_coordinator.unregister_sink(this)
+        _checkpoint_initiator.unregister_sink(this)
         _event_log.unregister_resilient(_sink_id, this)
       end
     end
@@ -407,7 +409,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
       end
     end
 
-  be barrier_fully_acked(token: BarrierToken) =>
+  be checkpoint_complete(checkpoint_id: CheckpointId) =>
     None
 
   fun ref _clear_barriers() =>

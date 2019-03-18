@@ -296,6 +296,8 @@ actor RouterRegistry
     _source_listeners.set(source_listener)
     _connections.register_disposable(source_listener)
 
+    _checkpoint_initiator.register_source_listener(source_listener)
+
     if _sources_started then
       source_listener.start_sources()
     end

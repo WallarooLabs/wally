@@ -47,6 +47,9 @@ actor CheckpointInitiator is Initializable
   let _barrier_coordinator: BarrierCoordinator
   var _recovery: (Recovery | None) = None
 
+  let _source_listeners: SetIs[SourceListener] = _source_listeners.create()
+  let _sinks: SetIs[Sink] = _sinks.create()
+
   // Used as a way to identify outdated timer-based initiate_checkpoint calls
   var _checkpoint_group: USize = 0
 
@@ -161,6 +164,18 @@ actor CheckpointInitiator is Initializable
         w.cstring())
     end
     _workers.unset(w)
+
+  be register_sink(sink: Sink) =>
+    _sinks.set(sink)
+
+  be unregister_sink(sink: Sink) =>
+    _sinks.unset(sink)
+
+  be register_source_listener(source_listener: SourceListener) =>
+    _source_listeners.set(source_listener)
+
+  be unregister_source_listener(source_listener: SourceListener) =>
+    _source_listeners.unset(source_listener)
 
   be lookup_next_checkpoint_id(p: Promise[CheckpointId]) =>
     p(_last_complete_checkpoint_id + 1)
@@ -360,6 +375,8 @@ actor CheckpointInitiator is Initializable
             Fail()
           end
 
+          _propagate_checkpoint_complete(st.id)
+
           // Prepare for next checkpoint
           if repeating and _is_active and (_worker_name == _primary_worker)
           then
@@ -378,6 +395,14 @@ actor CheckpointInitiator is Initializable
         Fail()
       end
       _phase = _WaitingCheckpointInitiatorPhase
+    end
+
+  fun _propagate_checkpoint_complete(checkpoint_id: CheckpointId) =>
+    for sl in _source_listeners.values() do
+      sl.checkpoint_complete(checkpoint_id)
+    end
+    for s in _sinks.values() do
+      s.checkpoint_complete(checkpoint_id)
     end
 
   be prepare_for_rollback() =>
@@ -454,6 +479,7 @@ actor CheckpointInitiator is Initializable
   =>
     if sender == _primary_worker then
       _commit_checkpoint_id(checkpoint_id, rollback_id)
+      _propagate_checkpoint_complete(checkpoint_id)
     else
       @printf[I32](("CommitCheckpointIdMsg received from worker that is " +
         "not the primary for checkpoints. Ignoring.\n").cstring())

@@ -461,18 +461,11 @@ actor BarrierCoordinator is Initializable
       try
         let promise = _pending_promises(barrier_token)?
         promise(barrier_token)
-
-        let msg = ChannelMsgEncoder.barrier_fully_acked(barrier_token, _auth)?
-        for w in _workers.values() do
-          if w != _worker_name then _connections.send_control(w, msg) end
-        end
       else
         ifdef debug then
           _unknown_barrier_for("barrier_fully_acked", barrier_token)
         end
       end
-
-      _injector_collector.barrier_fully_acked(barrier_token)
 
       _clear_barrier(barrier_token)
       _phase.barrier_fully_acked(barrier_token)
@@ -540,15 +533,6 @@ actor BarrierCoordinator is Initializable
     must be aborted.
     """
     _injector_collector.abort_barrier(barrier_token)
-
-  //!@ Should we rename this to be clearer?
-  be remote_barrier_fully_acked(barrier_token: BarrierToken) =>
-    """
-    Called in response to primary worker for this barrier token sending
-    message that this barrier is complete. We can now inform all local
-    sources (for example, so they can ack messages up to a checkpoint).
-    """
-    _injector_collector.barrier_fully_acked(barrier_token)
 
 class _WorkerAckCount
   let _token: BarrierToken
