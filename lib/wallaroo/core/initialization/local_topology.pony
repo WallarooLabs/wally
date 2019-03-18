@@ -1275,8 +1275,15 @@ actor LocalTopologyInitializer is LayoutInitializer
     join. This should not be called on any other worker than the one initially
     contacted.
     """
-    local_topology_for_joining_worker(conn, joining_worker_name,
-      joining_worker_count)
+    match _topology
+    | let t: LocalTopology =>
+      let current_worker_count = t.worker_names.size()
+      let new_t = local_topology_for_joining_worker(joining_worker_name)
+      _router_registry.worker_join(conn, joining_worker_name,
+        joining_worker_count, new_t, current_worker_count)
+    else
+      Fail()
+    end
 
   be connect_to_joining_workers(coordinator: String,
     control_addrs: Map[WorkerName, (String, String)] val,
@@ -1491,18 +1498,20 @@ actor LocalTopologyInitializer is LayoutInitializer
     _outgoing_boundaries = consume bs
     _outgoing_boundary_builders = consume bbs
 
-  fun ref local_topology_for_joining_worker(conn: TCPConnection,
-    joining_worker_name: String, joining_worker_count: USize)
+  fun ref local_topology_for_joining_worker(
+    joining_worker_name: String): LocalTopology
   =>
     match _topology
     | let t: LocalTopology =>
-      let current_worker_count = t.worker_names.size()
-      let new_t = t.add_new_worker(joining_worker_name)
+      t.add_new_worker(joining_worker_name)
         .new_barrier_source_id(_routing_id_gen())
-      _router_registry.worker_join(conn, joining_worker_name,
-        joining_worker_count, new_t, current_worker_count)
     else
-      Fail()
+      Unreachable()
+      LocalTopology("", "", recover val Dag[StepInitializer] end,
+        recover val Map[U128, SetIs[RoutingId] val] end,
+        recover val Array[WorkerName] end, recover val SetIs[WorkerName] end,
+        recover val Map[RoutingId, Map[WorkerName, RoutingId] val] end,
+        0)
     end
 
 
