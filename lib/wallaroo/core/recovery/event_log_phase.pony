@@ -41,7 +41,6 @@ trait _EventLogPhase
     checkpoint_id: CheckpointId, payload: Array[ByteSeq] val,
     is_last_entry: Bool)
   =>
-    // @printf[I32]("checkpoint_state() I am %s\n".cstring(), __loc().type_name().cstring())
     @printf[I32]("checkpoint_state() for resilient %s, checkpoint_id %s\n"
       .cstring(),resilient_id.string().cstring(),checkpoint_id.string().cstring())
     _invalid_call()

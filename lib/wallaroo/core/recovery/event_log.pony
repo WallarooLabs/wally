@@ -221,7 +221,6 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
       _backend.dispose()
       _disposed = true
       _phase = _DisposedEventLogPhase
-      @printf[I32]("WWW: EventLog _phase = _DisposedEventLogPhase line %d\n".cstring(), __loc.line())
     end
 
   /////////////////
@@ -253,7 +252,6 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
     pending_checkpoint_states: Array[_QueuedCheckpointState] =
       Array[_QueuedCheckpointState])
   =>
-    @printf[I32]("WWW: EventLog _phase = _CheckpointEventLogPhase line %d\n".cstring(), __loc.line())
     _phase = _CheckpointEventLogPhase(this, checkpoint_id, promise,
       _resilients)
     if pending_checkpoint_states.size() == 0 then
@@ -304,7 +302,6 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
     end
 
   fun ref state_checkpoints_complete(checkpoint_id: CheckpointId) =>
-    @printf[I32]("WWW: EventLog _phase = _WaitingForWriteIdEventLogPhase line %d\n".cstring(), __loc.line())
     _phase = _WaitingForWriteIdEventLogPhase(this, checkpoint_id)
 
   be write_initial_checkpoint_id(checkpoint_id: CheckpointId) =>
@@ -336,7 +333,6 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
 
   fun ref checkpoint_id_written(checkpoint_id: CheckpointId) =>
     write_log()
-    @printf[I32]("WWW: EventLog _phase = _WaitingForCheckpointInitiationEventLogPhase line %d\n".cstring(), __loc.line())
     _phase = _WaitingForCheckpointInitiationEventLogPhase(checkpoint_id + 1,
       this)
 
@@ -362,7 +358,6 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
   be initiate_rollback(token: CheckpointRollbackBarrierToken,
     promise: Promise[CheckpointRollbackBarrierToken])
   =>
-    @printf[I32]("WWW: EventLog _phase = _RollbackEventLogPhase line %d\n".cstring(), __loc.line())
     _phase = _RollbackEventLogPhase(this, token, promise)
 
     // If we have no resilients on this worker for some reason, then we
@@ -399,7 +394,6 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
     _phase.ack_rollback(resilient_id)
 
   fun ref rollback_complete(checkpoint_id: CheckpointId) =>
-    @printf[I32]("WWW: EventLog _phase = _WaitingForCheckpointInitiationEventLogPhase line %d\n".cstring(), __loc.line())
     _phase = _WaitingForCheckpointInitiationEventLogPhase(checkpoint_id + 1,
       this)
 

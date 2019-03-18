@@ -56,8 +56,8 @@ def serialize(o):
 
 
 def deserialize(bs):
-    print('DBG: deserialize len: {}'.format(len(bs)))
-    print('DBG: deserialize: {}'.format(bs))
+    # print('DBG: deserialize len: {}'.format(len(bs)))
+    # print('DBG: deserialize: {}'.format(bs))
     return pickle.loads(bs)
 
 

@@ -395,7 +395,6 @@ actor CheckpointInitiator is Initializable
 
   fun ref _clear_pending_checkpoints() =>
     _checkpoint_group = _checkpoint_group + 1
-    @printf[I32]("CheckpointInitiator: _timers.dispose()\n".cstring())
     _timers.dispose()
     _timers = Timers
 
@@ -553,6 +552,5 @@ class _InitiateCheckpoint is TimerNotify
     _checkpoint_group = checkpoint_group
 
   fun ref apply(timer: Timer, count: U64): Bool =>
-    @printf[I32]("_InitiateCheckpoint: timer fired\n".cstring())
     _si.initiate_checkpoint(_checkpoint_group)
     false

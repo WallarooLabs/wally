@@ -1081,7 +1081,6 @@ primitive _SinkConfig
       let cookie = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 6)))
       end
-      @printf[I32]("CCCC: host %s port %s cookie %s\n".cstring(), host.cstring(), port.cstring(), cookie.cstring())
       ConnectorSinkConfig[PyData val](encoder, host, port, "v0.0.1", cookie)
     else
       error
