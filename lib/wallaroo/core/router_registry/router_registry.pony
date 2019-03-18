@@ -808,6 +808,19 @@ actor RouterRegistry
     end
 
   fun ref try_to_resume_processing_immediately() =>
+    // TODO [source-migration] [NH]  remove this debug stuff
+    let ar' = recover iso Array[U8] end
+    ar'.append("{")
+    for v in _key_waiting_list.values() do
+      ar'.append(v)
+      ar'.append(", ")
+    end
+    ar'.append("}")
+    let s' = String.from_array(consume ar')
+    @printf[I32](("[NH] try_to_resume_processing_immediately, kwl: %s, " +
+      "slwl.size(): %s\n").cstring(), s'.cstring(),
+      _source_listeners_waiting_list.size().string().cstring())
+    // END of debug print
     if ((_key_waiting_list.size() == 0) and
         (_source_listeners_waiting_list.size() == 0))
     then
@@ -1102,31 +1115,27 @@ actor RouterRegistry
     """
     Step with provided step id has been created on another worker.
     """
+    (let s, let ns) = Time.now()
+    let us = ns / 1000
+    let ts = PosixDate(s, ns).format("%Y-%m-%d %H:%M:%S." + us.string())
+    @printf[I32]("[NH] %s ::: key_migration_complete(%s)\n".cstring(),
+      ts.cstring(), key.cstring())
+
     if _key_waiting_list.size() > 0 then
       _key_waiting_list.unset(key)
-      if ((_key_waiting_list.size() == 0) and
-          (_source_listeners_waiting_list.size() == 0))
-      then
-        try
-          (_autoscale as Autoscale).all_migration_complete()
-        else
-          Fail()
-        end
-      end
+      try_to_resume_processing_immediately()
     end
 
   be source_listener_migration_complete(source_listener: SourceListener) =>
-    if _source_listeners_waiting_list.size() > 0 then
-      _source_listeners_waiting_list.unset(source_listener)
-      if ((_key_waiting_list.size() == 0) and
-          (_source_listeners_waiting_list.size() == 0))
-      then
-        try
-          (_autoscale as Autoscale).all_migration_complete()
-        else
-          Fail()
-        end
-      end
+    (let s, let ns) = Time.now()
+    let us = ns / 1000
+    let ts = PosixDate(s, ns).format("%Y-%m-%d %H:%M:%S." + us.string())
+    @printf[I32]("[NH] %s ::: source_listener_migration_complete()\n".cstring(),
+      ts.cstring())
+
+    try
+      _source_listeners_waiting_list.extract(source_listener)?
+      try_to_resume_processing_immediately()
     end
 
   fun send_migration_batch_complete_msg(target: WorkerName) =>
@@ -1330,7 +1339,9 @@ actor RouterRegistry
         let msg = ChannelMsgEncoder.prepare_shrink(remaining_workers,
           leaving_workers, _auth)?
         for w in remaining_workers.values() do
-          _connections.send_control(w, msg)
+          if w != _worker_name then
+            _connections.send_control(w, msg)
+          end
         end
       else
         Fail()

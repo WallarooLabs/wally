@@ -51,11 +51,5 @@ export PYTHONPATH="$PYTHONPATH:/home/nisan/wallaroo-tutorial/wallaroo/machida/li
 
 you might have to kill this sender with kill
 ```
-ps aux | grep at_least_once
-```
-
-then
-
-```
-kill -9 <PID>
+pkill -9 -f at_least_once_feed
 ```

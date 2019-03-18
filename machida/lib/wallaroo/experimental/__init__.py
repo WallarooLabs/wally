@@ -147,7 +147,7 @@ Stream = namedtuple('Stream', ['id', 'name', 'point_of_ref', 'is_open'])
 
 class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
     def __init__(self, version, cookie, program_name, instance_name,
-                 host, port):
+                 host, port, delay=0):
         # connection details are given from the base
         self._host = host
         self._port = int(port)  # convert port to int
@@ -156,6 +156,8 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self.cookie = cookie
         self.program_name = program_name
         self.instance_name = instance_name
+        self._delay = delay
+        self._previous_ts = 0
 
         # Stream details
         # live streams for this connection
@@ -323,6 +325,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
     ##########################
 
     def connect(self):
+        logging.debug("ALOConnectorSource.connect")
         self.handshake_complete = False
         conn = socket.socket()
         try:
@@ -340,6 +343,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         hello = cwm.Hello(self.version, self.cookie, self.program_name,
                           self.instance_name)
         self._conn.sendall(cwm.Frame.encode(hello))
+        logging.debug("ALOConnectorSource handshake sent")
         header_bytes = self._conn.recv(4)
         frame_size = struct.unpack('>I', header_bytes)[0]
         frame = self._conn.recv(frame_size)
@@ -352,6 +356,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         # set socket to nonblocking
         self._conn.setblocking(0)
         # handshake complete: initialize async_chat
+        logging.debug("ALOConnectorSource handshake complete")
         self._async_init = True
         asynchat.async_chat.__init__(self,
                                      sock=self._conn,
@@ -366,6 +371,13 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         `shutdown()` to ensure the outgoing queue is flushed.
         """
         if hasattr(self, '__next__'):
+            # if delay is non-zero, return None if not enough time has elapsed
+            if self._delay > 0:
+                t = time.time()
+                if t - self._previous_ts < self._delay:
+                    return None
+                self._previous_ts = t
+                # continue
             try:
                 while self.credits > 0:
                     msg = self.__next__()
