@@ -56,11 +56,11 @@ required_params = ['host', 'port', 'filenames']
 optional_params = []
 
 client = MultiSourceConnector(version, cookie, program_name, instance_name,
-                              '127.0.0.1', '7100')
+                              '127.0.0.1', '7100', delay=0.1)
 
 
 client2 = MultiSourceConnector(version, cookie, program_name, instance_name,
-                              '127.0.0.1', '7101')
+                              '127.0.0.1', '7101', delay=0.1)
 
 
 sender1 = Sender(client)
