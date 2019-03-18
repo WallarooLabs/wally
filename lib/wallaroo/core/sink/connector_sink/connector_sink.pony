@@ -173,7 +173,6 @@ actor ConnectorSink is Sink
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
-    @printf[I32]("ConnectorSink: this = 0x%lx\n".cstring(), this)
     _env = env
     _sink_id = sink_id
     _name = sink_name
@@ -198,7 +197,6 @@ actor ConnectorSink is Sink
     _auth = auth
     _from = from
     _connect_count = 0
-    @printf[I32]("WWWW: 0 _message_processor = NormalSinkMessageProcessor\n".cstring())
     _message_processor = NormalSinkMessageProcessor(this)
     _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_coordinator)
 
@@ -207,20 +205,16 @@ actor ConnectorSink is Sink
   //
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
-    @printf[I32]("AAAA: %s\n".cstring(), __loc.method_name().cstring())
     _initializer = initializer
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer) =>
-    @printf[I32]("AAAA: %s\n".cstring(), __loc.method_name().cstring())
     initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
-    @printf[I32]("AAAA: %s\n".cstring(), __loc.method_name().cstring())
     _initial_connect()
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
-    @printf[I32]("AAAA: %s\n".cstring(), __loc.method_name().cstring())
     if _notify.twopc_txn_id_last_committed is None then
       // There hasn't been a rollback() as part of our startup, so we
       // are starting for the first time.  There is no prior committed
@@ -322,7 +316,6 @@ actor ConnectorSink is Sink
           let w2: Writer = w2.create()
           let b = cp.Frame.encode(msg, w1)
           w2.u32_be(b.size().u32())
-          @printf[I32]("Rcvd msg at ConnectorSink, 2 size = %d + header 4\n".cstring(), b.size())
           w2.write(b)
           w2.done()
         else
@@ -415,7 +408,9 @@ actor ConnectorSink is Sink
     _notify.stream_name + ":c_id=" + checkpoint_id.string()
 
   fun ref _reset_2pc_state() =>
-    @printf[I32]("2PC: reset 2PC state\n".cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("2PC: reset 2PC state\n".cstring())
+    end
     _twopc_state = cp.TwoPCFsmStart
     _twopc_txn_id = ""
     _twopc_barrier_token = CheckpointBarrierToken(0)
@@ -442,7 +437,9 @@ actor ConnectorSink is Sink
       // voted to commit, and that it does not mean that we know
       // the status of the global Wallaroo checkpoint protocol.
       _twopc_state = cp.TwoPCFsm2Commit
-      @printf[I32]("2PC: txn_id %s was %s\n".cstring(), txn_id.cstring(), commit.string().cstring())
+      ifdef "checkpoint_trace" then
+        @printf[I32]("2PC: txn_id %s was %s\n".cstring(), txn_id.cstring(), commit.string().cstring())
+      end
 
       _barrier_coordinator.ack_barrier(this, _twopc_barrier_token)
     else
@@ -452,8 +449,9 @@ actor ConnectorSink is Sink
   fun ref _abort_decision(reason: String, txn_id: String,
     barrier_token: CheckpointBarrierToken)
   =>
-    @printf[I32]("2PC: _abort_decision: txn_id %s %s\n".cstring(),
-      txn_id.cstring(), reason.cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("2PC: _abort_decision: txn_id %s %s\n".cstring(), txn_id.cstring(), reason.cstring())
+    end
 
     _twopc_state = cp.TwoPCFsm2Abort
     _barrier_coordinator.abort_barrier(barrier_token)
@@ -468,7 +466,9 @@ actor ConnectorSink is Sink
      else
        Fail()
     end
-    @printf[I32]("2PC: sent phase 2 commit=%s for txn_id %s\n".cstring(), commit.string().cstring(), txn_id.cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("2PC: sent phase 2 commit=%s for txn_id %s\n".cstring(), commit.string().cstring(), txn_id.cstring())
+    end
 
   fun ref twopc_intro_done() =>
     """
@@ -484,11 +484,11 @@ actor ConnectorSink is Sink
 
       _abort_decision("TCP connection closed during 2PC",
         _twopc_txn_id_at_close, _twopc_barrier_token_at_close)
-      @printf[I32]("2PC: Wallaroo local abort for txn_id %s barrier %s\n".cstring(), _twopc_txn_id_at_close.cstring(), _twopc_barrier_token_at_close.string().cstring())
+      ifdef "checkpoint_trace" then
+        @printf[I32]("2PC: Wallaroo local abort for txn_id %s barrier %s\n".cstring(), _twopc_txn_id_at_close.cstring(), _twopc_barrier_token_at_close.string().cstring())
+      end
 
       _reset_2pc_state()
-      // Set expected 2PC state when CheckpointRollbackBarrierToken arrives
-      //TODO delete this line & comment ^^^: _twopc_state = cp.TwoPCFsm2Abort
       _twopc_txn_id_at_close = ""
       _twopc_barrier_token_at_close = _twopc_barrier_token_initial
     end
@@ -516,7 +516,6 @@ actor ConnectorSink is Sink
     match barrier_token
     | let srt: CheckpointRollbackBarrierToken =>
       try
-        @printf[I32]("@@@@@@@ acker use @ line %d\n".cstring(), __loc.line())
         let b_acker = _barrier_acker as BarrierSinkAcker
         if b_acker.higher_priority(srt) then
           _prepare_for_rollback()
@@ -530,7 +529,6 @@ actor ConnectorSink is Sink
           where ack_barrier_if_complete = false)
       else
         try
-          @printf[I32]("WWWW: 1 _message_processor = BarrierSinkMessageProcessor\n".cstring())
           // We don't want any messages to be processed by this sink
           // until we know that system-wide 2PC can commit, hence
           // always_queue = true
@@ -546,7 +544,6 @@ actor ConnectorSink is Sink
       return
     end
 
-    @printf[I32]("SSSS: _message_processor.barrier_in_progress() = %s\n".cstring(), _message_processor.barrier_in_progress().string().cstring())
     if _message_processor.barrier_in_progress() then
       _message_processor.receive_barrier(input_id, producer,
         barrier_token)
@@ -554,7 +551,6 @@ actor ConnectorSink is Sink
       match _message_processor
       | let nsmp: NormalSinkMessageProcessor =>
         try
-          @printf[I32]("WWWW: 2 _message_processor = BarrierSinkMessageProcessor\n".cstring())
            _message_processor = BarrierSinkMessageProcessor(this,
              _barrier_acker as BarrierSinkAcker)
            _message_processor.receive_new_barrier(input_id, producer,
@@ -589,7 +585,9 @@ actor ConnectorSink is Sink
         // messages to us will block the senders.  However, the nature
         // of backpressure may change over time as the runtime's
         // backpressure system changes.
-        @printf[I32]("2PC: preemptive abort: connector sink not fully connected\n".cstring())
+        ifdef "checkpoint_trace" then
+          @printf[I32]("2PC: preemptive abort: connector sink not fully connected\n".cstring())
+        end
         _abort_decision("connector sink not fully connected",
           _twopc_txn_id, _twopc_barrier_token)
 
@@ -611,7 +609,9 @@ actor ConnectorSink is Sink
           // If no data has been processed by the sink since the last
           // checkpoint, then don't bother with 2PC.
 
-          @printf[I32]("2PC: no data written during this checkpoint interval, skipping 2PC round\n".cstring())
+          ifdef "checkpoint_trace" then
+            @printf[I32]("2PC: no data written during this checkpoint interval, skipping 2PC round\n".cstring())
+          end
           _barrier_coordinator.ack_barrier(this, sbt)
           _twopc_txn_id = ""
           _twopc_phase1_commit = true
@@ -628,7 +628,9 @@ actor ConnectorSink is Sink
          else
           Fail()
         end
-        @printf[I32]("2PC: sent phase 1 for txn_id %s\n".cstring(), txn_id.cstring())
+        ifdef "checkpoint_trace" then
+          @printf[I32]("2PC: sent phase 1 for txn_id %s\n".cstring(), txn_id.cstring())
+        end
 
         _twopc_state = cp.TwoPCFsm1Precommit
         _twopc_txn_id = txn_id
@@ -673,7 +675,6 @@ actor ConnectorSink is Sink
       _notify.twopc_txn_id_last_committed = _twopc_txn_id
       _reset_2pc_state()
 
-      @printf[I32]("WWWW: 1 _message_processor = NormalSinkMessageProcessor\n".cstring())
       _resume_processing_messages()
 
       if drop_phase2_msg then
@@ -689,14 +690,11 @@ actor ConnectorSink is Sink
                (_twopc_state is cp.TwoPCFsm2Abort)))
          or _twopc_phase1_commit
        then
-        @printf[I32]("RRRR: _twopc_state %d _twopc_phase1_commit %s\n".cstring(), _twopc_state(), _twopc_phase1_commit.string().cstring())
         Unreachable()
       end
 
-      @printf[I32]("WWWW: 6 _message_processor = NormalSinkMessageProcessor\n".cstring())
       _resume_processing_messages()
     | let rbrt: CheckpointRollbackResumeBarrierToken =>
-      @printf[I32]("WWWW: 7 _message_processor = NormalSinkMessageProcessor\n".cstring())
       _resume_processing_messages()
     end
     None
@@ -721,12 +719,10 @@ actor ConnectorSink is Sink
 
   fun ref _clear_barriers() =>
     try
-        @printf[I32]("@@@@@@@ acker use @ line %d\n".cstring(), __loc.line())
       (_barrier_acker as BarrierSinkAcker).clear()
     else
       Fail()
     end
-    @printf[I32]("WWWW: 2 _message_processor = NormalSinkMessageProcessor\n".cstring())
     _message_processor = NormalSinkMessageProcessor(this)
 
   ///////////////
@@ -788,9 +784,9 @@ actor ConnectorSink is Sink
     """
     ifdef "checkpoint_trace" then
       @printf[I32]("Rollback to %s at ConnectorSink %s\n".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring())
+      @printf[I32]("2PC: Rollback: twopc_state %d txn_id %s.\n".cstring(), _twopc_state(), _twopc_txn_id.cstring())
     end
 
-    @printf[I32]("2PC: Rollback: twopc_state %d txn_id %s.\n".cstring(), _twopc_state(), _twopc_txn_id.cstring())
     if _twopc_txn_id != "" then
       // Phase 1 decision was abort + we haven't been disconnected.
       // If we were disconnected + perform a local abort, then we
@@ -816,7 +812,9 @@ actor ConnectorSink is Sink
     _notify.twopc_txn_id_last_committed = _make_txn_id_string(checkpoint_id)
     _notify.process_uncommitted_list(this)
 
-    @printf[I32]("2PC: Rollback: _twopc_last_offset %lu _twopc_current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s\n".cstring(), _twopc_last_offset, _twopc_current_offset, _notify.acked_point_of_ref, try (_notify.twopc_txn_id_last_committed as String).cstring() else "<<<None>>>".string() end, _sink_id.string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("2PC: Rollback: _twopc_last_offset %lu _twopc_current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s\n".cstring(), _twopc_last_offset, _twopc_current_offset, _notify.acked_point_of_ref, try (_notify.twopc_txn_id_last_committed as String).cstring() else "<<<None>>>".string() end, _sink_id.string().cstring())
+    end
 
     event_log.ack_rollback(_sink_id)
 
@@ -937,14 +935,9 @@ actor ConnectorSink is Sink
   fun ref report_ready_to_work() =>
     match _initializer
     | let initializer: LocalTopologyInitializer =>
-      @printf[I32]("AAAA: %s\n".cstring(), __loc.method_name().cstring())
       initializer.report_ready_to_work(this)
       _initializer = None
     end
-//    todo left off here: send phase2 commit/abort (move from notify??)?
-//    wait, that won't work for non-crash rollback because non-crash
-//      rollback would never call report_ready_for_work() ... except that
-//      non-crash rollback doesn't lose state the state that we're worried about??
 
   fun ref _writev(data: ByteSeqIter, tracking_id: (SeqId | None))
   =>

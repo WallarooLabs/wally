@@ -67,7 +67,7 @@ def decode_feed(data):
 def encode_conversion(data):
     # Let's make line-oriented output
     x = (str(data) + '\n').encode('utf-8')
-    print('DBG: sink encode: {}'.format(x))
+    # print('DBG: sink encode: {}'.format(x))
     return x
 
 

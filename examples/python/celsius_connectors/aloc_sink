@@ -2,6 +2,7 @@
 
 import asyncore
 import asynchat
+import logging
 import os
 import random
 import re
@@ -59,7 +60,7 @@ def look_for_forced_abort(path):
                     res = False
                 elif a[1] == '1-ok':
                     if res == False:
-                        print('FATAL ERROR: next-txn-force-abort followed by 1-ok')
+                        logging.critical('next-txn-force-abort followed by 1-ok')
                         sys.exit(66)
                     res = True
                 elif a[1] == '1-rollback':
@@ -79,11 +80,11 @@ def look_for_orphaned_s3_phase2_data(path):
                 if op == '1-ok':
                     where_list = a[3]
                     if where_list == []:
-                        print('FATAL ERROR: Empty where_list in {}'.format(l))
+                        logging.critical('Empty where_list in {}'.format(l))
                         sys.exit(66)
                     for (stream_id, start_por, end_por) in where_list:
                         if stream_id != 1:
-                            print('FATAL ERROR: Bad stream_id in {}'.format(l))
+                            logging.critical('Bad stream_id in {}'.format(l))
                             sys.exit(66)
                     ## The first txn commit may be start=end=0.
                     ## We don't write an S3 object for 0 bytes,
@@ -97,10 +98,10 @@ def look_for_orphaned_s3_phase2_data(path):
                         orphaned[txn_id] = (txn_id, start_por, end_por, False)
                 elif op == '2-ok':
                     if not (txn_id in orphaned):
-                        print('FATAL ERROR: Expected txn_id {} in {}'.format(txn_id, l))
+                        logging.critical('Expected txn_id {} in {}'.format(txn_id, l))
                         sys.exit(66)
-                    print('DBG: 2-ok l = {}'.format(l))
-                    print('DBG: blah = {}'.format(orphaned[txn_id]))
+                    logging.debug('2-ok l = {}'.format(l))
+                    logging.debug('blah = {}'.format(orphaned[txn_id]))
                     q = orphaned[txn_id]
                     orphaned[txn_id] = (q[0], q[1], q[2], True)
                 elif op == '2-s3-ok':
@@ -127,13 +128,13 @@ HACK = 0
 
 class AsyncServer(asynchat.async_chat, object):
     def __init__(self, handler_id, sock, out_path, abort_rule_path, s3_scheme, s3_bucket, s3_prefix, streams=None):
-        print("AsyncServer.__init__", handler_id, sock)
+        logging.debug("AsyncServer.__init__: {} {}".format(handler_id, sock))
         self._id = handler_id
         self._conn = sock
         self._out_path = out_path
         self._out = open(self._out_path, 'ab')
         self._out_offset = self._out.tell()
-        print('DBG: top of AsyncServer self._out_offset = {}'.format(self._out_offset))
+        logging.debug('top of AsyncServer self._out_offset = {}'.format(self._out_offset))
         txn_log_path = self._out_path + ".txnlog"
         self._txn_log = open(txn_log_path, 'ab')
         self._abort_rule_path = abort_rule_path
@@ -165,11 +166,10 @@ class AsyncServer(asynchat.async_chat, object):
 
         if self._s3 is not None:
             try:
-                print('S3: _s3 = {}'.format(self._s3))
                 self._s3 = self._s3.create_bucket(Bucket=self._s3_bucket)
-                print('S3: _s3 = {}'.format(self._s3))
             except Exception as e:
-                print('FATAL ERROR: {}'.format(e)); sys.exit(66)
+                logging.critical('{}'.format(e))
+                sys.exit(66)
 
         self._abort_rules = parse_abort_rules(self._abort_rule_path)
         for t in self._abort_rules:
@@ -180,15 +180,14 @@ class AsyncServer(asynchat.async_chat, object):
                 # NOTE: This type doesn't have extended disconnect control!
 
         self._txn_state = reload_phase1_txn_state(txn_log_path)
-        print('DBG: restored txn state: {}'.format(self._txn_state))
+        logging.debug('restored txn state: {}'.format(self._txn_state))
         self._txn_commit_next = look_for_forced_abort(txn_log_path)
-        print('2PC: top: self._txn_commit_next = {}'.format(self._txn_commit_next))
         orphaned = look_for_orphaned_s3_phase2_data(txn_log_path)
-        print('S3: orphaned {}'.format(orphaned))
+        logging.debug('S3: orphaned {}'.format(orphaned))
         if orphaned == []:
             None
         elif len(orphaned) > 1:
-            print('FATAL ERROR: expected max 1 orphaned item: {}'.format(orphaned))
+            logging.critical('expected max 1 orphaned item: {}'.format(orphaned))
             sys.exit(66)
         else:
             (txn_id, start_por, end_por, _) = orphaned[0]
@@ -226,10 +225,10 @@ class AsyncServer(asynchat.async_chat, object):
         self.count = 0
         if isinstance(msg, cwm.Hello):
             if msg.version != "v0.0.1":
-                print('FATAL ERROR: bad protocol version: {}'.format(msg.version))
+                logging.critical('bad protocol version: {}'.format(msg.version))
                 sys.exit(66)
             if msg.cookie != "Dragons Love Tacos!":
-                print('FATAL ERROR: bad cookie: {}'.format(msg.cookie))
+                logging.critical('bad cookie: {}'.format(msg.cookie))
                 sys.exit(66)
             # As of 2019-03-04, Wallaroo's connector sink is not managing
             # credits and will rely solely on TCP backpressure for its
@@ -238,6 +237,7 @@ class AsyncServer(asynchat.async_chat, object):
             self.write(ok)
         elif isinstance(msg, cwm.Notify):
             if msg.stream_id != 1:
+                logging.error("Unsupported stream id {}".format(msg.stream_id))
                 error = cwm.Error("Unsupported stream id {}".format(msg.stream_id))
                 self.write(error)
                 return
@@ -259,7 +259,7 @@ class AsyncServer(asynchat.async_chat, object):
         elif isinstance(msg, cwm.Error):
             # Got error message from worker
             # close the connection and pass msg to the error handler
-            print("Received an error message. closing the connection")
+            logging.error("Received an error message. closing the connection")
             self.close()
             raise Exception(msg.message)
         else:
@@ -281,27 +281,27 @@ class AsyncServer(asynchat.async_chat, object):
             reply_bytes = cwm.TwoPCFrame.encode(reply)
             msg = cwm.Message(0, cwm.Message.Ephemeral, None, None, None, reply_bytes)
             self.write(msg)
-            print('2PC: ListUncommitted resp: {}'.format(reply))
+            logging.debug('2PC: ListUncommitted resp: {}'.format(reply))
 
             self.log_it(['list-uncommitted', uncommitted])
         elif isinstance(msg2, cwm.TwoPCPhase1):
-            print('2PC: Phase 1 got {}'.format(msg2))
-            print('2PC: Phase 1 txn_state = {}'.format(self._txn_state))
+            logging.debug('2PC: Phase 1 got {}'.format(msg2))
+            logging.debug('2PC: Phase 1 txn_state = {}'.format(self._txn_state))
 
             # Sanity checks
             start_por = -1
             for (stream_id, start_por, end_por) in msg2.where_list:
                 if stream_id != 1:
                     self._txn_commit_next = False
-                    print('2PC: Phase 1 invalid stream_id {} in {}'
+                    logging.error('2PC: Phase 1 invalid stream_id {} in {}'
                         .format(stream_id, msg2))
                 if start_por > end_por:
                     self._txn_commit_next = False
-                    print('2PC: Phase 1 invalid start_por {} end_por {}'
+                    logging.error('2PC: Phase 1 invalid start_por {} end_por {}'
                         .format(start_por, end_por))
                 if end_por > self._out_offset:
                     self._txn_commit_next = False
-                    print('2PC: Phase 1 invalid end_por {} file size {}'
+                    logging.error('2PC: Phase 1 invalid end_por {} file size {}'
                         .format(end_por, self._out.tell()))
 
             # Check local debugging/testing abort rules
@@ -313,7 +313,7 @@ class AsyncServer(asynchat.async_chat, object):
                 if r[0] == 'local-txn':
                     if TXN_COUNT == r[1]:
                         self._txn_commit_next = False
-                        print('2PC: abort next transaction: local txn count {}'
+                        logging.info('2PC: abort next transaction: local txn count {}'
                             .format(TXN_COUNT))
                         try:
                             success = r[2]
@@ -324,7 +324,7 @@ class AsyncServer(asynchat.async_chat, object):
                 elif r[0] == 'txnid-regexp':
                     if re.search(r[1], msg2.txn_id):
                         self._txn_commit_next = False
-                        print('2PC: abort next transaction: regexp {} matches txn_id {}'
+                        logging.info('2PC: abort next transaction: regexp {} matches txn_id {}'
                             .format(r[1], msg2.txn_id))
                         try:
                             success = r[2]
@@ -338,7 +338,7 @@ class AsyncServer(asynchat.async_chat, object):
             success = self._txn_commit_next
             if success and (self._s3 is not None) and start_por >= 0:
                 chunk = read_chunk(self._out_path, start_por, end_por)
-                # print('S3: offset {} to {} len(chunk) = {}'.format(start_por, end_por, len(chunk)))
+                logging.debug('S3: offset {} to {} len(chunk) = {}'.format(start_por, end_por, len(chunk)))
                 self._s3_chunk = chunk
                 self._s3_chunk_offset = start_por
 
@@ -369,8 +369,8 @@ class AsyncServer(asynchat.async_chat, object):
         elif isinstance(msg2, cwm.TwoPCReply):
             raise Exception("Bad stream ID 0 message: {}".format(msg2))
         elif isinstance(msg2, cwm.TwoPCPhase2):
-            print('2PC: Phase 2 got {}'.format(msg2))
-            print('2PC: Phase 2 pre txn_state = {}'.format(self._txn_state))
+            logging.debug('2PC: Phase 2 got {}'.format(msg2))
+            logging.debug('2PC: Phase 2 pre txn_state = {}'.format(self._txn_state))
             if msg2.txn_id in self._txn_state:
                 (phase1_status, where_list) = self._txn_state[msg2.txn_id]
                 if not msg2.commit:
@@ -378,17 +378,14 @@ class AsyncServer(asynchat.async_chat, object):
                         if stream_id != 1:
                             raise Exception('Phase 2 abort: bad stream_id {}'.
                                 format(stream_id))
-                        print('2PC: truncating {} to offset {}'.format(self._out_path, start_por))
+                        logging.info('2PC: truncating {} to offset {}'.format(self._out_path, start_por))
                         self._out.truncate(start_por)
                         self.flush_fsync(self._out)
                         self._out_offset = start_por
                         self._streams[stream_id][2] = start_por
 
                 if not phase1_status and msg2.commit:
-                    print('2PC: mute/unmute placeholder 1 @ aloc_sink')
-                    print('2PC: Protocol error: phase 1 status was rollback but phase 2 says commit')
-                    ##### time.sleep(1.0)
-                    print('2PC: mute/unmute placeholder 2 @ aloc_sink')
+                    logging.fatal('2PC: Protocol error: phase 1 status was rollback but phase 2 says commit')
                     sys.exit(66)
 
                 if msg2.commit and phase1_status:
@@ -405,9 +402,9 @@ class AsyncServer(asynchat.async_chat, object):
                         self._s3_chunk, msg2.txn_id, 'normal')
 
                 del self._txn_state[msg2.txn_id]
-                print('2PC: Phase 2 post txn_state = {}'.format(self._txn_state))
+                logging.debug('2PC: Phase 2 post txn_state = {}'.format(self._txn_state))
             else:
-                print('2PC: ERROR: Phase 2 got unknown txn_id {} commit {}'.format(msg2.txn_id, msg2.commit))
+                logging.error('2PC: ERROR: Phase 2 got unknown txn_id {} commit {}'.format(msg2.txn_id, msg2.commit))
                 self.log_it(['2-error', msg2.txn_id, msg2.commit])
             # No reply is required for Phase 2
         else:
@@ -420,11 +417,11 @@ class AsyncServer(asynchat.async_chat, object):
             if stream_id == msg.stream_id:
                 if re.search(regexp, str(bs)):
                     self._txn_commit_next = False
-                    print('2PC: abort next transaction: {} matches {}'
+                    logging.info('2PC: abort next transaction: {} matches {}'
                         .format(regexp, bs))
 
         if msg.message_id != None:
-            print('DBG: msg.message_id = {}'.format(msg.message_id))
+            logging.debug('msg.message_id = {}'.format(msg.message_id))
             if self._out_offset == msg.message_id:
                 ret1 = self._out.write(bs)
                 if len(bs) != ret1:
@@ -432,7 +429,7 @@ class AsyncServer(asynchat.async_chat, object):
                     raise Exception("File write error? {} != {} or {} != None".format(len(bs), ret1, ret2))
                 self._out_offset += len(msg.message)
                 self._streams[msg.stream_id][2] = msg.message_id
-                print('DBG: _out_offset is now {}'.format(self._out_offset))
+                logging.debug('_out_offset is now {}'.format(self._out_offset))
             elif self._out_offset < msg.message_id:
                 # TODO: After the bugfix in commit 88e4cdca2, this
                 # case should be impossible, and we ought to make this
@@ -440,41 +437,41 @@ class AsyncServer(asynchat.async_chat, object):
                 m = 'ERROR: MISSING DATA: self._out_offset {} < msg.message_id {}'.format(self._out_offset, msg.message_id)
                 self._txn_commit_next = False
                 if not self._next_txn_force_abort_written:
-                    print(m)
+                    logging.error(m)
                     self._next_txn_force_abort_written = True
                     self.log_it(['next-txn-force-abort', m])
             elif self._out_offset > msg.message_id:
-                print('NOTICE: duplicate data: self._out_offset {} > msg.message_id {}'.format(self._out_offset, msg.message_id))
+                logging.error('NOTICE: duplicate data: self._out_offset {} > msg.message_id {}'.format(self._out_offset, msg.message_id))
                 ## Deduplication case: we've already seen this, so
                 ## we don't take any further action.
         else:
-            print('FATAL ERROR: message has no message_id')
+            logging.critical('message has no message_id')
             sys.exit(66)
 
         if msg.flags & cwm.Message.Eos:
             # ack eos
-            print("NH: acking eos for {}".format(msg))
+            logging.debug("NH: acking eos for {}".format(msg))
             self.write(cwm.Ack(credits = 1,
                                acks= [(msg.stream_id, self._streams[msg.stream_id][2])]))
 
     def write(self, msg):
-        print("write {}".format(msg))
+        logging.debug("write {}".format(msg))
         data = cwm.Frame.encode(msg)
         super(AsyncServer, self).push(data)
 
     def update_received_count(self):
         self.received_count += 1
         if (not self._using_2pc) and self.received_count % 3 == 0:
-            print("Sending ack for streams!")
+            logging.debug("Sending ack for streams!")
             ack = cwm.Ack(
                 credits = 10,
                 acks = [
                     (sid, por) for sid, _, por in self._streams.values()])
-            print('DBG: send ack msg: {}'.format(ack))
+            logging.debug('send ack msg: {}'.format(ack))
             self.write(ack)
         if self.received_count % 9999200 == 0:
             # send a restart every 200 messages
-            print('PERIODIC RESTART, what could possibly go wrong?')
+            logging.info('PERIODIC RESTART, what could possibly go wrong?')
             self.write(cwm.Restart())
 
     def handle_error(self):
@@ -482,8 +479,8 @@ class AsyncServer(asynchat.async_chat, object):
         traceback.print_exception(_type, _value, _traceback)
 
     def close(self):
-        print("Closing the connection")
-        print("last received id by stream:\n\t{}".format(
+        logging.info("Closing the connection")
+        logging.info("last received id by stream:\n\t{}".format(
             "\n\t".join("{}, {}: {}".format(sid, sn, mid)
                       for sid, sn, mid in self._streams.values())))
         super(AsyncServer, self).close()
@@ -496,11 +493,11 @@ class AsyncServer(asynchat.async_chat, object):
         """
         x = file.flush()
         if x:
-            print('FATAL ERROR: flush failed: {}'.format(x))
+            logging.critical('flush failed: {}'.format(x))
             sys.exit(66)
         x = os.fsync(file.fileno())
         if x:
-            print('FATAL ERROR: fsync failed: {}'.format(x))
+            logging.critical('fsync failed: {}'.format(x))
             sys.exit(66)
 
     def log_it(self, log):
@@ -517,10 +514,10 @@ class AsyncServer(asynchat.async_chat, object):
                     Body=chunk,
                     Bucket=self._s3_bucket,
                     Key=name)
-                print('S3: put res = {}'.format(res))
+                logging.debug('S3: put res = {}'.format(res))
                 break
             except Exception as e:
-                print('S3: ERROR: put res = {}'.format(e))
+                logging.error('S3: ERROR: put res = {}'.format(e))
                 time.sleep(2.0)
         self.log_it(['2-s3-ok', txn_id, name, why])
 
@@ -542,10 +539,17 @@ class EchoServer(asyncore.dispatcher):
         self._streams = {}
 
     def handle_accepted(self, sock, addr):
-        print('Incoming connection from %s' % repr(addr))
+        logging.info('Incoming connection from %s' % repr(addr))
         handler = AsyncServer(self.count, sock,
             self._out_path, self._abort_rule_path, s3_scheme, s3_bucket, s3_prefix, self._streams)
         self.count += 1
+
+fmt = '%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
+logging.root.formatter = logging.Formatter(fmt)
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(logging.root.formatter)
+logging.root.addHandler(stream_handler)
+logging.root.setLevel(logging.INFO)
 
 out_path = sys.argv[1]
 abort_rule_path = sys.argv[2]
@@ -553,14 +557,14 @@ try:
     s3_scheme = sys.argv[3]
     s3_bucket = sys.argv[4]
     s3_prefix = sys.argv[5]
-    print("s3_scheme: {}, s3_bucket: {}, s3_prefix: {}".format(s3_scheme, s3_bucket, s3_prefix))
+    logging.debug("s3_scheme: {}, s3_bucket: {}, s3_prefix: {}".format(s3_scheme, s3_bucket, s3_prefix))
 except:
     s3_scheme = None
     s3_bucket = None
     s3_prefix = None
-print("out_path: ", out_path)
-print ("abort_rule_path: ", abort_rule_path)
+logging.debug("out_path: {}".format(out_path))
+logging.info("abort_rule_path: {}".format(abort_rule_path))
 server = EchoServer('127.0.0.1', 7200, out_path, abort_rule_path, s3_scheme, s3_bucket, s3_prefix)
-print("server: ", server)
-print("asyncore file: ", asyncore.__file__)
+logging.debug("server: {}".format(server))
+logging.debug("asyncore file: {}".format(asyncore.__file__))
 asyncore.loop(timeout=0.001)
