@@ -184,6 +184,8 @@ def pipeline_test(sources, expected, command, workers=1,
                 if not isinstance(sources, list):
                     sources = [sources]
                 for i, (gen, src_name) in enumerate(sources):
+                    # TODO [source-migration]: BaseSource is ConnectorBaseSource
+                    # should be renamed throughout
                     if isinstance(gen, BaseSource):
                         # AtLeastOnce Sender: ALOSender
                         sender = ALOSender(gen,

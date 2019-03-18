@@ -405,6 +405,7 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
 
     partition_multiplier = 5  # Used in partition count creation
     # create the sequence generator and the reader
+    # TODO [source-migration]: Pair with Nisan
     msg = MultiSequenceGenerator(base_parts=workers * partition_multiplier - 1)
 
     # Start cluster
