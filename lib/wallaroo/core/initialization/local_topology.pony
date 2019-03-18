@@ -1275,15 +1275,8 @@ actor LocalTopologyInitializer is LayoutInitializer
     join. This should not be called on any other worker than the one initially
     contacted.
     """
-    match _topology
-    | let t: LocalTopology =>
-      let current_worker_count = t.worker_names.size()
-      let new_t = t.add_new_worker(joining_worker_name)
-      _router_registry.worker_join(conn, joining_worker_name,
-        joining_worker_count, new_t, current_worker_count)
-    else
-      Fail()
-    end
+    local_topology_for_joining_worker(conn, joining_worker_name,
+      joining_worker_count)
 
   be connect_to_joining_workers(coordinator: String,
     control_addrs: Map[WorkerName, (String, String)] val,
@@ -1497,6 +1490,20 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
     _outgoing_boundaries = consume bs
     _outgoing_boundary_builders = consume bbs
+
+  fun ref local_topology_for_joining_worker(conn: TCPConnection,
+    joining_worker_name: String, joining_worker_count: USize)
+  =>
+    match _topology
+    | let t: LocalTopology =>
+      let current_worker_count = t.worker_names.size()
+      let new_t = t.add_new_worker(joining_worker_name)
+        .new_barrier_source_id(_routing_id_gen())
+      _router_registry.worker_join(conn, joining_worker_name,
+        joining_worker_count, new_t, current_worker_count)
+    else
+      Fail()
+    end
 
 
 ///////////////////////
