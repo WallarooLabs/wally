@@ -519,7 +519,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
   /////////////////
 
   fun ref begin_shrink(leaving: Array[WorkerName] val) =>
-    if leaving.contains(_worker_name) then
+    if leaving.contains(_worker_name, {(l, r) => l == r}) then
       _is_shrinking = true
     end
     if _is_leader then
@@ -745,7 +745,7 @@ class LocalConnectorStreamRegistry[In: Any val]
 
   fun ref begin_shrink(leaving: Array[WorkerName] val) =>
     _global_registry.begin_shrink(leaving)
-    if leaving.contains(_worker_name) then
+    if leaving.contains(_worker_name, {(l, r) => l == r}) then
       @printf[I32]("Starting shrink migration\n.".cstring())
       _is_shrinking = true
       // for each source, call shrink
