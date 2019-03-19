@@ -123,7 +123,8 @@ class BarrierStepForwarder
     check_completion(_step.inputs())
 
   fun ref check_completion(inputs: Map[RoutingId, Producer] box) =>
-    @printf[I32]("[JB] check_completion\n".cstring())
+    @printf[I32]("[JB] check_completion.1\n".cstring())
+    // TODO [source-migration]: John, does the below if do anything?
     if (inputs.size() - _inputs_blocking.size()) == 1 then
       for (kk, xx) in inputs.pairs() do
         var found: Bool = false
@@ -132,6 +133,9 @@ class BarrierStepForwarder
         end
       end
     end
+    @printf[I32]("[JB] check_completion.2\n".cstring())
+    @printf[I32]("[JB] check_completion.2 _inputs_blocking size: %s\n"
+      .cstring(), _inputs_blocking.size().string().cstring())
     if inputs.size() == _inputs_blocking.size()
     then
       for (o_id, o) in _step.outputs().pairs() do
@@ -145,8 +149,10 @@ class BarrierStepForwarder
       end
       let b_token = _barrier_token
       clear()
+      @printf[I32]("[JB] check_completion.2.clear\n".cstring())
       _step.barrier_complete(b_token)
     end
+    @printf[I32]("[JB] check_completion.3\n".cstring())
 
   fun ref clear() =>
     @printf[I32]("[JB]clear\n".cstring())

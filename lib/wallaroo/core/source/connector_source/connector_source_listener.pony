@@ -447,13 +447,21 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   // AUTOSCALE
   /////////////
   be begin_join_migration(joining_workers: Array[WorkerName] val) =>
+    @printf[I32]("ConnectorSourceListener beginning join migration.\n"
+      .cstring())
     // TODO [source-migration]: should leader election or leader notification
     // for joining workers be done here?
+    @printf[I32]("ConnectorSourceListener completed join migration.\n"
+      .cstring())
     _router_registry.source_listener_migration_complete(this)
 
   be begin_shrink_migration(leaving_workers: Array[WorkerName] val) =>
+    @printf[I32]("ConnectorSourceListener beginning shrink migration.\n"
+      .cstring())
     // this gets called on both remaining and leaving workers
-    _stream_registry.begin_shrink(leaving_workers)
+    _stream_registry.begin_shrink(leaving_workers, _connected_sources)
 
   be complete_shrink_migration() =>
+    @printf[I32]("ConnectorSourceListener completing shrink migration.\n"
+      .cstring())
     _router_registry.source_listener_migration_complete(this)

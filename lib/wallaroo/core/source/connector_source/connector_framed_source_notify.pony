@@ -821,6 +821,12 @@ class ConnectorSourceNotify[In: Any val]
       @printf[I32]("ConnectorSource relinquishing %s streams\n".cstring(),
         _pending_relinquish.size().string().cstring())
       _listener.streams_relinquish(consume streams)
+    else
+      if _fsm_state is _ProtoFsmShrinking then
+        @printf[I32]("ConnectorSource relinquishing %s streams\n".cstring(),
+          _pending_relinquish.size().string().cstring())
+        _listener.streams_relinquish(consume streams)
+      end
     end
 
   fun ref _clear_streams() =>

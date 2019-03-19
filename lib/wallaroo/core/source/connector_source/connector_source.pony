@@ -1027,6 +1027,8 @@ actor ConnectorSource[In: Any val] is Source
     _notify.stream_notify_result(session_id', success, stream)
 
   be begin_shrink() =>
+    @printf[I32]("ConnectorSource %s beginning shrink migration.\n"
+      .cstring(), _source_id.string().cstring())
     _notify.shrink()
 
   be complete_shrink(host: String, service: String) =>
@@ -1034,6 +1036,8 @@ actor ConnectorSource[In: Any val] is Source
     Send a RESTART message with the (host,service) data that the connector
     should reconnect to.
     """
+    @printf[I32]("ConnectorSource %s completed shrink migration with new address: (%s, %s).\n"
+      .cstring(), host.cstring(), service.cstring())
     _notify.host = host
     _notify.service = service
     _notify.send_restart()

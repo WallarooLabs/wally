@@ -323,6 +323,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
     ##########################
 
     def connect(self):
+        logging.debug("ALOConnectorSource.connect")
         self.handshake_complete = False
         conn = socket.socket()
         try:
@@ -340,6 +341,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         hello = cwm.Hello(self.version, self.cookie, self.program_name,
                           self.instance_name)
         self._conn.sendall(cwm.Frame.encode(hello))
+        logging.debug("ALOConnectorSource handshake sent")
         header_bytes = self._conn.recv(4)
         frame_size = struct.unpack('>I', header_bytes)[0]
         frame = self._conn.recv(frame_size)
@@ -352,6 +354,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         # set socket to nonblocking
         self._conn.setblocking(0)
         # handshake complete: initialize async_chat
+        logging.debug("ALOConnectorSource handshake complete")
         self._async_init = True
         asynchat.async_chat.__init__(self,
                                      sock=self._conn,

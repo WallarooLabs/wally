@@ -146,6 +146,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
       if _is_shrinking then
         try
           (let host, let service) = _source_addrs_reallocation(_worker_name)?
+          // Local calls _listener.complete_shrink_migration()
           _local_shrink_complete(host, service)
         end
       end
@@ -518,7 +519,11 @@ class GlobalConnectorStreamRegistry[In: Any val]
   // Streams Shrink
   /////////////////
 
-  fun ref begin_shrink(leaving: Array[WorkerName] val) =>
+  fun ref begin_shrink(leaving: Array[WorkerName] val,
+    streams_to_shrink: Array[StreamId] val)
+  =>
+    @printf[I32]("GlobalConnectorStreamRegistry beginning shrink.\n"
+      .cstring())
     if leaving.contains(_worker_name, {(l, r) => l == r}) then
       _is_shrinking = true
     end
@@ -529,7 +534,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
       _pending_shrink.clear()
       // set streams pending shrink
       for (id, name) in _active_streams.pairs() do
-        if leaving.contains(name) then
+        if leaving.contains(name, {(l, r) => l == r}) then
           _pending_shrink.set(id)
         end
       end
@@ -549,6 +554,11 @@ class GlobalConnectorStreamRegistry[In: Any val]
         try
           _source_addrs_reallocation(worker) = remaining(idx % rem_size)?
         end
+      end
+    else
+      _pending_shrink.clear()
+      for stream in streams_to_shrink.values() do
+        _pending_shrink.set(stream)
       end
     end
 
@@ -599,6 +609,8 @@ class GlobalConnectorStreamRegistry[In: Any val]
 
     worker->leader.stream_shrink
     """
+    @printf[I32]("GlobalConnectorStreamRegistry received streams shrink from %s.\n"
+      .cstring(), msg.worker_name.cstring())
     if _is_leader then
       streams_shrink(msg.streams, msg.worker_name)
       try
@@ -616,6 +628,8 @@ class GlobalConnectorStreamRegistry[In: Any val]
   fun ref process_streams_shrink_response_msg(
     msg: ConnectorStreamsShrinkResponseMsg)
   =>
+    @printf[I32]("GlobalConnectorStreamRegistry received streams shrink response.\n"
+      .cstring())
     if _is_shrinking then
       for stream in msg.streams.values() do
         _pending_shrink.unset(stream.id)
@@ -630,6 +644,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     end
 
   fun ref _local_shrink_complete(host: String, service: String) =>
+    // Local calls _listener.complete_shrink_migration()
     try
       (_local_registry as LocalConnectorStreamRegistry[In])
         .complete_shrink(host, service)
@@ -743,21 +758,34 @@ class LocalConnectorStreamRegistry[In: Any val]
   fun ref purge_pending_requests(session_id: RoutingId) =>
     _global_registry.purge_pending_requests(session_id)
 
-  fun ref begin_shrink(leaving: Array[WorkerName] val) =>
-    _global_registry.begin_shrink(leaving)
+  fun ref begin_shrink(leaving: Array[WorkerName] val,
+    connected_sources: SetIs[ConnectorSource[In]])
+  =>
+    let streams_to_shrink = recover iso Array[StreamId] end
+    for stream in _active_streams.values() do
+      streams_to_shrink.push(stream.id)
+    end
+    _global_registry.begin_shrink(leaving, consume streams_to_shrink)
     if leaving.contains(_worker_name, {(l, r) => l == r}) then
-      @printf[I32]("Starting shrink migration\n.".cstring())
       _is_shrinking = true
+      @printf[I32]("Starting shrink migration\n.".cstring())
+      if connected_sources.size() == 0 then
+        @printf[I32]("LocalConnectorStreamRegistry nothing to migrate\n."
+          .cstring())
+        return _listener.complete_shrink_migration()
+      end
       // for each source, call shrink
-      for stream in _active_streams.values() do
-        if not _shrinking_sources.contains(stream.source) then
-          _shrinking_sources.set(stream.source)
-          stream.source.begin_shrink()
-        end
+      @printf[I32]("LocalConnectorStreamRegistry shrinking %s sources\n."
+          .cstring(), connected_sources.size().string().cstring())
+      for source in connected_sources.values() do
+        _shrinking_sources.set(source)
+        source.begin_shrink()
       end
     end
 
   fun ref complete_shrink(host: String, service: String) =>
+    @printf[I32]("LocalConnectorStreamRegistry completing shrink\n"
+      .cstring())
     // tell each source to complete shrink and send a RESTART
     for source in _shrinking_sources.values() do
       source.complete_shrink(host, service)
