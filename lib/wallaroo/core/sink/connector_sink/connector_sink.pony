@@ -252,14 +252,6 @@ actor ConnectorSink is Sink
       @printf[I32]("Rcvd msg at ConnectorSink\n".cstring())
     end
     if _twopc_state is cp.TwoPCFsm2Abort then
-      // TODO I think that this is harmless, but double-check.
-      // We've done prepare_for_rollback before getting here.
-      // The next step is rollback().  Anything that we send to
-      // the sink is going to be undone.  Aside from the wasted
-      // effort, is there any harm done?  Is it worth the effort
-      // of trying to switch to NormalSinkMessageProcessor and
-      // sync _twopc_state=TwoPCFsmStart in only 1 behavior call?
-      // And can we do that without adding more bugs?
       None
     elseif not (_twopc_state is cp.TwoPCFsmStart) then
       @printf[I32]("2PC: ERROR: _twopc_state = %d\n".cstring(), _twopc_state())
@@ -643,14 +635,12 @@ actor ConnectorSink is Sink
         Fail()
       end
     | let srt: CheckpointRollbackBarrierToken =>
-      _reset_2pc_state() // SLF TODO
-      _clear_barriers() ////////// _resume_processing_messages() // SLF TODO
+      _clear_barriers()
     | let rbrt: CheckpointRollbackResumeBarrierToken =>
-      _resume_processing_messages() // SLF TODO
+      _resume_processing_messages()
     end
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
-    //SLF TODO
     ifdef "checkpoint_trace" then
       @printf[I32]("2PC: Checkpoint complete %d at ConnectorSink %s\n".cstring(), checkpoint_id, _sink_id.string().cstring())
     end
@@ -662,7 +652,7 @@ actor ConnectorSink is Sink
       Fail()
     end
 
-    let cpoint_id = "impossible-5" // Change to "some-int" for debugging
+    let cpoint_id = "impossible-5" // TODO Change to int for debugging
     let drop_phase2_msg = try if _twopc_txn_id.split("=")(1)? == cpoint_id then true else false end else false end
     if _twopc_txn_id != "" then
       if not drop_phase2_msg then
