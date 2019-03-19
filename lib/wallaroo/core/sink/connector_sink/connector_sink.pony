@@ -545,12 +545,15 @@ actor ConnectorSink is Sink
     end
 
     if _message_processor.barrier_in_progress() then
+      @printf[I32]("Receive barrier line %d\n".cstring(), __loc.line())
       _message_processor.receive_barrier(input_id, producer,
         barrier_token)
     else
+      @printf[I32]("Receive barrier line %d\n".cstring(), __loc.line())
       match _message_processor
       | let nsmp: NormalSinkMessageProcessor =>
         try
+          @printf[I32]("Receive barrier line %d\n".cstring(), __loc.line())
            _message_processor = BarrierSinkMessageProcessor(this,
              _barrier_acker as BarrierSinkAcker)
            _message_processor.receive_new_barrier(input_id, producer,
@@ -639,65 +642,48 @@ actor ConnectorSink is Sink
         @printf[I32]("2PC: ERROR: _twopc_state = %d\n".cstring(), _twopc_state())
         Fail()
       end
-    end
-
-  be barrier_fully_acked(token: BarrierToken) =>
-    """
-    The BarrierInitiator has determined that the barrier protocol
-    for this autoscale/checkpoint/rollback/whatever event has
-    completed successfully, including all other 2PC protocol rounds
-    executed by other sinks for this checkpoint *and* also all
-    resilients have written their state to the EventLog.
-    We may now advance.
-    """
-    ifdef "checkpoint_trace" then
-      @printf[I32]("Barrier fully acked %s at ConnectorSink %s\n".cstring(), token.string().cstring(), _sink_id.string().cstring())
-    end
-
-    match token
-    | let sbt: CheckpointBarrierToken =>
-      if (not (_twopc_state is cp.TwoPCFsm2Commit)) or
-         (not _twopc_phase1_commit)
-      then
-        @printf[I32]("2PC: DBG: _twopc_state = %s, _twopc_phase1_commit %s\n".cstring(), _twopc_state().string().cstring(), _twopc_phase1_commit.string().cstring())
-        Fail()
-      end
-
-      let cpoint_id = "impossible-5"
-      let drop_phase2_msg = try if _twopc_txn_id.split("=")(1)? == cpoint_id then true else false end else false end
-      if _twopc_txn_id != "" then
-        if not drop_phase2_msg then
-          _send_phase2(this, _twopc_txn_id, true)
-        end
-      end
-
-      _twopc_last_offset = _twopc_current_offset
-      _notify.twopc_txn_id_last_committed = _twopc_txn_id
-      _reset_2pc_state()
-
-      _resume_processing_messages()
-
-      if drop_phase2_msg then
-        // Because we're using TCP, we get message loss only when
-        // the TCP connection is closed.  It doesn't matter why the
-        // connection is closed.  We have direct control over the
-        // timing here, so close it now.
-        _hard_close()
-        _schedule_reconnect()
-      end
-    | let rbrt: CheckpointRollbackBarrierToken =>
-      if (not ((_twopc_state is cp.TwoPCFsmStart) or
-               (_twopc_state is cp.TwoPCFsm2Abort)))
-         or _twopc_phase1_commit
-       then
-        Unreachable()
-      end
-
-      _resume_processing_messages()
+    | let srt: CheckpointRollbackBarrierToken =>
+      _reset_2pc_state() // SLF TODO
+      _clear_barriers() ////////// _resume_processing_messages() // SLF TODO
     | let rbrt: CheckpointRollbackResumeBarrierToken =>
-      _resume_processing_messages()
+      _resume_processing_messages() // SLF TODO
     end
-    None
+
+  be checkpoint_complete(checkpoint_id: CheckpointId) =>
+    //SLF TODO
+    ifdef "checkpoint_trace" then
+      @printf[I32]("2PC: Checkpoint complete %d at ConnectorSink %s\n".cstring(), checkpoint_id, _sink_id.string().cstring())
+    end
+
+    if (not (_twopc_state is cp.TwoPCFsm2Commit)) or
+       (not _twopc_phase1_commit)
+    then
+      @printf[I32]("2PC: DBG: _twopc_state = %s, _twopc_phase1_commit %s\n".cstring(), _twopc_state().string().cstring(), _twopc_phase1_commit.string().cstring())
+      Fail()
+    end
+
+    let cpoint_id = "impossible-5" // Change to "some-int" for debugging
+    let drop_phase2_msg = try if _twopc_txn_id.split("=")(1)? == cpoint_id then true else false end else false end
+    if _twopc_txn_id != "" then
+      if not drop_phase2_msg then
+        _send_phase2(this, _twopc_txn_id, true)
+      end
+    end
+
+    _twopc_last_offset = _twopc_current_offset
+    _notify.twopc_txn_id_last_committed = _twopc_txn_id
+    _reset_2pc_state()
+
+    _resume_processing_messages()
+
+    if drop_phase2_msg then
+      // Because we're using TCP, we get message loss only when
+      // the TCP connection is closed.  It doesn't matter why the
+      // connection is closed.  We have direct control over the
+      // timing here, so close it now.
+      _hard_close()
+      _schedule_reconnect()
+    end
 
   fun ref _resume_processing_messages() =>
     """
@@ -713,10 +699,6 @@ actor ConnectorSink is Sink
         qb.inject_barrier(this)
       end
     end
-
-  be checkpoint_complete(checkpoint_id: CheckpointId) =>
-    //SLF TODO
-    None
 
   fun ref _clear_barriers() =>
     try
