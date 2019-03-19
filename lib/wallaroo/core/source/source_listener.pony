@@ -32,7 +32,7 @@ use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
 
 interface val SourceListenerBuilder
-  fun apply(env: Env /***SLF, the_journal: SimpleJournal, do_local_file_io: Bool ***/): SourceListener
+  fun apply(env: Env): SourceListener
 
 interface val SourceListenerBuilderBuilder
   fun apply(worker_name: String,

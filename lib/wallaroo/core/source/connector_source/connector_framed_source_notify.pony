@@ -328,15 +328,9 @@ class ConnectorSourceNotify[In: Any val]
         // process Hello: reply immediately with an Ok(credits, [], [])
         // reset _credits to _max_credits
         _credits = _max_credits
-        _send_reply(_connector_source, cwm.OkMsg(_credits, [], []))
+        _send_reply(cwm.OkMsg(_credits, [], []))
         _fsm_state = _ProtoFsmStreaming
         return _continue_perhaps(source)
-
-      | let m: cwm.OkMsg =>
-        ifdef "trace" then
-          @printf[I32]("TRACE: got OkMsg\n".cstring())
-        end
-        return _to_error_state(source, "Invalid message: ok")
 
       | let m: cwm.ErrorMsg =>
         @printf[I32]("Received ERROR msg from client: %s\n".cstring(),
@@ -364,12 +358,6 @@ class ConnectorSourceNotify[In: Any val]
           _process_notify(where source=source, stream_id=m.stream_id,
             stream_name=m.stream_name, point_of_reference=m.point_of_ref)
         end
-
-      | let m: cwm.NotifyAckMsg =>
-        ifdef "trace" then
-          @printf[I32]("TRACE: got NotifyAckMsg\n".cstring())
-        end
-        return _to_error_state(source, "Invalid message: notify_ack")
 
       | let m: cwm.MessageMsg =>
         // check that we're in state that allows processing messages
@@ -409,7 +397,7 @@ class ConnectorSourceNotify[In: Any val]
                 _pending_close.update(m.stream_id, s)
               else
                 // respond immediately
-                _send_reply(source, cwm.AckMsg(0, [(s.id, s.last_seen)]))
+                _send_reply(cwm.AckMsg(0, [(s.id, s.last_seen)]))
                 _listener.streams_relinquish([StreamTuple(s.id, s.name,
                   s.last_seen)])
                 // TODO [source-migration] remove stream from active
@@ -455,7 +443,7 @@ class ConnectorSourceNotify[In: Any val]
                   end
 
                 // process message
-                return _run_and_subsequent_activity(latest_metrics_id, ingest_ts,
+                return _process_data_message(latest_metrics_id, ingest_ts,
                   pipeline_time_spent, key_string, source, decoded, s,
                   m.message_id, m.flags)
               else
@@ -475,19 +463,8 @@ class ConnectorSourceNotify[In: Any val]
             return _to_error_state(source, "Unknown StreamId")
           end
         end
-
-      | let m: cwm.AckMsg =>
-        ifdef "trace" then
-          @printf[I32]("TRACE: got AckMsg\n".cstring())
-        end
-        return _to_error_state(source, "Invalid message: ack")
-
-      | let m: cwm.RestartMsg =>
-        ifdef "trace" then
-          @printf[I32]("TRACE: got RestartMsg\n".cstring())
-        end
-        return _to_error_state(source, "Invalid message: restart")
-
+      else
+        return _handle_invalid_message(connector_msg, source)
       end
     else
       @printf[I32](("Unable to decode message at " + _pipeline_name +
@@ -499,7 +476,38 @@ class ConnectorSourceNotify[In: Any val]
     end
     _continue_perhaps(source)
 
-  fun ref _run_and_subsequent_activity(latest_metrics_id: U16,
+  fun ref _handle_invalid_message(connector_msg: cwm.Message,
+    source: ConnectorSource[In val] ref): Bool
+  =>
+    match connector_msg
+    | let m: cwm.OkMsg =>
+      ifdef "trace" then
+        @printf[I32]("TRACE: got OkMsg\n".cstring())
+      end
+      return _to_error_state(source, "Invalid message: ok")
+    | let m: cwm.NotifyAckMsg =>
+      ifdef "trace" then
+        @printf[I32]("TRACE: got NotifyAckMsg\n".cstring())
+      end
+      return _to_error_state(source, "Invalid message: notify_ack")
+    | let m: cwm.AckMsg =>
+      ifdef "trace" then
+        @printf[I32]("TRACE: got AckMsg\n".cstring())
+      end
+      return _to_error_state(source, "Invalid message: ack")
+    | let m: cwm.RestartMsg =>
+      ifdef "trace" then
+        @printf[I32]("TRACE: got RestartMsg\n".cstring())
+      end
+      return _to_error_state(source, "Invalid message: restart")
+    else
+      ifdef "trace" then
+        @printf[I32]("TRACE: got unknown message\n".cstring())
+      end
+      return _to_error_state(source, "unknown message")
+    end
+
+  fun ref _process_data_message(latest_metrics_id: U16,
     ingest_ts: U64,
     pipeline_time_spent: U64,
     key_string: String val,
@@ -582,9 +590,6 @@ class ConnectorSourceNotify[In: Any val]
     end
     source.expect(_header_size)
     _header = true
-    _continue_perhaps2()
-
-  fun ref _continue_perhaps2(): Bool =>
     ifdef linux then
       true
     else
@@ -891,18 +896,22 @@ class ConnectorSourceNotify[In: Any val]
         stream_id.string().cstring(), point_of_reference.string().cstring())
     end
     let m = cwm.NotifyAckMsg(success, stream_id, point_of_reference)
-    _send_reply(_connector_source, m)
+    _send_reply(m)
 
   //////////////////
   // Sending Replies
   //////////////////
   fun ref _to_error_state(source: (ConnectorSource[In] ref|None), msg: String): Bool
   =>
-    _send_reply(source, cwm.ErrorMsg(msg))
+    _send_reply(cwm.ErrorMsg(msg))
 
     _fsm_state = _ProtoFsmError
     try (source as ConnectorSource[In] ref).close() else Fail() end
-    _continue_perhaps2()
+    ifdef linux then
+      true
+    else
+      false
+    end
 
   fun ref _send_acks() =>
     let new_credits = _max_credits - _credits
@@ -921,7 +930,7 @@ class ConnectorSourceNotify[In: Any val]
     if (new_credits > 0) or (acks.size() > 0) then
       @printf[I32]("Sending acks for %s streams\n".cstring(),
         _pending_acks.size().string().cstring())
-      _send_reply(_connector_source, cwm.AckMsg(new_credits, consume acks))
+      _send_reply(cwm.AckMsg(new_credits, consume acks))
     end
     _credits = _credits + new_credits
 
@@ -930,15 +939,12 @@ class ConnectorSourceNotify[In: Any val]
       @printf[I32]("TRACE: %s.%s()\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring())
     end
-    _send_reply(_connector_source, cwm.RestartMsg(host + ":" + service))
+    _send_reply(cwm.RestartMsg(host + ":" + service))
+    // This calls our closed() method which will reset our appropriate state.
     try (_connector_source as ConnectorSource[In] ref).close() end
-    // The .close() method ^^^ calls our closed() method which will
-    // twiddle all of the appropriate state variables.
 
-  // TODO [post-source-migration]: why pass source here instead of using
-  // var _connector_source?
-  fun _send_reply(source: (ConnectorSource[In] ref|None), msg: cwm.Message) =>
-    match source
+  fun ref _send_reply(msg: cwm.Message) =>
+    match _connector_source
     | let s: ConnectorSource[In] ref =>
       // write the frame data and length encode it
       let w1: Writer = w1.create()

@@ -665,10 +665,10 @@ actor ConnectorSource[In: Any val] is Source
   =>
     let p: String ref = p.create()
     match payload
-    | let ss: String =>
-      p.append(ss)
-    | let ia: Array[U8] val =>
-      for c in ia.values() do
+    | let s: String =>
+      p.append(s)
+    | let a: Array[U8] val =>
+      for c in a.values() do
         p.push(c)
       end
     end

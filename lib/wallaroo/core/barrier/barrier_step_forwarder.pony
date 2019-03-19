@@ -124,14 +124,6 @@ class BarrierStepForwarder
 
   fun ref check_completion(inputs: Map[RoutingId, Producer] box) =>
     @printf[I32]("[JB] check_completion\n".cstring())
-    if (inputs.size() - _inputs_blocking.size()) == 1 then
-      for (kk, xx) in inputs.pairs() do
-        var found: Bool = false
-        for yy in _inputs_blocking.values() do
-          if yy is xx then found = true end
-        end
-      end
-    end
     if inputs.size() == _inputs_blocking.size()
     then
       for (o_id, o) in _step.outputs().pairs() do
