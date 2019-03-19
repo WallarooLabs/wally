@@ -960,6 +960,18 @@ actor Connections is Cluster
       Fail()
     end
 
+  be connector_streams_restart(worker_name: WorkerName, source_name: String,
+    host: String, service: String)
+  =>
+    try
+      let connector_streams_restart_msg =
+        ChannelMsgEncoder.connector_streams_restart(source_name, host, service,
+          _auth)?
+      _send_control(worker_name, connector_streams_restart_msg)
+    else
+      Fail()
+    end
+
 // Ensures that the cluster shuts down, even if there are straggler actors.
 class _ExitTimerNotify is TimerNotify
   fun ref apply(timer: Timer, count: U64): Bool =>

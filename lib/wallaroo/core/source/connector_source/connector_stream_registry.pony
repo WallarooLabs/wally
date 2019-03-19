@@ -524,10 +524,15 @@ class GlobalConnectorStreamRegistry[In: Any val]
   =>
     @printf[I32]("GlobalConnectorStreamRegistry beginning shrink.\n"
       .cstring())
+    @printf[I32]("[JB] Global leaving: %s streams_to_shrink: %s active: %s inactive: %s.\n"
+      .cstring(), leaving.size().string().cstring(), streams_to_shrink.size().string().cstring(), _active_streams.size().string().cstring(), _inactive_streams.size().string().cstring())
     if leaving.contains(_worker_name, {(l, r) => l == r}) then
       _is_shrinking = true
     end
     if _is_leader then
+      if (streams_to_shrink.size() == 0) and (_active_streams.size() == 0) then
+        return _listener.complete_shrink_migration()
+      end
       // clear any previously set source addr reallocation data
       _source_addrs_reallocation.clear()
       // clear any previously pending shrink ids
@@ -553,6 +558,13 @@ class GlobalConnectorStreamRegistry[In: Any val]
       for (idx, worker) in leaving.pairs() do
         try
           _source_addrs_reallocation(worker) = remaining(idx % rem_size)?
+        end
+      end
+      for worker_name in leaving.values() do
+        try
+        (let host, let service) = _source_addrs_reallocation(worker_name)?
+        _connections.connector_streams_restart(worker_name,
+          _source_name, host, service)
         end
       end
     else
@@ -635,6 +647,8 @@ class GlobalConnectorStreamRegistry[In: Any val]
         _pending_shrink.unset(stream.id)
       end
       if _pending_shrink.size() == 0 then
+        // TODO [source-migration]: should we still call this here or rely on
+        // the process_streams_restart_msg
         _local_shrink_complete(msg.host, msg.service)
       end
     else
@@ -649,6 +663,12 @@ class GlobalConnectorStreamRegistry[In: Any val]
       (_local_registry as LocalConnectorStreamRegistry[In])
         .complete_shrink(host, service)
     end
+
+  fun ref process_streams_restart_msg(msg: ConnectorStreamsRestartMsg) =>
+    // TODO [source-migration]: do we automatically call:
+    //  _local_shrink_complete(msg.host, msg.service)
+    // or do we store this info until it is safe to call?
+    None
 
 
 class ActiveStreamTuple[In: Any val]
@@ -735,6 +755,14 @@ class LocalConnectorStreamRegistry[In: Any val]
       | let m: ConnectorLeaderNameResponseMsg =>
         _global_registry.process_leader_name_response_msg(m)
 
+      | let m: ConnectorStreamsRestartMsg =>
+        _global_registry.process_streams_restart_msg(m)
+
+      | let m: ConnectorStreamsShrinkMsg =>
+        _global_registry.process_streams_shrink_msg(m)
+
+      | let m: ConnectorStreamsShrinkResponseMsg =>
+        _global_registry.process_streams_shrink_response_msg(m)
       end
     else
       @printf[I32](("**Dropping message** _pipeline_name: " +
