@@ -1119,8 +1119,10 @@ actor RouterRegistry
     @printf[I32]("[NH] %s ::: key_migration_complete(%s)\n".cstring(),
       ts.cstring(), key.cstring())
 
-    _key_waiting_list.unset(key)
-    try_to_resume_processing_immediately()
+    if _key_waiting_list.size() > 0 then
+      _key_waiting_list.unset(key)
+      try_to_resume_processing_immediately()
+    end
 
   be source_listener_migration_complete(source_listener: SourceListener) =>
     (let s, let ns) = Time.now()
@@ -1129,8 +1131,10 @@ actor RouterRegistry
     @printf[I32]("[NH] %s ::: source_listener_migration_complete()\n".cstring(),
       ts.cstring())
 
-    _source_listeners_waiting_list.unset(source_listener)
-    try_to_resume_processing_immediately()
+    try
+      _source_listeners_waiting_list.extract(source_listener)?
+      try_to_resume_processing_immediately()
+    end
 
   fun send_migration_batch_complete_msg(target: WorkerName) =>
     """
