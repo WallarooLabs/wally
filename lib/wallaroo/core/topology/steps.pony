@@ -372,6 +372,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       try
         let b_forwarder = _barrier_forwarder as BarrierStepForwarder
         if b_forwarder.barrier_in_progress() then
+        @printf[I32]("[JB] Calling remove_input from unregister_producer\n".cstring())
           b_forwarder.remove_input(id)
         end
       else Fail() end

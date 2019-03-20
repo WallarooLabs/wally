@@ -92,6 +92,7 @@ class BarrierStepForwarder
     let inputs = _step.inputs()
     if inputs.contains(step_id) then
       _inputs_blocking(step_id) = producer
+      @printf[I32]("[JB] Calling check_completion from receive_barrier with id: %s\n".cstring(), step_id.string().cstring())
       check_completion(inputs)
     else
       if not _removed_inputs.contains(step_id) then
@@ -120,6 +121,7 @@ class BarrierStepForwarder
     if _inputs_blocking.contains(input_id) then
       try _inputs_blocking.remove(input_id)? else Unreachable() end
     end
+    @printf[I32]("[JB] Calling check_completion from remove_input with id: %s\n".cstring(), input_id.string().cstring())
     check_completion(_step.inputs())
 
   fun ref check_completion(inputs: Map[RoutingId, Producer] box) =>
