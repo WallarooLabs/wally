@@ -46,6 +46,10 @@ use "wallaroo/core/recovery"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink"
 use "wallaroo/core/topology"
+<<<<<<< HEAD
+=======
+use "wallaroo_labs/bytes"
+>>>>>>> d3d368031... 1st round of review fixups
 use cp = "wallaroo_labs/connector_protocol"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
@@ -57,6 +61,14 @@ use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
+
+primitive _ConnectTimeout
+  fun apply(): U64 =>
+    ifdef debug then
+      500_000_000
+    else
+      10_000_000_000
+    end
 
 actor ConnectorSink is Sink
   """
@@ -115,7 +127,6 @@ actor ConnectorSink is Sink
   var _connected: Bool = false
   var _closed: Bool = false
   var _writeable: Bool = false
-  // _throttled moved to CollectorSinkNotify
   var _event: AsioEventID = AsioEvent.none()
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
   embed _pending_tracking: List[(USize, SeqId)] = _pending_tracking.create()
@@ -167,7 +178,7 @@ actor ConnectorSink is Sink
     auth: ApplyReleaseBackpressureAuth,
     initial_msgs: Array[Array[ByteSeq] val] val,
     from: String = "", init_size: USize = 64, max_size: USize = 16384,
-    reconnect_pause: U64 = 500_000_000 /* TODO: 10_000_000_000 */)
+    reconnect_pause: U64 = _ConnectTimeout())
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
@@ -215,14 +226,7 @@ actor ConnectorSink is Sink
     _initial_connect()
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
-    if _notify.twopc_txn_id_last_committed is None then
-      // There hasn't been a rollback() as part of our startup, so we
-      // are starting for the first time.  There is no prior committed
-      // txn_id.
-      _notify.twopc_txn_id_last_committed = ""
-      _notify.process_uncommitted_list(this)
-    end
-    None
+    _notify.application_ready_to_work(this)
 
   fun ref _initial_connect() =>
     @printf[I32]("ConnectorSink initializing connection to %s:%s\n".cstring(),
@@ -260,7 +264,7 @@ actor ConnectorSink is Sink
 
     var receive_ts: U64 = 0
     ifdef "detailed-metrics" then
-      receive_ts = Time.nanos()
+      receive_ts = WallClock.nanoseconds()
       _metrics_reporter.step_metric(metric_name, "Before receive at sink",
         9998, latest_ts, receive_ts)
     end
@@ -303,13 +307,10 @@ actor ConnectorSink is Sink
 
       let encoded2 =
         try
+          let w1: Writer = w1.create()
           let msg = _notify.make_message(encoded1)?
-          let w1: Writer = w1.create()  
-          let w2: Writer = w2.create()
-          let b = cp.Frame.encode(msg, w1)
-          w2.u32_be(b.size().u32())
-          w2.write(b)
-          w2.done()
+          let bs = cp.Frame.encode(msg, w1)
+          Bytes.length_encode(bs)
         else
           Fail()
           encoded1
@@ -318,7 +319,7 @@ actor ConnectorSink is Sink
       let next_seq_id = (_seq_id = _seq_id + 1)
       _writev(encoded2, next_seq_id)
 
-      let end_ts = Time.nanos()
+      let end_ts = WallClock.nanoseconds()
       let time_spent = end_ts - worker_ingress_ts
 
       ifdef "detailed-metrics" then
@@ -493,9 +494,10 @@ actor ConnectorSink is Sink
   =>
     """
     Process a barrier token of some type: autoscale, checkpoint,
-    rollback, etc.  We will get lots of them for a specific event,
-    but we are permitted to advance only when we've received all
-    tokens for that event.
+    rollback, etc.  For a particular barrier, we should receive
+    exactly one per input (blocking each input over which we
+    receive one), at which point we can unblock all inputs and
+    continue.
     """
     ifdef "checkpoint_trace" then
       @printf[I32]("Receive barrier %s at ConnectorSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
@@ -594,8 +596,6 @@ actor ConnectorSink is Sink
       if _twopc_state is cp.TwoPCFsmStart then
         let txn_id = _make_txn_id_string(sbt.id)
         _twopc_txn_id = txn_id
-        // Correctness of the barrier protocol requires us to write
-        // checkpoint state here, not in barrier_fully_acked()
         checkpoint_state(sbt.id)
 
         if (_twopc_current_offset > 0) and
@@ -616,9 +616,9 @@ actor ConnectorSink is Sink
 
         let where_list: cp.WhereList =
           [(1, _twopc_last_offset.u64(), _twopc_current_offset.u64())]
-        let b = cp.TwoPCEncode.phase1(txn_id, where_list)
+        let bs = cp.TwoPCEncode.phase1(txn_id, where_list)
         try
-          let msg = cp.MessageMsg(0, cp.Ephemeral(), 0, 0, None, [b])?
+          let msg = cp.MessageMsg(0, cp.Ephemeral(), 0, 0, None, [bs])?
            _notify.send_msg(this, msg)
          else
           Fail()
@@ -652,7 +652,7 @@ actor ConnectorSink is Sink
       Fail()
     end
 
-    let cpoint_id = "impossible-5" // TODO Change to int for debugging
+    let cpoint_id = ifdef "test_disconnect_at_5" then "5" else "" end
     let drop_phase2_msg = try if _twopc_txn_id.split("=")(1)? == cpoint_id then true else false end else false end
     if _twopc_txn_id != "" then
       if not drop_phase2_msg then
@@ -740,14 +740,6 @@ actor ConnectorSink is Sink
 
   fun ref _prepare_for_rollback() =>
     _clear_barriers()
-
-  be incremental_rollback(payload: ByteSeq val, event_log: EventLog,
-    checkpoint_id: CheckpointId)
-  =>
-    ifdef "checkpoint_trace" then
-      @printf[I32]("Incremental rollback to %s at ConnectorSink %s\n".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring())
-    end
-    Fail()
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
