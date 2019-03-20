@@ -936,12 +936,12 @@ actor Connections is Cluster
 
   be connector_streams_shrink(leader_name: WorkerName,
     worker_name: WorkerName, source_name: String,
-    streams: Array[StreamTuple] val)
+    streams: Array[StreamTuple] val, source_id: RoutingId)
   =>
     try
       let connector_streams_shrink_msg =
         ChannelMsgEncoder.connector_streams_shrink(worker_name,
-          source_name, streams, _auth)?
+          source_name, streams, source_id, _auth)?
       _send_control(leader_name, connector_streams_shrink_msg)
     else
       Fail()
@@ -949,37 +949,25 @@ actor Connections is Cluster
 
   be connector_respond_to_streams_shrink(worker_name: WorkerName,
     source_name: String, streams: Array[StreamTuple] val, host: String,
-    service: String)
+    service: String, source_id: RoutingId)
   =>
     try
       let connector_streams_shrink_response_msg =
         ChannelMsgEncoder.connector_streams_shrink_response(source_name,
-          streams, host, service, _auth)?
+          streams, host, service, source_id, _auth)?
       _send_control(worker_name, connector_streams_shrink_response_msg)
     else
       Fail()
     end
 
-  be connector_request_address(leader_name: WorkerName,
-    worker_name: WorkerName, source_name: String)
+  be connector_worker_shrink_complete(source_name: String,
+    leader_name: WorkerName, worker_name: WorkerName)
   =>
     try
-      let connector_request_address_msg =
-        ChannelMsgEncoder.connector_address_request(source_name,
-        worker_name, _auth)?
-      _send_control(leader_name, connector_request_address_msg)
-    else
-      Fail()
-    end
-
-  be connector_respond_to_address_request(worker_name: WorkerName,
-    source_name: String, host: String, service: String)
-  =>
-    try
-      let connector_address_response_msg =
-        ChannelMsgEncoder.connector_address_response(source_name, host, service,
-          _auth)?
-      _send_control(worker_name, connector_address_response_msg)
+      let connector_worker_shrink_complete_msg =
+        ChannelMsgEncoder.connector_worker_shrink_complete(source_name,
+          worker_name, _auth)?
+      _send_control(leader_name, connector_worker_shrink_complete_msg)
     else
       Fail()
     end

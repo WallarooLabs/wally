@@ -174,9 +174,6 @@ actor ConnectorSource[In: Any val] is Source
     // register resilient with event log
     _event_log.register_resilient_source(_source_id, this)
 
-    @printf[I32](("[JB]ConnectorSource ID: " + _source_id.string() + "\n")
-      .cstring())
-
     _mute()
     ifdef "resilience" then
       _mute_local()
@@ -835,7 +832,7 @@ actor ConnectorSource[In: Any val] is Source
 
     _notify.closed(this)
 
-    _listen._conn_closed(this)
+    _listen._conn_closed(_source_id, this)
 
   fun ref _apply_backpressure() =>
     if not _throttled then
@@ -1036,8 +1033,12 @@ actor ConnectorSource[In: Any val] is Source
     Send a RESTART message with the (host,service) data that the connector
     should reconnect to.
     """
-    @printf[I32]("ConnectorSource %s completed shrink migration with new address: (%s, %s).\n"
-      .cstring(), host.cstring(), service.cstring())
+    @printf[I32](("ConnectorSource %s completed shrink migration with " +
+      "new address: (%s, %s).\n").cstring(),
+      _source_id.string().cstring(),
+      host.cstring(),
+      service.cstring())
+
     _notify.host = host
     _notify.service = service
     _notify.send_restart()
