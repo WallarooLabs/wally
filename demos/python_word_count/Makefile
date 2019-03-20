@@ -39,7 +39,75 @@ WORD_COUNT_PY_DEMO_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(rules_mk_path)
 
 build-demos-python_word_count: build-machida
+build-demos-python_word_count: build-machida3
 clean-demos-python_word_count: word_count_py_demo_clean
+
+integration-tests-demos-python_word_count: build-demos-python_word_count
+integration-tests-demos-python_word_count: word_count_py_demo_test
+integration-tests-demos-python_word_count: word_count_py3_demo_test
+
+word_count_py_demo_test:
+	cd $(WORD_COUNT_PY_DEMO_PATH) && \
+	integration_test --newline-file-sender count_this.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 1 \
+		--output 'received.txt' \
+		--command 'machida --application-module word_count $(RUN_WITH_RESILIENCE)' \
+		--sink-mode newlines \
+		--sink-expect 482
+	cd $(WORD_COUNT_PY_DEMO_PATH) && \
+	integration_test --newline-file-sender count_this.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 1 \
+		--output 'received.txt' \
+		--command 'machida --application-module word_count $(RUN_WITH_RESILIENCE)' \
+		--sink-mode newlines \
+		--sink-expect 482 \
+		--workers 2
+	cd $(WORD_COUNT_PY_DEMO_PATH) && \
+	integration_test --newline-file-sender count_this.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 1 \
+		--output 'received.txt' \
+		--command 'machida --application-module word_count $(RUN_WITH_RESILIENCE)' \
+		--sink-mode newlines \
+		--sink-expect 482 \
+		--workers 3
+
+word_count_py3_demo_test:
+	cd $(WORD_COUNT_PY_DEMO_PATH) && \
+	integration_test --newline-file-sender count_this.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 1 \
+		--output 'received.txt' \
+		--command 'machida3 --application-module word_count $(RUN_WITH_RESILIENCE)' \
+		--sink-mode newlines \
+		--sink-expect 482
+	cd $(WORD_COUNT_PY_DEMO_PATH) && \
+	integration_test --newline-file-sender count_this.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 1 \
+		--output 'received.txt' \
+		--command 'machida3 --application-module word_count $(RUN_WITH_RESILIENCE)' \
+		--sink-mode newlines \
+		--sink-expect 482 \
+		--workers 2
+	cd $(WORD_COUNT_PY_DEMO_PATH) && \
+	integration_test --newline-file-sender count_this.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 1 \
+		--output 'received.txt' \
+		--command 'machida3 --application-module word_count $(RUN_WITH_RESILIENCE)' \
+		--sink-mode newlines \
+		--sink-expect 482 \
+		--workers 3
+
 
 word_count_py_demo_clean:
 	$(QUIET)rm -f $(WORD_COUNT_PY_DEMO_PATH)/received.txt
