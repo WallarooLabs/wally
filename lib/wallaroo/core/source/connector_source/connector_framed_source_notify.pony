@@ -294,7 +294,7 @@ class ConnectorSourceNotify[In: Any val]
     try
       let data': Array[U8] val = consume data
       ifdef "trace" then
-        @printf[I32]("NH: decode data: %s\n".cstring(), _print_array[U8](data').cstring())
+        @printf[I32]("TRACE: decode data: %s\n".cstring(), _print_array[U8](data').cstring())
       end
       let connector_msg = cwm.Frame.decode(consume data')?
       match connector_msg
@@ -410,9 +410,8 @@ class ConnectorSourceNotify[In: Any val]
               else
                 // respond immediately
                 _send_reply(source, cwm.AckMsg(0, [(s.id, s.last_seen)]))
-                _listener.streams_relinquish([StreamTuple(s.id, s.name,
-                  s.last_seen)])
-                // TODO [source-migration] remove stream from active
+                _listener.streams_relinquish(source_id,
+                  [StreamTuple(s.id, s.name, s.last_seen)])
               end
               return true
             elseif cwm.Boundary.is_set(m.flags) then
@@ -576,10 +575,6 @@ class ConnectorSourceNotify[In: Any val]
     _continue_perhaps(source)
 
   fun ref _continue_perhaps(source: ConnectorSource[In] ref): Bool =>
-    ifdef "trace" then
-      @printf[I32]("NH: _continue_perhaps: %s\n".cstring(),
-        _header_size.string().cstring())
-    end
     source.expect(_header_size)
     _header = true
     _continue_perhaps2()
@@ -757,7 +752,7 @@ class ConnectorSourceNotify[In: Any val]
       // _active_streams and _pending_close
       for s_map in [_active_streams ; _pending_close].values() do
         for s in s_map.values() do
-          ifdef "trace" then
+          ifdef debug then
             @printf[I32]("%s ::: Updating stream_id %s last acked to %s\n"
               .cstring(), WallClock.seconds().string().cstring(),
               s.id.string().cstring(), s.last_seen.string().cstring())
@@ -817,15 +812,16 @@ class ConnectorSourceNotify[In: Any val]
       streams.push(s)
     end
     _pending_relinquish.clear()
+
     if streams.size() > 0 then
       @printf[I32]("ConnectorSource relinquishing %s streams\n".cstring(),
-        _pending_relinquish.size().string().cstring())
-      _listener.streams_relinquish(consume streams)
+        streams.size().string().cstring())
+      _listener.streams_relinquish(source_id, consume streams)
     else
       if _fsm_state is _ProtoFsmShrinking then
-        @printf[I32]("ConnectorSource relinquishing %s streams\n".cstring(),
-          _pending_relinquish.size().string().cstring())
-        _listener.streams_relinquish(consume streams)
+        @printf[I32]("ConnectorSource shrinking %s streams\n".cstring(),
+          streams.size().string().cstring())
+        _listener.streams_relinquish(source_id, consume streams)
       end
     end
 
@@ -838,9 +834,7 @@ class ConnectorSourceNotify[In: Any val]
   fun ref _clear_and_relinquish_all() =>
     for s_map in [_active_streams ; _pending_close].values() do
       for s in s_map.values() do
-        // This should never happen, but you never know
-        Invariant(s.last_seen == s.last_acked)
-        _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
+        _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_seen))
       end
     end
     _relinquish_streams()

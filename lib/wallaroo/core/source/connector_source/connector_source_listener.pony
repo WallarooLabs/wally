@@ -89,8 +89,10 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   var _init_size: USize
   var _max_size: USize
 
-  let _connected_sources: SetIs[ConnectorSource[In]] = _connected_sources.create()
-  let _available_sources: Array[ConnectorSource[In]] = _available_sources.create()
+  let _connected_sources: SetIs[(RoutingId, ConnectorSource[In])] =
+    _connected_sources.create()
+  let _available_sources: Array[(RoutingId, ConnectorSource[In])] =
+    _available_sources.create()
 
   // Stream Registry for managing updates to local and global stream state
   let _stream_registry: LocalConnectorStreamRegistry[In]
@@ -192,7 +194,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
           spr.partition_routing_id(), source)
       end
 
-      _available_sources.push(source)
+      _available_sources.push((source_id, source))
     end
 
   be start_listening() =>
@@ -212,10 +214,10 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     _start_sources()
 
   fun ref _start_sources() =>
-    for s in _available_sources.values() do
+    for (source_id, s) in _available_sources.values() do
       s.unmute(this)
     end
-    for s in _connected_sources.values() do
+    for (source_id, s) in _connected_sources.values() do
       s.unmute(this)
     end
 
@@ -283,14 +285,14 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       _event = AsioEvent.none()
     end
 
-  be _conn_closed(s: ConnectorSource[In]) =>
+  be _conn_closed(source_id: RoutingId, s: ConnectorSource[In]) =>
     """
     An accepted connection has closed. If we have dropped below the limit, try
     to accept new connections.
     """
-    if _connected_sources.contains(s) then
-      _connected_sources.unset(s)
-      _available_sources.push(s)
+    if _connected_sources.contains((source_id, s)) then
+      _connected_sources.unset((source_id, s))
+      _available_sources.push((source_id, s))
     else
       Fail()
     end
@@ -324,8 +326,9 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   be purge_pending_requests(session_id: RoutingId) =>
     _stream_registry.purge_pending_requests(session_id)
 
-  be streams_relinquish(streams: Array[StreamTuple] val) =>
-    _stream_registry.streams_relinquish(streams)
+  be streams_relinquish(source_id: RoutingId, streams: Array[StreamTuple] val)
+  =>
+    _stream_registry.streams_relinquish(source_id, streams)
 
   be stream_notify(request_id: ConnectorStreamNotifyId,
     stream_id: StreamId, stream_name: String,
@@ -371,9 +374,9 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     Spawn a new connection.
     """
     try
-      let source = _available_sources.pop()?
+      (let source_id, let source) = _available_sources.pop()?
       source.accept(ns, _init_size, _max_size)
-      _connected_sources.set(source)
+      _connected_sources.set((source_id, source))
       _count = _count + 1
     else
       @pony_os_socket_close[None](ns)
