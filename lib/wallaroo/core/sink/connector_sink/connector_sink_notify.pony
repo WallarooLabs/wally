@@ -89,7 +89,7 @@ class ConnectorSinkNotify
 
     // 2PC: We don't know how many transactions the sink has that
     // have been waiting for a phase 2 message.  We need to discover
-    // their txn_id strings and abort them.
+    // their txn_id strings and abort/commit them.
     _rtag = _rtag + 1
     let list_u = cp.TwoPCEncode.list_uncommitted(_rtag)
     try
@@ -226,14 +226,9 @@ class ConnectorSinkNotify
 
   fun send_msg(conn: WallarooOutgoingNetworkActor ref, msg: cp.Message) =>
     let w1: Writer = w1.create()
-    let w2: Writer = w2.create()
 
-    let b = cp.Frame.encode(msg, w1)
-    w2.u32_be(b.size().u32())
-    w2.write(b)
-
-    let b2 = recover trn w2.done() end
-    for item in b2.values() do
+    let bs = cp.Frame.encode(msg, w1)
+    for item in Bytes.length_encode(bs).values() do
       try (conn as ConnectorSink ref)._write_final(item, None) else Fail() end
     end
 
@@ -405,11 +400,11 @@ class ConnectorSinkNotify
         ifdef "checkpoint_trace" then
           @printf[I32]("2PC: uncommitted txn_id %s commit=%s\n".cstring(), txn_id.cstring(), do_commit.string().cstring())
         end
-        let abort = cp.TwoPCEncode.phase2(txn_id, do_commit)
+        let p2 = cp.TwoPCEncode.phase2(txn_id, do_commit)
         try
-          let abort_msg =
-            cp.MessageMsg(0, cp.Ephemeral(), 0, 0, None, [abort])?
-          send_msg(conn, abort_msg)
+          let p2_msg =
+            cp.MessageMsg(0, cp.Ephemeral(), 0, 0, None, [p2])?
+          send_msg(conn, p2_msg)
         else
           Fail()
         end
@@ -442,6 +437,15 @@ class ConnectorSinkNotify
       message_id = message_id + e.size().u64()
     end
     cp.MessageMsg(stream_id, flags, base_message_id, event_time, key, encoded1)?
+
+  fun ref application_ready_to_work(conn: ConnectorSink ref) =>
+    if twopc_txn_id_last_committed is None then
+      // There hasn't been a rollback() as part of our startup, so we
+      // are starting for the first time.  There is no prior committed
+      // txn_id.
+      twopc_txn_id_last_committed = ""
+      process_uncommitted_list(conn)
+    end
 
   fun _payload_length(data: Array[U8] iso): USize ? =>
     Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
