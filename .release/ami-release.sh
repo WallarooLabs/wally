@@ -47,7 +47,9 @@ compile_for_sandy_bridge() {
       utils/data_receiver/data_receiver \
       utils/cluster_shutdown/cluster_shutdown \
       utils/cluster_shrinker/cluster_shrinker \
-      giles/sender/sender
+      giles/sender/sender \
+      testing/tools/dos-dumb-object-service/dos-server.py \
+      testing/tools/dos-dumb-object-service/journal-dump.py
   echo "------ Wallaroo binaries compiled for ${TARGET_CPU}"
   git checkout "$PREV_HEAD"
 }
