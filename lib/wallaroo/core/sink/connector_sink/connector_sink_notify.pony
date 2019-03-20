@@ -45,8 +45,10 @@ class ConnectorSinkNotify
   var _rtag: U64 = 77777
   var twopc_intro_done: Bool = false
   var twopc_txn_id_last_committed: (None|String) = None
+  var twopc_txn_id_current: String = ""
   var twopc_uncommitted_list: (None|Array[String] val) = None
   let twopc_reconnect_buffer: Array[(String val | Array[U8] val)] = twopc_reconnect_buffer.create()
+  var twopc_current_txn_aborted: Bool = false
 
   new create(sink_id: RoutingId, worker_name: WorkerName,
     protocol_version: String, cookie: String,
@@ -215,11 +217,18 @@ class ConnectorSinkNotify
       @printf[I32](("ConnectorSink is no longer experiencing" +
         " back pressure, connected = %s\n").cstring(),
       _connected.string().cstring())
-      for d in twopc_reconnect_buffer.values() do
-        ifdef "checkpoint_trace" then
-          @printf[I32]("DBG: unthrottled: writing buffered %d bytes\n".cstring(), d.size())
+      try @printf[I32]("DBGDBG: unthrottled: buffer check, FSM state = %d\n".cstring(), (conn as ConnectorSink ref).get_2pc_state()) else Fail() end
+      @printf[I32]("DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s current txn=%s.\n".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_txn_id_current.cstring())
+      if twopc_current_txn_aborted then
+        @printf[I32]("DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s discard %d items\n".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_reconnect_buffer.size())
+        None
+      else
+        for d in twopc_reconnect_buffer.values() do
+          ifdef "checkpoint_trace" then
+            @printf[I32]("DBG: unthrottled: writing buffered %d bytes\n".cstring(), d.size())
+          end
+          try (conn as ConnectorSink ref)._write_final(d, None) else Fail() end
         end
-        try (conn as ConnectorSink ref)._write_final(d, None) else Fail() end
       end
       twopc_reconnect_buffer.clear()
     end
@@ -293,9 +302,11 @@ class ConnectorSinkNotify
           ifdef "trace" then
             @printf[I32]("TRACE: uncommitted txns = %d\n".cstring(),
               mi.txn_ids.size())
-            twopc_uncommitted_list = mi.txn_ids
-            process_uncommitted_list(conn as ConnectorSink ref)
           end
+          twopc_uncommitted_list = mi.txn_ids
+          // twopc_current_txn_aborted is used by unthrottled()
+          twopc_current_txn_aborted = process_uncommitted_list(
+            conn as ConnectorSink ref)
 
           // The 2PC intro dance has finished.  We can permit the rest
           // of the sink's operation to resume.  The txns in the
@@ -305,6 +316,7 @@ class ConnectorSinkNotify
           // call above).
           twopc_intro_done = true
           unthrottled(conn)
+          twopc_current_txn_aborted = false
           if _connection_count == 1 then
             try
               (conn as ConnectorSink ref).report_ready_to_work()
@@ -381,17 +393,21 @@ class ConnectorSinkNotify
       conn.close()
     end
 
-  fun ref process_uncommitted_list(conn: ConnectorSink ref) =>
+  fun ref process_uncommitted_list(conn: ConnectorSink ref): Bool =>
     """
     In case of a Wallaroo failure, we need to do two things that can
     happen in either order: 1. get list of uncommitted transactions,
     2. get the initial rollback() message + payload blob of state.
     After both have happened, then we need to commit/abort any
     uncommitted txns outstanding at the connector sink.
+
+    Return true if we aborted the twopc_txn_id_last_committed txn.
     """
 
     match (twopc_txn_id_last_committed, twopc_uncommitted_list)
     | (let last_committed: String, let uncommitted: Array[String] val) =>
+      var current_txn_aborted: Bool = false
+
       ifdef "checkpoint_trace" then
         @printf[I32]("2PC: process_uncommitted_list processing %d items, last_committed = %s\n".cstring(), uncommitted.size(), last_committed.cstring())
       end
@@ -399,6 +415,12 @@ class ConnectorSinkNotify
         let do_commit = if txn_id == last_committed then true else false end
         ifdef "checkpoint_trace" then
           @printf[I32]("2PC: uncommitted txn_id %s commit=%s\n".cstring(), txn_id.cstring(), do_commit.string().cstring())
+        end
+        if not do_commit and (txn_id == twopc_txn_id_current) then
+          ifdef "checkpoint_trace" then
+            @printf[I32]("2PC: current txn_id %s was aborted\n".cstring(), twopc_txn_id_current.cstring())
+          end
+          current_txn_aborted = true
         end
         let p2 = cp.TwoPCEncode.phase2(txn_id, do_commit)
         try
@@ -410,11 +432,12 @@ class ConnectorSinkNotify
         end
       end
       twopc_uncommitted_list = []
+      current_txn_aborted
     else
       ifdef "checkpoint_trace" then
         @printf[I32]("2PC: process_uncommitted_list waiting\n".cstring())
       end
-      None
+      false
     end
 
 
@@ -433,6 +456,7 @@ class ConnectorSinkNotify
     let key = None
 
     let base_message_id = message_id
+    @printf[I32]("DBGDBG: make_message: message_id = %d\n".cstring(), base_message_id)
     for e in encoded1.values() do
       message_id = message_id + e.size().u64()
     end

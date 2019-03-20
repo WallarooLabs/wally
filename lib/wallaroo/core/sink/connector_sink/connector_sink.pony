@@ -205,6 +205,7 @@ actor ConnectorSink is Sink
     _auth = auth
     _from = from
     _connect_count = 0
+    @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ ConnectorSink.create\n".cstring())
     _message_processor = NormalSinkMessageProcessor(this)
     _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_coordinator)
 
@@ -251,12 +252,6 @@ actor ConnectorSink is Sink
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at ConnectorSink\n".cstring())
-    end
-    if _twopc_state is cp.TwoPCFsm2Abort then
-      None
-    elseif not (_twopc_state is cp.TwoPCFsmStart) then
-      @printf[I32]("2PC: ERROR: _twopc_state = %d\n".cstring(), _twopc_state())
-      Fail()
     end
 
     var receive_ts: U64 = 0
@@ -514,37 +509,23 @@ actor ConnectorSink is Sink
       else
         Fail()
       end
-    | let sbt: CheckpointBarrierToken =>
-      if _message_processor.barrier_in_progress() then
-        _message_processor.receive_barrier(input_id, producer, barrier_token
-          where ack_barrier_if_complete = false)
-      else
-        try
-          // We don't want any messages to be processed by this sink
-          // until we know that system-wide 2PC can commit, hence
-          // always_queue = true
-          _message_processor = BarrierSinkMessageProcessor(this,
-            _barrier_acker as BarrierSinkAcker
-            where always_queue = true)
-          _message_processor.receive_new_barrier(input_id, producer,
-            barrier_token)
-        else
-          Fail()
-        end
-      end
-      return
     end
 
     if _message_processor.barrier_in_progress() then
-      @printf[I32]("Receive barrier line %d\n".cstring(), __loc.line())
+      let do_ack = match barrier_token
+      | let _: CheckpointBarrierToken =>
+        // We need to control of acking & when barrier_complete() gets called.
+        false
+      else
+        true
+      end
       _message_processor.receive_barrier(input_id, producer,
-        barrier_token)
+        barrier_token where ack_barrier_if_complete = do_ack)
     else
-      @printf[I32]("Receive barrier line %d\n".cstring(), __loc.line())
       match _message_processor
       | let nsmp: NormalSinkMessageProcessor =>
         try
-          @printf[I32]("Receive barrier line %d\n".cstring(), __loc.line())
+          @printf[I32]("2PC2PC2PC2PC: BarrierSinkMessageProcessor @ receive_barrier\n".cstring())
            _message_processor = BarrierSinkMessageProcessor(this,
              _barrier_acker as BarrierSinkAcker)
            _message_processor.receive_new_barrier(input_id, producer,
@@ -593,6 +574,7 @@ actor ConnectorSink is Sink
       if _twopc_state is cp.TwoPCFsmStart then
         let txn_id = _make_txn_id_string(sbt.id)
         _twopc_txn_id = txn_id
+        _notify.twopc_txn_id_current = txn_id
         checkpoint_state(sbt.id)
 
         if (_twopc_current_offset > 0) and
@@ -677,6 +659,7 @@ actor ConnectorSink is Sink
     2nd-half logic for barrier_fully_acked().
     """
     let queued = _message_processor.queued()
+    @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ _resume_processing_messages\n".cstring())
     _message_processor = NormalSinkMessageProcessor(this)
     for q in queued.values() do
       match q
@@ -693,6 +676,7 @@ actor ConnectorSink is Sink
     else
       Fail()
     end
+    @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ _clear_barriers\n".cstring())
     _message_processor = NormalSinkMessageProcessor(this)
 
   ///////////////
@@ -905,6 +889,7 @@ actor ConnectorSink is Sink
 
     var data_size: USize = 0
     for bytes in _notify.sentv(this, data).values() do
+      @printf[I32]("DBGDBG: _writev: %d bytes\n".cstring(), bytes.size())
       _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
       _pending_writev_total = _pending_writev_total + bytes.size()
       _pending.push((bytes, 0))
@@ -928,6 +913,7 @@ actor ConnectorSink is Sink
     everything was written. On an error, close the connection. This is for
     data that has already been transformed by the notifier.
     """
+    @printf[I32]("DBGDBG: _write_final: %d bytes\n".cstring(), data.size())
     _pending_writev.>push(data.cpointer().usize()).>push(data.size())
     _pending_writev_total = _pending_writev_total + data.size()
     ifdef "resilience" then
@@ -1317,6 +1303,9 @@ actor ConnectorSink is Sink
     error messages.
     """
     "[len=" + array.size().string() + ": " + ", ".join(array.values()) + "]"
+
+  fun get_2pc_state(): U8 =>
+    _twopc_state()
 
 class PauseBeforeReconnectConnectorSink is TimerNotify
   let _tcp_sink: ConnectorSink
