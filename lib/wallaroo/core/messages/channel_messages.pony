@@ -577,35 +577,31 @@ primitive ChannelMsgEncoder
   =>
     _encode(ConnectorStreamNotifyResponseMsg(source_name, success, stream, request_id), auth)?
 
-  fun connector_streams_relinquish(worker_name: String, source_name: String,
+  fun connector_streams_relinquish(worker_name: WorkerName, source_name: String,
     streams: Array[StreamTuple] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(ConnectorStreamsRelinquishMsg(worker_name, source_name, streams),
       auth)?
 
-  fun connector_streams_shrink(worker_name: String, source_name: String,
-    streams: Array[StreamTuple] val, auth: AmbientAuth) : Array[ByteSeq] val ?
+  fun connector_streams_shrink(worker_name: WorkerName, source_name: String,
+    streams: Array[StreamTuple] val, source_id: RoutingId,
+    auth: AmbientAuth) : Array[ByteSeq] val ?
   =>
-    _encode(ConnectorStreamsShrinkMsg(worker_name, source_name, streams),
-      auth)?
+    _encode(ConnectorStreamsShrinkMsg(worker_name, source_name, streams,
+      source_id), auth)?
 
   fun connector_streams_shrink_response(source_name: String,
     streams: Array[StreamTuple] val, host: String, service: String,
-    auth: AmbientAuth) : Array[ByteSeq] val ?
+    source_id: RoutingId, auth: AmbientAuth) : Array[ByteSeq] val ?
   =>
     _encode(ConnectorStreamsShrinkResponseMsg(source_name, streams, host,
-      service), auth)?
+      service, source_id), auth)?
 
-  fun connector_address_request(source_name: String, worker_name: WorkerName,
-    auth: AmbientAuth): Array[ByteSeq] val ?
+  fun connector_worker_shrink_complete(source_name: String,
+    worker_name: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(ConnectorAddressRequestMsg(source_name, worker_name), auth)?
-
-  fun connector_address_response(source_name: String, host: String,
-    service: String, auth: AmbientAuth): Array[ByteSeq] val ?
-  =>
-    _encode(ConnectorAddressResponseMsg(source_name, host, service), auth)?
+    _encode(ConnectorWorkerShrinkCompleteMsg(source_name, worker_name), auth)?
 
   fun connector_add_source_addr(worker_name: WorkerName,
     source_name: String, host: String, service: String,
@@ -809,17 +805,31 @@ class val ConnectorStreamsRelinquishMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
+class val ConnectorWorkerShrinkCompleteMsg is SourceListenerMsg
+  let worker_name: WorkerName
+  let _source_name: String
+
+  new val create(source_name': String, worker_name': WorkerName) =>
+    worker_name = worker_name'
+    _source_name = source_name'
+
+  fun source_name(): String =>
+    _source_name
+
+
 class val ConnectorStreamsShrinkMsg is SourceListenerMsg
   let worker_name: WorkerName
   let _source_name: String
   let streams: Array[StreamTuple] val
+  let source_id: RoutingId
 
   new val create(worker_name': WorkerName, source_name': String,
-    streams': Array[StreamTuple] val)
+    streams': Array[StreamTuple] val, source_id': RoutingId)
   =>
     worker_name = worker_name'
     _source_name = source_name'
     streams = streams'
+    source_id = source_id'
 
   fun source_name(): String =>
     _source_name
@@ -829,38 +839,16 @@ class val ConnectorStreamsShrinkResponseMsg is SourceListenerMsg
   let streams: Array[StreamTuple] val
   let host: String
   let service: String
+  let source_id: RoutingId
 
   new val create(source_name': String, streams': Array[StreamTuple] val,
-    host': String, service': String)
+    host': String, service': String, source_id': RoutingId)
   =>
     _source_name = source_name'
     streams = streams'
     host = host'
     service = service'
-
-  fun source_name(): String =>
-    _source_name
-
-class val ConnectorAddressRequestMsg is SourceListenerMsg
-  let _source_name: String
-  let worker_name: WorkerName
-
-  new val create(source_name': String, worker_name': WorkerName) =>
-    _source_name = source_name'
-    worker_name = worker_name'
-
-  fun source_name(): String =>
-    _source_name
-
-class val ConnectorAddressResponseMsg is SourceListenerMsg
-  let _source_name: String
-  let host: String
-  let service: String
-
-  new val create(source_name': String, host': String, service': String) =>
-    _source_name = source_name'
-    host = host'
-    service = service'
+    source_id = source_id'
 
   fun source_name(): String =>
     _source_name

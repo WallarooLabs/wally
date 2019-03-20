@@ -835,7 +835,7 @@ actor ConnectorSource[In: Any val] is Source
 
     _notify.closed(this)
 
-    _listen._conn_closed(this)
+    _listen._conn_closed(_source_id, this)
 
   fun ref _apply_backpressure() =>
     if not _throttled then

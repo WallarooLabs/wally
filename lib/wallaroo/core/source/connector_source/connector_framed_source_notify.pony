@@ -77,6 +77,14 @@ class _StreamState
   last_checkpoint = last_checkpoint'
 
   fun serialize(wb: Writer = Writer): Writer =>
+    @printf[I32](("[NH] _StreamState.serialize for id: %s, name: %s, " +
+      "last_acked: %s, last_seen: %s, last_checkpoint: %s\n").cstring(),
+      id.string().cstring(),
+      name.cstring(),
+      last_acked.string().cstring(),
+      last_seen.string().cstring(),
+      last_checkpoint.string().cstring())
+
     wb.u64_be(id)
     wb.u16_be(name.size().u16())
     wb.write(name)
@@ -410,9 +418,8 @@ class ConnectorSourceNotify[In: Any val]
               else
                 // respond immediately
                 _send_reply(source, cwm.AckMsg(0, [(s.id, s.last_seen)]))
-                _listener.streams_relinquish([StreamTuple(s.id, s.name,
-                  s.last_seen)])
-                // TODO [source-migration] remove stream from active
+                _listener.streams_relinquish(source_id,
+                  [StreamTuple(s.id, s.name, s.last_seen)])
               end
               return true
             elseif cwm.Boundary.is_set(m.flags) then
@@ -509,6 +516,13 @@ class ConnectorSourceNotify[In: Any val]
     message_id: (cwm.MessageId|None),
     flags: cwm.Flags): Bool
    =>
+    @printf[I32](("[NH] _run_and_subsequent... stream(id: %s, " +
+      "last_acked: %s, last_seen: %s, last_checkpoint: %s)\n").cstring(),
+      s.id.string().cstring(),
+      s.last_acked.string().cstring(),
+      s.last_seen.string().cstring(),
+      s.last_checkpoint.string().cstring())
+
     let decode_end_ts = WallClock.nanoseconds()
     _metrics_reporter.step_metric(_pipeline_name,
       "Decode Time in Connector Source", latest_metrics_id, ingest_ts,
@@ -554,6 +568,12 @@ class ConnectorSourceNotify[In: Any val]
     | let m_id: PointOfReference =>
       if not (cwm.Ephemeral.is_set(flags) or
         cwm.UnstableReference.is_set(flags)) then
+        @printf[I32](("[NH] _run_and_subsequent... updating stream %s " +
+          "last_seen from %s"
+          + " to %s\n").cstring(),
+          s.id.string().cstring(),
+          s.last_seen.string().cstring(),
+          m_id.string().cstring())
         s.last_seen = m_id
       end
     end
@@ -757,7 +777,7 @@ class ConnectorSourceNotify[In: Any val]
       // _active_streams and _pending_close
       for s_map in [_active_streams ; _pending_close].values() do
         for s in s_map.values() do
-          ifdef "trace" then
+          ifdef debug then
             @printf[I32]("%s ::: Updating stream_id %s last acked to %s\n"
               .cstring(), WallClock.seconds().string().cstring(),
               s.id.string().cstring(), s.last_seen.string().cstring())
@@ -820,12 +840,12 @@ class ConnectorSourceNotify[In: Any val]
     if streams.size() > 0 then
       @printf[I32]("ConnectorSource relinquishing %s streams\n".cstring(),
         _pending_relinquish.size().string().cstring())
-      _listener.streams_relinquish(consume streams)
+      _listener.streams_relinquish(source_id, consume streams)
     else
       if _fsm_state is _ProtoFsmShrinking then
-        @printf[I32]("ConnectorSource relinquishing %s streams\n".cstring(),
+        @printf[I32]("ConnectorSource shrinking %s streams\n".cstring(),
           _pending_relinquish.size().string().cstring())
-        _listener.streams_relinquish(consume streams)
+        _listener.streams_relinquish(source_id, consume streams)
       end
     end
 
@@ -836,9 +856,29 @@ class ConnectorSourceNotify[In: Any val]
     _pending_relinquish.clear()
 
   fun ref _clear_and_relinquish_all() =>
-    for s_map in [_active_streams ; _pending_close].values() do
+    for (id, s_map) in [_active_streams ; _pending_close].pairs() do
+      @printf[I32]("[NH] _clear_and_relinquish_all():\n".cstring())
       for s in s_map.values() do
+        @printf[I32]("[NH] \tmap: %s, stream_id: %s, last_seen: %d, last_acked: %s\n"
+        .cstring(),
+        if id == 0 then
+          "_active_streams".cstring()
+        else
+          "_pending_close".cstring()
+        end,
+        s.id.string().cstring(), s.last_seen.string().cstring(),
+        s.last_acked.string().cstring())
+      end
+      for s in s_map.values() do
+        @printf[I32]("[NH] relinqushing: stream_id: %s, last_seen: %d, last_acked: %s\n"
+          .cstring(), s.id.string().cstring(), s.last_seen.string().cstring(),
+          s.last_acked.string().cstring())
         // This should never happen, but you never know
+        // TODO [source-migration] this isn't true for connection closed() that
+        // isn't aligned with a checkpoint barrier
+        // But then what do we use here? last_seen won't be true until a
+        // checkpoint. If we're not connected, we won't receive a shrink from
+        // the listener, though. So what to do?
         Invariant(s.last_seen == s.last_acked)
         _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
       end
