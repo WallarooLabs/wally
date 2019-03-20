@@ -808,6 +808,7 @@ actor RouterRegistry
     end
 
   fun ref try_to_resume_processing_immediately() =>
+    // TODO [source-migration] [NH]  remove this debug stuff
     let ar' = recover iso Array[U8] end
     ar'.append("{")
     for v in _key_waiting_list.values() do
@@ -819,6 +820,7 @@ actor RouterRegistry
     @printf[I32](("[NH] try_to_resume_processing_immediately, kwl: %s, " +
       "slwl.size(): %s\n").cstring(), s'.cstring(),
       _source_listeners_waiting_list.size().string().cstring())
+    // END of debug print
     if ((_key_waiting_list.size() == 0) and
         (_source_listeners_waiting_list.size() == 0))
     then

@@ -597,10 +597,15 @@ primitive ChannelMsgEncoder
     _encode(ConnectorStreamsShrinkResponseMsg(source_name, streams, host,
       service), auth)?
 
-  fun connector_streams_restart(source_name: String, host: String,
+  fun connector_address_request(source_name: String, worker_name: WorkerName,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(ConnectorAddressRequestMsg(source_name, worker_name), auth)?
+
+  fun connector_address_response(source_name: String, host: String,
     service: String, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(ConnectorStreamsRestartMsg(source_name, host, service), auth)?
+    _encode(ConnectorAddressResponseMsg(source_name, host, service), auth)?
 
   fun connector_add_source_addr(worker_name: WorkerName,
     source_name: String, host: String, service: String,
@@ -836,7 +841,18 @@ class val ConnectorStreamsShrinkResponseMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
-class val ConnectorStreamsRestartMsg is SourceListenerMsg
+class val ConnectorAddressRequestMsg is SourceListenerMsg
+  let _source_name: String
+  let worker_name: WorkerName
+
+  new val create(source_name': String, worker_name': WorkerName) =>
+    _source_name = source_name'
+    worker_name = worker_name'
+
+  fun source_name(): String =>
+    _source_name
+
+class val ConnectorAddressResponseMsg is SourceListenerMsg
   let _source_name: String
   let host: String
   let service: String
