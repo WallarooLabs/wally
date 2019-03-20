@@ -168,14 +168,15 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
     ```
     """
     def __init__(self, version, cookie, program_name, instance_name, host,
-                 port):
+                 port, delay=0):
         AtLeastOnceSourceConnector.__init__(self,
                                             version,
                                             cookie,
                                             program_name,
                                             instance_name,
                                             host,
-                                            port)
+                                            port,
+                                            delay=delay)
         self.sources = {} # stream_id: [source instance, acked point of ref]
         self.closed_sources = {} # stream_id: acked point of ref
         self.keys = []
