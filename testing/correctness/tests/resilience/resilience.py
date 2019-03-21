@@ -45,7 +45,11 @@ except:
     basestring = str
 
 FROM_TAIL = int(os.environ.get("FROM_TAIL", 10))
+SAVE_LOGS = True if os.environ.get("SAVE_LOGS", 0) == "1" else False
 
+
+class SaveLogs(Exception):
+    pass
 
 ##################
 # Helper Functions
@@ -336,6 +340,9 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
                                 persistent_data.get('runner_data'),
                                 from_tail=FROM_TAIL)))
                 raise
+        else: # no exception
+            if SAVE_LOGS:  # raise an error and save logs
+                raise SaveLogs()
     except Exception as err:
         # save log stream to file
         try:
