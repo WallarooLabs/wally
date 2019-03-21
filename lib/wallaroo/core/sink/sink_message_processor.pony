@@ -102,8 +102,10 @@ class BarrierSinkMessageProcessor is SinkMessageProcessor
       let msg = TypedQueuedMessage[D](metric_name, pipeline_time_spent,
         data, key, event_ts, watermark_ts, i_producer_id, i_producer, msg_uid,
         frac_ids, i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
+      @printf[I32]("2PC: DBGDBG: BarrierSinkMessageProcessor _queued.push\n".cstring())
       _queued.push(msg)
     else
+      @printf[I32]("2PC: DBGDBG: BarrierSinkMessageProcessor process_message\n".cstring())
       sink.process_message[D](metric_name, pipeline_time_spent, data, key,
         event_ts, watermark_ts, i_producer_id, i_producer, msg_uid, frac_ids,
         i_seq_id, latest_ts, metrics_id, worker_ingress_ts)

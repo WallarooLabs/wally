@@ -456,7 +456,6 @@ class ConnectorSinkNotify
     let key = None
 
     let base_message_id = message_id
-    @printf[I32]("DBGDBG: make_message: message_id = %d\n".cstring(), base_message_id)
     for e in encoded1.values() do
       message_id = message_id + e.size().u64()
     end
