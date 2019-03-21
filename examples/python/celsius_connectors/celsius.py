@@ -75,7 +75,6 @@ def decoder(data):
     print("nh: {!r}".format(data))
     return struct.unpack(">f", data)[0]
 
-#@wallaroo.encoder
 @wallaroo.experimental.stream_message_encoder
 def encode_conversion(data):
     return "{}\n".format(data).encode('utf-8')

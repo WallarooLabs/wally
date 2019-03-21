@@ -59,7 +59,6 @@ class val StreamTuple
 // TODO [source-migration]: Either get a list of "existing" workers to query for
 // request_leader, or ask ALL workers and currently-joining workers do not
 // respond. or something else?
-// TODO [source-migration]: add var _is_joining: Bool to determine above logic
 class GlobalConnectorStreamRegistry[In: Any val]
   let _listener: ConnectorSourceListener[In] tag
   var _worker_name: String
@@ -518,8 +517,6 @@ class GlobalConnectorStreamRegistry[In: Any val]
   =>
     @printf[I32]("GlobalConnectorStreamRegistry beginning shrink.\n"
       .cstring())
-    @printf[I32]("[JB] Global leaving: %s streams_to_shrink: %s active: %s inactive: %s.\n"
-      .cstring(), leaving.size().string().cstring(), streams_to_shrink.size().string().cstring(), _active_streams.size().string().cstring(), _inactive_streams.size().string().cstring())
 
     if leaving.contains(_worker_name, {(l, r) => l == r}) then
       _is_shrinking = true
