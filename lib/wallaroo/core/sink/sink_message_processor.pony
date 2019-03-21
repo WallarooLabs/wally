@@ -83,14 +83,11 @@ class BarrierSinkMessageProcessor is SinkMessageProcessor
   let _barrier_acker: BarrierSinkAcker
   var _barrier_token: BarrierToken = InitialBarrierToken
   let _queued: Array[_Queued] = _queued.create()
-  let _always_queue: Bool
+  var _force_queue: Bool = false
 
-  new create(s: Sink ref, barrier_acker: BarrierSinkAcker,
-    always_queue: Bool = false)
-  =>
+  new create(s: Sink ref, barrier_acker: BarrierSinkAcker) =>
     sink = s
     _barrier_acker = barrier_acker
-    _always_queue = always_queue
 
   fun ref process_message[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
@@ -98,7 +95,7 @@ class BarrierSinkMessageProcessor is SinkMessageProcessor
     msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    if _always_queue or _barrier_acker.input_blocking(i_producer_id) then
+    if _force_queue or _barrier_acker.input_blocking(i_producer_id) then
       let msg = TypedQueuedMessage[D](metric_name, pipeline_time_spent,
         data, key, event_ts, watermark_ts, i_producer_id, i_producer, msg_uid,
         frac_ids, i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
@@ -129,6 +126,9 @@ class BarrierSinkMessageProcessor is SinkMessageProcessor
       _barrier_acker.receive_barrier(input_id, producer, barrier_token,
         ack_barrier_if_complete)
     end
+
+  fun ref set_force_queue() =>
+    _force_queue = true
 
   fun ref queued(): Array[_Queued] =>
     let qd = Array[_Queued]

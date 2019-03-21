@@ -578,6 +578,18 @@ actor ConnectorSink is Sink
       end
 
       if _twopc_state is cp.TwoPCFsmStart then
+        // As a 2PC participant as a Wallaroo *sink*, we cannot
+        // allow messages to be processed by this sink during 2PC.
+        // If we allow messages to be processed & sent to the external
+        // connector sink, then if the global decision for message-ids
+        // X..Y is abort, then we will also need to abort any messages
+        // Y+1, Y+2, ... that slipped through during 2PC, which will
+        // be another round of 2PC of message-ids (Y+1)..(Y+n) plus
+        // forced abort.
+        // Instead of that mess, we force the message processor to
+        // queue all messages.
+        try (_message_processor as BarrierSinkMessageProcessor).set_force_queue() else Fail end
+
         let txn_id = _make_txn_id_string(sbt.id)
         _twopc_txn_id = txn_id
         _notify.twopc_txn_id_current = txn_id
