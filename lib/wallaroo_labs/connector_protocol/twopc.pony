@@ -21,6 +21,7 @@ use "buffered"
 type TwoPCFsmState is (TwoPCFsmStart |
   TwoPCFsm1Precommit |
   TwoPCFsm2Commit |
+  TwoPCFsm2CommitFast |
   TwoPCFsm2Abort)
 
 primitive TwoPCFsmStart
@@ -29,8 +30,10 @@ primitive TwoPCFsm1Precommit
   fun apply(): U8 => 1
 primitive TwoPCFsm2Commit
   fun apply(): U8 => 2
-primitive TwoPCFsm2Abort
+primitive TwoPCFsm2CommitFast
   fun apply(): U8 => 3
+primitive TwoPCFsm2Abort
+  fun apply(): U8 => 4
 
 primitive TwoPCEncode
   fun list_uncommitted(rtag: U64): Array[U8] val =>
