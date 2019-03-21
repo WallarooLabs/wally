@@ -168,6 +168,7 @@ actor ConnectorSink is Sink
   var _twopc_phase1_commit: Bool = false
   var _twopc_last_offset: USize = 0
   var _twopc_current_offset: USize = 0
+  var _twopc_current_txn_end_offset: USize = 0
 
   new create(sink_id: RoutingId, sink_name: String, event_log: EventLog,
     recovering: Bool, env: Env, encoder_wrapper: ConnectorEncoderWrapper,
@@ -590,9 +591,8 @@ actor ConnectorSink is Sink
             @printf[I32]("2PC: no data written during this checkpoint interval, skipping 2PC round\n".cstring())
           end
           _barrier_coordinator.ack_barrier(this, sbt)
-          _twopc_txn_id = ""
           _twopc_phase1_commit = true
-          _twopc_state = cp.TwoPCFsm2Commit
+          _twopc_state = cp.TwoPCFsm2CommitFast
           return
         end
 
@@ -612,6 +612,7 @@ actor ConnectorSink is Sink
         _twopc_state = cp.TwoPCFsm1Precommit
         _twopc_txn_id = txn_id
         _twopc_barrier_token = sbt
+        _twopc_current_txn_end_offset = _twopc_current_offset
       else
         @printf[I32]("2PC: ERROR: _twopc_state = %d\n".cstring(), _twopc_state())
         Fail()
@@ -627,7 +628,8 @@ actor ConnectorSink is Sink
       @printf[I32]("2PC: Checkpoint complete %d at ConnectorSink %s\n".cstring(), checkpoint_id, _sink_id.string().cstring())
     end
 
-    if (not (_twopc_state is cp.TwoPCFsm2Commit)) or
+    if (not ((_twopc_state is cp.TwoPCFsm2Commit) or
+             (_twopc_state is cp.TwoPCFsm2CommitFast))) or
        (not _twopc_phase1_commit)
     then
       @printf[I32]("2PC: DBG: _twopc_state = %s, _twopc_phase1_commit %s\n".cstring(), _twopc_state().string().cstring(), _twopc_phase1_commit.string().cstring())
@@ -636,14 +638,16 @@ actor ConnectorSink is Sink
 
     let cpoint_id = ifdef "test_disconnect_at_5" then "5" else "" end
     let drop_phase2_msg = try if _twopc_txn_id.split("=")(1)? == cpoint_id then true else false end else false end
-    if _twopc_txn_id != "" then
+    if _twopc_state is cp.TwoPCFsm2Commit then
       if not drop_phase2_msg then
         _send_phase2(this, _twopc_txn_id, true)
       end
     end
 
-    _twopc_last_offset = _twopc_current_offset
+    try @printf[I32]("2PC: DBGDBG: X: checkpoint_complete: commit, _twopc_last_offset %d _notify.twopc_txn_id_last_committed %s\n".cstring(), _twopc_last_offset, (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
+    _twopc_last_offset = _twopc_current_txn_end_offset
     _notify.twopc_txn_id_last_committed = _twopc_txn_id
+    try @printf[I32]("2PC: DBGDBG: Y: checkpoint_complete: commit, _twopc_last_offset %d _notify.twopc_txn_id_last_committed %s\n".cstring(), _twopc_last_offset, (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
     _reset_2pc_state()
 
     _resume_processing_messages()
