@@ -305,6 +305,7 @@ actor ConnectorSink is Sink
         try
           let w1: Writer = w1.create()
           let msg = _notify.make_message(encoded1)?
+          @printf[I32]("DBGDBG: process_message: message_id = %d, _twopc_state = %d\n".cstring(), msg.message_id, _twopc_state())
           let bs = cp.Frame.encode(msg, w1)
           Bytes.length_encode(bs)
         else
@@ -477,7 +478,8 @@ actor ConnectorSink is Sink
         @printf[I32]("2PC: Wallaroo local abort for txn_id %s barrier %s\n".cstring(), _twopc_txn_id_at_close.cstring(), _twopc_barrier_token_at_close.string().cstring())
       end
 
-      _reset_2pc_state()
+      _twopc_state = cp.TwoPCFsm2Abort
+      _twopc_txn_id = _twopc_txn_id_at_close
       _twopc_txn_id_at_close = ""
       _twopc_barrier_token_at_close = _twopc_barrier_token_initial
     end
