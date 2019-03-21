@@ -752,6 +752,7 @@ actor ConnectorSink is Sink
     r.append(payload)
     _twopc_current_offset = try r.u64_be()?.usize() else Fail(); 0 end
     _twopc_last_offset = _twopc_current_offset
+    _twopc_current_txn_end_offset = _twopc_current_offset
     _notify.acked_point_of_ref = try r.u64_be()? else Fail(); 0 end
     _notify.message_id = _twopc_last_offset.u64()
 
