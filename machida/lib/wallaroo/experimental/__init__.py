@@ -84,7 +84,7 @@ class SourceConnectorConfig(object):
         self._max_credits = max_credits
         self._refill_credits = refill_credits
         self._host = host
-        logging.debug("{}: name {} encoder {} decoder {} max_credits {}"
+        logging.error("{}: name {} encoder {} decoder {} max_credits {}"
             .format(self,name, encoder, decoder, max_credits))
 
     def to_tuple(self):
@@ -164,6 +164,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self._host = host
         self._port = int(port)  # convert port to int
         self.credits = 0
+        logging.error("DBGDBG: PY credits {}".format(self.credits))
         self.version = version
         self.cookie = cookie
         self.program_name = program_name
@@ -296,6 +297,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         else:
             # deposit the credits
             self.credits += msg.initial_credits
+            logging.error("DBGDBG: PY credits {}".format(self.credits))
             # set handshake_complete
             self.handshake_complete = True
             # set terminator to 4 to expect the next message's header
@@ -318,6 +320,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
 
     def _handle_ack(self, msg):
         self.credits += msg.credits
+        logging.error("DBGDBG: PY credits {}".format(self.credits))
         for (stream_id, point_of_ref) in msg.acks:
             # Try to get old stream data
             old = self._streams.get(stream_id, None)
@@ -380,16 +383,22 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         if hasattr(self, '__next__'):
             try:
                 while self.credits > 0:
+                    logging.error("DBGDBG: PY handle_write credits {}".format(self.credits))
                     msg = self.__next__()
+                    logging.error("DBGDBG: PY handle_write msg0 {}".format(msg))
                     if msg:
+                        logging.error("DBGDBG: PY handle_write msg {}".format(msg))
                         self.write(msg)
                     else:
                         break
+                logging.error("DBGDBG: PY handle_write initiate_send")
                 self.initiate_send()
             except StopIteration:
+                logging.error("DBGDBG: PY StopIteration handle_write credits {}".format(self.credits))
                 self.initiate_send()
                 self.shutdown()
         else:
+            logging.error("DBGDBG: PY ELSE handle_write credits {}".format(self.credits))
             self.initiate_send()
 
     def shutdown(self, error=None):
@@ -434,6 +443,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                     self._write(data)
                     # use up 1 credit
                     self.credits -= 1
+                    logging.error("DBGDBG: PY credits {}".format(self.credits))
                 else:
                     raise
             except:
@@ -447,6 +457,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             self._write(data)
             # use up 1 credit
             self.credits -= 1
+            logging.error("DBGDBG: PY credits {}".format(self.credits))
         elif isinstance(msg, cwm.Error):
             # write the message
             data = cwm.Frame.encode(msg)
@@ -578,6 +589,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             "reinitiating handshake.")
         # reset credits
         self.credits = 0
+        logging.error("DBGDBG: PY credits {}".format(self.credits))
         # close connection
         self._conn.close()
         # close streams

@@ -678,13 +678,15 @@ actor ConnectorSink is Sink
     2nd-half logic for barrier_fully_acked().
     """
     let queued = _message_processor.queued()
-    @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ _resume_processing_messages\n".cstring())
+    @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ _resume_processing_messages with %d items\n".cstring(), queued.size())
     _message_processor = NormalSinkMessageProcessor(this)
     for q in queued.values() do
       match q
       | let qm: QueuedMessage =>
+        @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ _resume_processing_messages process_message\n".cstring())
         qm.process_message(this)
       | let qb: QueuedBarrier =>
+        @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ _resume_processing_messages inject_barrier\n".cstring())
         qb.inject_barrier(this)
       end
     end
