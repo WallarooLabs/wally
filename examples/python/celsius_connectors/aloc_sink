@@ -404,8 +404,8 @@ class AsyncServer(asynchat.async_chat, object):
                 del self._txn_state[msg2.txn_id]
                 logging.debug('2PC: Phase 2 post txn_state = {}'.format(self._txn_state))
             else:
-                logging.error('2PC: ERROR: Phase 2 got unknown txn_id {} commit {}'.format(msg2.txn_id, msg2.commit))
-                self.log_it(['2-error', msg2.txn_id, msg2.commit])
+                logging.error('2PC: Phase 2 got unknown txn_id {} commit {}'.format(msg2.txn_id, msg2.commit))
+                self.log_it(['2-error', msg2.txn_id, 'unknown txn_id, commit {}'.format(msg2.commit)])
             # No reply is required for Phase 2
         else:
             raise Exception("Stream ID 0 not implemented, msg2 = {}".format(msg2))
