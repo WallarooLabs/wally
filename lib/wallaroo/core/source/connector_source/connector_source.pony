@@ -692,6 +692,7 @@ actor ConnectorSource[In: Any val] is Source
           _event,
           _read_buf.cpointer(_read_buf_offset),
           _read_buf.size() - _read_buf_offset) ?
+        @printf[I32]("DBGDBG: ConnectorSource @pony_os_recv -> %d bytes\n".cstring(), len)
 
         match len
         | 0 =>
