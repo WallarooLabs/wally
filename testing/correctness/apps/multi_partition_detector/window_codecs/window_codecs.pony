@@ -32,12 +32,7 @@ use "wallaroo/core/source"
 use "wallaroo/core/source/tcp_source"
 
 primitive WindowPartitionFunction
-  fun apply(m: Message): String =>
-    try
-      m.key().split(".", 2)(0)?
-    else
-      m.key()
-    end
+  fun apply(m: Message): String => m.key()
 
 primitive MessageEncoder
   fun apply(m: Message, wb: Writer = Writer): Array[ByteSeq] val =>
@@ -77,7 +72,7 @@ primitive PartitionedU64FramedHandler is FramedSourceHandler[Message]
     let u: Value = Bytes.to_u64(data(0)?, data(1)?, data(2)?, data(3)?,
       data(4)?, data(5)?, data(6)?, data(7)?)
     let k: Key = String.from_array(recover data.slice(8) end)
-    let m = Message(k, u)
+    let m = Message(k, "", u)
     ifdef debug then
         (let sec', let ns') = Time.now()
         let us' = ns' / 1000

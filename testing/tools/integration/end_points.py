@@ -416,6 +416,25 @@ def first_nonzero_index(seq):
         raise NoNonzeroError("No nonzero values found in list")
 
 
+class Sequence(object):
+    def __init__(self, index, val=0):
+        self.index = index
+        self.val = val
+
+    def __next__(self):
+        self.val += 1
+        return (self.index, self.val)
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        return self.__next__()
+
+    def throw(self, type=None, value=None, traceback=None):
+        raise StopIteration
+
+
 class MultiSequenceGenerator(object):
     """
     A growable collection of sequence generators.
@@ -426,9 +445,11 @@ class MultiSequenceGenerator(object):
     - At stoppage time, all generators are allowed to reach the same final
       value
     """
-    def __init__(self, base_parts=1, base_value=0):
+    def __init__(self, base_index=0, initial_partitions=1, base_value=0):
         self._base_value = base_value
-        self.seqs = [self._base_value for x in range(base_parts)]
+        self._next_index = base_index + initial_partitions
+        self.seqs = [Sequence(x, self._base_value)
+                     for x in range(base_index, self._next_index)]
         # self.seqs stores the last value sent for each sequence
         self._idx = 0  # the idx of the last sequence sent
         self._remaining = []
@@ -442,19 +463,17 @@ class MultiSequenceGenerator(object):
         # Normal operation next value: round robin through the sets
         if self._idx >= len(self.seqs):
             self._idx = 0
-        self.seqs[self._idx] += 1
-        idx = self._idx
-        val = self.seqs[idx]
+        next_seq = self.seqs[self._idx]
         self._idx += 1
-        return (idx, val)
+        return next(next_seq)
 
     def _next_catchup_value(self):
         # After stop() was called: all sets catch up to current max
         try:
             idx = first_nonzero_index(self._remaining)
-            self.seqs[idx] += 1
+            next_seq = self.seqs[idx]
             self._remaining[idx] -= 1
-            return (idx, self.seqs[idx])
+            return next(next_seq)
         except NoNonzeroError:
             # reset self._remaining so it can be reused
             if not self.max_val:
@@ -467,14 +486,15 @@ class MultiSequenceGenerator(object):
     def add_sequence(self):
         if not self._remaining:
             logging.debug("MultiSequenceGenerator: adding new sequence")
-            self.seqs.append(self._base_value)
+            self.seqs.append(Sequence(self._next_index, self._base_value))
+            self._next_index += 1
 
     def stop(self):
         logging.info("MultiSequenceGenerator: stop called")
         logging.debug("seqs are: {}".format(self.seqs))
         with self.lock:
-            self.max_val = max(self.seqs)
-            self._remaining = [self.max_val - v for v in self.seqs]
+            self.max_val = max([seq.val for seq in self.seqs])
+            self._remaining = [self.max_val - seq.val for seq in self.seqs]
             logging.debug("_remaining: {}".format(self._remaining))
 
     def send(self, ignored_arg):
@@ -695,7 +715,7 @@ class ALOSender(StoppableThread):
     """
     A wrapper for MultiSourceConnector to look like a regular TCP Sender
     """
-    def __init__(self, source, version, cookie, program_name, instance_name,
+    def __init__(self, sources, version, cookie, program_name, instance_name,
                  addr):
         super(ALOSender, self).__init__()
         host, port = addr.split(':')
@@ -706,10 +726,13 @@ class ALOSender(StoppableThread):
             program_name,
             instance_name,
             host, port)
-        self.name = "ALOSender_{}".format(source.name.decode())
-        self.source = source
-        logging.debug("ALO: source = {}".format(source))
-        self.data = source.data
+        self.name = "ALOSender_{}".format("-".join(
+            [source.name.decode() for source in sources]))
+        self.sources = sources
+        logging.debug("ALO: source = {}".format(sources))
+        self.data = []
+        for source in self.sources:
+            source.data = self.data
         self.host = host
         self.port = port
         self.start_time = None
@@ -718,7 +741,8 @@ class ALOSender(StoppableThread):
     def run(self):
         self.start_time = datetime.datetime.now()
         self.client.connect()
-        self.client.add_source(self.source)
+        for source in self.sources:
+            self.client.add_source(source)
         self.error = self.client.join()
 
     def stop(self, error=None):

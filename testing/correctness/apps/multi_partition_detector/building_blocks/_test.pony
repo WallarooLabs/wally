@@ -28,7 +28,6 @@ actor Main is TestList
   fun tag tests(test: PonyTest) =>
     test(_TestWindow)
     test(_TestMessage)
-    test(_TestMessageDecode)
 
 class iso _TestWindow is UnitTest
   fun name(): String => "bulding_blocks/Window"
@@ -58,28 +57,15 @@ class iso _TestMessage is UnitTest
     end
 
     let key: Key = "key"
+    let trace: String = "trace"
     // test Message with window
-    let m1: Message = Message(key, w)
+    let m1: Message = Message(key, trace, w)
     h.assert_eq[Key](key, m1.key())
     h.assert_eq[Value]((ceil-1), m1.value())
+    h.assert_eq[String](trace, m1.trace())
 
     // test Message with Value
-    let m2: Message = Message(key, (ceil-1))
+    let m2: Message = Message(key, trace, (ceil-1))
     h.assert_eq[Key](key, m2.key())
     h.assert_eq[Value]((ceil-1), m2.value())
-
-class iso _TestMessageDecode is UnitTest
-  fun name(): String => "building_blocks/MessageDecode"
-
-  fun apply(h: TestHelper) ? =>
-    let s = "(key,[1,2,3,4])"
-    let key: Key = "key"
-    let values: Array[U64] val = recover [1;2;3;4] end
-    let m = Message.decode(s)?
-    h.assert_eq[Key](key, m.key())
-    h.assert_eq[Value](values(3)?, m.value())
-    let w = m.window()?
-    h.assert_eq[Value](values(0)?, w(3)?)
-    h.assert_eq[Value](values(1)?, w(2)?)
-    h.assert_eq[Value](values(2)?, w(1)?)
-    h.assert_eq[Value](values(3)?, w(0)?)
+    h.assert_eq[String](trace, m2.trace())
