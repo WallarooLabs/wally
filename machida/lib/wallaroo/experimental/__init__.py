@@ -617,7 +617,8 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             self._port = port
         # try to connect again
         print("DBGDBG: handle_restart, time = {}".format(time.time()))
-        time.sleep(1.567) ## TODO work-around for NotifyAck.notify_success=False)
+        time.sleep(1.5) ## TODO work-around for NotifyAck.notify_success=False)
+        #time.sleep(2.345) ## TODO work-around for NotifyAck.notify_success=False)
         print("DBGDBG: handle_restart, time = {}".format(time.time()))
         self.connect()
         self.handle_restarted(self._streams)

@@ -119,6 +119,7 @@ class NotifyResultFulfill[In: Any val] is
     session_id = session_id'
 
   fun apply(t: NotifyResult[In]) =>
+    @printf[I32]("STREAM:SLF NotifyResultFulfill apply %s @ %d/%s\n".cstring(), t.success.string().cstring(), t.stream.id, t.stream.name.cstring())
     t.source.stream_notify_result(session_id, t.success, t.stream)
 
 class val ConnectorSourceNotifyParameters[In: Any val]
@@ -798,6 +799,8 @@ class ConnectorSourceNotify[In: Any val]
     end
     _pending_relinquish.clear()
     if streams.size() > 0 then
+      @printf[I32]("STREAM:SLF ConnectorSource relinquishing %s streams\n".cstring(),
+        _pending_relinquish.size().string().cstring())
       @printf[I32]("ConnectorSource relinquishing %s streams\n".cstring(),
         _pending_relinquish.size().string().cstring())
       _listener.streams_relinquish(consume streams)
@@ -810,6 +813,7 @@ class ConnectorSourceNotify[In: Any val]
     _pending_notify.set(stream_id)
 
     // create a promise for handling result
+    @printf[I32]("STREAM:SLF ConnectorSource _process_notify %d/%s streams\n".cstring(), stream_id, stream_name.cstring())
     let promise = Promise[NotifyResult[In]]
     promise.next[None](recover NotifyResultFulfill[In](stream_id, _session_id) end)
 
@@ -839,6 +843,7 @@ class ConnectorSourceNotify[In: Any val]
       _active_streams(stream.id) = s
     end
     // send response either way
+    @printf[I32]("STREAM:SLF %s ::: send_notify_ack @ line %d\n".cstring(), WallClock.seconds().string().cstring(), __loc.line())
     @printf[I32]("%s ::: send_notify_ack @ line %d\n".cstring(), WallClock.seconds().string().cstring(), __loc.line())
     send_notify_ack(success, stream.id, stream.last_acked)
 
@@ -884,6 +889,8 @@ class ConnectorSourceNotify[In: Any val]
 
   fun ref _send_restart() =>
     ifdef "trace" then
+      @printf[I32](("%s ::: _send_restart top\n").cstring(),
+        WallClock.seconds().string().cstring())
       @printf[I32]("TRACE: %s.%s()\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring())
     end
