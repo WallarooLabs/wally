@@ -305,6 +305,9 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
 
     def _handle_notify_ack(self, msg):
         old = self._streams.get(msg.stream_id, None)
+        if not msg.notify_success:
+            logging.warning("TODO do something to try again, failed notify: {}".format(msg))
+            sys.exit(66)
         if old is not None:
             new = Stream(old.id, old.name, msg.point_of_ref,
                          msg.notify_success)
