@@ -36,12 +36,31 @@ use "wallaroo_labs/string_set"
 
 
 actor CheckpointInitiator is Initializable
+  """
+  Phases:
+    _WaitingCheckpointInitiatorPhase: Waiting for a checkpoint to be initiated.
+
+    _CheckpointingPhase: A checkpoint barrier is in flight. Waiting for a
+      the barrier to be acked by all sinks.
+      |||| ASSUMPTION: There is only one checkpoint barrier in flight
+      |||| at a time. The barrier protocol in general does not require this,
+      |||| but we currently assume that all checkpoint event log entries for a
+      |||| single checkpoint id are consecutive.
+
+    _WaitingForEventLogIdWrittenPhase: Waiting for event log to persist a
+      committed checkpoint id.
+
+    _RollbackCheckpointInitiatorPhase: A rollback is ongoing, so we ignore any
+      current checkpoint activity. Waiting for rollback to complete.
+
+    _DisposedCheckpointInitiatorPhase: This actor is disposed, so we ignore all
+      activity.
+  """
   let _self: CheckpointInitiator tag = this
 
   let _auth: AmbientAuth
   let _worker_name: WorkerName
   var _primary_worker: WorkerName
-  var _is_active: Bool
   var _time_between_checkpoints: U64
   let _event_log: EventLog
   let _barrier_initiator: BarrierInitiator
@@ -64,8 +83,6 @@ actor CheckpointInitiator is Initializable
   let _do_local_file_io: Bool
 
   var _is_recovering: Bool
-  var _ignoring_checkpoints: Bool = false
-  var _disposed: Bool = false
 
   var _phase: _CheckpointInitiatorPhase = _WaitingCheckpointInitiatorPhase
 
@@ -79,7 +96,6 @@ actor CheckpointInitiator is Initializable
     _auth = auth
     _worker_name = worker_name
     _primary_worker = primary_worker
-    _is_active = is_active
     _time_between_checkpoints = time_between_checkpoints
     _event_log = event_log
     _barrier_initiator = barrier_initiator
@@ -139,13 +155,22 @@ actor CheckpointInitiator is Initializable
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     ifdef "resilience" then
-      if _is_active and (_worker_name == _primary_worker) then
-        let t = Timer(_InitiateCheckpoint(this, _checkpoint_group),
-          1_000_000_000)
-        _timers(consume t)
+      if _worker_name == _primary_worker then
+        _phase.start_checkpoint_timer(1_000_000_000, this)
       end
     end
     _is_recovering = false
+
+  fun ref _start_checkpoint_timer(time_until_checkpoint: U64) =>
+    """
+    Ignoring the initial checkpoint, we only set a new checkpoint timer once
+    the last checkpoint is complete. That means that "time_until_checkpoint"
+    is the absolute minimum time between checkpoints. In reality, we need to
+    add the time taken to actually complete the checkpoint to this time.
+    """
+    let t = Timer(_InitiateCheckpoint(this, _checkpoint_group),
+      time_until_checkpoint)
+    _timers(consume t)
 
   fun workers(): StringSet box => _workers
 
@@ -170,8 +195,9 @@ actor CheckpointInitiator is Initializable
     p((_last_complete_checkpoint_id, _last_rollback_id))
 
   be initiate_checkpoint(checkpoint_group: USize) =>
-    @printf[I32]("[JB]CheckpointInitiator: initiate_checkpoint\n".cstring())
-    _initiate_checkpoint(checkpoint_group)
+    if checkpoint_group == _checkpoint_group then
+      _phase.initiate_checkpoint(checkpoint_group, this)
+    end
 
   be clear_pending_checkpoints(promise: Promise[None]) =>
     _clear_pending_checkpoints()
@@ -180,55 +206,51 @@ actor CheckpointInitiator is Initializable
   be restart_repeating_checkpoints() =>
     @printf[I32]("[JB]CheckpointInitiator: restart_repeating_checkpoints\n".cstring())
     _clear_pending_checkpoints()
-    _initiate_checkpoint(_checkpoint_group)
+    _phase.initiate_checkpoint(_checkpoint_group, this)
 
-  fun ref _initiate_checkpoint(checkpoint_group: USize,
-    repeating: Bool = true)
-  =>
+  fun ref _initiate_checkpoint(checkpoint_group: USize) =>
     ifdef "resilience" then
-      if not _ignoring_checkpoints and (checkpoint_group == _checkpoint_group)
-      then
-        _clear_pending_checkpoints()
-        _current_checkpoint_id = _current_checkpoint_id + 1
+      _clear_pending_checkpoints()
+      _current_checkpoint_id = _current_checkpoint_id + 1
 
-        ifdef "checkpoint_trace" then
-          (let s, let ns) = Time.now()
-          let us = ns / 1000
-          let ts = PosixDate(s, ns).format("%Y-%m-%d %H:%M:%S." + us.string())
-          @printf[I32]("Initiating checkpoint %s at %s\n".cstring(),
-            _current_checkpoint_id.string().cstring(), ts.string().cstring())
-        end
-
-        let event_log_promise = Promise[CheckpointId]
-        event_log_promise.next[None](
-          recover this~event_log_checkpoint_complete(_worker_name) end)
-        _event_log.initiate_checkpoint(_current_checkpoint_id,
-          event_log_promise)
-
-        try
-          let msg = ChannelMsgEncoder.event_log_initiate_checkpoint(
-            _current_checkpoint_id, _worker_name, _auth)?
-          _connections.send_control_to_cluster(msg)
-        else
-          Fail()
-        end
-
-        let token = CheckpointBarrierToken(_current_checkpoint_id)
-
-        let barrier_promise = Promise[BarrierToken]
-        barrier_promise.next[None](
-          recover this~checkpoint_barrier_complete() end)
-        _barrier_initiator.inject_barrier(token, barrier_promise)
-
-        _phase = _CheckpointingPhase(token, repeating, this)
+      ifdef "checkpoint_trace" then
+        (let s, let ns) = Time.now()
+        let us = ns / 1000
+        let ts = PosixDate(s, ns).format("%Y-%m-%d %H:%M:%S." + us.string())
+        @printf[I32]("Initiating checkpoint %s at %s\n".cstring(),
+          _current_checkpoint_id.string().cstring(), ts.string().cstring())
       end
+
+      let event_log_promise = Promise[CheckpointId]
+      event_log_promise.next[None](
+        recover this~event_log_checkpoint_complete(_worker_name) end)
+      _event_log.initiate_checkpoint(_current_checkpoint_id,
+        event_log_promise)
+
+      try
+        let msg = ChannelMsgEncoder.event_log_initiate_checkpoint(
+          _current_checkpoint_id, _worker_name, _auth)?
+        _connections.send_control_to_cluster(msg)
+      else
+        Fail()
+      end
+
+      let token = CheckpointBarrierToken(_current_checkpoint_id)
+
+      let barrier_promise = Promise[BarrierToken]
+      barrier_promise.next[None](
+        recover this~checkpoint_barrier_complete() end)
+      _barrier_initiator.inject_barrier(token, barrier_promise)
+
+      _phase = _CheckpointingPhase(token, this)
     end
 
-  be resume_checkpoint() =>
+  be resume_checkpointing_from_rollback() =>
     ifdef "checkpoint_trace" then
-      @printf[I32]("CheckpointInitiator: resume_checkpoint()\n".cstring())
+      @printf[I32]("CheckpointInitiator: resume_checkpointing_from_rollback()\n"
+        .cstring())
     end
-    if _is_active and (_worker_name == _primary_worker) then
+    if _worker_name == _primary_worker then
       _clear_pending_checkpoints()
       ifdef "resilience" then
         let promise = Promise[BarrierToken]
@@ -237,32 +259,40 @@ actor CheckpointInitiator is Initializable
         _barrier_initiator.inject_barrier(
           CheckpointRollbackResumeBarrierToken(_last_rollback_id,
             _last_complete_checkpoint_id), promise)
-        _ignoring_checkpoints = false
+        _phase.resume_checkpointing_from_rollback()
       end
     else
       try
         ifdef "resilience" then
           let msg = ChannelMsgEncoder.resume_checkpoint(_worker_name, _auth)?
           _connections.send_control(_primary_worker, msg)
-          _ignoring_checkpoints = false
+          _phase.resume_checkpointing_from_rollback()
         end
       else
         Fail()
       end
     end
 
+  fun ref wait_for_next_checkpoint() =>
+    _phase = _WaitingCheckpointInitiatorPhase
+
   be checkpoint_barrier_complete(token: BarrierToken) =>
-    if not _ignoring_checkpoints then
-      ifdef debug then
-        @printf[I32]("Checkpoint_Initiator: Checkpoint Barrier %s Complete\n"
-          .cstring(), token.string().cstring())
-      end
-      _phase.checkpoint_barrier_complete(token)
+    """
+    This is called when all sinks have acked the checkpoint barrier.
+    """
+    ifdef debug then
+      @printf[I32]("Checkpoint_Initiator: Checkpoint Barrier %s Complete\n"
+        .cstring(), token.string().cstring())
     end
+    _phase.checkpoint_barrier_complete(token)
 
   be event_log_checkpoint_complete(worker: WorkerName,
     checkpoint_id: CheckpointId)
   =>
+    """
+    This is called when the EventLog has written all entries in the scope of
+    this checkpoint
+    """
     ifdef debug then
       @printf[I32](("Checkpoint_Initiator: Event Log CheckpointId %s " +
         "complete for worker %s\n").cstring(), checkpoint_id.string()
@@ -271,9 +301,16 @@ actor CheckpointInitiator is Initializable
     _phase.event_log_checkpoint_complete(worker, checkpoint_id)
 
   be event_log_id_written(worker: WorkerName, checkpoint_id: CheckpointId) =>
+    """
+    This is called once the EventLog on this worker has persisted this
+    checkpoint id.
+    """
     _phase.event_log_id_written(worker, checkpoint_id)
 
   be inform_recovering_worker(w: WorkerName, conn: TCPConnection) =>
+    """
+    Tell a recovering worker what the last complete checkpoint was.
+    """
     try
       @printf[I32]("Sending recovery data to %\n".cstring(),
         w.cstring())
@@ -284,8 +321,10 @@ actor CheckpointInitiator is Initializable
       Fail()
     end
 
+  // fun ref event_log_write_checkpoint_id(checkpoint_id: CheckpointId,
+  //   token: CheckpointBarrierToken, repeating: Bool)
   fun ref event_log_write_checkpoint_id(checkpoint_id: CheckpointId,
-    token: CheckpointBarrierToken, repeating: Bool)
+    token: CheckpointBarrierToken)
   =>
     ifdef "checkpoint_trace" then
       @printf[I32]("CheckpointInitiator: event_log_write_checkpoint_id()\n"
@@ -310,52 +349,51 @@ actor CheckpointInitiator is Initializable
       end
     end
 
-    _phase = _WaitingForEventLogIdWrittenPhase(token, repeating, this)
+    _phase = _WaitingForEventLogIdWrittenPhase(token, this)
 
-  fun ref checkpoint_complete(token: BarrierToken, repeating: Bool) =>
-    if not _ignoring_checkpoints and not _disposed then
-      ifdef "resilience" then
-        match token
-        | let st: CheckpointBarrierToken =>
-          if st.id != _current_checkpoint_id then Fail() end
-          ifdef "checkpoint_trace" then
-            @printf[I32]("CheckpointInitiator: Checkpoint %s is complete!\n".
-              cstring(), st.id.string().cstring())
-          end
-          _save_checkpoint_id(st.id, _last_rollback_id)
-          _last_complete_checkpoint_id = st.id
+  fun ref checkpoint_complete(token: BarrierToken) =>
+    """
+    This is called once all workers in the cluster have committed the
+    checkpoitn id for this token.
+    """
+    ifdef "resilience" then
+      match token
+      | let st: CheckpointBarrierToken =>
+        if st.id != _current_checkpoint_id then Fail() end
+        ifdef "checkpoint_trace" then
+          @printf[I32]("CheckpointInitiator: Checkpoint %s is complete!\n".
+            cstring(), st.id.string().cstring())
+        end
+        _save_checkpoint_id(st.id, _last_rollback_id)
+        _last_complete_checkpoint_id = st.id
 
-          try
-            let msg = ChannelMsgEncoder.commit_checkpoint_id(st.id,
-              _last_rollback_id, _worker_name, _auth)?
-            _connections.send_control_to_cluster(msg)
-          else
-            Fail()
-          end
-
-          // Prepare for next checkpoint
-          if repeating and _is_active and (_worker_name == _primary_worker)
-          then
-            ifdef "checkpoint_trace" then
-              @printf[I32]("Creating _InitiateCheckpoint timer for future checkpoint %s\n".cstring(),
-                (_current_checkpoint_id + 1).string().cstring())
-            end
-            let t = Timer(_InitiateCheckpoint(this, _checkpoint_group),
-              _time_between_checkpoints)
-            _timers(consume t)
-          end
+        try
+          let msg = ChannelMsgEncoder.commit_checkpoint_id(st.id,
+            _last_rollback_id, _worker_name, _auth)?
+          _connections.send_control_to_cluster(msg)
         else
           Fail()
+        end
+
+        // Prepare for next checkpoint
+        if _worker_name == _primary_worker then
+          ifdef "checkpoint_trace" then
+            @printf[I32]("Creating _InitiateCheckpoint timer for future checkpoint %s\n".cstring(),
+              (_current_checkpoint_id + 1).string().cstring())
+          end
+          _phase = _WaitingCheckpointInitiatorPhase
+          _phase.start_checkpoint_timer(_time_between_checkpoints, this)
         end
       else
         Fail()
       end
-      _phase = _WaitingCheckpointInitiatorPhase
+    else
+      Fail()
     end
 
   be prepare_for_rollback() =>
-    if _is_active and (_worker_name == _primary_worker) then
-      _ignoring_checkpoints = true
+    if _worker_name == _primary_worker then
+      _phase = _RollbackCheckpointInitiatorPhase(this)
     end
     _clear_pending_checkpoints()
 
@@ -481,7 +519,7 @@ actor CheckpointInitiator is Initializable
   be dispose() =>
     @printf[I32]("Shutting down CheckpointInitiator\n".cstring())
     _clear_pending_checkpoints()
-    _disposed = true
+    _phase = _DisposedCheckpointInitiatorPhase
 
 primitive LatestCheckpointId
   fun read(auth: AmbientAuth, checkpoint_id_file: String):
