@@ -44,21 +44,21 @@ include $(rules_mk_path)
 
 build-testing-correctness-apps-multi_partition_detector: build-machida
 build-testing-correctness-apps-multi_partition_detector: build-machida3
-build-testing-correctness-apps-multi_partition_detector: build-testing-correctness-apps-multi_partition_detector-validator
 integration-tests-testing-correctness-apps-multi_partition_detector: build-testing-correctness-apps-multi_partition_detector
 integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_tests
 
 # Group the tests under a single target
 multi_partition_detector_tests: multi_partition_detector_tests_pony
-multi_partition_detector_tests: multi_partition_detector_tests_python
-multi_partition_detector_tests: multi_partition_detector_tests_python3
+#multi_partition_detector_tests: multi_partition_detector_tests_python
+#multi_partition_detector_tests: multi_partition_detector_tests_python3
 
 # group the tests by target API (Pony, Python, Python3)
 # Pony
-multi_partition_detector_tests_pony: multi_partition_detector_test_pony
-multi_partition_detector_tests_pony: multi_partition_detector_test_pony_gen_source
-multi_partition_detector_tests_pony: multi_partition_detector_test_pony_10_worker
-multi_partition_detector_tests_pony: multi_partition_detector_test_pony_gen_source_10_worker
+multi_partition_detector_tests_pony: multi_partition_alo_source_test_pony
+#multi_partition_detector_tests_pony: multi_partition_detector_test_pony
+#multi_partition_detector_tests_pony: multi_partition_detector_test_pony_gen_source
+#multi_partition_detector_tests_pony: multi_partition_detector_test_pony_10_worker
+#multi_partition_detector_tests_pony: multi_partition_detector_test_pony_gen_source_10_worker
 
 # Python
 multi_partition_detector_tests_python: multi_partition_detector_test_python
@@ -194,6 +194,22 @@ multi_partition_detector_test_python3_gen_source_10_worker:
 		--sink-expect-allow-more
 
 # Pony tests
+multi_partition_alo_source_test_pony:
+	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
+	integration_test \
+		--alo-sequence-sender key_0 '(0,100]' Detector \
+		--alo-sequence-sender key_1 '(0,100]' Detector \
+		--alo-sequence-sender key_0 '(100,200]' Detector \
+		--alo-sequence-sender key_1 '(100,200]' Detector \
+		--log-level $(LOGLEVEL) \
+		--command './multi_partition_detector --source alo $(RUN_WITH_RESILIENCE)' \
+		--validation-cmd 'python _validate.py --output' \
+		--output 'received.txt' \
+		--batch-size 10 \
+		--workers 2 \
+		--sink-await-key key_0 200 \
+		--sink-await-key key_1 200
+
 multi_partition_detector_test_pony:
 	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
 	integration_test \
