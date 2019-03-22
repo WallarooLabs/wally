@@ -356,6 +356,7 @@ class ConnectorSourceNotify[In: Any val]
         then
           // This notifier is already handling this stream
           // So reject directly
+          @printf[I32]("%s ::: send_notify_ack @ line %d\n".cstring(), WallClock.seconds().string().cstring(), __loc.line())
           send_notify_ack(false, m.stream_id, m.point_of_ref)
         else
           _process_notify(where source=source, stream_id=m.stream_id,
@@ -838,6 +839,7 @@ class ConnectorSourceNotify[In: Any val]
       _active_streams(stream.id) = s
     end
     // send response either way
+    @printf[I32]("%s ::: send_notify_ack @ line %d\n".cstring(), WallClock.seconds().string().cstring(), __loc.line())
     send_notify_ack(success, stream.id, stream.last_acked)
 
   fun ref _to_error_state(source: (ConnectorSource[In] ref|None), msg: String): Bool
