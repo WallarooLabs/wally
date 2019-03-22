@@ -32,33 +32,33 @@ TC = Creator(this)
 APIS = {
     'pony': [
         {'app': 'multi_partition_detector',
-         'cmd': 'multi_partition_detector --depth 1 --gen-source --run-with-resilience',
-         'validation_cmd': None}],
+         'cmd': 'multi_partition_detector --depth 1 --source gensource --run-with-resilience',
+         'validation_cmd': 'python ../../apps/multi_partition_detector/_validate.py --window-type tumbling --output {out_file}'}],
     'python': [
         {'app': 'multi_partition_detector',
-         'cmd': 'machida --application-module multi_partition_detector --depth 1 --gen-source --run-with-resilience',
-         'validation_cmd': None},
+         'cmd': 'machida --application-module multi_partition_detector --depth 1 --source gensource --run-with-resilience',
+         'validation_cmd': 'python ../../apps/multi_partition_detector/_validate.py --window-type tumbling --output {out_file}'},
         {'app': 'window_detector_tumbling',
-         'cmd': 'machida --application-module window_detector --gen-source --window-type tumbling --window-delay 100 --run-with-resilience',
+         'cmd': 'machida --application-module window_detector --source gensource --window-type tumbling --window-delay 100 --run-with-resilience',
          'validation_cmd': 'python ../../apps/window_detector/_validate.py --window-type tumbling --output {out_file}'},
         {'app': 'window_detector_counting',
-         'cmd': 'machida --application-module window_detector --gen-source --window-type counting --run-with-resilience',
+         'cmd': 'machida --application-module window_detector --source gensource --window-type counting --run-with-resilience',
          'validation_cmd': 'python ../../apps/window_detector/_validate.py --window-type counting --output {out_file}'},
         {'app': 'window_detector_sliding',
-         'cmd': 'machida --application-module window_detector --gen-source --window-type sliding --window-delay 100 --run-with-resilience',
+         'cmd': 'machida --application-module window_detector --source gensource --window-type sliding --window-delay 100 --run-with-resilience',
          'validation_cmd': 'python ../../apps/window_detector/_validate.py --window-type sliding --output {out_file}'}],
     'python3': [
         {'app': 'multi_partition_detector',
-         'cmd': 'machida3 --application-module multi_partition_detector --depth 1 --gen-source --run-with-resilience',
-         'validation_cmd': None},
+         'cmd': 'machida3 --application-module multi_partition_detector --depth 1 --source gensource --run-with-resilience',
+         'validation_cmd': 'python ../../apps/multi_partition_detector/_validate.py --window-type tumbling --output {out_file}'},
         {'app': 'window_detector_tumbling',
-         'cmd': 'machida3 --application-module window_detector --gen-source --window-type tumbling --window-delay 100 --run-with-resilience',
+         'cmd': 'machida3 --application-module window_detector --source gensource --window-type tumbling --window-delay 100 --run-with-resilience',
          'validation_cmd': 'python3 ../../apps/window_detector/_validate.py --window-type tumbling --output {out_file}'},
         {'app': 'window_detector_counting',
-         'cmd': 'machida3 --application-module window_detector --gen-source --window-type counting --run-with-resilience',
+         'cmd': 'machida3 --application-module window_detector --source gensource --window-type counting --run-with-resilience',
          'validation_cmd': 'python3 ../../apps/window_detector/_validate.py --window-type counting --output {out_file}'},
         {'app': 'window_detector_sliding',
-         'cmd': 'machida3 --application-module window_detector --gen-source --window-type sliding --window-delay 100 --run-with-resilience',
+         'cmd': 'machida3 --application-module window_detector --source gensource --window-type sliding --window-delay 100 --run-with-resilience',
          'validation_cmd': 'python3 ../../apps/window_detector/_validate.py --window-type sliding --output {out_file}'}]}
 
 
@@ -100,7 +100,7 @@ for api, group in APIS.items():
 #############
 
 # def test_grow1_wait2_shrink1_wait_2_times_ten():
-#     command = 'multi_partition_detector --depth 1 --gen-source'
+#     command = 'multi_partition_detector --depth 1 --source gensource'
 #     ops = [Wait(2), Grow(1), Wait(2), Shrink(1), Wait(2)]
 #     _test_resilience(command, ops, cycles=10, sources=0)
 

@@ -24,6 +24,7 @@ import time
 
 # import requisite components for integration test
 from integration import (Cluster,
+                         json_keyval_extract,
                          run_shell_cmd,
                          MultiSequenceGenerator,
                          Reader,
@@ -77,10 +78,10 @@ def pause_senders_and_sink_await(cluster, timeout=10):
     msg = cluster.senders[0].reader.gen
     await_values = []
     for part, val in enumerate(msg.seqs):
-        key = '{:07d}'.format(part).encode()
-        data = '[{},{},{},{}]'.format(*[val-x for x in range(3,-1,-1)]).encode()
+        key = '{:07d}'.format(part)
+        data = '[{},{},{},{}]'.format(*[val-x for x in range(3,-1,-1)])
         await_values.append((key, data))
-    cluster.sink_await(values=await_values, func=parse_sink_value)
+    cluster.sink_await(values=await_values, func=json_keyval_extract)
     # Since snapshots happen at a 1 second frequency, we need to wait
     # more than 1 second to guarantee a snapshot after messages arrived
     time.sleep(5)
@@ -368,10 +369,8 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
 # Test Runner
 #############
 
-VALIDATION_CMD = 'validator -i {out_file} -a'
-EXPECT_STUB = ' -e {expect}'
 def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
-         partition_multiplier=1, validation_cmd=None,
+         partition_multiplier=1, validation_cmd=False,
          sender_mps=1000, sender_interval=0.01):
     host = '127.0.0.1'
     sinks = 1
@@ -380,8 +379,6 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
     logging.debug("batch_size is {}".format(batch_size))
 
     # If validation_cmd is False, it remains False and no validation is run
-    if validation_cmd is None:
-        validation_cmd = VALIDATION_CMD
 
     if not isinstance(ops, (list, tuple)):
         raise TypeError("ops must be a list or tuple of operations")
@@ -478,10 +475,10 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
             # the multi sequence generator
             await_values = []
             for part, val in enumerate(msg.seqs):
-                key = '{:07d}'.format(part).encode()
-                data = '[{},{},{},{}]'.format(*[val-x for x in range(3,-1,-1)]).encode()
+                key = '{:07d}'.format(part)
+                data = '[{},{},{},{}]'.format(*[val-x for x in range(3,-1,-1)])
                 await_values.append((key, data))
-            cluster.sink_await(values=await_values, func=parse_sink_value)
+            cluster.sink_await(values=await_values, func=json_keyval_extract)
 
         logging.info("Completion condition achieved. Shutting down cluster.")
 

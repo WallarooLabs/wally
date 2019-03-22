@@ -43,7 +43,7 @@ class iso _TestMessageEncoder is UnitTest
     w.push(2)
     w.push(3)
     w.push(4)
-    let msg = Message(k, w.clone())
+    let msg = Message(k, "trace", w.clone(), "ts")
     let byteseqs = MessageEncoder(msg)
 
     let payload = recover val
@@ -53,7 +53,8 @@ class iso _TestMessageEncoder is UnitTest
     end
 
     let encoded : String = String.from_array(payload)
-    h.assert_eq[String]("(key,[1,2,3,4])", encoded)
+    h.assert_eq[String]("{\"key\": \"key\", \"value\": [1,2,3,4], " +
+      "\"trace\": \"trace\", \"ts\": \"ts\"}", encoded)
 
 class iso _TestWindowDecoder is UnitTest
   fun name(): String => "window_codecs/WindowDecoder"
@@ -86,4 +87,5 @@ class iso _TestPartitionedU64FramedHandler is UnitTest
     let m = PartitionedU64FramedHandler.decode(recover data.slice(4) end)?
     h.assert_eq[Key](key, m.key())
     h.assert_eq[Value](value, m.value())
+    h.assert_eq[String]("", m.trace())
 

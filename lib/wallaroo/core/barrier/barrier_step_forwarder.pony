@@ -136,6 +136,13 @@ class BarrierStepForwarder
       end
     end
     @printf[I32]("[JB] check_completion.2\n".cstring())
+    @printf[I32]("[JB] check_completion.2 _step.inputs.size(): %s\n".cstring(),
+      _step.inputs().size().string().cstring())
+    @printf[I32]("[JB] check_completion inputs: ".cstring())
+    for input in _step.inputs().keys() do
+      @printf[I32]("%s, ".cstring(), input.string().cstring())
+    end
+    @printf[I32]("\n".cstring())
     @printf[I32]("[JB] check_completion.2 _inputs_blocking size: %s\n"
       .cstring(), _inputs_blocking.size().string().cstring())
     @printf[I32]("[JB] check_completion blocking inputs: ".cstring())

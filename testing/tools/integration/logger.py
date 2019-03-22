@@ -13,6 +13,7 @@
 #  permissions and limitations under the License.
 
 import logging
+import os
 try:
     from cStringIO import StringIO      # Python 2
 except ImportError:
@@ -23,6 +24,24 @@ logging.addLevelName(INFO2, 'INFO2')
 
 DEFAULT_LOG_FMT = '%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
 DEFAULT_LOG_FMT_NAME = '%(asctime)s %(name)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
+
+LOG_LEVELS = {'none': 0,
+              '1': 1,
+              'debug': 10,
+              'info': 20,
+              'warn': 30,
+              'error': 40,
+              'critical': 50}
+def get_log_level(value=None):
+    """Get the effective log level"""
+    if value is None:
+        value = os.environ.get("LOGLEVEL")
+    return LOG_LEVELS.get(value, 20)
+
+
+def set_name(name=''):
+    logging.root.name = name
+
 
 def set_logging(name='', level=logging.INFO, fmt=None):
     logging.root.name = name

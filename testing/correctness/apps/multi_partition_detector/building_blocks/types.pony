@@ -33,6 +33,7 @@ Then the following constraints are required:
 - Encoder takes Message as its input.
 """
 
+use "time"
 use "regex"
 use "../ring"
 use "../window_codecs"
@@ -51,26 +52,41 @@ trait Partitionable
 trait Computable
   fun value(): U64
 
+primitive Timestamp
+  fun apply(): String =>
+    Time.nanos().string()
+
 class val Message is (Partitionable & Computable)
   """
   The type that all computations in a multi-partition-detector application
   should return as their result.
   """
   let _key: String
+  let _trace: String
   let _payload: Payload val
+  let _ts: String
 
-  new val create(k: Key, p: Payload val) =>
+  new val create(k: Key, trace': String, p: Payload val,
+    ts': (String | None) = None)
+  =>
     _key = k
+    _trace = trace'
     _payload = p
+    _ts = match ts'
+    | let t: String =>
+      t
+    else
+      Timestamp()
+    end
 
-  new val decode(a: (String | Array[U8] val)) ? =>
-    let regex = Regex("\\((.*?),\\[(.*?)\\]\\)")?
-    let m = regex(a)?
-    _key = m(1)?
-    _payload = WindowDecoder(m(2)?)?
+  fun ts(): String =>
+    _ts
 
   fun key(): String =>
     _key
+
+  fun trace(): String =>
+    _trace
 
   fun value(): U64 =>
     match _payload
@@ -98,7 +114,8 @@ class val Message is (Partitionable & Computable)
       end
     | let v: Value val => v.string()
     end
-    "(" + key() + "," + data + ")"
+    ("{\"key\": \"" + _key + "\", \"value\": " + data +
+      ", \"trace\": \"" + _trace + "\", \"ts\": \"" + _ts + "\"}")
 
   fun window(): Window val ? =>
     match _payload

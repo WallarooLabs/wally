@@ -43,6 +43,7 @@ use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
+use "wallaroo/core/source/connector_source"
 use "wallaroo/core/source/gen_source"
 use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/state"
@@ -54,17 +55,17 @@ actor Main
     try
       // Add options:
       //  "--depth": Int
-      //  "--internal-source": flag
+      //  "--source": String
       //  "--partitions": Int
       var depth: USize = 1
-      var gen_source: Bool = false
+      var source: String = "tcp"
       var partition_count: USize = 40
       var cluster_initializer: Bool = false
 
       let options = Options(env.args, false)
 
       options.add("depth", "", I64Argument)
-      options.add("gen-source", "", None)
+      options.add("source", "", StringArgument)
       options.add("partitions", "", I64Argument)
       options.add("cluster-initializer", "", None)
 
@@ -72,8 +73,16 @@ actor Main
         match option
         | ("depth", let arg: I64) =>
           depth = arg.usize()
-        | ("gen-source", None) =>
-          gen_source = true
+        | ("source", let s: String) =>
+          match s
+          | "tcp" => source = "tcp"
+          | "gensource" => source = "gensource"
+          | "alo" => source = "alo"
+          else
+            @printf[I32](("'--source' value must be one of 'tcp', 'gensource'"
+              + ", or 'alo'.\n").cstring())
+            Fail()
+          end
         | ("partitions", let arg: I64) =>
           partition_count = arg.usize()
         | ("cluster-initializer", None) =>
@@ -85,11 +94,29 @@ actor Main
       end
 
       let pipeline = recover val
-        var p = if gen_source then
+        var p = match source
+        | "gensource" =>
           Wallaroo.source[t.Message]("Detector",
             GenSourceConfig[t.Message](
               MultiPartitionGeneratorBuilder(partition_count)))
+        | "tcp" =>
+          Wallaroo.source[t.Message]("Detector",
+            TCPSourceConfig[t.Message]
+              .from_options(PartitionedU64FramedHandler,
+                TCPSourceConfigCLIParser("Detector", env.args)?))
+        | "alo" =>
+          // Note that we could use ConnectorSourceConfigCLIParser instead
+          // but then we'd have to update the harness to use a different
+          // `--in ...` string for connector sources
+          // TODO: do that later. For now hardcode cookie, max_credits, and
+          // refill_credits.
+          let opts = TCPSourceConfigCLIParser("Detector", env.args)?
+          Wallaroo.source[t.Message]("Detector",
+            ConnectorSourceConfig[t.Message]
+              .create("Detector", PartitionedU64FramedHandler,
+                 opts.host, opts.service, "cookie", 67, 10))
         else
+          Unreachable()
           Wallaroo.source[t.Message]("Detector",
             TCPSourceConfig[t.Message]
               .from_options(PartitionedU64FramedHandler,
@@ -102,6 +129,8 @@ actor Main
           p = p.to[t.Message](TraceID(x.string()))
           p = p.to[t.Message](TraceWindow(x.string()))
         end
+        // Return single value messages
+        // p = p.to[t.Message](WindowToValue)
         p.to_sink(TCPSinkConfig[t.Message].from_options(MessageEncoder,
             TCPSinkConfigCLIParser(env.args)?(0)?))
       end
@@ -129,7 +158,7 @@ class MultiPartitionGenerator
 
   fun initial_value(): (t.Message | None) =>
     if _partitions > 0 then
-      t.Message("0", 1)
+      t.Message("0","", 1)
     else
       None
     end
@@ -147,7 +176,7 @@ class MultiPartitionGenerator
           end
         let next_key = (last_key + 1) % _partitions
 
-        let m = t.Message(next_key.string(), next_value)
+        let m = t.Message(next_key.string(), "", next_value)
 
         // Print a timestamp
         ifdef debug then
@@ -161,7 +190,7 @@ class MultiPartitionGenerator
         consume m
       else
         Fail()
-        t.Message("0", 1)
+        t.Message("0", "", 1)
       end
     else
       None
@@ -214,7 +243,7 @@ class val TraceID is StatelessComputation[t.Message, t.Message]
   new val create(s: String) =>
     _id = _name + "-" + s
 
-  fun rekey(k: String): String =>
+  fun trace(k: String): String =>
     k + "." + _id
 
   fun name(): String => "TraceID"
@@ -225,7 +254,7 @@ class val TraceID is StatelessComputation[t.Message, t.Message]
         "'%s'\n").cstring(),
         _id.cstring(), m.key().cstring(), m.value().string().cstring())
     end
-    t.Message(rekey(m.key()), m.value())
+    t.Message(m.key(), trace(m.trace()), m.value(), m.ts())
 
 class val TraceWindow is StateComputation[t.Message, t.Message, WindowState]
   let _id: String
@@ -236,7 +265,7 @@ class val TraceWindow is StateComputation[t.Message, t.Message, WindowState]
 
   fun name(): String => _name
 
-  fun rekey(k: String): String =>
+  fun trace(k: String): String =>
     k + "." + _id
 
   fun apply(m: t.Message, state: WindowState): t.Message =>
@@ -248,7 +277,14 @@ class val TraceWindow is StateComputation[t.Message, t.Message, WindowState]
 
     state.push(m)
 
-    t.Message(rekey(m.key()), state.window())
+    t.Message(m.key(), trace(m.trace()), state.window())
 
   fun initial_state(): WindowState =>
     WindowState
+
+primitive WindowToValue is StatelessComputation[t.Message, t.Message]
+  fun name(): String =>
+    "WindowToValue"
+
+  fun apply(input: t.Message): t.Message val =>
+    t.Message(input.key(), input.trace(), input.value(), input.ts())
