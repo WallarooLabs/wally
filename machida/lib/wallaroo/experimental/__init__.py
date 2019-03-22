@@ -308,6 +308,8 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         if old is not None:
             new = Stream(old.id, old.name, msg.point_of_ref,
                          msg.notify_success)
+            logging.error("DBGDBG: _handle_notify_ack msg {}".format(msg))
+            logging.error("DBGDBG: _handle_notify_ack new Stream {}".format(new))
             self._streams[old.id] = new
             self.stream_added(new)
             if new.is_open:
@@ -328,6 +330,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 if point_of_ref != old.point_of_ref:
                     new = Stream(stream_id, old.name, point_of_ref,
                                  old.is_open)
+                    logging.error("DBGDBG: _handle_ack new Stream {}".format(new))
                     self._streams[stream_id] = new
                 else:
                     new = old
@@ -498,6 +501,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                          (point_of_ref if point_of_ref is not None else
                           old.point_of_ref),
                          old.is_open)
+            logging.error("DBGDBG: notify new Stream {}".format(new))
         else:
             if stream_name is None:
                 raise ConnectorError("Cannot notify a new stream without "
@@ -506,6 +510,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                          stream_name,
                          0 if point_of_ref is None else point_of_ref,
                          False)
+            logging.error("DBGDBG: notify 2 new Stream {}".format(new))
 
         # update locally and call stream_added
         self._streams[new.id] = new
@@ -596,6 +601,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         for sid, stream in self._streams.items():
             if stream.is_open:
                 new = Stream(stream.id, stream.name, stream.point_of_ref, False)
+                logging.error("DBGDBG: _handle_restart new Stream {}".format(new))
                 self._streams[sid] = new
                 self.stream_closed(new)
         # optionally update target host and port
