@@ -94,6 +94,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     for worker in workers_list.values() do
       _workers_set.set(worker)
     end
+    _dump_stream_state(__loc)
     _elect_leader()
 
   fun ref set_local_registry(local_registry: LocalConnectorStreamRegistry[In] ref) =>
@@ -116,6 +117,9 @@ class GlobalConnectorStreamRegistry[In: Any val]
   fun ref process_new_leader_msg(msg: ConnectorNewLeaderMsg) =>
     if not _is_leader then
       _leader_name = msg.leader_name
+      ifdef "stream_trace" then
+        @printf[I32]("STREAM: %s: _leader_name = %s\n".cstring(), __loc.method_name().cstring(), _leader_name.cstring())
+      end
     else
       @printf[I32](("GlobalConnectorStreamRegistry leader received a new leader"
         + " message from non-leader: %s.\n").cstring(),
@@ -128,6 +132,9 @@ class GlobalConnectorStreamRegistry[In: Any val]
   =>
     if _is_leader and _is_relinquishing then
       _leader_name = msg.leader_name
+      ifdef "stream_trace" then
+        @printf[I32]("STREAM: %s: _leader_name = %s\n".cstring(), __loc.method_name().cstring(), _leader_name.cstring())
+      end
       _is_leader = false
       _active_streams.clear()
       _inactive_streams.clear()
@@ -136,6 +143,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
       _is_relinquishing = false
       @printf[I32](("Connector Leadership relinquish complete. New Leader: " +
       msg.leader_name + "\n").cstring())
+      _dump_stream_state(__loc)
     else
       @printf[I32](("Not a Connector leader but received a " +
         "ConnectorLeaderStateReceivedAckMsg from " + msg.leader_name +
@@ -186,9 +194,13 @@ class GlobalConnectorStreamRegistry[In: Any val]
     // update leader state
     _is_leader = true
     _leader_name = _worker_name
+    ifdef "stream_trace" then
+      @printf[I32]("STREAM: %s: _leader_name = %s\n".cstring(), __loc.method_name().cstring(), _leader_name.cstring())
+    end
     // send ack
     _send_leader_state_received_ack(worker_name)
     _broadcast_new_leader()
+    _dump_stream_state(__loc)
 
   fun ref process_add_source_addr_msg(msg: ConnectorAddSourceAddrMsg) =>
     if _is_leader then
@@ -214,6 +226,9 @@ class GlobalConnectorStreamRegistry[In: Any val]
   fun ref process_leader_name_response_msg(msg: ConnectorLeaderNameResponseMsg)
   =>
     _leader_name = msg.leader_name
+    ifdef "stream_trace" then
+      @printf[I32]("STREAM: %s: _leader_name = %s\n".cstring(), __loc.method_name().cstring(), _leader_name.cstring())
+    end
     _is_joining = false
     // TODO [source-migration]: should the global registry be able to notify
     // the SourceListener (via local registry or some other fashion) that
@@ -231,6 +246,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     // TODO [post-source-migration-3]: we are lazily not re-electing leader on grow,
     // should we?
     _workers_set.set(worker_name)
+    _dump_stream_state(__loc)
 
   fun ref remove_worker(worker_name: WorkerName) =>
     // Relinquish streams should have happened before this is called
@@ -240,11 +256,15 @@ class GlobalConnectorStreamRegistry[In: Any val]
       try
         let new_leader_name = _leader_from_workers_list()?
         relinquish_leadership(new_leader_name)
+        ifdef "stream_trace" then
+          @printf[I32]("STREAM: %s: new_leader_name = %s\n".cstring(), __loc.method_name().cstring(), new_leader_name.cstring())
+        end
       else
         @printf[I32](("GlobalConnectorStreamRegistry could not determine "
         + "the new leader. Exiting.\n").cstring())
       end
     end
+    _dump_stream_state(__loc)
 
   ////////////////////////////
   // INTERNAL STATE MANAGEMENT
@@ -260,6 +280,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     // fail if not already active
     _active_streams.remove(stream.id)?
     _inactive_streams(stream.id) = stream
+    _dump_stream_state(__loc)
 
   fun ref _activate_stream(stream: StreamTuple, worker_name: WorkerName):
     StreamTuple ?
@@ -267,6 +288,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     // fail if not already in inactive
     let s = _inactive_streams.remove(stream.id)?
     _active_streams(stream.id) = worker_name
+    _dump_stream_state(__loc)
     s._2
 
   fun ref _new_stream(stream: StreamTuple, worker_name: WorkerName) ? =>
@@ -274,6 +296,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     if _inactive_streams.contains(stream.id) then error end
     if _active_streams.contains(stream.id) then error end
     _active_streams(stream.id) = worker_name
+    _dump_stream_state(__loc)
 
   ////////////////
   // STREAM_NOTIFY
@@ -418,6 +441,10 @@ class GlobalConnectorStreamRegistry[In: Any val]
     _source_addrs = Map[WorkerName, (String, String)]()
     _is_leader = false
     _leader_name = new_leader_name
+    ifdef "stream_trace" then
+      @printf[I32]("STREAM: %s: _leader_name = %s\n".cstring(), __loc.method_name().cstring(), _leader_name.cstring())
+    end
+    _dump_stream_state(__loc)
 
   fun ref _elect_leader() =>
     if _is_joining then
@@ -437,6 +464,9 @@ class GlobalConnectorStreamRegistry[In: Any val]
           _leader_name = leader_name
           _send_source_address_to_leader()
         end
+        ifdef "stream_trace" then
+          @printf[I32]("STREAM: %s: _leader_name = %s\n".cstring(), __loc.method_name().cstring(), _leader_name.cstring())
+        end
       else
         // unable to elect a leader
         Fail()
@@ -455,10 +485,14 @@ class GlobalConnectorStreamRegistry[In: Any val]
   fun ref _initiate_leader_state() =>
     _is_leader = true
     _leader_name = _worker_name
+    ifdef "stream_trace" then
+      @printf[I32]("STREAM: %s: _leader_name = %s\n".cstring(), __loc.method_name().cstring(), _leader_name.cstring())
+    end
     _active_streams = Map[StreamId, WorkerName]()
     _inactive_streams = Map[StreamId, StreamTuple]()
     _source_addrs = Map[WorkerName, (String, String)]()
     _source_addrs(_worker_name) = (_source_addr._1, _source_addr._2)
+    _dump_stream_state(__loc)
 
   fun ref _send_source_address_to_leader() =>
     try
@@ -504,6 +538,27 @@ class GlobalConnectorStreamRegistry[In: Any val]
       new_leader_name, _worker_name, _source_name,
       consume active_streams_copy, consume inactive_streams_copy,
       consume source_addrs_copy)
+    _dump_stream_state(__loc)
+
+  fun _dump_stream_state(l: SourceLoc) =>
+    ifdef "stream_trace" then
+      @printf[I32]("STREAM: %s:%d global _DumpStreamState start\n".cstring(),
+        l.method_name().cstring(), l.line())
+      for (s, w) in _active_streams.pairs() do
+        @printf[I32]("STREAM:   global active_stream: %d -> %s\n".cstring(),
+          s, w.cstring())
+      end
+      for (s, t) in _inactive_streams.pairs() do
+        @printf[I32]("STREAM:   global inactive_stream: %d -> %d,%s,%d\n".cstring(),
+          s, t.id, t.name.cstring(), t.last_acked)
+      end
+      for w in _workers_set.values() do
+        @printf[I32]("STREAM:   global worker: %s\n".cstring(),
+          w.cstring())
+      end
+      @printf[I32]("STREAM: %s:%d global _DumpStreamState end\n".cstring(),
+        l.method_name().cstring(), l.line())
+    end
 
 
 class ActiveStreamTuple[In: Any val]
@@ -648,12 +703,26 @@ class LocalConnectorStreamRegistry[In: Any val]
         stream.last_acked, stream.last_acked, connector_source)
     end
     promise(NotifyResult[In](connector_source, success, stream))
+    _dump_stream_state(__loc)
 
   fun ref streams_relinquish(streams: Array[StreamTuple] val) =>
     for stream in streams.values() do
       try _active_streams.remove(stream.id)? end
     end
     _global_registry.streams_relinquish(streams)
+    _dump_stream_state(__loc)
+
+  fun _dump_stream_state(l: SourceLoc) =>
+    ifdef "stream_trace" then
+      @printf[I32]("STREAM: %s:%d local _DumpStreamState start\n".cstring(),
+        l.method_name().cstring(), l.line())
+      for (s, t) in _active_streams.pairs() do
+        @printf[I32]("STREAM:   local active_stream: %d -> %d,%s,%d\n".cstring(),
+          s, t.id, t.name.cstring(), t.last_acked)
+      end
+      @printf[I32]("STREAM: %s:%d local _DumpStreamState end\n".cstring(),
+        l.method_name().cstring(), l.line())
+    end
 
 class val ConnectorStreamNotifyId is Equatable[ConnectorStreamNotifyId]
   let stream_id: StreamId
