@@ -31,7 +31,6 @@ use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
-
 class ConnectorSourceNotify[In: Any val]
   let _source_id: RoutingId
   let _env: Env
