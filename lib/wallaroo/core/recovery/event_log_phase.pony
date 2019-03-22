@@ -82,6 +82,9 @@ trait _EventLogPhase
     _invalid_call()
     Fail()
 
+  fun ref dispose(event_log: EventLog ref) =>
+    event_log._dispose()
+
   fun _invalid_call() =>
     @printf[I32]("Invalid call on event log phase %s\n".cstring(),
       name().cstring())
@@ -351,6 +354,9 @@ class _DisposedEventLogPhase is _EventLogPhase
     None
 
   fun ref check_completion() =>
+    None
+
+  fun ref dispose(event_log: EventLog ref) =>
     None
 
 class _QueuedCheckpointState

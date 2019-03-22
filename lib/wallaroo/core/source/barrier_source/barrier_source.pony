@@ -194,29 +194,26 @@ actor BarrierSource is Source
     active graph (or on dispose())
     """
     for (source, outputs) in _source_outputs.pairs() do
+      let outputs_to_remove = Array[RoutingId]()
       for (id, consumer) in outputs.pairs() do
         _unregister_output(source, id, consumer)
+        outputs_to_remove.push(id)
+      end
+      try
+        for id in outputs_to_remove.values() do
+          outputs.remove(id)?
+        end
+      else
+        Fail()
       end
     end
 
   fun ref _unregister_output(source: String, id: RoutingId, c: Consumer) =>
-    try
-      _source_outputs(source)?.remove(id)?
-      match c
-      | let ob: OutgoingBoundary =>
-        ob.forward_unregister_producer(_source_id, id, this)
-      else
-        c.unregister_producer(_source_id, this)
-      end
-      var last_one = true
-      for (p, outputs) in _source_outputs.pairs() do
-        if outputs.contains(id) then last_one = false end
-      end
-      if last_one then
-        _outputs.remove(id)?
-      end
+    match c
+    | let ob: OutgoingBoundary =>
+      ob.forward_unregister_producer(_source_id, id, this)
     else
-      Fail()
+      c.unregister_producer(_source_id, this)
     end
 
   be register_downstream() =>

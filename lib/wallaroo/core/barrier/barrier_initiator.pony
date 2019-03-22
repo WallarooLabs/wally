@@ -592,6 +592,9 @@ actor BarrierInitiator is Initializable
     message that this barrier is complete. We can now inform all local
     sources (for example, so they can ack messages up to a checkpoint).
     """
+    for b_source in _barrier_sources.values() do
+      b_source.barrier_complete(barrier_token)
+    end
     for s in _sources.values() do
       s.barrier_complete(barrier_token)
     end
