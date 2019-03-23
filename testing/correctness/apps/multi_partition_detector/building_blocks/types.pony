@@ -54,9 +54,7 @@ trait Computable
 
 primitive Timestamp
   fun apply(): String =>
-    (let s, let ns) = Time.now()
-    s.string() + "." + ns.string()
-
+    Time.nanos().string()
 
 class val Message is (Partitionable & Computable)
   """

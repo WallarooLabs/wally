@@ -130,7 +130,7 @@ actor Main
           p = p.to[t.Message](TraceWindow(x.string()))
         end
         // Return single value messages
-        p = p.to[t.Message](WindowToValue)
+        // p = p.to[t.Message](WindowToValue)
         p.to_sink(TCPSinkConfig[t.Message].from_options(MessageEncoder,
             TCPSinkConfigCLIParser(env.args)?(0)?))
       end
@@ -277,7 +277,7 @@ class val TraceWindow is StateComputation[t.Message, t.Message, WindowState]
 
     state.push(m)
 
-    t.Message(m.key(), trace(m.trace()), state.window(), m.ts())
+    t.Message(m.key(), trace(m.trace()), state.window())
 
   fun initial_state(): WindowState =>
     WindowState

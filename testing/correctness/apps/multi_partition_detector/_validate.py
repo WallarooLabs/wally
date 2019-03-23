@@ -33,17 +33,9 @@ while True:
     header = struct.unpack('>I', header_bytes)[0]
     payload = f.read(header)
     assert(len(payload) > 0)
-    print("payload: ", payload)
     obj = loads(payload.decode())  # Python3.5/json needs a string
-    windows.setdefault(obj['key'], {}).setdefault(float(obj['ts']), []).append(obj['value'])
+    windows.setdefault(obj['key'], {}).setdefault(int(obj['ts']), []).extend(obj['value'])
 
-
-for k in windows.keys():
-    print("sorted(windows[{}].keys())".format(k))
-    for v in sorted(windows[k].keys()):
-        print(k, v, windows[k][v])
-    print("")
-exit(1)
 # flatten windows to sequences
 sequences = {}
 for k in windows.keys():
@@ -55,10 +47,6 @@ for k in windows.keys():
         sequences.setdefault(k, []).extend(windows[k][w])
 
 
-for (k, s) in sequences.items():
-    print(k, s)
-    print("")
-exit(1)
 # unlike window_detector, in multi_partition_detector all windows are
 # basically sliding windows
 for k, v in sequences.items():
@@ -75,6 +63,7 @@ for k, v in sequences.items():
             old = processed[i]
 
     assert(len(processed) == size), "Expect: sorted unique window elements form a subsegement of the natural sequence but for key {}".format(k)
+
 for k in sorted(windows.keys(), key=lambda k: int(k.replace('key_',''))):
     # Check that for each window, there are at most 2 duplicates per item
     # i.e. the duplicates are plausibly caused by the sub window overlap,
@@ -86,7 +75,8 @@ for k in sorted(windows.keys(), key=lambda k: int(k.replace('key_',''))):
         most_common = counter.most_common(3)
         assert(len(most_common) > 0)
         for key, count in most_common:
-            assert(count in (1,2))
+            if key != 0:
+                assert(count in (1,2))
 
 # Regardless of window type, check sequentialty:
 # 1. increments are always at +1 size
