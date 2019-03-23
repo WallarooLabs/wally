@@ -49,12 +49,13 @@ integration-tests-testing-correctness-apps-multi_partition_detector: multi_parti
 
 # Group the tests under a single target
 #multi_partition_detector_tests: multi_partition_detector_tests_pony
-multi_partition_detector_tests: multi_partition_detector_tests_python
-#multi_partition_detector_tests: multi_partition_detector_tests_python3
+#multi_partition_detector_tests: multi_partition_detector_tests_python
+multi_partition_detector_tests: multi_partition_detector_tests_python3
 
 # group the tests by target API (Pony, Python, Python3)
 # Pony
 multi_partition_detector_tests_pony: multi_partition_alo_source_test_pony
+multi_partition_detector_tests_pony: multi_partition_alo_source_test_pony_10_worker
 multi_partition_detector_tests_pony: multi_partition_detector_test_pony
 multi_partition_detector_tests_pony: multi_partition_detector_test_pony_gen_source
 multi_partition_detector_tests_pony: multi_partition_alo_source_test_pony_10_worker
@@ -62,12 +63,16 @@ multi_partition_detector_tests_pony: multi_partition_detector_test_pony_10_worke
 multi_partition_detector_tests_pony: multi_partition_detector_test_pony_gen_source_10_worker
 
 # Python
+multi_partition_detector_tests_python: multi_partition_detector_test_python_alo
+multi_partition_detector_tests_python: multi_partition_detector_test_python_alo_10_worker
 multi_partition_detector_tests_python: multi_partition_detector_test_python
-multi_partition_detector_tests_python: multi_partition_detector_test_python_gen_source
 multi_partition_detector_tests_python: multi_partition_detector_test_python_10_worker
+multi_partition_detector_tests_python: multi_partition_detector_test_python_gen_source
 multi_partition_detector_tests_python: multi_partition_detector_test_python_gen_source_10_worker
 
 # Python3
+multi_partition_detector_tests_python3: multi_partition_detector_test_python3_alo
+multi_partition_detector_tests_python3: multi_partition_detector_test_python3_alo_10_worker
 multi_partition_detector_tests_python3: multi_partition_detector_test_python3
 multi_partition_detector_tests_python3: multi_partition_detector_test_python3_gen_source
 multi_partition_detector_tests_python3: multi_partition_detector_test_python3_10_worker
@@ -77,6 +82,62 @@ multi_partition_detector_tests_python3: multi_partition_detector_test_python3_ge
 # Individual test definitions below
 #
 # Python tests
+multi_partition_detector_test_python_alo:
+	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
+	integration_test \
+		--alo-sequence-sender key_0 '(0,100]' Detector \
+		--alo-sequence-sender key_1 '(0,100]' Detector \
+		--alo-sequence-sender key_0 '(100,200]' Detector \
+		--alo-sequence-sender key_1 '(100,200]' Detector \
+		--log-level $(LOGLEVEL) \
+		--command 'machida --application-module multi_partition_detector --source alo $(RUN_WITH_RESILIENCE)' \
+		--validation-cmd 'python _validate.py --output' \
+		--output 'received.txt' \
+		--batch-size 10 \
+		--workers 2 \
+		--sink-await-key key_0 [197,198,199,200] \
+		--sink-await-key key_1 [197,198,199,200]
+
+multi_partition_detector_test_python_alo_10_worker:
+	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
+	integration_test \
+		--alo-sequence-sender key_0 '(0,100]' Detector \
+		--alo-sequence-sender key_1 '(0,100]' Detector \
+		--alo-sequence-sender key_2 '(0,100]' Detector \
+		--alo-sequence-sender key_3 '(0,100]' Detector \
+		--alo-sequence-sender key_4 '(0,100]' Detector \
+		--alo-sequence-sender key_5 '(0,100]' Detector \
+		--alo-sequence-sender key_6 '(0,100]' Detector \
+		--alo-sequence-sender key_7 '(0,100]' Detector \
+		--alo-sequence-sender key_8 '(0,100]' Detector \
+		--alo-sequence-sender key_9 '(0,100]' Detector \
+		--alo-sequence-sender key_0 '(100,200]' Detector \
+		--alo-sequence-sender key_1 '(100,200]' Detector \
+		--alo-sequence-sender key_2 '(100,200]' Detector \
+		--alo-sequence-sender key_3 '(100,200]' Detector \
+		--alo-sequence-sender key_4 '(100,200]' Detector \
+		--alo-sequence-sender key_5 '(100,200]' Detector \
+		--alo-sequence-sender key_6 '(100,200]' Detector \
+		--alo-sequence-sender key_7 '(100,200]' Detector \
+		--alo-sequence-sender key_8 '(100,200]' Detector \
+		--alo-sequence-sender key_9 '(100,200]' Detector \
+		--log-level $(LOGLEVEL) \
+		--command 'machida --application-module multi_partition_detector --source alo $(RUN_WITH_RESILIENCE)' \
+		--validation-cmd 'python _validate.py --output' \
+		--output 'received.txt' \
+		--batch-size 10 \
+		--workers 2 \
+		--sink-await-key key_0 [197,198,199,200] \
+		--sink-await-key key_1 [197,198,199,200] \
+		--sink-await-key key_2 [197,198,199,200] \
+		--sink-await-key key_3 [197,198,199,200] \
+		--sink-await-key key_4 [197,198,199,200] \
+		--sink-await-key key_5 [197,198,199,200] \
+		--sink-await-key key_6 [197,198,199,200] \
+		--sink-await-key key_7 [197,198,199,200] \
+		--sink-await-key key_8 [197,198,199,200] \
+		--sink-await-key key_9 [197,198,199,200]
+
 multi_partition_detector_test_python:
 	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
 	integration_test \
@@ -139,6 +200,62 @@ multi_partition_detector_test_python_gen_source_10_worker:
 		--sink-expect-allow-more
 
 # Python3 tests
+multi_partition_detector_test_python3_alo:
+	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
+	integration_test \
+		--alo-sequence-sender key_0 '(0,100]' Detector \
+		--alo-sequence-sender key_1 '(0,100]' Detector \
+		--alo-sequence-sender key_0 '(100,200]' Detector \
+		--alo-sequence-sender key_1 '(100,200]' Detector \
+		--log-level $(LOGLEVEL) \
+		--command 'machida3 --application-module multi_partition_detector --source alo $(RUN_WITH_RESILIENCE)' \
+		--validation-cmd 'python _validate.py --output' \
+		--output 'received.txt' \
+		--batch-size 10 \
+		--workers 2 \
+		--sink-await-key key_0 [197,198,199,200] \
+		--sink-await-key key_1 [197,198,199,200]
+
+multi_partition_detector_test_python3_alo_10_worker:
+	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
+	integration_test \
+		--alo-sequence-sender key_0 '(0,100]' Detector \
+		--alo-sequence-sender key_1 '(0,100]' Detector \
+		--alo-sequence-sender key_2 '(0,100]' Detector \
+		--alo-sequence-sender key_3 '(0,100]' Detector \
+		--alo-sequence-sender key_4 '(0,100]' Detector \
+		--alo-sequence-sender key_5 '(0,100]' Detector \
+		--alo-sequence-sender key_6 '(0,100]' Detector \
+		--alo-sequence-sender key_7 '(0,100]' Detector \
+		--alo-sequence-sender key_8 '(0,100]' Detector \
+		--alo-sequence-sender key_9 '(0,100]' Detector \
+		--alo-sequence-sender key_0 '(100,200]' Detector \
+		--alo-sequence-sender key_1 '(100,200]' Detector \
+		--alo-sequence-sender key_2 '(100,200]' Detector \
+		--alo-sequence-sender key_3 '(100,200]' Detector \
+		--alo-sequence-sender key_4 '(100,200]' Detector \
+		--alo-sequence-sender key_5 '(100,200]' Detector \
+		--alo-sequence-sender key_6 '(100,200]' Detector \
+		--alo-sequence-sender key_7 '(100,200]' Detector \
+		--alo-sequence-sender key_8 '(100,200]' Detector \
+		--alo-sequence-sender key_9 '(100,200]' Detector \
+		--log-level $(LOGLEVEL) \
+		--command 'machida3 --application-module multi_partition_detector --source alo $(RUN_WITH_RESILIENCE)' \
+		--validation-cmd 'python _validate.py --output' \
+		--output 'received.txt' \
+		--batch-size 10 \
+		--workers 2 \
+		--sink-await-key key_0 [197,198,199,200] \
+		--sink-await-key key_1 [197,198,199,200] \
+		--sink-await-key key_2 [197,198,199,200] \
+		--sink-await-key key_3 [197,198,199,200] \
+		--sink-await-key key_4 [197,198,199,200] \
+		--sink-await-key key_5 [197,198,199,200] \
+		--sink-await-key key_6 [197,198,199,200] \
+		--sink-await-key key_7 [197,198,199,200] \
+		--sink-await-key key_8 [197,198,199,200] \
+		--sink-await-key key_9 [197,198,199,200]
+
 multi_partition_detector_test_python3:
 	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
 	integration_test \
@@ -156,7 +273,7 @@ multi_partition_detector_test_python3_gen_source:
 	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
 	integration_test \
 		--log-level $(LOGLEVEL) \
-		--command 'machida3 --application-module multi_partition_detector --gen-source $(RUN_WITH_RESILIENCE)' \
+		--command 'machida3 --application-module multi_partition_detector --source gensource $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
@@ -189,7 +306,7 @@ multi_partition_detector_test_python3_gen_source_10_worker:
 	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
 	integration_test \
 		--log-level $(LOGLEVEL) \
-		--command 'machida3 --application-module multi_partition_detector --gen-source $(RUN_WITH_RESILIENCE)' \
+		--command 'machida3 --application-module multi_partition_detector --source gensource $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
