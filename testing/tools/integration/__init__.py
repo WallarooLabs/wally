@@ -56,7 +56,8 @@ from .external import (clean_resilience_path,
                       is_address_available,
                       setup_resilience_path)
 
-from .integration import pipeline_test
+from .integration import (json_keyval_extract,
+                          pipeline_test)
 
 from .logger import (DEFAULT_LOG_FMT,
                     INFO2,
