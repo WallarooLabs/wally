@@ -32,9 +32,10 @@ while True:
         break
     header = struct.unpack('>I', header_bytes)[0]
     payload = f.read(header)
+    print(payload)
     assert(len(payload) > 0)
     obj = loads(payload.decode())  # Python3.5/json needs a string
-    windows.setdefault(obj['key'], {}).setdefault(int(obj['ts']), []).extend(obj['value'])
+    windows.setdefault(obj['key'], {}).setdefault(float(obj['ts']), []).extend(obj['value'])
 
 # flatten windows to sequences
 sequences = {}
@@ -64,6 +65,7 @@ for k, v in sequences.items():
 
     assert(len(processed) == size), "Expect: sorted unique window elements form a subsegement of the natural sequence but for key {}".format(k)
 
+print(windows.keys())
 for k in sorted(windows.keys(), key=lambda k: int(k.replace('key_',''))):
     # Check that for each window, there are at most 2 duplicates per item
     # i.e. the duplicates are plausibly caused by the sub window overlap,
