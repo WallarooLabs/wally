@@ -649,6 +649,7 @@ class ConnectorSourceNotify[In: Any val]
         _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_seen))
       end
     end
+    @printf[I32]("STREAM:SLF call _relinquish_streams() line %d\n".cstring(), __loc.line())
     _relinquish_streams()
     _clear_streams()
 
@@ -701,7 +702,9 @@ class ConnectorSourceNotify[In: Any val]
   fun create_checkpoint_state(): Array[ByteSeq val] val =>
     let w: Writer = w.create()
     for s_map in [_active_streams ; _pending_close].values() do
+      @printf[I32]("STREAM:TMP create_checkpoint_state\n".cstring())
       for stream_state in s_map.values() do
+        @printf[I32]("STREAM:TMP create_checkpoint_state moo\n".cstring())
         stream_state.serialize(w)
       end
     end
@@ -731,6 +734,7 @@ class ConnectorSourceNotify[In: Any val]
         _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
       end
     end
+    @printf[I32]("STREAM:SLF call _relinquish_streams() line %d\n".cstring(), __loc.line())
     _relinquish_streams()
     rollback_complete(checkpoint_id)
 
@@ -784,6 +788,7 @@ class ConnectorSourceNotify[In: Any val]
       // clear _pending_close
       _pending_close.clear()
       // process any stream relinquish requests
+      @printf[I32]("STREAM:SLF call _relinquish_streams() line %d\n".cstring(), __loc.line())
       _relinquish_streams()
 
       if _fsm_state is _ProtoFsmStreaming then
@@ -793,6 +798,7 @@ class ConnectorSourceNotify[In: Any val]
     end
 
   fun ref _relinquish_streams() =>
+    @printf[I32]("STREAM:SLF _relinquish_streams() top, _pending_relinquish.size = %d\n".cstring(), _pending_relinquish.size())
     let streams = recover iso Array[StreamTuple] end
     for s in _pending_relinquish.values() do
       streams.push(s)
@@ -800,9 +806,9 @@ class ConnectorSourceNotify[In: Any val]
     _pending_relinquish.clear()
     if streams.size() > 0 then
       @printf[I32]("STREAM:SLF ConnectorSource relinquishing %s streams\n".cstring(),
-        _pending_relinquish.size().string().cstring())
+        streams.size().string().cstring())
       @printf[I32]("ConnectorSource relinquishing %s streams\n".cstring(),
-        _pending_relinquish.size().string().cstring())
+        streams.size().string().cstring())
       _listener.streams_relinquish(consume streams)
     end
 

@@ -634,6 +634,11 @@ actor ConnectorSource[In: Any val] is Source
   // CHECKPOINTS
   //////////////
   fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
+    @printf[I32]("STREAM:TMP Checkpoint state for checkpoint_id %s at ConnectorSource %s\n".cstring(), checkpoint_id.string().cstring(), _source_id.string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("Checkpoint state for checkpoint_id %s at ConnectorSource %s\n".cstring(),
+        checkpoint_id.string().cstring(), _source_id.string().cstring())
+    end
     _next_checkpoint_id = checkpoint_id + 1
     let state = _notify.create_checkpoint_state()
     _event_log.checkpoint_state(_source_id, checkpoint_id, state)
