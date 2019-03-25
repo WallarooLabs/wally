@@ -196,14 +196,13 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
     end
 
   be dispose() =>
-    match _phase
-    | let delp: _DisposedEventLogPhase => None
-    else
-      @printf[I32]("EventLog: dispose\n".cstring())
-      _backend.dispose()
-      _disposed = true
-      _phase = _DisposedEventLogPhase
-    end
+    _phase.dispose(this)
+
+  fun ref _dispose() =>
+    @printf[I32]("EventLog: dispose\n".cstring())
+    _backend.dispose()
+    _disposed = true
+    _phase = _DisposedEventLogPhase
 
   /////////////////
   // CHECKPOINT
