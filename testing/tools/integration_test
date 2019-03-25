@@ -20,6 +20,7 @@ from integration.external import (run_shell_cmd,
                                   save_logs_to_file)
 from integration.integration import pipeline_test
 from integration.logger import (add_in_memory_log_stream,
+                                get_log_level,
                                 INFO2,
                                 set_logging)
 
@@ -332,18 +333,6 @@ class SinkAwaitKeysAction(argparse.Action):
             dest = []
             setattr(namespace, self.dest, dest)
         dest.append((key, value))
-
-
-LOG_LEVELS = {'none': 0,
-              '1': 1,
-              'debug': 10,
-              'info': 20,
-              'warn': 30,
-              'error': 40,
-              'critical': 50}
-def get_log_level(value):
-    """Get the effective log level"""
-    return LOG_LEVELS.get(value, 10)
 
 
 class SetLogFile(argparse.Action):

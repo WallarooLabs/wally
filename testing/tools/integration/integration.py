@@ -56,8 +56,11 @@ def json_keyval_extract(msg):
     d = json.loads(msg[4:].decode())
     key = str(d.get('key'))
     val = d.get('value')
-    if all(map(lambda x: isinstance(x, int), val)):
-        val = str(val).replace(" ", "")
+    if isinstance(val, (list,tuple)):
+        if all(map(lambda x: isinstance(x, int), val)):
+            val = str(val).replace(" ", "")
+        else:
+            val = str(val)
     else:
         val = str(val)
     return (key, val)
@@ -192,7 +195,7 @@ def pipeline_test(sources, expected, command, workers=1,
                     # should be renamed throughout
                     if isinstance(gen, BaseSource):
                         # AtLeastOnce Sender: ALOSender
-                        sender = ALOSender(gen,
+                        sender = ALOSender([gen],
                                            VERSION,
                                            COOKIE,
                                            command,
