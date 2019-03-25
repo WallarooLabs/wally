@@ -279,7 +279,7 @@ actor Recovery
       Fail()
     end
 
-    _checkpoint_initiator.resume_checkpoint()
+    _checkpoint_initiator.resume_checkpointing_from_rollback()
 
   fun ref _abort_early(worker: WorkerName) =>
     """
