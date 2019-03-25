@@ -50,10 +50,6 @@ class BarrierStepForwarder
   fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    @printf[I32]("[JB]receive_new_barrier: %s\n".cstring(),
-      barrier_token.string().cstring())
-    @printf[I32]("[JB]old barrier: %s\n".cstring(),
-      _barrier_token.string().cstring())
     _barrier_token = barrier_token
     receive_barrier(step_id, producer, barrier_token)
 
@@ -62,11 +58,7 @@ class BarrierStepForwarder
   =>
     // If this new token is a higher priority token, then the forwarder should
     // have already been cleared to make way for it.
-    @printf[I32]("[JB] receive_barrier(step_id: %s barrier_token: %s _barrier_token: %s\n".cstring(),
-      step_id.string().cstring(), barrier_token.string().cstring(), _barrier_token.string().cstring())
-
     ifdef debug then
-      @printf[I32]("[JB]is barrier_token > _barrier_token\n".cstring())
       if barrier_token > _barrier_token then
         @printf[I32]("Invariant violation: received barrier %s is greater than current barrier %s at Step %s\n".cstring(), barrier_token.string().cstring(), _barrier_token.string().cstring(), _step_id.string().cstring())
       end
@@ -76,12 +68,10 @@ class BarrierStepForwarder
 
     // If we're processing a rollback token which is higher priority than
     // this new one, then we need to drop this new one.
-    @printf[I32]("[JB]is _barrier_token > barrier_token\n".cstring())
     if _barrier_token > barrier_token then
       return
     end
 
-    @printf[I32]("[JB]is barrier_token != _barrier_token\n".cstring())
     if barrier_token != _barrier_token then
       @printf[I32]("Received %s when still processing %s at step %s\n"
         .cstring(), barrier_token.string().cstring(),
@@ -92,15 +82,11 @@ class BarrierStepForwarder
     let inputs = _step.inputs()
     if inputs.contains(step_id) then
       _inputs_blocking(step_id) = producer
-      @printf[I32]("[JB] Calling check_completion from receive_barrier with id: %s\n".cstring(), step_id.string().cstring())
       check_completion(inputs)
     else
       if not _removed_inputs.contains(step_id) then
         @printf[I32]("%s: Forwarder at %s doesn't know about %s\n".cstring(), barrier_token.string().cstring(), _step_id.string().cstring(), step_id.string().cstring())
         Fail()
-      else
-      @printf[I32]("[JB] received_barrier: _removed_inputs does not contain %s\n"
-        .cstring(), step_id.string().cstring())
       end
     end
 
@@ -121,12 +107,9 @@ class BarrierStepForwarder
     if _inputs_blocking.contains(input_id) then
       try _inputs_blocking.remove(input_id)? else Unreachable() end
     end
-    @printf[I32]("[JB] Calling check_completion from remove_input with id: %s\n".cstring(), input_id.string().cstring())
     check_completion(_step.inputs())
 
   fun ref check_completion(inputs: Map[RoutingId, Producer] box) =>
-    @printf[I32]("[JB] check_completion.1\n".cstring())
-    // TODO [source-migration]: John, does the below if do anything?
     if (inputs.size() - _inputs_blocking.size()) == 1 then
       for (kk, xx) in inputs.pairs() do
         var found: Bool = false
@@ -135,21 +118,6 @@ class BarrierStepForwarder
         end
       end
     end
-    @printf[I32]("[JB] check_completion.2\n".cstring())
-    @printf[I32]("[JB] check_completion.2 _step.inputs.size(): %s\n".cstring(),
-      _step.inputs().size().string().cstring())
-    @printf[I32]("[JB] check_completion inputs: ".cstring())
-    for input in _step.inputs().keys() do
-      @printf[I32]("%s, ".cstring(), input.string().cstring())
-    end
-    @printf[I32]("\n".cstring())
-    @printf[I32]("[JB] check_completion.2 _inputs_blocking size: %s\n"
-      .cstring(), _inputs_blocking.size().string().cstring())
-    @printf[I32]("[JB] check_completion blocking inputs: ".cstring())
-    for input in _inputs_blocking.keys() do
-      @printf[I32]("%s, ".cstring(), input.string().cstring())
-    end
-    @printf[I32]("\n".cstring())
     if inputs.size() == _inputs_blocking.size()
     then
       for (o_id, o) in _step.outputs().pairs() do
@@ -163,13 +131,10 @@ class BarrierStepForwarder
       end
       let b_token = _barrier_token
       clear()
-      @printf[I32]("[JB] check_completion.2.clear\n".cstring())
       _step.barrier_complete(b_token)
     end
-    @printf[I32]("[JB] check_completion.3\n".cstring())
 
   fun ref clear() =>
-    @printf[I32]("[JB]clear\n".cstring())
     _inputs_blocking.clear()
     _removed_inputs.clear()
     _barrier_token = InitialBarrierToken

@@ -29,9 +29,10 @@ from .control import (CrashChecker,
                      TryUntilTimeout,
                      WaitForClusterToResumeProcessing)
 
-from .end_points import (Metrics,
-                        Sender,
-                        Sink)
+from .end_points import (ALOSender,
+                         Metrics,
+                         Sender,
+                         Sink)
 
 from .errors import (ClusterError,
                     CrashedWorkerError,
@@ -818,7 +819,7 @@ class Cluster(object):
     def wait_for_sender(self, sender=-1, timeout=30):
         logging.log(1, "wait_for_sender(sender={}, timeout={})"
             .format(sender, timeout))
-        if isinstance(sender, Sender):
+        if isinstance(sender, (ALOSender, Sender)):
             pass
         else:
             sender = self.senders[sender]

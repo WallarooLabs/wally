@@ -82,8 +82,6 @@ actor DataReceiver is Producer
     _sender_name = sender_name
     _router = data_router
     _metrics_reporter = consume metrics_reporter'
-    @printf[I32](("[JB]DataReceiver ID: " + _id.string() + "\n")
-      .cstring())
     if is_recovering then
       _phase = _RecoveringDataReceiverPhase(this)
     else

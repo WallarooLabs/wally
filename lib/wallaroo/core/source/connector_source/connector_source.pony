@@ -86,7 +86,7 @@ actor ConnectorSource[In: Any val] is Source
 
   // Connector
   let _listen: ConnectorSourceListener[In]
-  let _notify: ConnectorSourceNotify[In] ref
+  let _notify: ConnectorSourceNotify[In]
   var _next_size: USize = 0
   var _max_size: USize = 0
   var _connect_count: U32 = 0
@@ -131,7 +131,7 @@ actor ConnectorSource[In: Any val] is Source
   var _next_checkpoint_id: CheckpointId = 1
 
   //Session Id
-  var session_id: RoutingId = 0
+  var _session_id: RoutingId = 0
 
   new create(source_id: RoutingId, auth: AmbientAuth,
     listen: ConnectorSourceListener[In],
@@ -141,7 +141,6 @@ actor ConnectorSource[In: Any val] is Source
     layout_initializer: LayoutInitializer,
     metrics_reporter': MetricsReporter iso, router_registry: RouterRegistry)
   =>
-    @printf[I32]("^^^^Creating ConnectorSource...\n".cstring())
     """
     A new connection accepted on a server.
     """
@@ -185,11 +184,11 @@ actor ConnectorSource[In: Any val] is Source
     """
     if not _disposed then
       // Purge pending requests on old session id
-      _listen.purge_pending_requests(session_id)
+      _listen.purge_pending_requests(_session_id)
       // Get new session id for new connection
-      session_id = _routing_id_gen()
+      _session_id = _routing_id_gen()
       // update notify's session value
-      _notify.accepted(this, session_id)
+      _notify.accepted(this, _session_id)
 
       _connect_count = 0
       _fd = fd
@@ -529,8 +528,8 @@ actor ConnectorSource[In: Any val] is Source
     for (id, consumer) in _outputs.pairs() do
       outputs_to_remove(id) = consumer
     end
-    for (id', consumer') in outputs_to_remove.pairs() do
-      _unregister_output(id', consumer')
+    for (id, consumer) in outputs_to_remove.pairs() do
+      _unregister_output(id, consumer)
     end
 
   be dispose_with_promise(promise: Promise[None]) =>

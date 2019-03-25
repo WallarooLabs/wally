@@ -279,7 +279,7 @@ class ConnectorSourceNotify[In: Any val]
     if _prep_for_rollback then
       // Anything that the connector sends us is ignored while we wait
       // for the rollback to finish.  Tell the connector to restart later.
-      send_restart()
+      //send_restart()
       return _continue_perhaps(source)
     end
 
@@ -413,10 +413,10 @@ class ConnectorSourceNotify[In: Any val]
                 _listener.streams_relinquish(source_id,
                   [StreamTuple(s.id, s.name, s.last_seen)])
               end
-              return true
+              return _continue_perhaps(source)
             elseif cwm.Boundary.is_set(m.flags) then
               // TODO [post-source-migration] what's supposed to happen here?
-              return true
+              return _continue_perhaps(source)
             else // not an EOS and not a boundary
               // process message
               try

@@ -393,6 +393,8 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             self.initiate_send()
 
     def shutdown(self, error=None):
+        if error is not None:
+            logging.info("AtLeastOnceConnector.shutdown(error={})".format(error))
         if self._async_init:
             self.del_channel(self._socket_map) # remove the connection from asyncore loop
         self._loop_sentinel.set() # exit the asyncore loop

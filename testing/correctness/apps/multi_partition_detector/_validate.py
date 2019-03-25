@@ -32,7 +32,7 @@ while True:
         break
     header = struct.unpack('>I', header_bytes)[0]
     payload = f.read(header)
-    print(payload)
+#    print(payload)
     assert(len(payload) > 0)
     obj = loads(payload.decode())  # Python3.5/json needs a string
     windows.setdefault(obj['key'], {}).setdefault(float(obj['ts']), []).extend(obj['value'])
@@ -40,12 +40,13 @@ while True:
 # flatten windows to sequences
 sequences = {}
 for k in windows.keys():
-    for w in sorted(windows[k].keys()):
-        if not (windows[k][w] == sorted(windows[k][w])):
-            print(windows[k][w],sorted(windows[k][w]))
-            print(k,w)
-            assert(False)
-        sequences.setdefault(k, []).extend(windows[k][w])
+    for w_key in sorted(windows[k].keys()):
+        win = windows[k][w_key]
+        if not (win == sorted(win)):
+            assert(False), ("Out of order violation for key: {}, w_key: {}, "
+                            "window: {}, sorted: {}"
+                            .format(k, w_key, win, sorted(win)))
+        sequences.setdefault(k, []).extend(win)
 
 
 # unlike window_detector, in multi_partition_detector all windows are
