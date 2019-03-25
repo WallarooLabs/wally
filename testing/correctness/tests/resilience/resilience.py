@@ -81,6 +81,10 @@ def pause_senders_and_sink_await(cluster, timeout=10):
     await_values = []
     for sender in cluster.senders:
         await_values.extend(sender.last_sent())
+    await_values = [
+        (key, "[{}]".format(
+            ",".join(('{}'.format(x) for x in range(val-3, val+1)))))
+        for key, val in await_values]
     cluster.sink_await(values=await_values, func=json_keyval_extract)
     # Since snapshots happen at a 1 second frequency, we need to wait
     # more than 1 second to guarantee a snapshot after messages arrived
@@ -518,6 +522,10 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
             await_values = []
             for sender in cluster.senders:
                 await_values.extend(sender.last_sent())
+            await_values = [
+                (key, "[{}]".format(
+                    ",".join(('{}'.format(x) for x in range(val-3, val+1)))))
+                for key, val in await_values]
             cluster.sink_await(values=await_values, func=json_keyval_extract)
 
         logging.info("Completion condition achieved. Shutting down cluster.")

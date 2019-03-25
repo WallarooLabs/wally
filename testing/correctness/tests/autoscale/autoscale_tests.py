@@ -35,7 +35,7 @@ CMD_PONY = 'multi_partition_detector --depth 1'
 CMD_PYTHON = 'machida --application-module multi_partition_detector --depth 1'
 CMD_PYTHON3 = 'machida3 --application-module multi_partition_detector --depth 1'
 
-VALIDATION_CMD = 'python _validate.py --output {out_file}'
+VALIDATION_CMD = 'python ../../apps/multi_partition_detector/_validate.py --output {out_file}'
 
 APIS = {'pony': CMD_PONY, 'python': CMD_PYTHON, 'python3': CMD_PYTHON3}
 
@@ -58,7 +58,7 @@ AUTOSCALE_TEST_NAME_FMT = 'test_autoscale_{api}_{source_type}_{source_number}_{o
 OPS = [Grow(1), Grow(4), Shrink(1), Shrink(4)]
 SOURCE_TYPES = ['tcp', 'gensource', 'alo']
 SOURCE_NAME = 'Detector'
-SOURCE_NUMBERS = [1, 2]
+SOURCE_NUMBERS = [1]
 
 # Programmatically create the tests, do the name mangling, and place them
 # in the global scope for pytest to find

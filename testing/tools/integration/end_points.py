@@ -505,7 +505,7 @@ class MultiSequenceGenerator(object):
             logging.debug("_remaining: {}".format(self._remaining))
 
     def last_sent(self):
-        return [(f"{key}", f"{val}") for (key,val) in
+        return [(f"{key}", val) for (key,val) in
          [(seq.index, seq.val) for seq in self.seqs]]
 
     def send(self, ignored_arg):
@@ -713,7 +713,7 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
         if self.stopped:
             raise StopIteration
         if self._stop is not None:
-            if self.position >= self.stop:
+            if self.position >= self._stop:
                 raise StopIteration
         self.position += 1
         val, pos, key = (self.position, self.position, self.key)
@@ -777,5 +777,4 @@ class ALOSender(StoppableThread):
         logging.debug("ALOSender resume: noop")
 
     def last_sent(self):
-        return [(f"{key:07d}", f"{val}") for (key,val) in
-         [(source.partition, source.position) for source in self.sources]]
+        return [(source.partition, source.position) for source in self.sources]

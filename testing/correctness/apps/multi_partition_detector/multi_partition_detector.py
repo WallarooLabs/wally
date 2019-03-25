@@ -176,6 +176,9 @@ class Ring(object):
     def __str__(self):
         return "[{}]".format(",".join(map(str, self._array)))
 
+    def __repr__(self):
+        return "[{}]".format(",".join(map(str, self._array)))
+
     def __getitem__(self, key):
         return self._array[key]
 
