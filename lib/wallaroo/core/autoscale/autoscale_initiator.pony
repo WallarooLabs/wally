@@ -83,7 +83,6 @@ actor AutoscaleInitiator
       .next[None](recover this~autoscale_resume_complete() end)
       .next[None]({(_: None) => autoscale_resume_promise(None)})
 
-    @printf[I32]("[jb]Current autoscale token's resume token: %s\n".cstring(), _current_autoscale_tokens.resume_token.string().cstring())
     _barrier_initiator.inject_barrier(_current_autoscale_tokens.resume_token,
       barrier_promise)
 

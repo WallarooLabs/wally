@@ -107,7 +107,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     _recovery_replayer.register_step(this)
     _router_registry = router_registry
     _id = id
-    @printf[I32](("[JB]Step ID: " + _id.string() + "\n").cstring())
 
     for (worker, boundary) in outgoing_boundaries.pairs() do
       _outgoing_boundaries(worker) = boundary
@@ -372,7 +371,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       try
         let b_forwarder = _barrier_forwarder as BarrierStepForwarder
         if b_forwarder.barrier_in_progress() then
-        @printf[I32]("[JB] Calling remove_input from unregister_producer\n".cstring())
           b_forwarder.remove_input(id)
         end
       else Fail() end

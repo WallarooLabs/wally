@@ -110,7 +110,7 @@ class FramedFileReader(BaseIter, BaseSource):
             return -1
 
     def reset(self, pos=0):
-        logging.info("resetting {} from {} to position {}"
+        logging.debug("resetting {} from {} to position {}"
             .format(self.__str__(), self.point_of_ref(), pos))
         self.file.seek(pos)
 
@@ -306,7 +306,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             raise StopIteration
 
     def stream_added(self, stream):
-        logging.info("MultiSourceConnector added {}".format(stream))
+        logging.debug("MultiSourceConnector added {}".format(stream))
         source, acked = self.sources.get(stream.id, (None, None))
         if source:
             if stream.point_of_ref != source.point_of_ref():
@@ -318,11 +318,11 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             self.sources[stream.id] = [None, stream.point_of_ref]
 
     def stream_removed(self, stream):
-        logging.info("MultiSourceConnector removed {}".format(stream))
+        logging.debug("MultiSourceConnector removed {}".format(stream))
         pass
 
     def stream_opened(self, stream):
-        logging.info("MultiSourceConnector stream_opened {}".format(stream))
+        logging.debug("MultiSourceConnector stream_opened {}".format(stream))
         source, acked = self.sources.get(stream.id, (None, None))
         if source:
             if stream.id in self.joining:
@@ -336,7 +336,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                                  .format(stream))
 
     def stream_closed(self, stream):
-        logging.info("MultiSourceConnector closed {}".format(stream))
+        logging.debug("MultiSourceConnector closed {}".format(stream))
         source, acked = self.sources.get(stream.id, (None, None))
         if source:
             if stream.id in self.open:
@@ -349,7 +349,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                 del self.pending_eos_ack[stream.id]
                 self.joining.add(stream.id)
             elif stream.id in self.closed:
-                logging.info("tried to close an already closed source: {}"
+                logging.debug("tried to close an already closed source: {}"
                   .format(Source))
             else:
                 pass
@@ -357,7 +357,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             pass
 
     def stream_acked(self, stream):
-        logging.info("MultiSourceConnector acked {}".format(stream))
+        logging.debug("MultiSourceConnector acked {}".format(stream))
         source, acked = self.sources.get(stream.id, (None, None))
         if source:
             # check if there's an eos pending this ack

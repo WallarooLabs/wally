@@ -15,6 +15,7 @@
 
 import datetime
 import logging
+import math
 from numbers import Number
 import os
 import re
@@ -23,13 +24,19 @@ import time
 
 
 # import requisite components for integration test
-from integration import (Cluster,
-                         json_keyval_extract,
-                         run_shell_cmd,
-                         MultiSequenceGenerator,
-                         Reader,
-                         runner_data_format,
-                         Sender)
+from integration.integration import (COOKIE,
+                                     json_keyval_extract,
+                                     VERSION)
+
+from integration.cluster import (Cluster,
+                                 runner_data_format)
+
+from integration.end_points import (ALOSender,
+                                    ALOSequenceGenerator,
+                                    MultiSequenceGenerator,
+                                    Reader,
+                                    Sender)
+
 
 from integration.logger import add_in_memory_log_stream
 
@@ -37,7 +44,8 @@ from integration.errors import (RunnerHasntStartedError,
                                 SinkAwaitTimeoutError,
                                 TimeoutError)
 
-from integration.external import save_logs_to_file
+from integration.external import (run_shell_cmd,
+                                  save_logs_to_file)
 
 
 try:
@@ -56,11 +64,18 @@ class SaveLogs(Exception):
 # Helper Functions
 ##################
 
-# Keep only the key as a string, and the final output tuple as a
-# string
-def parse_sink_value(s):
-    return (s[4:].strip(b"()").split(b',',1)[0].split(b".",1)[0],
-        s[4:].strip(b"()").split(b",",1)[1])
+def get_await_values(last_sent_groups):
+    if _OUTPUT_TYPE == "int":
+        return [(str(key), str(val))
+                for group in last_sent_groups
+                for key, val in group]
+    else:
+        logging.error(repr(last_sent_groups))
+        return [(key,
+                 "[{}]".format(",".join(
+                     ("{}".format(max(0,x)) for x in range(val-3, val+1)))))
+                for group in last_sent_groups
+                for key, val in group]
 
 
 # TODO: refactor and move to control.py
@@ -69,22 +84,18 @@ def pause_senders_and_sink_await(cluster, timeout=10):
     if not cluster.senders:
         logging.debug("No senders to pause. Continuing.")
         return
+    # we currently only support one type of sender per run
+    if not isinstance(cluster.senders[0], Sender):
+        return
     cluster.pause_senders()
-    time.sleep(5)
     for s in cluster.senders:
-        logging.debug("Sender paused with {}, and {} bytes in buffer".format(
-            s.reader.gen.seqs, len(s.batch)))
+            logging.debug("Sender paused with {}, and {} bytes in buffer"
+                .format(s.reader.gen.seqs, len(s.batch)))
     logging.debug("Waiting for messages to propagate to sink")
-    msg = cluster.senders[0].reader.gen
-    await_values = []
-    for part, val in enumerate(msg.seqs):
-        key = '{:07d}'.format(part)
-        data = '[{},{},{},{}]'.format(*[val-x for x in range(3,-1,-1)])
-        await_values.append((key, data))
+    await_values = get_await_values([sender.last_sent() for sender in cluster.senders])
     cluster.sink_await(values=await_values, func=json_keyval_extract)
     # Since snapshots happen at a 1 second frequency, we need to wait
     # more than 1 second to guarantee a snapshot after messages arrived
-    time.sleep(5)
     logging.debug("All messages arrived at sink!")
 
 
@@ -256,13 +267,28 @@ def lowest_point(ops):
     return l
 
 
+def get_parts(partitions, num):
+    """
+    Divide a number of partitions over a number of sources,
+    With the last source having possibly fewer items.
+    """
+    parts = []
+    size = int(math.ceil(partitions/float(num)))
+    for x in range(num):
+        parts.append([])
+        for v in range(size*x, size*(x+1)):
+            if v < partitions:
+                parts[-1].append(v)
+    return parts
+
 ####################################
 # Test Runner - Error handler wrapper
 ####################################
 
 
-def _test_resilience(command, ops=[], initial=None, sources=1,
-                     partition_multiplier=5, cycles=1, validation_cmd=None,
+def _test_resilience(command, ops=[], initial=None, source_type='tcp',
+                     source_name='Detector', source_number=1,
+                     partitions=40, cycles=1, validation_cmd=False,
                      sender_mps=1000, sender_interval=0.01,
                      retry_count=5,
                      api=None):
@@ -272,12 +298,12 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
     `command` - the command string to execute
     `ops` - the list of operations to perform.
     `initial` - (optional) the initial cluster size
-    `sources` - the number of sources to use
-    `partition_multiplier` - multiply number of workers by this to determine
-      how many partitiosn to use
+    `source_type` - the type of the source ('tcp', 'gensource', 'alo')
+    `source_name` - the name of the source (e.g. 'Detector')
+    `source_number` - the number of workers to start sources on (default: 1)
+    `partitions` - number of partitions to use (default: 40)
     `cycles` - how many times to repeat the list of operations
-    `validation_cmd` - The command to use for validation. Default is:
-        'validator -i {out_file} -a [-e {expect}]'
+    `validation_cmd` - The command to use for validation. Default is: False
     `sender_mps` - messages per second to send from the sender (default 1000)
     `sender_interval` - seconds between sender batches (default 0.01)
     `retry_count` - number of times to retry a test after RunnerHasntStartedError
@@ -297,8 +323,10 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
                 command=command,
                 ops=ops*cycles,
                 initial=initial,
-                sources=sources,
-                partition_multiplier=partition_multiplier,
+                source_type=source_type,
+                source_name=source_name,
+                source_number=source_number,
+                partitions=partitions,
                 validation_cmd=validation_cmd,
                 sender_mps=sender_mps,
                 sender_interval=sender_interval)
@@ -316,8 +344,10 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
                         command=command,
                         ops=ops,
                         initial=initial,
-                        sources=sources,
-                        partition_multiplier=partition_multiplier,
+                        source_type=source_type,
+                        source_name=source_name,
+                        source_number=source_number,
+                        partitions=partitions,
                         cycles=cycles,
                         validation_cmd=validation_cmd,
                         sender_mps=sender_mps,
@@ -333,7 +363,10 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
                 logging.error("TimeoutError encountered.")
                 raise
             except:
-                if persistent_data.get('runner_data'):
+                crashed_workers = list(
+                    filter(lambda r: r.returncode not in (0,-9,-15),
+                           persistent_data.get('runner_data')))
+                if crashed_workers:
                     logging.error("Some workers exited badly. The last {} lines of "
                         "each were:\n\n{}"
                         .format(FROM_TAIL,
@@ -349,10 +382,14 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
         try:
             cwd = os.getcwd()
             trunc_head = cwd.find('/wallaroo/') + len('/wallaroo/')
-            base_dir = ('/tmp/wallaroo_test_errors/{head}/{api}/{ops}/{time}'
+            test_root = '/tmp/wallaroo_test_errors'
+            base_dir = ('{test_root}/{head}/{api}/{src_type}/{src_num}/{ops}/{time}'
                 .format(
+                    test_root=test_root,
                     head=cwd[trunc_head:],
                     api=api,
+                    src_type=source_type,
+                    src_num=source_number,
                     time=t0.strftime('%Y%m%d_%H%M%S'),
                     ops='_'.join((o.name().replace(':','')
                                   for o in ops*cycles))))
@@ -369,16 +406,27 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
 # Test Runner
 #############
 
-def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
-         partition_multiplier=1, validation_cmd=False,
+def _run(persistent_data, res_ops, command, ops=[], initial=None,
+         source_type='tcp', source_name='Detector', source_number=1,
+         partitions=40, validation_cmd=False,
          sender_mps=1000, sender_interval=0.01):
+    # set global flag _OUTPUT_TYPE based on application command
+    # [TODO] make this less coupled and brittle
+    global _OUTPUT_TYPE
+    _OUTPUT_TYPE = "int" if "window_detector" in command else "array"
+
     host = '127.0.0.1'
     sinks = 1
     sink_mode = 'framed'
     batch_size = int(sender_mps * sender_interval)
-    logging.debug("batch_size is {}".format(batch_size))
+    logging.debug(f"batch_size is {batch_size}")
 
     # If validation_cmd is False, it remains False and no validation is run
+    logging.debug(f"Validation command is: {validation_cmd}")
+    logging.debug(f"Source_type: {source_type}")
+    logging.debug(f"source_name: {source_name}")
+    logging.debug(f"source_number: {source_number}")
+    logging.debug(f"partitions: {partitions}")
 
     if not isinstance(ops, (list, tuple)):
         raise TypeError("ops must be a list or tuple of operations")
@@ -407,31 +455,55 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
 
     logging.info("Initial cluster size: {}".format(workers))
 
-    partition_multiplier = 5  # Used in partition count creation
-    # create the sequence generator and the reader
-    # TODO [source-migration]: Pair with Nisan
-    msg = MultiSequenceGenerator(base_parts=workers * partition_multiplier - 1)
+    parts = get_parts(partitions, source_number)
+    sources = []
+    if source_type == 'gensource':
+        # noop
+        command += " --source gensource"
+    elif source_type == 'tcp':
+        command += " --source tcp"
+        # for each part, create a MultiSequenceGenerator with the right base_index
+        for part in parts:
+            sources.append(MultiSequenceGenerator(base_index=min(part),
+                                                  initial_partitions=len(part)))
+    elif source_type == 'alo':
+        command += " --source alo"
+        # for each number in each part, create an ALOSequenceGenerator
+        # and group them in groups matching the parts
+        for part in parts:
+            sources.append([ALOSequenceGenerator(f"key_{key}", 10000)
+                            for key in part])
+    else:
+        raise ValueError("source_type must be one of ['gensource', 'tcp', 'alo']")
 
     # Start cluster
-    #source_names = ["source{}".format(x) for x in range(1, sources+1)]
-    source_names = ["Detector"] if sources > 0 else []
     logging.debug("Creating cluster")
-    with Cluster(command=command, host=host, sources=source_names,
+    with Cluster(command=command, host=host,
+                 sources=[source_name] if source_type != 'gensource' else [],
                  workers=workers, sinks=sinks, sink_mode=sink_mode,
                  persistent_data=persistent_data) as cluster:
 
         # start senders
-        # [NH]: is it even possible to run this with more than 1 source right now?
-        # the reliance on `msg` makes things problematic for rollback
-        for src in source_names:
-            # TODO [NH]: figure out how to support sending to workers
-            # other than initializer
-            sender = Sender(cluster.source_addrs[0][src],
-                            Reader(msg),
-                            batch_size=batch_size,
-                            interval=sender_interval,
-                            reconnect=True)
-            cluster.add_sender(sender, start=True)
+        if source_type == 'tcp':
+            # All tcp sources connect to initializer, because they don't
+            # support shrinking
+            for source_gen in sources:
+                sender = Sender(cluster.source_addrs[0][source_name],
+                    Reader(source_gen),
+                    batch_size=batch_size,
+                    interval=sender_interval,
+                    reconnect=True)
+                cluster.add_sender(sender, start=True)
+        elif source_type == 'alo':
+            for (idx, source_gens) in enumerate(sources):
+                sender = ALOSender(source_gens,
+                    VERSION,
+                    COOKIE,
+                    command,
+                    f"instance_{idx}",
+                    (cluster.source_addrs[idx % len(cluster.workers)]
+                     [source_name]))
+                cluster.add_sender(sender, start=True)
 
         # let the senders send some data first
         time.sleep(1)
@@ -451,33 +523,16 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
         # If using external senders, wait for them to stop cleanly
         if cluster.senders:
             # Tell the multi-sequence-sender to stop
-            msg.stop()
+            cluster.stop_senders()
 
             # wait for senders to reach the end of their readers and stop
             for s in cluster.senders:
                 cluster.wait_for_sender(s)
 
-            # Validate all sender values caught up
-            stop_value = max(msg.seqs)
-            t0 = time.time()
-            while True:
-                try:
-                    assert(len(msg.seqs) == msg.seqs.count(stop_value))
-                    break
-                except:
-                    if time.time() - t0 > 2:
-                        logging.error("msg.seqs aren't all equal: {}"
-                            .format(msg.seqs))
-                        raise
-                time.sleep(0.1)
-
             # Create await_values for the sink based on the stop values from
             # the multi sequence generator
-            await_values = []
-            for part, val in enumerate(msg.seqs):
-                key = '{:07d}'.format(part)
-                data = '[{},{},{},{}]'.format(*[val-x for x in range(3,-1,-1)])
-                await_values.append((key, data))
+            await_values = get_await_values([sender.last_sent()
+                                             for sender in cluster.senders])
             cluster.sink_await(values=await_values, func=json_keyval_extract)
 
         logging.info("Completion condition achieved. Shutting down cluster.")
@@ -492,10 +547,6 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
             # Validate captured output
             logging.info("Validating output")
             cmd_validate = validation_cmd.format(out_file = out_file)
-            # if senders == 0, using internal source
-            # else: add expect stub '-e {expect value}'
-            if cluster.senders:
-                cmd_validate += EXPECT_STUB.format(expect = stop_value)
             res = run_shell_cmd(cmd_validate)
             try:
                 assert(res.success)

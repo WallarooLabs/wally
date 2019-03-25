@@ -530,11 +530,12 @@ actor GenSource[V: Any val] is Source
 
     event_log.ack_rollback(_source_id)
 
-  fun _deserialize(data: ByteSeq val): V ? =>
+  fun _deserialize(data: ByteSeq val): (V | None) ? =>
     try
       match Serialised.input(InputSerialisedAuth(_auth),
         data as Array[U8] val)(DeserialiseAuth(_auth))?
       | let v: V => v
+      | let v: None => None
       else
         error
       end

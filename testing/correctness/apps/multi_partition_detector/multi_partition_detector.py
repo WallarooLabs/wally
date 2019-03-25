@@ -136,8 +136,12 @@ class Message(object):
                              "Payload must be a Ring or an int."
                              .format(self.payload))
 
+    def __repr__(self):
+        return repr({"key": self.key, "trace": self.trace,
+                     "payload": self.payload, "ts": self.ts})
+
     def __str__(self):
-        return "({},{}, {})".format(self.key, self.trace, str(self.payload))
+        return self.__repr__()
 
     def window(self):
         if isinstance(self.payload, Ring):
@@ -170,6 +174,9 @@ class Ring(object):
         return Ring(self.clone_array())
 
     def __str__(self):
+        return "[{}]".format(",".join(map(str, self._array)))
+
+    def __repr__(self):
         return "[{}]".format(",".join(map(str, self._array)))
 
     def __getitem__(self, key):
@@ -221,7 +228,7 @@ def trace_window(msg, state):
     print("trace_window({}, {})".format(msg, state))
     state.push(msg)
     print("trace_window.updated: {}".format(state))
-    return Message(msg.key, msg.trace + ".TraceWindow", state.window(), msg.ts)
+    return Message(msg.key, msg.trace + ".TraceWindow", state.window(), time.time())
 
 
 #####################
