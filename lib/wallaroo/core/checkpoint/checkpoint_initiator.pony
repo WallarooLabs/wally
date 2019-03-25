@@ -186,46 +186,41 @@ actor CheckpointInitiator is Initializable
     repeating: Bool = true)
   =>
     ifdef "resilience" then
-      match _phase
-      | let p: _CheckpointingPhase =>
-        return
-      | let p: _WaitingCheckpointInitiatorPhase =>
-        if not _ignoring_checkpoints and (checkpoint_group == _checkpoint_group)
-        then
-          _clear_pending_checkpoints()
-          _current_checkpoint_id = _current_checkpoint_id + 1
+      if not _ignoring_checkpoints and (checkpoint_group == _checkpoint_group)
+      then
+        _clear_pending_checkpoints()
+        _current_checkpoint_id = _current_checkpoint_id + 1
 
-          ifdef "checkpoint_trace" then
-            (let s, let ns) = Time.now()
-            let us = ns / 1000
-            let ts = PosixDate(s, ns).format("%Y-%m-%d %H:%M:%S." + us.string())
-            @printf[I32]("Initiating checkpoint %s at %s\n".cstring(),
-              _current_checkpoint_id.string().cstring(), ts.string().cstring())
-          end
-
-          let event_log_promise = Promise[CheckpointId]
-          event_log_promise.next[None](
-            recover this~event_log_checkpoint_complete(_worker_name) end)
-          _event_log.initiate_checkpoint(_current_checkpoint_id,
-            event_log_promise)
-
-          try
-            let msg = ChannelMsgEncoder.event_log_initiate_checkpoint(
-              _current_checkpoint_id, _worker_name, _auth)?
-            _connections.send_control_to_cluster(msg)
-          else
-            Fail()
-          end
-
-          let token = CheckpointBarrierToken(_current_checkpoint_id)
-
-          let barrier_promise = Promise[BarrierToken]
-          barrier_promise.next[None](
-            recover this~checkpoint_barrier_complete() end)
-          _barrier_initiator.inject_barrier(token, barrier_promise)
-
-          _phase = _CheckpointingPhase(token, repeating, this)
+        ifdef "checkpoint_trace" then
+          (let s, let ns) = Time.now()
+          let us = ns / 1000
+          let ts = PosixDate(s, ns).format("%Y-%m-%d %H:%M:%S." + us.string())
+          @printf[I32]("Initiating checkpoint %s at %s\n".cstring(),
+            _current_checkpoint_id.string().cstring(), ts.string().cstring())
         end
+
+        let event_log_promise = Promise[CheckpointId]
+        event_log_promise.next[None](
+          recover this~event_log_checkpoint_complete(_worker_name) end)
+        _event_log.initiate_checkpoint(_current_checkpoint_id,
+          event_log_promise)
+
+        try
+          let msg = ChannelMsgEncoder.event_log_initiate_checkpoint(
+            _current_checkpoint_id, _worker_name, _auth)?
+          _connections.send_control_to_cluster(msg)
+        else
+          Fail()
+        end
+
+        let token = CheckpointBarrierToken(_current_checkpoint_id)
+
+        let barrier_promise = Promise[BarrierToken]
+        barrier_promise.next[None](
+          recover this~checkpoint_barrier_complete() end)
+        _barrier_initiator.inject_barrier(token, barrier_promise)
+
+        _phase = _CheckpointingPhase(token, repeating, this)
       end
     end
 
