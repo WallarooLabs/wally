@@ -21,14 +21,21 @@ class Creator(object):
         self.module = module
 
     def create(self, test_name_fmt, api, cmd, ops, cycles=1, initial=None,
-                    validation_cmd=None, sources=1):
-        print(test_name_fmt, api, cmd, ops, cycles, initial, validation_cmd, sources)
+               validation_cmd=None, source_type='tcp',
+               source_name='Detector', source_number=1):
+        print(test_name_fmt, api, cmd, ops, cycles, initial, validation_cmd,
+              source_type, source_name, source_number)
         test_name = test_name_fmt.format(api=api,
                                          ops='_'.join((o.name().replace(':','')
-                                                       for o in ops*cycles)))
+                                                       for o in ops*cycles)),
+                                         source_type=source_type,
+                                         source_number=source_number)
         def f():
             _test_resilience(cmd, ops=ops, cycles=cycles, initial=initial,
-                             validation_cmd=validation_cmd, sources=sources,
+                             validation_cmd=validation_cmd,
+                             source_type=source_type,
+                             source_name=source_name,
+                             source_number=source_number,
                              api=api)
         f.__name__ = test_name
         setattr(self.module, test_name, f)

@@ -400,6 +400,13 @@ class Sender(StoppableThread):
             logging.warning("Sender stopped, but send buffer size is {}"
                             .format(len(self.batch)))
 
+    def last_sent(self):
+        if isinstance(sel.reader.gen, MultiSequenceGenerator):
+            return self.reader.gen.last_sent()
+        else:
+            raise ValueError("Can only use last_sent on a sender with "
+                             "a MultiSequenceGenerator, or an ALOSender.")
+
 
 class NoNonzeroError(ValueError):
     pass
@@ -418,12 +425,13 @@ def first_nonzero_index(seq):
 
 class Sequence(object):
     def __init__(self, index, val=0):
-        self.index = index
+        self.index = f'{index:07d}'
+        self.key = self.index.encode()
         self.val = val
 
     def __next__(self):
         self.val += 1
-        return (self.index, self.val)
+        return (self.key, self.val)
 
     def __iter__(self):
         return self
@@ -456,8 +464,8 @@ class MultiSequenceGenerator(object):
         self.lock = threading.Lock()
 
     def format_value(self, value, partition):
-        return struct.pack('>IQ7s', 15, value,
-                           '{:07d}'.format(partition).encode())
+        return struct.pack('>IQ{}s'.format(len(partition)), 8+len(partition),
+                           value, partition)
 
     def _next_value_(self):
         # Normal operation next value: round robin through the sets
@@ -496,6 +504,10 @@ class MultiSequenceGenerator(object):
             self.max_val = max([seq.val for seq in self.seqs])
             self._remaining = [self.max_val - seq.val for seq in self.seqs]
             logging.debug("_remaining: {}".format(self._remaining))
+
+    def last_sent(self):
+        return [(f"{key:07d}", f"{val}") for (key,val) in
+         [(seq.index, seq.position) for seq in self.seqs]]
 
     def send(self, ignored_arg):
         with self.lock:
@@ -674,19 +686,19 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
     if `data` is a list, data generated is appended to it in order
     as (position, value) tuples.
     """
-    def __init__(self, key, stop=1000, start=0):
-        self.key = key
+    def __init__(self, key, stop=None, start=0):
+        self.partition = key
         self.name = key.encode()
         self.key = key.encode()
-        self.closed = False
         self.position = start
-        self.stop = stop
+        self._stop = stop
         self.start = start
         self.data = []
+        self.stopped = False
 
     def __str__(self):
-        return ("ALOSequenceGenerator(partition: {}, closed: {}, point_of_ref: {})"
-                .format(self.name, self.closed, self.point_of_ref()))
+        return ("ALOSequenceGenerator(partition: {}, stopped: {}, point_of_ref: {})"
+                .format(self.name, self.stopped, self.point_of_ref()))
 
     def point_of_ref(self):
         return self.position
@@ -699,8 +711,11 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
     def __next__(self):
         # This has to be before the increment, otherwise point_of_ref()
         # doesn't return the previous position!
-        if self.position >= self.stop:
+        if self.stopped:
             raise StopIteration
+        if self._stop is not None:
+            if self.position >= self.stop:
+                raise StopIteration
         self.position += 1
         val, pos, key = (self.position, self.position, self.key)
         payload = struct.pack('>Q{}s'.format(len(key)), val, key)
@@ -709,6 +724,9 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
 
     def close(self):
         self.closed = True
+
+    def stop(self):
+        self.stopped = True
 
 
 class ALOSender(StoppableThread):
@@ -727,9 +745,9 @@ class ALOSender(StoppableThread):
             instance_name,
             host, port)
         self.name = "ALOSender_{}".format("-".join(
-            [source.name.decode() for source in sources]))
+            [source.partition for source in sources]))
         self.sources = sources
-        logging.debug("ALO: source = {}".format(sources))
+        logging.debug("ALO: sources = {}".format(sources))
         self.data = []
         for source in self.sources:
             source.data = self.data
@@ -747,12 +765,18 @@ class ALOSender(StoppableThread):
 
     def stop(self, error=None):
         logging.debug("ALOSender stop")
-        self.client.shutdown(error=error)
+        for source in self.sources:
+            logging.debug("source to stop: {}".format(source))
+            source.stop()
+        if error is not None:
+            self.client.shutdown(error=error)
 
     def pause(self):
-        logging.debug("ALOSender pause")
-        pass
+        logging.debug("ALOSender pause: noop")
 
     def resume(self):
-        logging.debug("ALOSender resume")
-        pass
+        logging.debug("ALOSender resume: noop")
+
+    def last_sent(self):
+        return [(f"{key:07d}", f"{val}") for (key,val) in
+         [(source.partition, source.position) for source in self.sources]]
