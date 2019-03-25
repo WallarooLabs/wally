@@ -204,7 +204,6 @@ actor CheckpointInitiator is Initializable
     promise(None)
 
   be restart_repeating_checkpoints() =>
-    @printf[I32]("[JB]CheckpointInitiator: restart_repeating_checkpoints\n".cstring())
     _clear_pending_checkpoints()
     _phase.initiate_checkpoint(_checkpoint_group, this)
 
