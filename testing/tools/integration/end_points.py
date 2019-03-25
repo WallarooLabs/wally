@@ -295,7 +295,6 @@ class Sender(StoppableThread):
         self.interval = interval
         self.header_fmt = header_fmt
         self.header_length = struct.calcsize(self.header_fmt)
-        self.last_sent = 0
         self.address = address
         (host, port) = address.split(":")
         self.host = host
@@ -401,7 +400,7 @@ class Sender(StoppableThread):
                             .format(len(self.batch)))
 
     def last_sent(self):
-        if isinstance(sel.reader.gen, MultiSequenceGenerator):
+        if isinstance(self.reader.gen, MultiSequenceGenerator):
             return self.reader.gen.last_sent()
         else:
             raise ValueError("Can only use last_sent on a sender with "
@@ -506,8 +505,8 @@ class MultiSequenceGenerator(object):
             logging.debug("_remaining: {}".format(self._remaining))
 
     def last_sent(self):
-        return [(f"{key:07d}", f"{val}") for (key,val) in
-         [(seq.index, seq.position) for seq in self.seqs]]
+        return [(f"{key}", f"{val}") for (key,val) in
+         [(seq.index, seq.val) for seq in self.seqs]]
 
     def send(self, ignored_arg):
         with self.lock:

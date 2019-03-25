@@ -353,7 +353,10 @@ def _test_resilience(command, ops=[], initial=None, source_type='tcp',
                 logging.error("TimeoutError encountered.")
                 raise
             except:
-                if persistent_data.get('runner_data'):
+                crashed_workers = list(
+                    filter(lambda r: r.returncode not in (0,-9,-15),
+                           persistent_data.get('runner_data')))
+                if crashed_workers:
                     logging.error("Some workers exited badly. The last {} lines of "
                         "each were:\n\n{}"
                         .format(FROM_TAIL,

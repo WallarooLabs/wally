@@ -136,8 +136,12 @@ class Message(object):
                              "Payload must be a Ring or an int."
                              .format(self.payload))
 
+    def __repr__(self):
+        return repr({"key": self.key, "trace": self.trace,
+                     "payload": self.payload, "ts": self.ts})
+
     def __str__(self):
-        return "({},{}, {})".format(self.key, self.trace, str(self.payload))
+        return self.__repr__()
 
     def window(self):
         if isinstance(self.payload, Ring):
