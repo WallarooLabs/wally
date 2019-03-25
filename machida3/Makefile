@@ -72,7 +72,7 @@ machida3_clean:
 
 machida3_build: $(MACHIDA3_BUILD)/machida3
 
--include $(MACHIDA3_PATH)/machida.d
+-include $(MACHIDA3_PATH)/machida3.d
 ifeq ($(UNAME_S),Darwin)
 $(MACHIDA3_BUILD)/machida3: EXTRA_PONYCFLAGS= --output=$(MACHIDA3_BUILD) --path=$(MACHIDA3_BUILD) --linker '$(LD) $(PYTHON3_LIBS)'
 else
