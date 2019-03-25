@@ -37,7 +37,12 @@ trait _CheckpointInitiatorPhase
   fun ref initiate_checkpoint(checkpoint_group: USize,
     checkpoint_initiator: CheckpointInitiator ref)
   =>
-    checkpoint_initiator._initiate_checkpoint(checkpoint_group)
+    """
+    Currently, we do not allow two checkpoints to be in flight at once. If a
+    timer goes off while one is in progress, we ignore it for now. We only
+    initiate a checkpoint from _WaitingCheckpointInitiatorPhase.
+    """
+    None
 
   fun ref checkpoint_barrier_complete(token: BarrierToken) =>
     _invalid_call()
@@ -70,6 +75,11 @@ class _WaitingCheckpointInitiatorPhase is _CheckpointInitiatorPhase
     checkpoint_initiator: CheckpointInitiator ref)
   =>
     checkpoint_initiator._start_checkpoint_timer(time_until_next_checkpoint)
+
+  fun ref initiate_checkpoint(checkpoint_group: USize,
+    checkpoint_initiator: CheckpointInitiator ref)
+  =>
+    checkpoint_initiator._initiate_checkpoint(checkpoint_group)
 
   fun ref resume_checkpointing_from_rollback() =>
     None
