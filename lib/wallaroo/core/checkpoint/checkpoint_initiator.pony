@@ -198,10 +198,6 @@ actor CheckpointInitiator is Initializable
     _clear_pending_checkpoints()
     promise(None)
 
-  be restart_repeating_checkpoints() =>
-    _clear_pending_checkpoints()
-    _phase.initiate_checkpoint(_checkpoint_group, this)
-
   fun ref _initiate_checkpoint(checkpoint_group: USize) =>
     ifdef "resilience" then
       _clear_pending_checkpoints()
