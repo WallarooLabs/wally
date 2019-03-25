@@ -28,6 +28,22 @@ use "wallaroo_labs/mort"
 trait _CheckpointInitiatorPhase
   fun name(): String
 
+  fun ref start_checkpoint_timer(time_until_next_checkpoint: U64,
+    checkpoint_initiator: CheckpointInitiator ref)
+  =>
+    _invalid_call()
+    Fail()
+
+  fun ref initiate_checkpoint(checkpoint_group: USize,
+    checkpoint_initiator: CheckpointInitiator ref)
+  =>
+    """
+    Currently, we do not allow two checkpoints to be in flight at once. If a
+    timer goes off while one is in progress, we ignore it for now. We only
+    initiate a checkpoint from _WaitingCheckpointInitiatorPhase.
+    """
+    None
+
   fun ref checkpoint_barrier_complete(token: BarrierToken) =>
     _invalid_call()
     Fail()
@@ -44,6 +60,10 @@ trait _CheckpointInitiatorPhase
     _invalid_call()
     Fail()
 
+  fun ref resume_checkpointing_from_rollback() =>
+    _invalid_call()
+    Fail()
+
   fun _invalid_call() =>
     @printf[I32]("Invalid call on checkpoint initiator phase %s\n".cstring(),
       name().cstring())
@@ -51,19 +71,30 @@ trait _CheckpointInitiatorPhase
 class _WaitingCheckpointInitiatorPhase is _CheckpointInitiatorPhase
   fun name(): String => "_WaitingCheckpointInitiatorPhase"
 
+  fun ref start_checkpoint_timer(time_until_next_checkpoint: U64,
+    checkpoint_initiator: CheckpointInitiator ref)
+  =>
+    checkpoint_initiator._start_checkpoint_timer(time_until_next_checkpoint)
+
+  fun ref initiate_checkpoint(checkpoint_group: USize,
+    checkpoint_initiator: CheckpointInitiator ref)
+  =>
+    checkpoint_initiator._initiate_checkpoint(checkpoint_group)
+
+  fun ref resume_checkpointing_from_rollback() =>
+    None
+
 class _CheckpointingPhase is _CheckpointInitiatorPhase
   let _token: CheckpointBarrierToken
   let _c_initiator: CheckpointInitiator ref
-  let _repeating: Bool
   var _barrier_complete: Bool = false
   var _event_log_checkpoints_complete: Bool = false
   let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
 
-  new create(token: CheckpointBarrierToken, repeating: Bool,
+  new create(token: CheckpointBarrierToken,
     c_initiator: CheckpointInitiator ref)
   =>
     _token = token
-    _repeating = repeating
     _c_initiator = c_initiator
 
   fun name(): String => "_CheckpointingPhase"
@@ -99,21 +130,18 @@ class _CheckpointingPhase is _CheckpointInitiatorPhase
 
   fun ref _check_completion() =>
     if _barrier_complete and _event_log_checkpoints_complete then
-      _c_initiator.event_log_write_checkpoint_id(_token.id, _token,
-        _repeating)
+      _c_initiator.event_log_write_checkpoint_id(_token.id, _token)
     end
 
 class _WaitingForEventLogIdWrittenPhase is _CheckpointInitiatorPhase
   let _token: CheckpointBarrierToken
   let _c_initiator: CheckpointInitiator ref
-  let _repeating: Bool
   let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
 
-  new create(token: CheckpointBarrierToken, repeating: Bool,
+  new create(token: CheckpointBarrierToken,
     c_initiator: CheckpointInitiator ref)
   =>
     _token = token
-    _repeating = repeating
     _c_initiator = c_initiator
 
   fun name(): String => "_WaitingForEventLogIdWrittenPhase"
@@ -136,5 +164,67 @@ class _WaitingForEventLogIdWrittenPhase is _CheckpointInitiatorPhase
         _c_initiator.workers().size().string().cstring())
     end
     if (_acked_workers.size() == _c_initiator.workers().size()) then
-      _c_initiator.checkpoint_complete(_token, _repeating)
+      _c_initiator.checkpoint_complete(_token)
     end
+
+class _RollbackCheckpointInitiatorPhase is _CheckpointInitiatorPhase
+  let _c_initiator: CheckpointInitiator ref
+
+  new create(c_initiator: CheckpointInitiator ref) =>
+    _c_initiator = c_initiator
+
+  fun name(): String => "_RollbackCheckpointInitiatorPhase"
+
+  fun ref _initiate_checkpoint(checkpoint_group: USize,
+    checkpoint_initiator: CheckpointInitiator ref)
+  =>
+    """
+    We're rolling back, so we should not initiate a new checkpoint yet.
+    """
+    None
+
+  fun ref checkpoint_barrier_complete(token: BarrierToken) =>
+    """
+    We're rolling back. Ignore all current checkpoint activity.
+    """
+    None
+
+  fun ref event_log_checkpoint_complete(worker: WorkerName,
+    checkpoint_id: CheckpointId)
+  =>
+    """
+    We're rolling back. Ignore all current checkpoint activity.
+    """
+    None
+
+  fun ref event_log_id_written(worker: WorkerName,
+    checkpoint_id: CheckpointId)
+  =>
+    """
+    We're rolling back. Ignore all current checkpoint activity.
+    """
+    None
+
+  fun ref resume_checkpointing_from_rollback() =>
+    _c_initiator.wait_for_next_checkpoint()
+
+class _DisposedCheckpointInitiatorPhase is _CheckpointInitiatorPhase
+  fun name(): String => "_DisposedCheckpointInitiatorPhase"
+
+  fun ref _initiate_checkpoint(checkpoint_group: USize,
+    checkpoint_initiator: CheckpointInitiator ref)
+  =>
+    None
+
+  fun ref checkpoint_barrier_complete(token: BarrierToken) =>
+    None
+
+  fun ref event_log_checkpoint_complete(worker: WorkerName,
+    checkpoint_id: CheckpointId)
+  =>
+    None
+
+  fun ref event_log_id_written(worker: WorkerName,
+    checkpoint_id: CheckpointId)
+  =>
+    None

@@ -613,7 +613,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         ifdef "checkpoint_trace" then
           @printf[I32]("Rcvd ResumeCheckpointMsg!!\n".cstring())
         end
-        _checkpoint_initiator.resume_checkpoint()
+        _checkpoint_initiator.resume_checkpointing_from_rollback()
       | let m: ResumeProcessingMsg =>
         ifdef "trace" then
           @printf[I32]("Received ResumeTheWorldMsg from %s\n".cstring(),
