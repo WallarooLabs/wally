@@ -358,12 +358,28 @@ class GlobalConnectorStreamRegistry[In: Any val]
   fun ref _activate_stream(stream: StreamTuple, worker_name: WorkerName):
     StreamTuple ?
   =>
+    ifdef debug then
+      @printf[I32](("%s ::: GlobalConnectorStreamRegistry._activate_stream("
+        + "StreamTuple(%s, %s, %s), worker_name: %s)\n").cstring(),
+        WallClock.seconds().string().cstring(),
+        stream.id.string().cstring(), stream.name.cstring(),
+        stream.last_acked.string().cstring(),
+        worker_name.cstring())
+    end
     // fail if not already in inactive
     let s = _inactive_streams.remove(stream.id)?
     _active_streams(stream.id) = worker_name
     s._2
 
   fun ref _new_stream(stream: StreamTuple, worker_name: WorkerName) ? =>
+    ifdef debug then
+      @printf[I32](("%s ::: GlobalConnectorStreamRegistry._new_stream("
+        + "StreamTuple(%s, %s, %s), worker_name: %s)\n").cstring(),
+        WallClock.seconds().string().cstring(),
+        stream.id.string().cstring(), stream.name.cstring(),
+        stream.last_acked.string().cstring(),
+        worker_name.cstring())
+    end
     // fail if already in inactive or active
     if _inactive_streams.contains(stream.id) then error end
     if _active_streams.contains(stream.id) then error end
