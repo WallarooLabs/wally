@@ -265,7 +265,6 @@ actor Recovery
     end
     _router_registry.resume_the_world(_worker_name)
     _data_receivers.recovery_complete()
-    _router_registry.recovery_protocol_complete()
     _recovery_phase = _FinishedRecovering
     match _initializer
     | let lti: LocalTopologyInitializer =>
@@ -302,5 +301,4 @@ actor Recovery
     else
       Fail()
     end
-    _router_registry.recovery_protocol_complete()
     _recovery_phase = _RecoveryOverrideAccepted

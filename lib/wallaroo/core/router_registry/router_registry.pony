@@ -159,10 +159,6 @@ actor RouterRegistry
 
   var _initiated_stop_the_world: Bool = false
 
-  var _recovery_protocol_complete: Bool = false
-
-  var _sources_started: Bool = false
-
   // If this is a worker that joined during an autoscale event, then there
   // is one worker we contacted to join.
   let _contacted_worker: (WorkerName | None)
@@ -204,29 +200,6 @@ actor RouterRegistry
 
   be application_ready_to_work() =>
     _application_ready_to_work = true
-
-  be start_sources() =>
-    _sources_started = true
-    if not _recovery_protocol_complete then
-      for sl in _source_listeners.values() do
-        sl.start_sources()
-      end
-    end
-
-  be recovery_protocol_complete() =>
-    """
-    Called when Recovery is finished. If we're not recovering, that's right
-    away.
-    """
-    // TODO [source-migration]: Ask John if we still want to start sources here
-    // given that source listeners are now initializable
-    if not _recovery_protocol_complete then
-      for sl in _source_listeners.values() do
-        sl.start_sources()
-      end
-      _sources_started = true
-    end
-    _recovery_protocol_complete = true
 
   be data_receivers_initialized() =>
     _data_receivers_initialized = true

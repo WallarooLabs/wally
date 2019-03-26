@@ -225,9 +225,6 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
         spr.partition_routing_id(), this)
     end
 
-  be start_listening() =>
-    _start_listening()
-
   fun ref _start_listening() =>
     // create kafka client
     _kc = match KafkaConfigFactory(_ksco, _env.out)
@@ -247,14 +244,6 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
       @printf[I32]("Client for %s now created\n".cstring(),
         _pipeline_name.cstring())
     end
-
-  be start_sources() =>
-    // !TODO!: We need the listener to wait until this point to actually
-    // start reading in data
-    None
-
-  be recovery_protocol_complete() =>
-    None
 
   be kafka_client_error(client: KafkaClient, error_report: KafkaErrorReport) =>
     @printf[I32](("ERROR: Kafka client encountered an unrecoverable error! " +

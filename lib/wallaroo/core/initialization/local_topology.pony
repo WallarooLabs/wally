@@ -1095,7 +1095,6 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   fun ref application_ready_to_work(initializables: Initializables) =>
     _phase = _ApplicationReadyToWorkPhase(this, initializables)
-    // _start_sources()
 
     if _is_initializer then
       match _cluster_initializer
@@ -1109,12 +1108,8 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   fun ref _register_source_listeners() =>
     for sl in sl_actors.values() do
-      // sl.start_listening()
       _router_registry.register_source_listener(sl)
     end
-
-  fun ref _start_sources() =>
-    _router_registry.start_sources()
 
 ///////////////////////
 // RESILIENCE

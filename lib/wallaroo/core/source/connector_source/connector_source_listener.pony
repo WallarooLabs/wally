@@ -197,9 +197,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       _available_sources.push((source_id, source))
     end
 
-  be start_listening() =>
-    _start_listening()
-
   fun ref _start_listening() =>
     _event = @pony_os_listen_tcp[AsioEventID](this,
       _host.cstring(), _service.cstring())
@@ -210,9 +207,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
         _pipeline_name.cstring(), _host.cstring(), _service.cstring())
     end
 
-  be start_sources() =>
-    _start_sources()
-
   fun ref _start_sources() =>
     for (source_id, s) in _available_sources.values() do
       s.unmute(this)
@@ -220,13 +214,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     for (source_id, s) in _connected_sources.values() do
       s.unmute(this)
     end
-
-  be recovery_protocol_complete() =>
-    """
-    Called when Recovery is finished. At that point, we can tell sources that
-    from our perspective it's safe to unmute and start listening.
-    """
-    _start_sources()
 
   be update_router(router: Router) =>
     _router = router
