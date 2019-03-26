@@ -72,8 +72,6 @@ def pause_senders_and_sink_await(cluster, timeout=10):
         logging.debug("No senders to pause. Continuing.")
         return
     cluster.pause_senders()
-    # TODO [source-migration] is this sleep still necessary?
-    time.sleep(5)
     for s in cluster.senders:
         logging.debug("Sender paused with {}, and {} bytes in buffer".format(
             s.reader.gen.seqs, len(s.batch)))
@@ -88,8 +86,6 @@ def pause_senders_and_sink_await(cluster, timeout=10):
     cluster.sink_await(values=await_values, func=json_keyval_extract)
     # Since snapshots happen at a 1 second frequency, we need to wait
     # more than 1 second to guarantee a snapshot after messages arrived
-    # TODO [source-migration] is this sleep still necessary?
-    time.sleep(5)
     logging.debug("All messages arrived at sink!")
 
 
