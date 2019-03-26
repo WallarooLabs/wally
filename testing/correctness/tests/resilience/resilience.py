@@ -282,7 +282,7 @@ def get_parts(partitions, num):
 
 def _test_resilience(command, ops=[], initial=None, source_type='tcp',
                      source_name='Detector', source_number=1,
-                     partitions=10, cycles=1, validation_cmd=False,
+                     partitions=40, cycles=1, validation_cmd=False,
                      sender_mps=1000, sender_interval=0.01,
                      retry_count=5,
                      api=None):
@@ -402,7 +402,7 @@ def _test_resilience(command, ops=[], initial=None, source_type='tcp',
 
 def _run(persistent_data, res_ops, command, ops=[], initial=None,
          source_type='tcp', source_name='Detector', source_number=1,
-         partitions=10, validation_cmd=False,
+         partitions=40, validation_cmd=False,
          sender_mps=1000, sender_interval=0.01):
     host = '127.0.0.1'
     sinks = 1
@@ -451,7 +451,7 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
         command += " --source gensource"
     elif source_type == 'tcp':
         command += " --source tcp"
-        # for each part, create a MultSquenceGenerator with the right base_index
+        # for each part, create a MultiSequenceGenerator with the right base_index
         for part in parts:
             sources.append(MultiSequenceGenerator(base_index=min(part),
                                                   initial_partitions=len(part)))
