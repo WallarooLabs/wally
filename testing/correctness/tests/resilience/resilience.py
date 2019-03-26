@@ -419,14 +419,14 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
     sinks = 1
     sink_mode = 'framed'
     batch_size = int(sender_mps * sender_interval)
-    logging.debug(f"batch_size is {batch_size}")
+    logging.debug("batch_size is {batch_size}".format(batch_size = batch_size))
 
     # If validation_cmd is False, it remains False and no validation is run
-    logging.debug(f"Validation command is: {validation_cmd}")
-    logging.debug(f"Source_type: {source_type}")
-    logging.debug(f"source_name: {source_name}")
-    logging.debug(f"source_number: {source_number}")
-    logging.debug(f"partitions: {partitions}")
+    logging.debug("Validation command is: {validation_cmd}".format(validation_cmd = validation_cmd))
+    logging.debug("Source_type: {source_type}".format(source_type = source_type))
+    logging.debug("source_name: {source_name}".format(source_name = source_name))
+    logging.debug("source_number: {source_number}".format(source_number = source_number))
+    logging.debug("partitions: {partitions}".format(partitions=partitions))
 
     if not isinstance(ops, (list, tuple)):
         raise TypeError("ops must be a list or tuple of operations")
@@ -471,7 +471,7 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
         # for each number in each part, create an ALOSequenceGenerator
         # and group them in groups matching the parts
         for part in parts:
-            sources.append([ALOSequenceGenerator(f"key_{key}", 10000)
+            sources.append([ALOSequenceGenerator("key_{key}".format(key=key), 10000)
                             for key in part])
     else:
         raise ValueError("source_type must be one of ['gensource', 'tcp', 'alo']")
@@ -500,7 +500,7 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
                     VERSION,
                     COOKIE,
                     command,
-                    f"instance_{idx}",
+                    "instance_{idx}".format(idx=idx),
                     (cluster.source_addrs[idx % len(cluster.workers)]
                      [source_name]))
                 cluster.add_sender(sender, start=True)
