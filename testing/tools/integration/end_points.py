@@ -424,7 +424,7 @@ def first_nonzero_index(seq):
 
 class Sequence(object):
     def __init__(self, index, val=0):
-        self.index = f'{index:07d}'
+        self.index = '{index:07d}'.format(index = index)
         self.key = self.index.encode()
         self.val = val
 
@@ -505,7 +505,7 @@ class MultiSequenceGenerator(object):
             logging.debug("_remaining: {}".format(self._remaining))
 
     def last_sent(self):
-        return [(f"{key}", val) for (key,val) in
+        return [('{}'.format(key), val) for (key,val) in
          [(seq.index, seq.val) for seq in self.seqs]]
 
     def send(self, ignored_arg):
