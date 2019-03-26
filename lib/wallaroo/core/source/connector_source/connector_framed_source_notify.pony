@@ -413,10 +413,10 @@ class ConnectorSourceNotify[In: Any val]
                 _listener.streams_relinquish(source_id,
                   [StreamTuple(s.id, s.name, s.last_seen)])
               end
-              return true
+              return _continue_perhaps(source)
             elseif cwm.Boundary.is_set(m.flags) then
               // TODO [post-source-migration] what's supposed to happen here?
-              return true
+              return _continue_perhaps(source)
             else // not an EOS and not a boundary
               // process message
               try
