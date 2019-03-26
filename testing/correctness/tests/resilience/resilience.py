@@ -64,6 +64,19 @@ class SaveLogs(Exception):
 # Helper Functions
 ##################
 
+def get_await_values(last_sent_groups):
+    if _OUTPUT_TYPE == "int":
+        return [(str(key), str(val))
+                for group in last_sent_groups
+                for key, val in group]
+    else:
+        logging.error(repr(last_sent_groups))
+        return [(key,
+                 "[{}]".format(",".join(
+                     ("{}".format(max(0,x)) for x in range(val-3, val+1)))))
+                for group in last_sent_groups
+                for key, val in group]
+
 
 # TODO: refactor and move to control.py
 def pause_senders_and_sink_await(cluster, timeout=10):
@@ -71,18 +84,15 @@ def pause_senders_and_sink_await(cluster, timeout=10):
     if not cluster.senders:
         logging.debug("No senders to pause. Continuing.")
         return
+    # we currently only support one type of sender per run
+    if not isinstance(cluster.senders[0], Sender):
+        return
     cluster.pause_senders()
     for s in cluster.senders:
-        logging.debug("Sender paused with {}, and {} bytes in buffer".format(
-            s.reader.gen.seqs, len(s.batch)))
+            logging.debug("Sender paused with {}, and {} bytes in buffer"
+                .format(s.reader.gen.seqs, len(s.batch)))
     logging.debug("Waiting for messages to propagate to sink")
-    await_values = []
-    for sender in cluster.senders:
-        await_values.extend(sender.last_sent())
-    await_values = [
-        (key, "[{}]".format(
-            ",".join(('{}'.format(x) for x in range(val-3, val+1)))))
-        for key, val in await_values]
+    await_values = get_await_values([sender.last_sent() for sender in cluster.senders])
     cluster.sink_await(values=await_values, func=json_keyval_extract)
     # Since snapshots happen at a 1 second frequency, we need to wait
     # more than 1 second to guarantee a snapshot after messages arrived
@@ -400,6 +410,11 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
          source_type='tcp', source_name='Detector', source_number=1,
          partitions=40, validation_cmd=False,
          sender_mps=1000, sender_interval=0.01):
+    # set global flag _OUTPUT_TYPE based on application command
+    # [TODO] make this less coupled and brittle
+    global _OUTPUT_TYPE
+    _OUTPUT_TYPE = "int" if "window_detector" in command else "array"
+
     host = '127.0.0.1'
     sinks = 1
     sink_mode = 'framed'
@@ -463,7 +478,8 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
 
     # Start cluster
     logging.debug("Creating cluster")
-    with Cluster(command=command, host=host, sources=[source_name],
+    with Cluster(command=command, host=host,
+                 sources=[source_name] if source_type != 'gensource' else [],
                  workers=workers, sinks=sinks, sink_mode=sink_mode,
                  persistent_data=persistent_data) as cluster:
 
@@ -515,13 +531,8 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
 
             # Create await_values for the sink based on the stop values from
             # the multi sequence generator
-            await_values = []
-            for sender in cluster.senders:
-                await_values.extend(sender.last_sent())
-            await_values = [
-                (key, "[{}]".format(
-                    ",".join(('{}'.format(x) for x in range(val-3, val+1)))))
-                for key, val in await_values]
+            await_values = get_await_values([sender.last_sent()
+                                             for sender in cluster.senders])
             cluster.sink_await(values=await_values, func=json_keyval_extract)
 
         logging.info("Completion condition achieved. Shutting down cluster.")

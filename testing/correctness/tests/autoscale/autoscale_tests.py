@@ -74,7 +74,7 @@ for api, cmd in APIS.items():
                     for src_num in SOURCE_NUMBERS:
                         TC.create(test_name_fmt = AUTOSCALE_TEST_NAME_FMT,
                                   api = api,
-                                  cmd= cmd,
+                                  cmd = cmd,
                                   ops = op_seq,
                                   validation_cmd = VALIDATION_CMD,
                                   source_name = SOURCE_NAME,
@@ -84,7 +84,7 @@ for api, cmd in APIS.items():
                     # only create 1 source for gensource
                     TC.create(test_name_fmt = AUTOSCALE_TEST_NAME_FMT,
                               api = api,
-                              cmd= cmd,
+                              cmd = cmd,
                               ops = op_seq,
                               validation_cmd = VALIDATION_CMD,
                               source_name = SOURCE_NAME,

@@ -32,33 +32,33 @@ TC = Creator(this)
 APIS = {
     'pony': [
         {'app': 'multi_partition_detector',
-         'cmd': 'multi_partition_detector --depth 1 --source gensource --run-with-resilience',
-         'validation_cmd': 'python ../../apps/multi_partition_detector/_validate.py --window-type tumbling --output {out_file}'}],
+         'cmd': 'multi_partition_detector --depth 1 --run-with-resilience',
+         'validation_cmd': 'python ../../apps/multi_partition_detector/_validate.py --output {out_file}'}],
     'python': [
         {'app': 'multi_partition_detector',
-         'cmd': 'machida --application-module multi_partition_detector --depth 1 --source gensource --run-with-resilience',
-         'validation_cmd': 'python ../../apps/multi_partition_detector/_validate.py --window-type tumbling --output {out_file}'},
+         'cmd': 'machida --application-module multi_partition_detector --depth 1 --run-with-resilience',
+         'validation_cmd': 'python ../../apps/multi_partition_detector/_validate.py --output {out_file}'},
         {'app': 'window_detector_tumbling',
-         'cmd': 'machida --application-module window_detector --source gensource --window-type tumbling --window-delay 100 --run-with-resilience',
+         'cmd': 'machida --application-module window_detector --window-type tumbling --window-delay 100 --run-with-resilience',
          'validation_cmd': 'python ../../apps/window_detector/_validate.py --window-type tumbling --output {out_file}'},
         {'app': 'window_detector_counting',
-         'cmd': 'machida --application-module window_detector --source gensource --window-type counting --run-with-resilience',
+         'cmd': 'machida --application-module window_detector --window-type counting --run-with-resilience',
          'validation_cmd': 'python ../../apps/window_detector/_validate.py --window-type counting --output {out_file}'},
         {'app': 'window_detector_sliding',
-         'cmd': 'machida --application-module window_detector --source gensource --window-type sliding --window-delay 100 --run-with-resilience',
+         'cmd': 'machida --application-module window_detector --window-type sliding --window-delay 100 --run-with-resilience',
          'validation_cmd': 'python ../../apps/window_detector/_validate.py --window-type sliding --output {out_file}'}],
     'python3': [
         {'app': 'multi_partition_detector',
-         'cmd': 'machida3 --application-module multi_partition_detector --depth 1 --source gensource --run-with-resilience',
-         'validation_cmd': 'python ../../apps/multi_partition_detector/_validate.py --window-type tumbling --output {out_file}'},
+         'cmd': 'machida3 --application-module multi_partition_detector --depth 1 --run-with-resilience',
+         'validation_cmd': 'python ../../apps/multi_partition_detector/_validate.py --output {out_file}'},
         {'app': 'window_detector_tumbling',
-         'cmd': 'machida3 --application-module window_detector --source gensource --window-type tumbling --window-delay 100 --run-with-resilience',
+         'cmd': 'machida3 --application-module window_detector --window-type tumbling --window-delay 100 --run-with-resilience',
          'validation_cmd': 'python3 ../../apps/window_detector/_validate.py --window-type tumbling --output {out_file}'},
         {'app': 'window_detector_counting',
-         'cmd': 'machida3 --application-module window_detector --source gensource --window-type counting --run-with-resilience',
+         'cmd': 'machida3 --application-module window_detector --window-type counting --run-with-resilience',
          'validation_cmd': 'python3 ../../apps/window_detector/_validate.py --window-type counting --output {out_file}'},
         {'app': 'window_detector_sliding',
-         'cmd': 'machida3 --application-module window_detector --source gensource --window-type sliding --window-delay 100 --run-with-resilience',
+         'cmd': 'machida3 --application-module window_detector --window-type sliding --window-delay 100 --run-with-resilience',
          'validation_cmd': 'python3 ../../apps/window_detector/_validate.py --window-type sliding --output {out_file}'}]}
 
 
@@ -66,11 +66,15 @@ APIS = {
 # Test spec(s)
 ##############
 
-RESILIENCE_TEST_NAME_FMT = 'test_resilience_{api}_{ops}'
+RESILIENCE_TEST_NAME_FMT = 'test_resilience_{api}_{source_type}_{source_number}_{ops}'
 
 ##################
 # Resilience Tests
 ##################
+
+SOURCE_TYPES = ['gensource', 'alo']
+SOURCE_NAME = 'Detector'
+SOURCE_NUMBERS = [1, 2]
 
 RESILIENCE_SEQS = [
     # wait, grow1, wait, shrink1, wait, crash2, wait, recover
@@ -88,12 +92,27 @@ RESILIENCE_SEQS = [
 for api, group in APIS.items():
     for app in group:
         for ops in RESILIENCE_SEQS:
-            TC.create(RESILIENCE_TEST_NAME_FMT,
-                      '{}_{}'.format(api, app['app']),
-                      app['cmd'], ops,
-                      validation_cmd = app['validation_cmd'],
-                      sources=0)
-
+            for src_type in SOURCE_TYPES:
+                if src_type != 'gensource':
+                    for src_num in SOURCE_NUMBERS:
+                        TC.create(test_name_fmt = RESILIENCE_TEST_NAME_FMT,
+                                  api = '{}_{}'.format(api, app['app']),
+                                  cmd = app['cmd'],
+                                  ops = ops,
+                                  validation_cmd = app['validation_cmd'],
+                                  source_name = SOURCE_NAME,
+                                  source_type = src_type,
+                                  source_number = src_num)
+                else:
+                    for src_num in SOURCE_NUMBERS:
+                        TC.create(test_name_fmt = RESILIENCE_TEST_NAME_FMT,
+                                  api = '{}_{}'.format(api, app['app']),
+                                  cmd = app['cmd'],
+                                  ops = ops,
+                                  validation_cmd = app['validation_cmd'],
+                                  source_name = SOURCE_NAME,
+                                  source_type = src_type,
+                                  source_number = 1)
 
 #############
 # Fixed Tests

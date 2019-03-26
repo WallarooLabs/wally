@@ -754,6 +754,7 @@ class ALOSender(StoppableThread):
         self.port = port
         self.start_time = None
         self.error = None
+        self.batch = [] # for compatibility with Sender during validations
 
     def run(self):
         self.start_time = datetime.datetime.now()

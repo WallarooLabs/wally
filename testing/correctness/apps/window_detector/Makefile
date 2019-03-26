@@ -84,10 +84,10 @@ window_detector_tests_python3: window_detector_sliding_alo_source_test_python3
 window_detector_tumbling_alo_source_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
-		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
-		--alo-sequence-sender key_0 '(100,200]' "'window detector'" \
-		--alo-sequence-sender key_1 '(100,200]' "'window detector'" \
+		--alo-sequence-sender key_0 '(0,100]' Detector \
+		--alo-sequence-sender key_1 '(0,100]' Detector \
+		--alo-sequence-sender key_0 '(100,200]' Detector \
+		--alo-sequence-sender key_1 '(100,200]' Detector \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module window_detector --source alo --window-type tumbling $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
@@ -100,10 +100,10 @@ window_detector_tumbling_alo_source_test_python:
 window_detector_sliding_alo_source_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
-		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
-		--alo-sequence-sender key_0 '(100,200]' "'window detector'" \
-		--alo-sequence-sender key_1 '(100,200]' "'window detector'" \
+		--alo-sequence-sender key_0 '(0,100]' Detector \
+		--alo-sequence-sender key_1 '(0,100]' Detector \
+		--alo-sequence-sender key_0 '(100,200]' Detector \
+		--alo-sequence-sender key_1 '(100,200]' Detector \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module window_detector --source alo --window-type sliding $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type sliding --output' \
@@ -116,10 +116,10 @@ window_detector_sliding_alo_source_test_python:
 window_detector_counting_alo_source_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
-		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
-		--alo-sequence-sender key_0 '(100,200]' "'window detector'" \
-		--alo-sequence-sender key_1 '(100,200]' "'window detector'" \
+		--alo-sequence-sender key_0 '(0,100]' Detector \
+		--alo-sequence-sender key_1 '(0,100]' Detector \
+		--alo-sequence-sender key_0 '(100,200]' Detector \
+		--alo-sequence-sender key_1 '(100,200]' Detector \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module window_detector --source alo --window-type counting $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type counting --output' \
@@ -132,8 +132,8 @@ window_detector_counting_alo_source_test_python:
 window_detector_tumbling_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sequence-sender '(0,100]' "'tumbling window'" '>I' key_0 \
-		--sequence-sender '(0,100]' "'tumbling window'" '>I' key_1 \
+		--sequence-sender '(0,100]' Detector '>I' key_0 \
+		--sequence-sender '(0,100]' Detector '>I' key_1 \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module window_detector --window-type tumbling $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
@@ -146,8 +146,8 @@ window_detector_tumbling_test_python:
 window_detector_counting_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sequence-sender '(0,100]' "'counting window'" '>I' key_0 \
-		--sequence-sender '(0,100]' "'counting window'" '>I' key_1 \
+		--sequence-sender '(0,100]' Detector '>I' key_0 \
+		--sequence-sender '(0,100]' Detector '>I' key_1 \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module window_detector --window-type counting $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type counting --output' \
@@ -160,8 +160,8 @@ window_detector_counting_test_python:
 window_detector_sliding_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sequence-sender '(0,100]' "'sliding window'" '>I' key_0 \
-		--sequence-sender '(0,100]' "'sliding window'" '>I' key_1 \
+		--sequence-sender '(0,100]' Detector '>I' key_0 \
+		--sequence-sender '(0,100]' Detector '>I' key_1 \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module window_detector --window-type sliding $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type sliding --output' \
@@ -211,10 +211,10 @@ window_detector_sliding_gensource_test_python:
 window_detector_tumbling_alo_source_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
-		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
-		--alo-sequence-sender key_0 '(100, 200]' "'window detector'" \
-		--alo-sequence-sender key_1 '(100, 200]' "'window detector'" \
+		--alo-sequence-sender key_0 '(0,100]' Detector \
+		--alo-sequence-sender key_1 '(0,100]' Detector \
+		--alo-sequence-sender key_0 '(100, 200]' Detector \
+		--alo-sequence-sender key_1 '(100, 200]' Detector \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module window_detector --source alo --window-type tumbling $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
@@ -227,10 +227,10 @@ window_detector_tumbling_alo_source_test_python3:
 window_detector_sliding_alo_source_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
-		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
-		--alo-sequence-sender key_0 '(100, 200]' "'window detector'" \
-		--alo-sequence-sender key_1 '(100, 200]' "'window detector'" \
+		--alo-sequence-sender key_0 '(0,100]' Detector \
+		--alo-sequence-sender key_1 '(0,100]' Detector \
+		--alo-sequence-sender key_0 '(100, 200]' Detector \
+		--alo-sequence-sender key_1 '(100, 200]' Detector \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module window_detector --source alo --window-type sliding $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type sliding --output' \
@@ -243,10 +243,10 @@ window_detector_sliding_alo_source_test_python3:
 window_detector_counting_alo_source_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--alo-sequence-sender key_0 '(0,100]' "'window detector'" \
-		--alo-sequence-sender key_1 '(0,100]' "'window detector'" \
-		--alo-sequence-sender key_0 '(100, 200]' "'window detector'" \
-		--alo-sequence-sender key_1 '(100, 200]' "'window detector'" \
+		--alo-sequence-sender key_0 '(0,100]' Detector \
+		--alo-sequence-sender key_1 '(0,100]' Detector \
+		--alo-sequence-sender key_0 '(100, 200]' Detector \
+		--alo-sequence-sender key_1 '(100, 200]' Detector \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module window_detector --source alo --window-type counting $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type counting --output' \
@@ -259,8 +259,8 @@ window_detector_counting_alo_source_test_python3:
 window_detector_tumbling_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sequence-sender '(0,100]' "'tumbling window'" '>I' key_0 \
-		--sequence-sender '(0,100]' "'tumbling window'" '>I' key_1 \
+		--sequence-sender '(0,100]' Detector '>I' key_0 \
+		--sequence-sender '(0,100]' Detector '>I' key_1 \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module window_detector --window-type tumbling $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python3 _validate.py --window-type tumbling --output' \
@@ -273,8 +273,8 @@ window_detector_tumbling_test_python3:
 window_detector_counting_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sequence-sender '(0,100]' "'counting window'" '>I' key_0 \
-		--sequence-sender '(0,100]' "'counting window'" '>I' key_1 \
+		--sequence-sender '(0,100]' Detector '>I' key_0 \
+		--sequence-sender '(0,100]' Detector '>I' key_1 \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module window_detector --window-type counting $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python3 _validate.py --window-type counting --output' \
@@ -287,8 +287,8 @@ window_detector_counting_test_python3:
 window_detector_sliding_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
-		--sequence-sender '(0,100]' "'sliding window'" '>I' key_0 \
-		--sequence-sender '(0,100]' "'sliding window'" '>I' key_1 \
+		--sequence-sender '(0,100]' Detector '>I' key_0 \
+		--sequence-sender '(0,100]' Detector '>I' key_1 \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module window_detector --window-type sliding $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python3 _validate.py --window-type sliding --output' \

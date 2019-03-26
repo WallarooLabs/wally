@@ -228,7 +228,7 @@ def trace_window(msg, state):
     print("trace_window({}, {})".format(msg, state))
     state.push(msg)
     print("trace_window.updated: {}".format(state))
-    return Message(msg.key, msg.trace + ".TraceWindow", state.window(), msg.ts)
+    return Message(msg.key, msg.trace + ".TraceWindow", state.window(), time.time())
 
 
 #####################
