@@ -279,7 +279,7 @@ class ConnectorSourceNotify[In: Any val]
     if _prep_for_rollback then
       // Anything that the connector sends us is ignored while we wait
       // for the rollback to finish.  Tell the connector to restart later.
-      send_restart()
+      //send_restart()
       return _continue_perhaps(source)
     end
 
