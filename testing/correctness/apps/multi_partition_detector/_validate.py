@@ -66,7 +66,6 @@ for k, v in sequences.items():
 
     assert(len(processed) == size), "Expect: sorted unique window elements form a subsegement of the natural sequence but for key {}".format(k)
 
-print(windows.keys())
 for k in sorted(windows.keys(), key=lambda k: int(k.replace('key_',''))):
     # Check that for each window, there are at most 2 duplicates per item
     # i.e. the duplicates are plausibly caused by the sub window overlap,

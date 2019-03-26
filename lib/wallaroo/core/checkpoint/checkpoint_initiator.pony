@@ -320,8 +320,6 @@ actor CheckpointInitiator is Initializable
       Fail()
     end
 
-  // fun ref event_log_write_checkpoint_id(checkpoint_id: CheckpointId,
-  //   token: CheckpointBarrierToken, repeating: Bool)
   fun ref event_log_write_checkpoint_id(checkpoint_id: CheckpointId,
     token: CheckpointBarrierToken)
   =>

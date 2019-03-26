@@ -168,9 +168,6 @@ actor TCPSourceListener[In: Any val] is SourceListener
       _available_sources.push(source)
     end
 
-  be start_listening() =>
-    _start_listening()
-
   fun ref _start_listening() =>
     if _valid then
       _event = @pony_os_listen_tcp[AsioEventID](this,
@@ -183,9 +180,6 @@ actor TCPSourceListener[In: Any val] is SourceListener
       end
     end
 
-  be start_sources() =>
-    _start_sources()
-
   fun ref _start_sources() =>
     for s in _available_sources.values() do
       s.unmute(this)
@@ -193,14 +187,6 @@ actor TCPSourceListener[In: Any val] is SourceListener
     for s in _connected_sources.values() do
       s.unmute(this)
     end
-
-  be recovery_protocol_complete() =>
-    """
-    Called when Recovery is finished. At that point, we can tell sources that
-    from our perspective it's safe to unmute and begin listening for new
-    connections.
-    """
-    _start_sources()
 
   be update_router(router: Router) =>
     _router = router

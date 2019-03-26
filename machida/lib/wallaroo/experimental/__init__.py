@@ -292,6 +292,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             self.set_terminator(4)
 
     def _handle_notify_ack(self, msg):
+        logging.debug("_handle_notify_ack({})".format(msg))
         old = self._streams.get(msg.stream_id, None)
         if old is not None:
             new = Stream(old.id, old.name, msg.point_of_ref,
@@ -479,6 +480,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self.shutdown(error=message)
 
     def notify(self, stream_id, stream_name=None, point_of_ref=None):
+        logging.debug("notify({}, {}, {})".format(stream_id, stream_name, point_of_ref))
         old = self._streams.get(stream_id, None)
         if old:
             if point_of_ref is None:

@@ -48,9 +48,6 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
-// TODO [post-source-migration] make this actor participate in checkpointing
-// and rollback, saving its local and global registries
-
 actor ConnectorSourceListener[In: Any val] is SourceListener
   """
   # ConnectorSourceListener
@@ -101,10 +98,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
 
   var _initializer: (LocalTopologyInitializer | None) = None
 
-  // TODO [source-migration]: Add worker_name to query for leader name
-  // TODO [source-migration]: Add new message + handling for requesting
-  //  the leader name, and updating the local based on the response
-  //  before completing startup?
   new create(env: Env, worker_name: WorkerName, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
     router: Router, metrics_conn: MetricsSink,
@@ -121,7 +114,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     max_credits: U32, refill_credits: U32,
     init_size: USize = 64, max_size: USize = 16384)
   =>
-    @printf[I32]("^^^^Creating ConnectorSourceListener...\n".cstring())
     """
     Listens for both IPv4 and IPv6 connections.
     """
@@ -155,7 +147,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
 
     // Pass LocalConnectorStreamRegistry the parameters it needs to create
     // its own instance of the GlobalConnectorStreamRegistry
-    _stream_registry = _stream_registry.create(this, _worker_name,
+    _stream_registry = _stream_registry.create(this, _auth, _worker_name,
       _pipeline_name, _connections, _host, _service, workers_list, _is_joining)
 
     match router
@@ -197,9 +189,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       _available_sources.push((source_id, source))
     end
 
-  be start_listening() =>
-    _start_listening()
-
   fun ref _start_listening() =>
     _event = @pony_os_listen_tcp[AsioEventID](this,
       _host.cstring(), _service.cstring())
@@ -210,9 +199,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
         _pipeline_name.cstring(), _host.cstring(), _service.cstring())
     end
 
-  be start_sources() =>
-    _start_sources()
-
   fun ref _start_sources() =>
     for (source_id, s) in _available_sources.values() do
       s.unmute(this)
@@ -220,13 +206,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     for (source_id, s) in _connected_sources.values() do
       s.unmute(this)
     end
-
-  be recovery_protocol_complete() =>
-    """
-    Called when Recovery is finished. At that point, we can tell sources that
-    from our perspective it's safe to unmute and start listening.
-    """
-    _start_sources()
 
   be update_router(router: Router) =>
     _router = router
@@ -450,10 +429,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   // AUTOSCALE
   /////////////
   be begin_join_migration(joining_workers: Array[WorkerName] val) =>
-    @printf[I32]("ConnectorSourceListener beginning join migration.\n"
-      .cstring())
-    // TODO [source-migration]: should leader election or leader notification
-    // for joining workers be done here?
     @printf[I32]("ConnectorSourceListener completed join migration.\n"
       .cstring())
     _router_registry.source_listener_migration_complete(this)

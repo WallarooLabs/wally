@@ -159,10 +159,6 @@ actor RouterRegistry
 
   var _initiated_stop_the_world: Bool = false
 
-  var _recovery_protocol_complete: Bool = false
-
-  var _sources_started: Bool = false
-
   // If this is a worker that joined during an autoscale event, then there
   // is one worker we contacted to join.
   let _contacted_worker: (WorkerName | None)
@@ -204,29 +200,6 @@ actor RouterRegistry
 
   be application_ready_to_work() =>
     _application_ready_to_work = true
-
-  be start_sources() =>
-    _sources_started = true
-    if not _recovery_protocol_complete then
-      for sl in _source_listeners.values() do
-        sl.start_sources()
-      end
-    end
-
-  be recovery_protocol_complete() =>
-    """
-    Called when Recovery is finished. If we're not recovering, that's right
-    away.
-    """
-    // TODO [source-migration]: Ask John if we still want to start sources here
-    // given that source listeners are now initializable
-    if not _recovery_protocol_complete then
-      for sl in _source_listeners.values() do
-        sl.start_sources()
-      end
-      _sources_started = true
-    end
-    _recovery_protocol_complete = true
 
   be data_receivers_initialized() =>
     _data_receivers_initialized = true
@@ -808,19 +781,6 @@ actor RouterRegistry
     end
 
   fun ref try_to_resume_processing_immediately() =>
-    // TODO [source-migration] [NH]  remove this debug stuff
-    let ar' = recover iso Array[U8] end
-    ar'.append("{")
-    for v in _key_waiting_list.values() do
-      ar'.append(v)
-      ar'.append(", ")
-    end
-    ar'.append("}")
-    let s' = String.from_array(consume ar')
-    @printf[I32](("[NH] try_to_resume_processing_immediately, kwl: %s, " +
-      "slwl.size(): %s\n").cstring(), s'.cstring(),
-      _source_listeners_waiting_list.size().string().cstring())
-    // END of debug print
     if ((_key_waiting_list.size() == 0) and
         (_source_listeners_waiting_list.size() == 0))
     then
@@ -1115,24 +1075,12 @@ actor RouterRegistry
     """
     Step with provided step id has been created on another worker.
     """
-    (let s, let ns) = Time.now()
-    let us = ns / 1000
-    let ts = PosixDate(s, ns).format("%Y-%m-%d %H:%M:%S." + us.string())
-    @printf[I32]("[NH] %s ::: key_migration_complete(%s)\n".cstring(),
-      ts.cstring(), key.cstring())
-
     if _key_waiting_list.size() > 0 then
       _key_waiting_list.unset(key)
       try_to_resume_processing_immediately()
     end
 
   be source_listener_migration_complete(source_listener: SourceListener) =>
-    (let s, let ns) = Time.now()
-    let us = ns / 1000
-    let ts = PosixDate(s, ns).format("%Y-%m-%d %H:%M:%S." + us.string())
-    @printf[I32]("[NH] %s ::: source_listener_migration_complete()\n".cstring(),
-      ts.cstring())
-
     try
       _source_listeners_waiting_list.extract(source_listener)?
       try_to_resume_processing_immediately()
