@@ -36,7 +36,8 @@ actor Main
         let events = Wallaroo.source[Event]("Multi_Aggregations",
           TCPSourceConfig[Event]
               .from_options(EventDecoder,
-                            TCPSourceConfigCLIParser(env.args)?(0)?))
+                            TCPSourceConfigCLIParser("Multi_Aggregations",
+                              env.args)?))
         events
           .key_by(GetEventKey)
           .to[Event](Wallaroo.range_windows(Milliseconds(50))

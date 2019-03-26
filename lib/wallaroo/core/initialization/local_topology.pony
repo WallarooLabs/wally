@@ -847,9 +847,10 @@ actor LocalTopologyInitializer is LayoutInitializer
                 // pass in list of workers
                 let sl_builder_builder =
                   source_data.source_listener_builder_builder()
-                // TODO [source-migration]: add an existing-worker name
-                // That isn't currently joining (e.g. either initializer at
-                // startup or any one of the "non-joining" workers in a join)
+                // TODO [post-source-migration]: add an existing-worker name
+                // That isn't currently joining so we can get registry leader
+                // (e.g. either initializer at startup or any one of the
+                // "non-joining" workers in a join)
                 let sl_builder = sl_builder_builder(_worker_name,
                   source_name, source_runner_builder, partitioner_builder,
                   out_router, _metrics_conn, consume source_reporter,
@@ -1051,7 +1052,6 @@ actor LocalTopologyInitializer is LayoutInitializer
     _phase.report_initialized(initializable)
 
   fun ref _application_initialized(initializables: Initializables) =>
-    // _register_source_listeners()
     _phase = _ApplicationInitializedPhase(this, initializables)
 
   be report_ready_to_work(initializable: Initializable) =>
@@ -1095,7 +1095,6 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   fun ref application_ready_to_work(initializables: Initializables) =>
     _phase = _ApplicationReadyToWorkPhase(this, initializables)
-    // _start_sources()
 
     if _is_initializer then
       match _cluster_initializer
@@ -1109,12 +1108,8 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   fun ref _register_source_listeners() =>
     for sl in sl_actors.values() do
-      // sl.start_listening()
       _router_registry.register_source_listener(sl)
     end
-
-  fun ref _start_sources() =>
-    _router_registry.start_sources()
 
 ///////////////////////
 // RESILIENCE
@@ -1278,7 +1273,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     match _topology
     | let t: LocalTopology =>
       let current_worker_count = t.worker_names.size()
-      let new_t = local_topology_for_joining_worker(joining_worker_name)
+      let new_t = local_topology_for_joining_worker(t, joining_worker_name)
       _router_registry.worker_join(conn, joining_worker_name,
         joining_worker_count, new_t, current_worker_count)
     else
@@ -1498,21 +1493,11 @@ actor LocalTopologyInitializer is LayoutInitializer
     _outgoing_boundaries = consume bs
     _outgoing_boundary_builders = consume bbs
 
-  fun ref local_topology_for_joining_worker(
+  fun ref local_topology_for_joining_worker(t: LocalTopology,
     joining_worker_name: String): LocalTopology
   =>
-    match _topology
-    | let t: LocalTopology =>
-      t.add_new_worker(joining_worker_name)
-        .new_barrier_source_id(_routing_id_gen())
-    else
-      Unreachable()
-      LocalTopology("", "", recover val Dag[StepInitializer] end,
-        recover val Map[U128, SetIs[RoutingId] val] end,
-        recover val Array[WorkerName] end, recover val SetIs[WorkerName] end,
-        recover val Map[RoutingId, Map[WorkerName, RoutingId] val] end,
-        0)
-    end
+    t.add_new_worker(joining_worker_name)
+      .new_barrier_source_id(_routing_id_gen())
 
 
 ///////////////////////

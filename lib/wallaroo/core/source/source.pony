@@ -80,9 +80,6 @@ trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
 // also need to rename `start_listening`
 trait tag SourceListener is (DisposableActor & BoundaryUpdatable &
   Initializable)
-  be start_listening()
-  be start_sources()
-  be recovery_protocol_complete()
   be update_router(router: StatePartitionRouter)
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
