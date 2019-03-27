@@ -46,10 +46,7 @@ use "wallaroo/core/recovery"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink"
 use "wallaroo/core/topology"
-<<<<<<< HEAD
-=======
 use "wallaroo_labs/bytes"
->>>>>>> d3d368031... 1st round of review fixups
 use cp = "wallaroo_labs/connector_protocol"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
@@ -530,15 +527,9 @@ actor ConnectorSink is Sink
     else
       match _message_processor
       | let nsmp: NormalSinkMessageProcessor =>
-        try
-          @printf[I32]("2PC2PC2PC2PC: BarrierSinkMessageProcessor @ receive_barrier\n".cstring())
-           _message_processor = BarrierSinkMessageProcessor(this,
-             _barrier_acker as BarrierSinkAcker)
-           _message_processor.receive_new_barrier(input_id, producer,
-             barrier_token)
-        else
-          Fail()
-        end
+        _use_barrier_processor()
+        _message_processor.receive_new_barrier(input_id, producer,
+          barrier_token)
       else
         Fail()
       end
@@ -578,6 +569,18 @@ actor ConnectorSink is Sink
       end
 
       if _twopc_state is cp.TwoPCFsmStart then
+        // As a 2PC participant as a Wallaroo *sink*, we cannot
+        // allow messages to be processed by this sink during 2PC.
+        // If we allow messages to be processed & sent to the external
+        // connector sink, then if the global decision for message-ids
+        // X..Y is abort, then we will also need to abort any messages
+        // Y+1, Y+2, ... that slipped through during 2PC, which will
+        // be another round of 2PC of message-ids (Y+1)..(Y+n) plus
+        // forced abort.
+        // Instead of that mess, we force the barrier acker to
+        // queue all messages (including barrier messages).
+        try (_barrier_acker as BarrierSinkAcker).set_force_queue() else Fail end
+
         let txn_id = _make_txn_id_string(sbt.id)
         _twopc_txn_id = txn_id
         _notify.twopc_txn_id_current = txn_id
@@ -620,7 +623,7 @@ actor ConnectorSink is Sink
         Fail()
       end
     | let srt: CheckpointRollbackBarrierToken =>
-      _clear_barriers()
+      _use_normal_processor()
     | let rbrt: CheckpointRollbackResumeBarrierToken =>
       _resume_processing_messages()
       _reset_2pc_state()
@@ -670,7 +673,7 @@ actor ConnectorSink is Sink
     """
     let queued = _message_processor.queued()
     @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ _resume_processing_messages with %d items\n".cstring(), queued.size())
-    _message_processor = NormalSinkMessageProcessor(this)
+    _use_normal_processor()
     for q in queued.values() do
       match q
       | let qm: QueuedMessage =>
@@ -682,17 +685,19 @@ actor ConnectorSink is Sink
       end
     end
 
-  be checkpoint_complete(checkpoint_id: CheckpointId) =>
-    None
+  fun ref _use_normal_processor() =>
+    @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ _use_normal_processor\n".cstring())
+    _message_processor = NormalSinkMessageProcessor(this)
 
-  fun ref _clear_barriers() =>
+  fun ref _use_barrier_processor() =>
+    @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ _use_barrier_processor\n".cstring())
     try
       (_barrier_acker as BarrierSinkAcker).clear()
+      _message_processor = BarrierSinkMessageProcessor(this,
+        _barrier_acker as BarrierSinkAcker)
     else
       Fail()
     end
-    @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ _clear_barriers\n".cstring())
-    _message_processor = NormalSinkMessageProcessor(this)
 
   ///////////////
   // CHECKPOINTS
@@ -724,10 +729,10 @@ actor ConnectorSink is Sink
     ifdef "checkpoint_trace" then
       @printf[I32]("Prepare for checkpoint rollback at ConnectorSink %s\n".cstring(), _sink_id.string().cstring())
     end
-    // Don't call _clear_barriers() here
+    // Don't call _use_normal_processor() here
 
   fun ref _prepare_for_rollback() =>
-    _clear_barriers()
+    _use_normal_processor()
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
