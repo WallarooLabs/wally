@@ -177,7 +177,6 @@ class ConnectorSourceNotify[In: Any val]
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
   var _listener: ConnectorSourceListener[In]
-  var _connector_source: (ConnectorSource[In] ref | None) = None
 
   // Barrier/checkpoint id tracking
   var _barrier_ongoing: Bool = false
@@ -239,9 +238,6 @@ class ConnectorSourceNotify[In: Any val]
       __loc.type_name().cstring(), _max_credits, _refill_credits)
     end
 
-  fun ref set_connector_source(source': ConnectorSource[In] ref) =>
-    _connector_source = source'
-
   fun ref received(source: ConnectorSource[In] ref, data: Array[U8] iso): Bool =>
     if _header then
       try
@@ -288,7 +284,7 @@ class ConnectorSourceNotify[In: Any val]
         (_fsm_state is _ProtoFsmStreaming) then
       // Our client's credits are running low and we haven't replenished
       // them after barrier_complete() processing.  Replenish now.
-      _send_acks()
+      _send_acks(source)
     end
 
     try
@@ -328,7 +324,7 @@ class ConnectorSourceNotify[In: Any val]
         // process Hello: reply immediately with an Ok(credits, [], [])
         // reset _credits to _max_credits
         _credits = _max_credits
-        _send_reply(_connector_source, cwm.OkMsg(_credits, [], []))
+        _send_reply(source, cwm.OkMsg(_credits, [], []))
         _fsm_state = _ProtoFsmStreaming
         return _continue_perhaps(source)
 
@@ -359,7 +355,7 @@ class ConnectorSourceNotify[In: Any val]
         then
           // This notifier is already handling this stream
           // So reject directly
-          send_notify_ack(false, m.stream_id, m.point_of_ref)
+          send_notify_ack(source, false, m.stream_id, m.point_of_ref)
         else
           _process_notify(where source=source, stream_id=m.stream_id,
             stream_name=m.stream_name, point_of_reference=m.point_of_ref)
@@ -689,10 +685,10 @@ class ConnectorSourceNotify[In: Any val]
     """
     qty
 
-  fun ref shrink() =>
+  fun ref shrink(source: ConnectorSource[In] ref) =>
     _fsm_state = _ProtoFsmShrinking
-    _process_acks_for_active()
-    _process_acks_for_pending_close()
+    _process_acks_for_active(source)
+    _process_acks_for_pending_close(source)
     _clear_and_relinquish_all()
 
   ///////////////////////////////////
@@ -717,7 +713,9 @@ class ConnectorSourceNotify[In: Any val]
       end
     end
 
-  fun ref rollback(checkpoint_id: CheckpointId, payload: ByteSeq val) =>
+  fun ref rollback(source: ConnectorSource[In] ref,
+    checkpoint_id: CheckpointId, payload: ByteSeq val)
+  =>
     @printf[I32]("ConnectorSource[%s] is rolling back to checkpoint_id %s\n"
       .cstring(), _source_name.cstring(), checkpoint_id.string().cstring())
     _barrier_checkpoint_id = checkpoint_id
@@ -733,11 +731,13 @@ class ConnectorSourceNotify[In: Any val]
       end
     end
     _relinquish_streams()
-    rollback_complete(checkpoint_id)
+    rollback_complete(source, checkpoint_id)
 
-  fun ref rollback_complete(checkpoint_id: CheckpointId) =>
+  fun ref rollback_complete(source: ConnectorSource[In] ref,
+    checkpoint_id: CheckpointId)
+  =>
     _prep_for_rollback = false
-    send_restart()
+    send_restart(source)
 
   fun ref initiate_barrier(checkpoint_id: CheckpointId) =>
     @printf[I32]("Initiate_barrier(%s) at %s\n".cstring(),
@@ -762,16 +762,18 @@ class ConnectorSourceNotify[In: Any val]
       end
     end
 
-  fun ref barrier_complete(checkpoint_id: CheckpointId) =>
+  fun ref barrier_complete(source: ConnectorSource[In] ref,
+    checkpoint_id: CheckpointId)
+  =>
     // update barrier state and check checkpoint_id matches our local knowledge
     _barrier_ongoing = false
     Invariant(checkpoint_id == _barrier_checkpoint_id)
 
     if _session_active then
-      _process_acks_for_active()
+      _process_acks_for_active(source)
 
       // process acks for EOS/_pending_close streams
-      _process_acks_for_pending_close()
+      _process_acks_for_pending_close(source)
       // process any stream relinquish requests
       _relinquish_streams()
     end
@@ -779,16 +781,16 @@ class ConnectorSourceNotify[In: Any val]
   /////////////////////////
   // Local state management
   /////////////////////////
-  fun ref _process_acks_for_active() =>
+  fun ref _process_acks_for_active(source: ConnectorSource[In] ref) =>
     for (stream_id, s) in _active_streams.pairs() do
       _pending_acks.push((stream_id, s.last_acked))
     end
     if (_fsm_state is _ProtoFsmStreaming) or
        (_fsm_state is _ProtoFsmShrinking) then
-      _send_acks()
+      _send_acks(source)
     end
 
-  fun ref _process_acks_for_pending_close() =>
+  fun ref _process_acks_for_pending_close(source: ConnectorSource[In] ref) =>
     for (stream_id, s) in _pending_close.pairs() do
       ifdef "trace" then
         @printf[I32]("%s ::: Processing ack for %s at %s\n".cstring(),
@@ -802,7 +804,7 @@ class ConnectorSourceNotify[In: Any val]
     _pending_close.clear()
     if (_fsm_state is _ProtoFsmStreaming) or
        (_fsm_state is _ProtoFsmShrinking) then
-      _send_acks()
+      _send_acks(source)
     end
 
   fun ref _relinquish_streams() =>
@@ -858,8 +860,8 @@ class ConnectorSourceNotify[In: Any val]
     _listener.stream_notify(request_id, stream_id, stream_name,
       point_of_reference, promise, source)
 
-  fun ref stream_notify_result(session_id: RoutingId, success: Bool,
-    stream: StreamTuple)
+  fun ref stream_notify_result(source: ConnectorSource[In] ref,
+    session_id: RoutingId, success: Bool, stream: StreamTuple)
   =>
     if (session_id != _session_id) or (not _session_active) then
       // This is a reply from a query that we'd sent in a prior TCP
@@ -879,10 +881,10 @@ class ConnectorSourceNotify[In: Any val]
       _active_streams(stream.id) = s
     end
     // send response either way
-    send_notify_ack(success, stream.id, stream.last_acked)
+    send_notify_ack(source, success, stream.id, stream.last_acked)
 
-  fun ref send_notify_ack(success: Bool, stream_id: StreamId,
-    point_of_reference: PointOfReference)
+  fun ref send_notify_ack(source: ConnectorSource[In] ref, success: Bool,
+    stream_id: StreamId, point_of_reference: PointOfReference)
   =>
     ifdef "trace" then
       @printf[I32]("%s ::: send_notify_ack(%s, %s, %s)\n".cstring(),
@@ -890,20 +892,20 @@ class ConnectorSourceNotify[In: Any val]
         stream_id.string().cstring(), point_of_reference.string().cstring())
     end
     let m = cwm.NotifyAckMsg(success, stream_id, point_of_reference)
-    _send_reply(_connector_source, m)
+    _send_reply(source, m)
 
   //////////////////
   // Sending Replies
   //////////////////
-  fun ref _to_error_state(source: (ConnectorSource[In] ref|None), msg: String): Bool
+  fun ref _to_error_state(source: ConnectorSource[In] ref, msg: String): Bool
   =>
     _send_reply(source, cwm.ErrorMsg(msg))
 
     _fsm_state = _ProtoFsmError
-    try (source as ConnectorSource[In] ref).close() else Fail() end
+    source.close()
     _continue_perhaps2()
 
-  fun ref _send_acks() =>
+  fun ref _send_acks(source: ConnectorSource[In] ref) =>
     let new_credits = _max_credits - _credits
     let acks = recover iso Array[(StreamId, PointOfReference)] end
     for v in _pending_acks.values() do
@@ -920,32 +922,25 @@ class ConnectorSourceNotify[In: Any val]
     if (new_credits > 0) or (acks.size() > 0) then
       @printf[I32]("Sending acks for %s streams\n".cstring(),
         _pending_acks.size().string().cstring())
-      _send_reply(_connector_source, cwm.AckMsg(new_credits, consume acks))
+      _send_reply(source, cwm.AckMsg(new_credits, consume acks))
     end
     _credits = _credits + new_credits
 
-  fun ref send_restart() =>
+  fun ref send_restart(source: ConnectorSource[In] ref) =>
     ifdef "trace" then
       @printf[I32]("TRACE: %s.%s()\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring())
     end
-    _send_reply(_connector_source, cwm.RestartMsg(host + ":" + service))
-    try (_connector_source as ConnectorSource[In] ref).close() end
+    _send_reply(source, cwm.RestartMsg(host + ":" + service))
+    source.close()
     // The .close() method ^^^ calls our closed() method which will
     // twiddle all of the appropriate state variables.
 
-  // TODO [post-source-migration]: why pass source here instead of using
-  // var _connector_source?
-  fun _send_reply(source: (ConnectorSource[In] ref|None), msg: cwm.Message) =>
-    match source
-    | let s: ConnectorSource[In] ref =>
-      // write the frame data and length encode it
-      let w1: Writer = w1.create()
-      let b1 = cwm.Frame.encode(msg, w1)
-      s.writev_final(Bytes.length_encode(b1))
-    else
-      Fail()
-    end
+  fun _send_reply(source: ConnectorSource[In] ref, msg: cwm.Message) =>
+    let w1: Writer = w1.create()
+    let b1 = cwm.Frame.encode(msg, w1)
+    source.writev_final(Bytes.length_encode(b1))
+
 
   fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
     """

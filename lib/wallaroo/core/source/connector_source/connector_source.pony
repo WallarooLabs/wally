@@ -167,7 +167,6 @@ actor ConnectorSource[In: Any val] is Source
     _router = router'
     _update_router(router')
 
-    _notify.set_connector_source(this)
     _notify.update_boundaries(_outgoing_boundaries)
 
     // register resilient with event log
@@ -630,7 +629,7 @@ actor ConnectorSource[In: Any val] is Source
     end
     match token
     | let sbt: CheckpointBarrierToken =>
-      _notify.barrier_complete(sbt.id)
+      _notify.barrier_complete(this, sbt.id)
     else
       @printf[I32]("DEBUG %s.%s when %s\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring(),
@@ -674,7 +673,7 @@ actor ConnectorSource[In: Any val] is Source
         _source_id.string().cstring(), p.size())
     end
 
-    _notify.rollback(checkpoint_id, payload)
+    _notify.rollback(this, checkpoint_id, payload)
     _next_checkpoint_id = checkpoint_id + 1
     event_log.ack_rollback(_source_id)
 
@@ -1020,12 +1019,12 @@ actor ConnectorSource[In: Any val] is Source
   be stream_notify_result(session_id': RoutingId, success: Bool,
     stream: StreamTuple)
   =>
-    _notify.stream_notify_result(session_id', success, stream)
+    _notify.stream_notify_result(this, session_id', success, stream)
 
   be begin_shrink() =>
     @printf[I32]("ConnectorSource %s beginning shrink migration.\n"
       .cstring(), _source_id.string().cstring())
-    _notify.shrink()
+    _notify.shrink(this)
 
   be complete_shrink(host: String, service: String) =>
     """
@@ -1040,5 +1039,5 @@ actor ConnectorSource[In: Any val] is Source
 
     _notify.host = host
     _notify.service = service
-    _notify.send_restart()
+    _notify.send_restart(this)
     // send_restart calls connector_source.close() at the end
