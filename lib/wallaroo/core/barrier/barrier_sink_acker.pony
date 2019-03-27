@@ -28,6 +28,7 @@ class BarrierSinkAcker
   var _barrier_token: BarrierToken = InitialBarrierToken
   let _barrier_coordinator: BarrierCoordinator
   let _inputs_blocking: Map[RoutingId, Producer] = _inputs_blocking.create()
+  var _force_queue: Bool = false
 
   new create(sink_id: RoutingId, sink: Sink ref,
     barrier_coordinator: BarrierCoordinator)
@@ -43,6 +44,9 @@ class BarrierSinkAcker
     token < _barrier_token
 
   fun input_blocking(id: RoutingId): Bool =>
+    if _force_queue then
+      return true
+    end
     _inputs_blocking.contains(id)
 
   fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
@@ -107,3 +111,8 @@ class BarrierSinkAcker
     @printf[I32]("2PC: DBGDBG: acker: clear\n".cstring())
     _inputs_blocking.clear()
     _barrier_token = InitialBarrierToken
+    _force_queue = false
+
+  fun ref set_force_queue() =>
+    @printf[I32]("2PC: DBGDBG: acker: set_force_queue\n".cstring())
+    _force_queue = true
