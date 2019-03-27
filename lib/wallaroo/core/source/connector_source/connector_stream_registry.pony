@@ -54,11 +54,6 @@ class val StreamTuple
     id = stream_id
     last_acked = point_of_ref
 
-// TODO [source-migration]: Add _request_leader() function to get existing
-// leader during a join
-// TODO [source-migration]: Either get a list of "existing" workers to query for
-// request_leader, or ask ALL workers and currently-joining workers do not
-// respond. or something else?
 class GlobalConnectorStreamRegistry[In: Any val]
   let _listener: ConnectorSourceListener[In] tag
   var _worker_name: String
@@ -237,10 +232,6 @@ class GlobalConnectorStreamRegistry[In: Any val]
 
   fun ref _elect_leader() =>
     if _is_joining then
-      // !TODO! [source-migration]: we're currently deferring leader request to
-      // the Initializer due to the fact that it still holds "special" status.
-      // This should be updated to request from a non-joining worker via a
-      // different protocol in the near future.
       _connections.connector_leader_name_request(_worker_name, "initializer",
         _source_name)
     else
@@ -326,8 +317,6 @@ class GlobalConnectorStreamRegistry[In: Any val]
     end
 
   fun ref add_worker(worker_name: WorkerName) =>
-    // TODO [post-source-migration-3]: we are lazily not re-electing leader on grow,
-    // should we?
     _workers_set.set(worker_name)
 
   fun ref remove_worker(worker_name: WorkerName) =>
@@ -779,9 +768,9 @@ class LocalConnectorStreamRegistry[In: Any val]
         _global_registry.process_streams_shrink_response_msg(m)
       end
     else
-      @printf[I32](("**Dropping message** _pipeline_name: " +
-         _source_name +  " =/= source_name: " + msg.source_name() + " \n")
-        .cstring())
+      @printf[I32](("**LocalConnectorStreamRegistry Dropping message**"
+        + " _pipeline_name: " + _source_name +  " =/= source_name: "
+        + msg.source_name() + " \n").cstring())
     end
 
   fun ref set_joining(is_joining: Bool) =>

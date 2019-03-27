@@ -48,9 +48,6 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
-// TODO [post-source-migration] make this actor participate in checkpointing
-// and rollback, saving its local and global registries
-
 actor ConnectorSourceListener[In: Any val] is SourceListener
   """
   # ConnectorSourceListener
@@ -101,10 +98,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
 
   var _initializer: (LocalTopologyInitializer | None) = None
 
-  // TODO [source-migration]: Add worker_name to query for leader name
-  // TODO [source-migration]: Add new message + handling for requesting
-  //  the leader name, and updating the local based on the response
-  //  before completing startup?
   new create(env: Env, worker_name: WorkerName, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
     router: Router, metrics_conn: MetricsSink,
@@ -121,7 +114,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     max_credits: U32, refill_credits: U32,
     init_size: USize = 64, max_size: USize = 16384)
   =>
-    @printf[I32]("^^^^Creating ConnectorSourceListener...\n".cstring())
     """
     Listens for both IPv4 and IPv6 connections.
     """
@@ -437,10 +429,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   // AUTOSCALE
   /////////////
   be begin_join_migration(joining_workers: Array[WorkerName] val) =>
-    @printf[I32]("ConnectorSourceListener beginning join migration.\n"
-      .cstring())
-    // TODO [source-migration]: should leader election or leader notification
-    // for joining workers be done here?
     @printf[I32]("ConnectorSourceListener completed join migration.\n"
       .cstring())
     _router_registry.source_listener_migration_complete(this)

@@ -524,15 +524,14 @@ class ConnectorSourceNotify[In: Any val]
       if key_string isnt None then
         key_string
       else
-        // wat
-        // TODO [post-source-migration] should this be stream_id for messages that
-        // do not provide a key?
+        // TODO [post-source-migration] should this be stream_id for messages
+        // that do not provide a key?
         // What is a sane default here?
         // What does it mean to use a unique key for each message?
         msg_uid.string()
       end
 
-    // TOOD: We need a way to assign watermarks based on the policy
+    // TODO [source-migration]: We need a way to assign watermarks based on the policy
     // for any particular connector.
     if ingest_ts > _watermark_ts then
       _watermark_ts = ingest_ts
@@ -631,10 +630,10 @@ class ConnectorSourceNotify[In: Any val]
     @printf[I32]("ConnectorSource connection closed 0x%lx\n".cstring(), source)
     _session_active = false
     _fsm_state = _ProtoFsmDisconnected
-    // TODO [post-source-migration] When john's work is ready, this assumption
-    // becomes true:
-    // 1. we relinquish streams with last_seen value
-    // 2. on rollback (post-john's-work), global registry rolls back too.
+    // TODO [post-source-migration] When the SourceListener actors are added
+    // to participate in rollback, the following assumptions become true:
+    //   1. we relinquish streams with last_seen value
+    //   2. on rollback, global registry rolls back too.
     // Streams become "owned" again at the source, and will get relinquished to
     // the last_acked at the time of checkpoint.
     // So a notify_ack after a rollback will have the correct last_acked

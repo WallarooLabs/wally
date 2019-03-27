@@ -635,8 +635,8 @@ actor ConnectorSource[In: Any val] is Source
       @printf[I32]("DEBUG %s.%s when %s\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring(),
         token.string().cstring())
-      // TODO [post-source-migration]: this shouldn't actually fail, there are many
-      // barrier token types for which it's safe to do nothing.
+      // TODO [post-source-migration]: this shouldn't actually fail, there are
+      // many barrier token types for which it's safe to do nothing.
       // Bug john for documentation on this.
       // TODO [post-source-migration]: Check with John on whether this is okay
       None
