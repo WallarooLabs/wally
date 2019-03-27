@@ -153,19 +153,7 @@ actor ConnectorSink is Sink
   var _seq_id: SeqId = 0
 
   // 2PC
-  var _twopc_state: cp.TwoPCFsmState = cp.TwoPCFsmStart
-  var _twopc_txn_id: String = ""
-  var _twopc_txn_id_at_close: String = ""
-  var _twopc_barrier_token_initial: CheckpointBarrierToken =
-    CheckpointBarrierToken(0)
-  var _twopc_barrier_token: CheckpointBarrierToken =
-    _twopc_barrier_token_initial
-  var _twopc_barrier_token_at_close: CheckpointBarrierToken =
-    _twopc_barrier_token_initial
-  var _twopc_phase1_commit: Bool = false
-  var _twopc_last_offset: USize = 0
-  var _twopc_current_offset: USize = 0
-  var _twopc_current_txn_end_offset: USize = 0
+  let _twopc: ConnectorSink2PC
 
   new create(sink_id: RoutingId, sink_name: String, event_log: EventLog,
     recovering: Bool, env: Env, encoder_wrapper: ConnectorEncoderWrapper,
@@ -206,9 +194,10 @@ actor ConnectorSink is Sink
     _auth = auth
     _from = from
     _connect_count = 0
+    _twopc = ConnectorSink2PC(_notify.stream_name)
+    _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_coordinator)
     @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ ConnectorSink.create\n".cstring())
     _message_processor = NormalSinkMessageProcessor(this)
-    _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_coordinator)
 
   //
   // Application Lifecycle events
@@ -296,13 +285,13 @@ actor ConnectorSink is Sink
         encoded1_len = encoded1_len + x.size()
       end
       // We do not include MessageMsg size overhead in our offset accounting
-      _twopc_current_offset = _twopc_current_offset + encoded1_len
+      _twopc.update_offset(encoded1_len)
 
       let encoded2 =
         try
           let w1: Writer = w1.create()
           let msg = _notify.make_message(encoded1)?
-          @printf[I32]("DBGDBG: process_message: message_id = %s, _twopc_state = %d\n".cstring(), msg.message_id.string().cstring(), _twopc_state())
+          @printf[I32]("DBGDBG: process_message: message_id = %s, _twopc.state = %d\n".cstring(), msg.message_id.string().cstring(), _twopc.state())
           let bs = cp.Frame.encode(msg, w1)
           Bytes.length_encode(bs)
         else
@@ -388,98 +377,39 @@ actor ConnectorSink is Sink
     None
 
   ///////////////
-  // 2PC
+  // 2PC glue funcs between this, ConnectorSinkNotify, and ConnectorSink2PC
   ///////////////
-
-  fun _make_txn_id_string(checkpoint_id: CheckpointId): String =>
-    _notify.stream_name + ":c_id=" + checkpoint_id.string()
-
-  fun ref _reset_2pc_state() =>
-    ifdef "checkpoint_trace" then
-      @printf[I32]("2PC: reset 2PC state\n".cstring())
-    end
-    _twopc_state = cp.TwoPCFsmStart
-    _twopc_txn_id = ""
-    _twopc_barrier_token = CheckpointBarrierToken(0)
-    _twopc_phase1_commit = false
 
   fun ref twopc_phase1_reply(txn_id: String, commit: Bool) =>
     """
     This is a callback used by the ConnectorSinkNotify class to Inform
     us that it received a 2PC phase 1 reply.
     """
-    if not (_twopc_state is cp.TwoPCFsm1Precommit) then
-      @printf[I32]("2PC: ERROR: twopc_reply: _twopc_state = %d\n".cstring(), _twopc_state())
-      Fail()
-    end
-    if txn_id != _twopc_txn_id then
-      @printf[I32]("2PC: ERROR: twopc_reply: txn_id %s != %s\n".cstring(),
-        txn_id.cstring(), _twopc_txn_id.cstring())
-      Fail()
-    end
-
-    _twopc_phase1_commit = commit
-    if commit then
-      // NOTE: TwoPCFsm2Commit means that our connector sink has
-      // voted to commit, and that it does not mean that we know
-      // the status of the global Wallaroo checkpoint protocol.
-      _twopc_state = cp.TwoPCFsm2Commit
-      ifdef "checkpoint_trace" then
-        @printf[I32]("2PC: txn_id %s was %s\n".cstring(), txn_id.cstring(), commit.string().cstring())
-      end
-
-      _barrier_coordinator.ack_barrier(this, _twopc_barrier_token)
+    if _twopc.twopc_phase1_reply(txn_id, commit) then
+      _barrier_coordinator.ack_barrier(this, _twopc.barrier_token)
     else
-      _abort_decision("phase 1 ABORT", _twopc_txn_id, _twopc_barrier_token)
+      abort_decision("phase 1 ABORT", _twopc.txn_id, _twopc.barrier_token)
     end
 
-  fun ref _abort_decision(reason: String, txn_id: String,
+  fun ref abort_decision(reason: String, txn_id: String,
     barrier_token: CheckpointBarrierToken)
   =>
     ifdef "checkpoint_trace" then
-      @printf[I32]("2PC: _abort_decision: txn_id %s %s\n".cstring(), txn_id.cstring(), reason.cstring())
+      @printf[I32]("2PC: abort_decision: txn_id %s %s\n".cstring(), txn_id.cstring(), reason.cstring())
     end
 
-    _twopc_state = cp.TwoPCFsm2Abort
+    _twopc.set_state_abort()
     _barrier_coordinator.abort_barrier(barrier_token)
 
-  fun _send_phase2(conn: WallarooOutgoingNetworkActor ref,
-    txn_id: String, commit: Bool)
-  =>
-    let b: Array[U8] val = cp.TwoPCEncode.phase2(txn_id, commit)
-    try
-      let msg: cp.MessageMsg = cp.MessageMsg(0, cp.Ephemeral(), 0, 0, None, [b])?
-       _notify.send_msg(conn, msg)
-     else
-       Fail()
-    end
-    ifdef "checkpoint_trace" then
-      @printf[I32]("2PC: sent phase 2 commit=%s for txn_id %s\n".cstring(), commit.string().cstring(), txn_id.cstring())
-    end
+  fun send_msg(sink: ConnectorSink ref, msg: cp.Message) =>
+    _notify.send_msg(sink, msg)
 
   fun ref twopc_intro_done() =>
     """
     This callback is used by ConnectorSinkNotify when the 2PC intro
     part of the connector sink protocol has finished.
-
-    We use _twopc_barrier_token_at_close to determine if we were
-    disconnected during a round of 2PC.  If so, we assume that we
-    lost the phase1 reply from the connector sink, so we make the
-    pessimistic assumption that the connector sink voted rollback/abort.
     """
-    if _twopc_barrier_token_at_close != _twopc_barrier_token_initial then
-
-      _abort_decision("TCP connection closed during 2PC",
-        _twopc_txn_id_at_close, _twopc_barrier_token_at_close)
-      ifdef "checkpoint_trace" then
-        @printf[I32]("2PC: Wallaroo local abort for txn_id %s barrier %s\n".cstring(), _twopc_txn_id_at_close.cstring(), _twopc_barrier_token_at_close.string().cstring())
-      end
-
-      _twopc_state = cp.TwoPCFsm2Abort
-      _twopc_txn_id = _twopc_txn_id_at_close
-      _twopc_txn_id_at_close = ""
-      _twopc_barrier_token_at_close = _twopc_barrier_token_initial
-    end
+    _twopc.twopc_intro_done(this)
 
   ///////////////
   // BARRIER
@@ -560,73 +490,49 @@ actor ConnectorSink is Sink
         ifdef "checkpoint_trace" then
           @printf[I32]("2PC: preemptive abort: connector sink not fully connected\n".cstring())
         end
-        _abort_decision("connector sink not fully connected",
-          _twopc_txn_id, _twopc_barrier_token)
-
-        _twopc_txn_id = "preemptive txn abort"
-        _twopc_barrier_token = sbt
+        abort_decision("connector sink not fully connected",
+          _twopc.txn_id, _twopc.barrier_token)
+        _twopc.preemptive_txn_abort(sbt)
         return
       end
 
-      if _twopc_state is cp.TwoPCFsmStart then
-        // As a 2PC participant as a Wallaroo *sink*, we cannot
-        // allow messages to be processed by this sink during 2PC.
-        // If we allow messages to be processed & sent to the external
-        // connector sink, then if the global decision for message-ids
-        // X..Y is abort, then we will also need to abort any messages
-        // Y+1, Y+2, ... that slipped through during 2PC, which will
-        // be another round of 2PC of message-ids (Y+1)..(Y+n) plus
-        // forced abort.
-        // Instead of that mess, we force the barrier acker to
-        // queue all messages (including barrier messages).
-        try (_barrier_acker as BarrierSinkAcker).set_force_queue() else Fail end
+      checkpoint_state(sbt.id)
+      _notify.twopc_txn_id_current = _twopc.txn_id
+      match _twopc.barrier_complete(sbt)
+      | None =>
+        // If no data has been processed by the sink since the last
+        // checkpoint, then don't bother with 2PC, return early.
 
-        let txn_id = _make_txn_id_string(sbt.id)
-        _twopc_txn_id = txn_id
-        _notify.twopc_txn_id_current = txn_id
-        checkpoint_state(sbt.id)
-
-        if (_twopc_current_offset > 0) and
-           (_twopc_current_offset == _twopc_last_offset)
-        then
-          // If no data has been processed by the sink since the last
-          // checkpoint, then don't bother with 2PC.
-
-          ifdef "checkpoint_trace" then
-            @printf[I32]("2PC: no data written during this checkpoint interval, skipping 2PC round\n".cstring())
-          end
-          _barrier_coordinator.ack_barrier(this, sbt)
-          _twopc_phase1_commit = true
-          _twopc_state = cp.TwoPCFsm2CommitFast
-          return
-        end
-
-        let where_list: cp.WhereList =
-          [(1, _twopc_last_offset.u64(), _twopc_current_offset.u64())]
-        let bs = cp.TwoPCEncode.phase1(txn_id, where_list)
-        try
-          let msg = cp.MessageMsg(0, cp.Ephemeral(), 0, 0, None, [bs])?
-           _notify.send_msg(this, msg)
-         else
-          Fail()
-        end
+        _barrier_coordinator.ack_barrier(this, sbt)
         ifdef "checkpoint_trace" then
-          @printf[I32]("2PC: sent phase 1 for txn_id %s\n".cstring(), txn_id.cstring())
+          @printf[I32]("2PC: no data written during this checkpoint interval, skipping 2PC round\n".cstring())
         end
+        return
 
-        _twopc_state = cp.TwoPCFsm1Precommit
-        _twopc_txn_id = txn_id
-        _twopc_barrier_token = sbt
-        _twopc_current_txn_end_offset = _twopc_current_offset
-      else
-        @printf[I32]("2PC: ERROR: _twopc_state = %d\n".cstring(), _twopc_state())
-        Fail()
+      | let msg: cp.MessageMsg =>
+        _notify.send_msg(this, msg)
+        ifdef "checkpoint_trace" then
+          @printf[I32]("2PC: sent phase 1 for txn_id %s\n".cstring(), _twopc.txn_id.cstring())
+        end
       end
+
+      // As a 2PC participant as a Wallaroo *sink*, we cannot
+      // allow messages to be processed by this sink during 2PC.
+      // If we allow messages to be processed & sent to the external
+      // connector sink, then if the global decision for message-ids
+      // X..Y is abort, then we will also need to abort any messages
+      // Y+1, Y+2, ... that slipped through during 2PC, which will
+      // be another round of 2PC of message-ids (Y+1)..(Y+n) plus
+      // forced abort.
+      // Instead of that mess, we force the barrier acker to
+      // queue all messages (including barrier messages).
+      try (_barrier_acker as BarrierSinkAcker).set_force_queue() else Fail end
+
     | let srt: CheckpointRollbackBarrierToken =>
       _use_normal_processor()
     | let rbrt: CheckpointRollbackResumeBarrierToken =>
       _resume_processing_messages()
-      _reset_2pc_state()
+      _twopc.reset_state()
     end
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
@@ -634,27 +540,15 @@ actor ConnectorSink is Sink
       @printf[I32]("2PC: Checkpoint complete %d at ConnectorSink %s\n".cstring(), checkpoint_id, _sink_id.string().cstring())
     end
 
-    if (not ((_twopc_state is cp.TwoPCFsm2Commit) or
-             (_twopc_state is cp.TwoPCFsm2CommitFast))) or
-       (not _twopc_phase1_commit)
-    then
-      @printf[I32]("2PC: DBG: _twopc_state = %s, _twopc_phase1_commit %s\n".cstring(), _twopc_state().string().cstring(), _twopc_phase1_commit.string().cstring())
-      Fail()
-    end
-
     let cpoint_id = ifdef "test_disconnect_at_5" then "5" else "" end
-    let drop_phase2_msg = try if _twopc_txn_id.split("=")(1)? == cpoint_id then true else false end else false end
-    if _twopc_state is cp.TwoPCFsm2Commit then
-      if not drop_phase2_msg then
-        _send_phase2(this, _twopc_txn_id, true)
-      end
-    end
+    let drop_phase2_msg = try if _twopc.txn_id.split("=")(1)? == cpoint_id then true else false end else false end
 
-    try @printf[I32]("2PC: DBGDBG: X: checkpoint_complete: commit, _twopc_last_offset %d _notify.twopc_txn_id_last_committed %s\n".cstring(), _twopc_last_offset, (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
-    _twopc_last_offset = _twopc_current_txn_end_offset
-    _notify.twopc_txn_id_last_committed = _twopc_txn_id
-    try @printf[I32]("2PC: DBGDBG: Y: checkpoint_complete: commit, _twopc_last_offset %d _notify.twopc_txn_id_last_committed %s\n".cstring(), _twopc_last_offset, (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
-    _reset_2pc_state()
+    _twopc.checkpoint_complete(this, drop_phase2_msg)
+
+    try @printf[I32]("2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d _notify.twopc_txn_id_last_committed %s\n".cstring(), _twopc.last_offset, (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
+
+    _notify.twopc_txn_id_last_committed = _twopc.txn_id
+    _twopc.reset_state()
 
     _resume_processing_messages()
 
@@ -708,17 +602,17 @@ actor ConnectorSink is Sink
     Serialize hard state (i.e., can't afford to lose it) and send
     it to the local event log and reset 2PC state.
     """
-    if not (_twopc_state is cp.TwoPCFsmStart) then
-      @printf[I32]("2PC: ERROR: _twopc_state = %d\n".cstring(), _twopc_state())
+    if not (_twopc.state_is_1precommit() or _twopc.state_is_start()) then
+      @printf[I32]("2PC: ERROR: _twopc.state = %d\n".cstring(), _twopc.state())
       Fail()
     end
 
     ifdef "checkpoint_trace" then
-      @printf[I32]("2PC: Checkpoint state %s at ConnectorSink %s, txn-id %s\n".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring(), _twopc_txn_id.cstring())
+      @printf[I32]("2PC: Checkpoint state %s at ConnectorSink %s, txn-id %s\n".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring(), _twopc.txn_id.cstring())
     end
 
     let wb: Writer = wb.create()
-    wb.u64_be(_twopc_current_offset.u64())
+    wb.u64_be(_twopc.current_offset.u64())
     wb.u64_be(_notify.acked_point_of_ref)
     let bs = wb.done()
 
@@ -745,37 +639,37 @@ actor ConnectorSink is Sink
     """
     ifdef "checkpoint_trace" then
       @printf[I32]("Rollback to %s at ConnectorSink %s\n".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring())
-      @printf[I32]("2PC: Rollback: twopc_state %d txn_id %s.\n".cstring(), _twopc_state(), _twopc_txn_id.cstring())
+      @printf[I32]("2PC: Rollback: twopc_state %d txn_id %s.\n".cstring(), _twopc.state(), _twopc.txn_id.cstring())
     end
 
-    if _twopc_txn_id != "" then
+    if _twopc.txn_id != "" then
       // Phase 1 decision was abort + we haven't been disconnected.
       // If we were disconnected + perform a local abort, then we
-      // arrive here with _twopc_txn_id="".  The last transaction,
-      // named by _twopc_txn_id_at_close, has already been aborted
+      // arrive here with _twopc.txn_id="".  The last transaction,
+      // named by _twopc.txn_id_at_close, has already been aborted
       // during the twopc_intro portion of the connector sink protocol.
-      _send_phase2(this, _twopc_txn_id, false)
+      _twopc.send_phase2(this, false)
     end
-    _reset_2pc_state()
+    _twopc.reset_state()
 
     let r = Reader
     r.append(payload)
-    _twopc_current_offset = try r.u64_be()?.usize() else Fail(); 0 end
-    _twopc_last_offset = _twopc_current_offset
-    _twopc_current_txn_end_offset = _twopc_current_offset
+    let current_offset = try r.u64_be()?.usize() else Fail(); 0 end
+    _twopc.rollback(current_offset)
     _notify.acked_point_of_ref = try r.u64_be()? else Fail(); 0 end
-    _notify.message_id = _twopc_last_offset.u64()
+    _notify.message_id = _twopc.last_offset.u64()
 
     // The EventLog's payload's data doesn't include the last
     // committed txn_id because at the time that payload was created,
     // we didn't know if the txn-in-progress had committed globally.
     // When rollback() is called here, we now know the global txn
     // commit status: commit for checkpoint_id, all greater are invalid.
-    _notify.twopc_txn_id_last_committed = _make_txn_id_string(checkpoint_id)
+    _notify.twopc_txn_id_last_committed =
+      _twopc.make_txn_id_string(checkpoint_id)
     _notify.process_uncommitted_list(this)
 
     ifdef "checkpoint_trace" then
-      @printf[I32]("2PC: Rollback: _twopc_last_offset %lu _twopc_current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s\n".cstring(), _twopc_last_offset, _twopc_current_offset, _notify.acked_point_of_ref, try (_notify.twopc_txn_id_last_committed as String).cstring() else "<<<None>>>".string() end, _sink_id.string().cstring())
+      @printf[I32]("2PC: Rollback: _twopc.last_offset %lu _twopc.current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s\n".cstring(), _twopc.last_offset, _twopc.current_offset, _notify.acked_point_of_ref, try (_notify.twopc_txn_id_last_committed as String).cstring() else "<<<None>>>".string() end, _sink_id.string().cstring())
     end
 
     event_log.ack_rollback(_sink_id)
@@ -1020,11 +914,7 @@ actor ConnectorSink is Sink
     @pony_os_socket_close[None](_fd)
     _fd = -1
 
-    // 2PC
-    _twopc_txn_id_at_close = _twopc_txn_id
-    _twopc_barrier_token_at_close = _twopc_barrier_token
-    _reset_2pc_state()
-
+    _twopc.hard_close()
     _notify.closed(this)
 
   fun ref _pending_reads() =>
@@ -1326,7 +1216,7 @@ actor ConnectorSink is Sink
     "[len=" + array.size().string() + ": " + ", ".join(array.values()) + "]"
 
   fun get_2pc_state(): U8 =>
-    _twopc_state()
+    _twopc.state()
 
 class PauseBeforeReconnectConnectorSink is TimerNotify
   let _tcp_sink: ConnectorSink
