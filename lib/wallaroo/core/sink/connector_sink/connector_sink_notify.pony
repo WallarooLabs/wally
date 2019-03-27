@@ -81,6 +81,7 @@ class ConnectorSinkNotify
     _connection_count = _connection_count + 1
     // Apply runtime throttle until we're done with initial 2PC ballet.
     throttled(conn)
+    conn.set_nodelay(true)
     conn.expect(4)
 
     // TODO: configure connector v2 program string
