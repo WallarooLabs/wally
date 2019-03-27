@@ -93,6 +93,7 @@ actor AutoscaleInitiator
   be autoscale_resume_complete(barrier_token: BarrierToken) =>
     if barrier_token != _current_autoscale_tokens.resume_token then Fail() end
     _autoscale_token_in_progress = false
+    _checkpoint_initiator.restart_repeating_checkpoints()
 
   be dispose() =>
     @printf[I32]("Shutting down AutoscaleInitiator\n".cstring())
