@@ -1,2 +1,2 @@
-("local-txn", 3, False, True, False)
-("local-txn", 5, False, False, True)
+("local-txn", 3, True, True, False)
+("local-txn", 5, True, False, True)
