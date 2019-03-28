@@ -147,7 +147,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
 
     // Pass LocalConnectorStreamRegistry the parameters it needs to create
     // its own instance of the GlobalConnectorStreamRegistry
-    _stream_registry = _stream_registry.create(this, _worker_name,
+    _stream_registry = _stream_registry.create(this, _auth, _worker_name,
       _pipeline_name, _connections, _host, _service, workers_list, _is_joining)
 
     match router
