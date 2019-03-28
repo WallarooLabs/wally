@@ -1277,12 +1277,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       _router_registry.worker_join(conn, joining_worker_name,
         joining_worker_count, new_t, current_worker_count)
     else
-      Unreachable()
-      LocalTopology("", "", recover val Dag[StepInitializer] end,
-        recover val Map[U128, SetIs[RoutingId] val] end,
-        recover val Array[WorkerName] end, recover val SetIs[WorkerName] end,
-        recover val Map[RoutingId, Map[WorkerName, RoutingId] val] end,
-        0)
+      Fail()
     end
 
   be connect_to_joining_workers(coordinator: String,
