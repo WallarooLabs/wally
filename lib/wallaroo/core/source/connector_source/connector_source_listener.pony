@@ -160,13 +160,15 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     _start_sources()
 
   fun ref _start_sources() =>
-    _event = @pony_os_listen_tcp[AsioEventID](this,
-      _host.cstring(), _service.cstring())
-    _fd = @pony_asio_event_fd(_event)
+    if _event == AsioEvent.none() then
+      _event = @pony_os_listen_tcp[AsioEventID](this,
+        _host.cstring(), _service.cstring())
+      _fd = @pony_asio_event_fd(_event)
 
-    @printf[I32]((_pipeline_name + " source attempting to listen on "
-      + _host + ":" + _service + "\n").cstring())
-    _notify_listening()
+      @printf[I32]((_pipeline_name + " source attempting to listen on "
+        + _host + ":" + _service + "\n").cstring())
+      _notify_listening()
+    end
 
     for s in _available_sources.values() do
       s.unmute(this)

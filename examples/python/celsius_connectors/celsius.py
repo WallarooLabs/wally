@@ -18,7 +18,6 @@ Celsius value and sends out a floating point Fahrenheit value.
 """
 
 import struct
-
 import wallaroo
 import wallaroo.experimental
 
@@ -33,7 +32,8 @@ def application_setup(args):
         "fahrenheit_conversion",
         encoder=encode_conversion,
         decoder=decode_conversion,
-        port=7200)
+        port=7200,
+        cookie="Dragons Love Tacos!")
     pipeline = (
         wallaroo.source("convert temperature readings", celsius_feed)
         .to(multiply)
@@ -63,9 +63,9 @@ def decode_feed(data):
     return struct.unpack(">f", data)[0]
 
 
-@wallaroo.experimental.stream_message_encoder
+@wallaroo.experimental.octet_message_encoder
 def encode_conversion(data):
-    return str(data).encode('utf-8')
+    return (str(data) + '\n').encode('utf-8')
 
 
 @wallaroo.experimental.stream_message_decoder
