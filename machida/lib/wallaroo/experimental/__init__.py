@@ -161,6 +161,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
     def __init__(self, version, cookie, program_name, instance_name,
                  host, port, delay=0):
 
+        self.data = None
         # connection details are given from the base
         self._host = host
         self._port = int(port)  # convert port to int
@@ -223,6 +224,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
     def _stop_asyncore_loop(self):
         logging.debug("Stopping the asyncore loop")
         self._loop_sentinel.set()
+        self.discard_buffers()
 
     def _start_asyncore_loop(self):
         self._loop_sentinel.clear()
@@ -359,7 +361,10 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self.in_handshake = True
         hello = cwm.Hello(self.version, self.cookie, self.program_name,
                           self.instance_name)
-        self._conn.sendall(cwm.Frame.encode(hello))
+        data = cwm.Frame.encode(hello)
+        self._conn.sendall(data)
+        if self.data is not None:
+            self.data.append(data)
         header_bytes = self._conn.recv(4)
         frame_size = struct.unpack('>I', header_bytes)[0]
         frame = self._conn.recv(frame_size)
@@ -482,6 +487,40 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         """
         self._sent += 1
         self.producer_fifo.append(data)
+
+    def initiate_send(self):
+        if self.connected:
+            # collect data up to 4kb in size, send, repeat, until empty
+            obs = self.ac_out_buffer_size
+            q = self.producer_fifo
+            data = []
+            data_len = 0
+            while q:
+                b = q.popleft()
+                if b is None:
+                    self.handle_close()
+                    return
+                elif not b:
+                    continue
+                if not isinstance(b, bytes):
+                    b = b.encode()
+                if data_len + len(b) > obs:
+                    self._send(b''.join(data))
+                    data_len = 0
+                    data = []
+                else:
+                    data.append(b)
+                    data_len += len(b)
+            if data:
+                self._send(b''.join(data))
+
+    def _send(self, data):
+        try:
+            self.send(data)
+            if self.data is not None:
+                self.data.append(data)
+        except OSError:
+            self.handle_error()
 
     def pending_sends(self):
         """

@@ -692,7 +692,6 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
         self.position = start
         self._stop = stop
         self.start = start
-        self.data = []
         self.stopped = False
 
     def __str__(self):
@@ -703,6 +702,7 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
         return self.position
 
     def reset(self, pos=None):
+        logging.debug("{} resetting positino to {}".format(self, pos))
         if pos is None:
             pos = self.start
         self.position = pos
@@ -718,7 +718,7 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
         self.position += 1
         val, pos, key = (self.position, self.position, self.key)
         payload = struct.pack('>Q{}s'.format(len(key)), val, key)
-        self.data.append(payload)
+        logging.debug("{} next value: {}".format(self, (key, val)))
         return (payload, pos)
 
     def close(self):
@@ -748,6 +748,7 @@ class ALOSender(StoppableThread):
         self.sources = sources
         logging.debug("ALO: sources = {}".format(sources))
         self.data = []
+        self.client.data = self.data
         for source in self.sources:
             source.data = self.data
         self.host = host
