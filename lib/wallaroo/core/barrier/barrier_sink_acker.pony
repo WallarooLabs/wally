@@ -52,7 +52,6 @@ class BarrierSinkAcker
   fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    @printf[I32]("2PC: DBGDBG: acker: new barrier\n".cstring())
     _barrier_token = barrier_token
     receive_barrier(step_id, producer, barrier_token, true)
 
@@ -67,7 +66,6 @@ class BarrierSinkAcker
     let inputs = _sink.inputs()
     if inputs.contains(step_id) then
       _inputs_blocking(step_id) = producer
-      @printf[I32]("2PC: DBGDBG: acker: receive barrier, new _inputs_blocking.size() = %d\n".cstring(), _inputs_blocking.size())
       _check_completion(inputs, ack_barrier_if_complete)
     else
       @printf[I32]("Failed to find step_id %s in inputs at Sink %s\n".cstring(), step_id.string().cstring(), _sink_id.string().cstring())
@@ -83,7 +81,6 @@ class BarrierSinkAcker
     if _inputs_blocking.contains(input_id) then
       try
         _inputs_blocking.remove(input_id)?
-        @printf[I32]("2PC: DBGDBG: acker: remove_input, new _inputs_blocking.size() = %d\n".cstring(), _inputs_blocking.size())
       else
         Unreachable()
       end
@@ -102,17 +99,14 @@ class BarrierSinkAcker
         None
       end
       let b_token = _barrier_token
-      @printf[I32]("2PC: DBGDBG: acker: clear call @ ack_barrier_if_complete=%s\n".cstring(), ack_barrier_if_complete.string().cstring())
       clear()
       _sink.barrier_complete(b_token)
     end
 
   fun ref clear() =>
-    @printf[I32]("2PC: DBGDBG: acker: clear\n".cstring())
     _inputs_blocking.clear()
     _barrier_token = InitialBarrierToken
     _force_queue = false
 
   fun ref set_force_queue() =>
-    @printf[I32]("2PC: DBGDBG: acker: set_force_queue\n".cstring())
     _force_queue = true
