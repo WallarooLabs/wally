@@ -48,7 +48,7 @@ integration-tests-demos-python_word_count: word_count_py3_demo_test
 
 word_count_py_demo_test:
 	cd $(WORD_COUNT_PY_DEMO_PATH) && \
-	integration_test --newline-file-sender count_this.txt \
+	integration_test --newline-file-sender count_this.txt "'Split and Count'" \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 1 \
@@ -57,7 +57,7 @@ word_count_py_demo_test:
 		--sink-mode newlines \
 		--sink-expect 482
 	cd $(WORD_COUNT_PY_DEMO_PATH) && \
-	integration_test --newline-file-sender count_this.txt \
+	integration_test --newline-file-sender count_this.txt "'Split and Count'" \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 1 \
@@ -67,7 +67,7 @@ word_count_py_demo_test:
 		--sink-expect 482 \
 		--workers 2
 	cd $(WORD_COUNT_PY_DEMO_PATH) && \
-	integration_test --newline-file-sender count_this.txt \
+	integration_test --newline-file-sender count_this.txt "'Split and Count'" \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 1 \
@@ -79,7 +79,7 @@ word_count_py_demo_test:
 
 word_count_py3_demo_test:
 	cd $(WORD_COUNT_PY_DEMO_PATH) && \
-	integration_test --newline-file-sender count_this.txt \
+	integration_test --newline-file-sender count_this.txt "'Split and Count'" \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 1 \
@@ -88,7 +88,7 @@ word_count_py3_demo_test:
 		--sink-mode newlines \
 		--sink-expect 482
 	cd $(WORD_COUNT_PY_DEMO_PATH) && \
-	integration_test --newline-file-sender count_this.txt \
+	integration_test --newline-file-sender count_this.txt "'Split and Count'" \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 1 \
@@ -98,7 +98,7 @@ word_count_py3_demo_test:
 		--sink-expect 482 \
 		--workers 2
 	cd $(WORD_COUNT_PY_DEMO_PATH) && \
-	integration_test --newline-file-sender count_this.txt \
+	integration_test --newline-file-sender count_this.txt "'Split and Count'" \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 1 \

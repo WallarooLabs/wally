@@ -748,19 +748,22 @@ class Restart(object):
         return (other.address == self.address)
 
     def encode(self):
-        b_addr = self.address.encode()
-        return struct.pack('>I{}s'.format(len(b_addr)),
-                           len(b_addr),
-                           b_addr)
+        if self.address is not None:
+            b_addr = self.address.encode()
+            return struct.pack('>I{}s'.format(len(b_addr)),
+                               len(b_addr),
+                               b_addr)
+        else:
+            return struct.pack('>I', 0)
 
     @staticmethod
     def decode(bs):
+        addr = None
         if len(bs) > 0:
             reader = StringIO(bs)
             a_length = struct.unpack('>I', reader.read(4))[0]
-            addr = reader.read(a_length).decode()
-        else:
-            addr = None
+            if a_length > 0:
+                addr = reader.read(a_length).decode()
         return Restart(addr)
 
 
