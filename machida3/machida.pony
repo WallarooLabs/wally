@@ -1073,10 +1073,10 @@ primitive _SinkConfig
       end
 
       let cookie = recover val
-        Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(sink_config_tuple, 5))
+        Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(sink_config_tuple, 6))
       end
 
-      ConnectorSinkConfig[PyData val](encoder, host, port, cookie)
+      ConnectorSinkConfig[PyData val](encoder, host, port, "v0.0.1", cookie)
     else
       error
     end
