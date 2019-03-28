@@ -218,10 +218,14 @@ class ConnectorSinkNotify
       @printf[I32](("ConnectorSink is no longer experiencing" +
         " back pressure, connected = %s\n").cstring(),
       _connected.string().cstring())
-      try @printf[I32]("DBGDBG: unthrottled: buffer check, FSM state = %d\n".cstring(), (conn as ConnectorSink ref).get_2pc_state()) else Fail() end
-      @printf[I32]("DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s current txn=%s.\n".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_txn_id_current.cstring())
+      ifdef "checkpoint_trace" then
+        try @printf[I32]("DBGDBG: unthrottled: buffer check, FSM state = %d\n".cstring(), (conn as ConnectorSink ref).get_2pc_state()) else Fail() end
+        @printf[I32]("DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s current txn=%s.\n".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_txn_id_current.cstring())
+      end
       if twopc_current_txn_aborted then
-        @printf[I32]("DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s discard %d items\n".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_reconnect_buffer.size())
+        ifdef "checkpoint_trace" then
+          @printf[I32]("DBGDBG: unthrot tled: buffer: twopc_current_txn_aborted = %s discard %d items\n".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_reconnect_buffer.size())
+        end
         None
       else
         for d in twopc_reconnect_buffer.values() do
@@ -300,7 +304,7 @@ class ConnectorSinkNotify
             @printf[I32]("2PC: bad rtag match: %lu != %lu\n".cstring(), mi.rtag, _rtag)
             Fail()
           end
-          ifdef "trace" then
+          ifdef "checkpoint_trace" then
             @printf[I32]("TRACE: uncommitted txns = %d\n".cstring(),
               mi.txn_ids.size())
           end
@@ -388,7 +392,7 @@ class ConnectorSinkNotify
         _error_and_close(conn, "Bad FSM State: F" + _fsm_state().string())
       end
     | let m: cp.RestartMsg =>
-      ifdef "trace" then
+      ifdef "checkpoint_trace" then
         @printf[I32]("TRACE: got restart message, closing connection\n".cstring())
       end
       conn.close()

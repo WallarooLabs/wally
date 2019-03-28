@@ -196,7 +196,6 @@ actor ConnectorSink is Sink
     _connect_count = 0
     _twopc = ConnectorSink2PC(_notify.stream_name)
     _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_coordinator)
-    @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ ConnectorSink.create\n".cstring())
     _message_processor = NormalSinkMessageProcessor(this)
 
   //
@@ -291,7 +290,6 @@ actor ConnectorSink is Sink
         try
           let w1: Writer = w1.create()
           let msg = _notify.make_message(encoded1)?
-          @printf[I32]("DBGDBG: process_message: message_id = %s, _twopc.state = %d\n".cstring(), msg.message_id.string().cstring(), _twopc.state())
           let bs = cp.Frame.encode(msg, w1)
           Bytes.length_encode(bs)
         else
@@ -545,7 +543,9 @@ actor ConnectorSink is Sink
 
     _twopc.checkpoint_complete(this, drop_phase2_msg)
 
-    try @printf[I32]("2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d _notify.twopc_txn_id_last_committed %s\n".cstring(), _twopc.last_offset, (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
+    ifdef "checkpoint_trace" then
+      try @printf[I32]("2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d _notify.twopc_txn_id_last_committed %s\n".cstring(), _twopc.last_offset, (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
+    end
 
     _notify.twopc_txn_id_last_committed = _twopc.txn_id
     _twopc.reset_state()
@@ -566,25 +566,20 @@ actor ConnectorSink is Sink
     2nd-half logic for barrier_fully_acked().
     """
     let queued = _message_processor.queued()
-    @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ _resume_processing_messages with %d items\n".cstring(), queued.size())
     _use_normal_processor()
     for q in queued.values() do
       match q
       | let qm: QueuedMessage =>
-        @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ _resume_processing_messages process_message\n".cstring())
         qm.process_message(this)
       | let qb: QueuedBarrier =>
-        @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ _resume_processing_messages inject_barrier\n".cstring())
         qb.inject_barrier(this)
       end
     end
 
   fun ref _use_normal_processor() =>
-    @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ _use_normal_processor\n".cstring())
     _message_processor = NormalSinkMessageProcessor(this)
 
   fun ref _use_barrier_processor() =>
-    @printf[I32]("2PC2PC2PC2PC: NormalSinkMessageProcessor @ _use_barrier_processor\n".cstring())
     try
       (_barrier_acker as BarrierSinkAcker).clear()
       _message_processor = BarrierSinkMessageProcessor(this,
@@ -804,7 +799,6 @@ actor ConnectorSink is Sink
 
     var data_size: USize = 0
     for bytes in _notify.sentv(this, data).values() do
-      @printf[I32]("DBGDBG: _writev: %d bytes\n".cstring(), bytes.size())
       _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
       _pending_writev_total = _pending_writev_total + bytes.size()
       _pending.push((bytes, 0))
@@ -828,7 +822,6 @@ actor ConnectorSink is Sink
     everything was written. On an error, close the connection. This is for
     data that has already been transformed by the notifier.
     """
-    @printf[I32]("DBGDBG: _write_final: %d bytes\n".cstring(), data.size())
     _pending_writev.>push(data.cpointer().usize()).>push(data.size())
     _pending_writev_total = _pending_writev_total + data.size()
     ifdef "resilience" then

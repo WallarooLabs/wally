@@ -54,10 +54,10 @@ class BarrierSinkAcker
   =>
     @printf[I32]("2PC: DBGDBG: acker: new barrier\n".cstring())
     _barrier_token = barrier_token
-    receive_barrier(step_id, producer, barrier_token)
+    receive_barrier(step_id, producer, barrier_token, true)
 
   fun ref receive_barrier(step_id: RoutingId, producer: Producer,
-    barrier_token: BarrierToken)
+    barrier_token: BarrierToken, ack_barrier_if_complete: Bool)
   =>
     if barrier_token != _barrier_token then
       @printf[I32]("SinkAcker: Expected %s, got %s\n".cstring(), _barrier_token.string().cstring(), barrier_token.string().cstring())
@@ -67,12 +67,8 @@ class BarrierSinkAcker
     let inputs = _sink.inputs()
     if inputs.contains(step_id) then
       _inputs_blocking(step_id) = producer
-<<<<<<< HEAD
-      _check_completion(inputs)
-=======
       @printf[I32]("2PC: DBGDBG: acker: receive barrier, new _inputs_blocking.size() = %d\n".cstring(), _inputs_blocking.size())
       _check_completion(inputs, ack_barrier_if_complete)
->>>>>>> 6db3a1838... WIP: spam for acker & barrier queueing debugging
     else
       @printf[I32]("Failed to find step_id %s in inputs at Sink %s\n".cstring(), step_id.string().cstring(), _sink_id.string().cstring())
       Fail()
@@ -92,11 +88,19 @@ class BarrierSinkAcker
         Unreachable()
       end
     end
-    _check_completion(_sink.inputs())
+    _check_completion(_sink.inputs(), true)
 
-  fun ref _check_completion(inputs: Map[RoutingId, Producer] box) =>
+  fun ref _check_completion(inputs: Map[RoutingId, Producer] box,
+    ack_barrier_if_complete: Bool)
+   =>
     if inputs.size() == _inputs_blocking.size() then
-      _barrier_coordinator.ack_barrier(_sink, _barrier_token)
+      if ack_barrier_if_complete then
+        _barrier_coordinator.ack_barrier(_sink, _barrier_token)
+      else
+        // The sink has told us that it is responsible for calling
+        // _barrier_coordinator.ack_barrier()
+        None
+      end
       let b_token = _barrier_token
       @printf[I32]("2PC: DBGDBG: acker: clear call @ ack_barrier_if_complete=%s\n".cstring(), ack_barrier_if_complete.string().cstring())
       clear()

@@ -549,7 +549,7 @@ logging.root.formatter = logging.Formatter(fmt)
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(logging.root.formatter)
 logging.root.addHandler(stream_handler)
-logging.root.setLevel(logging.DEBUG)
+logging.root.setLevel(logging.INFO)
 
 out_path = sys.argv[1]
 abort_rule_path = sys.argv[2]

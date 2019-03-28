@@ -39,7 +39,7 @@ class UDPHandler(SocketServer.BaseRequestHandler):
 def send_feed():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     value = 0.0
-    while value < 6320:
+    while value < 7500:
         packet = struct.pack(">f", value)
         sock.sendto(packet, ('127.0.0.1', 8801))
         if value == 11:
