@@ -166,7 +166,7 @@ actor TCPSourceListener[In: Any val] is SourceListener
     _start_sources()
 
   fun ref _start_sources() =>
-    if _event != AsioEvent.none() then
+    if _event == AsioEvent.none() then
       _event = @pony_os_listen_tcp[AsioEventID](this,
         _host.cstring(), _service.cstring())
       _fd = @pony_asio_event_fd(_event)
