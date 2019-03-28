@@ -1,0 +1,130 @@
+#!/usr/bin/env python
+import argparse
+import os
+import signal
+import struct
+import socket
+import subprocess
+import threading
+import time
+
+import sys
+if sys.version_info.major == 2:
+    import SocketServer
+else:
+    import socketserver as SocketServer
+
+parser = argparse.ArgumentParser("Celsius Connectors Example")
+parser.add_argument('--command', default='machida')
+pargs, _ = parser.parse_known_args()
+machida = pargs.command
+
+# This is imported to test that wallaroo's python library is reachable.
+try:
+    import wallaroo
+except ImportError:
+    raise ImportError("Unable to find wallaroo python library. Has the wallaroo "
+          "environment been activated? "
+          "See https://docs.wallaroolabs.com/book/getting-started/wallaroo-up.html")
+except:
+    raise
+
+
+class UDPHandler(SocketServer.BaseRequestHandler):
+    def handle(self):
+        data = self.request[0].strip()
+        print('run_sample UDPHandler got something:')
+        print(data)
+
+
+def send_feed():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    value = 0.0
+    while value < 7500:
+        packet = struct.pack(">f", value)
+        sock.sendto(packet, ('127.0.0.1', 8801))
+        if value == 11:
+            time.sleep(2.2)
+        value += 1
+        time.sleep(0.001)
+
+
+def recv_conv():
+    server = server = SocketServer.UDPServer(('127.0.0.1', 8901), UDPHandler)
+    server.serve_forever()
+
+
+def terminate(_signal=None, _frame=None):
+    #print("terminating source")
+    #if source:
+    #    source.terminate()
+    print("terminating sink")
+    if sink:
+        sink.terminate()
+    if wallaroo:
+        print("terminating wallaroo")
+        wallaroo.terminate()
+        try:
+            # machida occasionally leaves the
+            # tty in a non-echoing state. This
+            # will fix the shell after it exits.
+            subprocess.call(['stty', 'sane'])
+        except:
+            pass
+    print("Waiting one second for processes to exit cleanly")
+    time.sleep(1)
+    if sink:
+        sink.poll()
+        if sink.returncode is None:
+            sink.kill()
+    if wallaroo:
+        wallaroo.poll()
+        if wallaroo.returncode is None:
+            wallaroo.kill()
+    exit(-1)
+
+sink_args = [
+    "./aloc_sink",
+    "/tmp/aloc_sink.out",
+    "./aloc_sink.abort-rules"]
+if os.environ.get('USE_FAKE_S3', '') == 'on':
+    sink_args.append('fake-s3')
+    sink_args.append('wallaroo-s3-sink-test')
+    sink_args.append('/')
+sink = subprocess.Popen(sink_args)
+
+print("Ensuring connectors are initialized")
+time.sleep(1)
+sink.poll()
+
+thread = threading.Thread(target = recv_conv)
+thread.daemon = True
+thread.start()
+
+try:
+    wallaroo = subprocess.Popen([
+        machida,
+        "--application-module", "celsius",
+        "--metrics", "127.0.0.1:5001",
+        "--control", "127.0.0.1:6000",
+        "--data", "127.0.0.1:6001",
+        "--name", "worker-name",
+        "--external", "127.0.0.1:5050",
+        "--cluster-initializer", "--run-with-resilience",
+        "--ponythreads=1", "--ponynoblock"])
+except:
+    print("Unable to run %s. Has the wallaroo environment "
+          " been activated? "
+          "See https://docs.wallaroolabs.com/python-installation/python-wallaroo-up-installation-guide/"
+          % machida)
+
+time.sleep(1)
+if sink.returncode:
+    terminate()
+time.sleep(1)
+
+signal.signal(signal.SIGINT, terminate)
+signal.signal(signal.SIGTERM, terminate)
+
+time.sleep(20.0)
+terminate()

@@ -27,6 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+use "backpressure"
 use "buffered"
 use "collections"
 use "net"
@@ -45,6 +46,8 @@ use "wallaroo/core/recovery"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink"
 use "wallaroo/core/topology"
+use "wallaroo_labs/bytes"
+use cp = "wallaroo_labs/connector_protocol"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
 
@@ -55,6 +58,14 @@ use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
+
+primitive _ConnectTimeout
+  fun apply(): U64 =>
+    ifdef debug then
+      100_000_000
+    else
+      1_000_000_000
+    end
 
 actor ConnectorSink is Sink
   """
@@ -100,10 +111,9 @@ actor ConnectorSink is Sink
   // duplicate producers in this map (unlike _upstreams) since there might be
   // multiple upstream step ids over a boundary
   let _inputs: Map[RoutingId, Producer] = _inputs.create()
-  var _mute_outstanding: Bool = false
 
   // Connector
-  var _notify: WallarooOutgoingNetworkActorNotify
+  var _notify: ConnectorSinkNotify
   var _read_buf: Array[U8] iso
   var _next_size: USize
   let _max_size: USize
@@ -114,13 +124,11 @@ actor ConnectorSink is Sink
   var _connected: Bool = false
   var _closed: Bool = false
   var _writeable: Bool = false
-  var _throttled: Bool = false
   var _event: AsioEventID = AsioEvent.none()
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
   embed _pending_tracking: List[(USize, SeqId)] = _pending_tracking.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
-  var _muted: Bool = false
   var _expect_read_buf: Reader = Reader
 
   var _shutdown_peer: Bool = false
@@ -133,6 +141,10 @@ actor ConnectorSink is Sink
   var _reconnect_pause: U64
   var _host: String
   var _service: String
+  let _worker_name: WorkerName
+  let _protocol_version: String
+  let _cookie: String
+  let _auth: ApplyReleaseBackpressureAuth
   var _from: String
 
   // Producer (Resilience)
@@ -140,13 +152,19 @@ actor ConnectorSink is Sink
 
   var _seq_id: SeqId = 0
 
+  // 2PC
+  let _twopc: ConnectorSink2PC
+
   new create(sink_id: RoutingId, sink_name: String, event_log: EventLog,
     recovering: Bool, env: Env, encoder_wrapper: ConnectorEncoderWrapper,
     metrics_reporter: MetricsReporter iso,
     barrier_coordinator: BarrierCoordinator, checkpoint_initiator: CheckpointInitiator,
-    host: String, service: String, initial_msgs: Array[Array[ByteSeq] val] val,
+    host: String, service: String, worker_name: WorkerName,
+    protocol_version: String, cookie: String,
+    auth: ApplyReleaseBackpressureAuth,
+    initial_msgs: Array[Array[ByteSeq] val] val,
     from: String = "", init_size: USize = 64, max_size: USize = 16384,
-    reconnect_pause: U64 = 10_000_000_000)
+    reconnect_pause: U64 = _ConnectTimeout())
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
@@ -164,16 +182,21 @@ actor ConnectorSink is Sink
     _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
-    _notify = ConnectorSinkNotify
+    _notify = ConnectorSinkNotify(
+      _sink_id, worker_name, protocol_version, cookie, auth)
     _initial_msgs = initial_msgs
     _reconnect_pause = reconnect_pause
     _host = host
     _service = service
+    _worker_name = worker_name
+    _protocol_version = protocol_version
+    _cookie = cookie
+    _auth = auth
     _from = from
     _connect_count = 0
-    _message_processor = NormalSinkMessageProcessor(this)
+    _twopc = ConnectorSink2PC(_notify.stream_name)
     _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_coordinator)
-    _mute_upstreams()
+    _message_processor = NormalSinkMessageProcessor(this)
 
   //
   // Application Lifecycle events
@@ -184,14 +207,13 @@ actor ConnectorSink is Sink
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer) =>
-    _mute_upstreams()
     initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
     _initial_connect()
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
-    None
+    _notify.application_ready_to_work(this)
 
   be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
@@ -220,6 +242,10 @@ actor ConnectorSink is Sink
     msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd msg at ConnectorSink\n".cstring())
+    end
+
     var receive_ts: U64 = 0
     ifdef "detailed-metrics" then
       receive_ts = WallClock.nanoseconds()
@@ -227,17 +253,56 @@ actor ConnectorSink is Sink
         9998, latest_ts, receive_ts)
     end
 
-    ifdef "trace" then
-      @printf[I32]("Rcvd msg at ConnectorSink\n".cstring())
-    end
     try
-      let encoded = _encoder.encode[D](data, _wb)?
+      if _notify.credits == 0 then
+        // TODO: add token management back to connector sink protocol?
+        // Ideas?
+        // 1. We can't simply use _apply_backpressure because the socket
+        //    probably is writeable, which would mean ASIO would immediately
+        //    trigger a writeable event, and we'd have to check credits
+        //    and defer again, causing an ASIO busy wait loop??
+        //    Maybe that's OK?  But if the remote were to crash without
+        //    sending an Ack with credit replenishing, then we could
+        //    busy wait for a long time.
+        // 2. If we have zero credits, then we set
+        //    pony_asio_event_set_writeable(false), then we also apply
+        //    backpressure *without* also resubscribing
+        //    pony_asio_event_set_writeable(true)!  We want to mute
+        //    upstreams, and the rest of _apply_backpressure() will do
+        //    that for us.
+        //    * For events that arrive here while pony**writeable(false),
+        //      can we simply call _writev() and then know exactly how
+        //      many credits correspond to stuff in _pending??
+        //      * Do we change the 2-tuple in _pending to a 3-tuple, where
+        //        the 3rd element is the # of credits that correspond?
+        //        * Tricksy, because a single credit of message may be more
+        //          than one writev array item!
+        None
+      else
+        _notify.credits = _notify.credits - 1
+      end
+      let encoded1 = _encoder.encode[D](data, _wb)?
+      var encoded1_len: USize = 0
+      for x in encoded1.values() do
+        encoded1_len = encoded1_len + x.size()
+      end
+      // We do not include MessageMsg size overhead in our offset accounting
+      _twopc.update_offset(encoded1_len)
+
+      let encoded2 =
+        try
+          let w1: Writer = w1.create()
+          let msg = _notify.make_message(encoded1)?
+          let bs = cp.Frame.encode(msg, w1)
+          Bytes.length_encode(bs)
+        else
+          Fail()
+          encoded1
+        end
 
       let next_seq_id = (_seq_id = _seq_id + 1)
-      _writev(encoded, next_seq_id)
+      _writev(encoded2, next_seq_id)
 
-      // TODO: Should happen when tracking info comes back from writev as
-      // being done.
       let end_ts = WallClock.nanoseconds()
       let time_spent = end_ts - worker_ingress_ts
 
@@ -252,8 +317,6 @@ actor ConnectorSink is Sink
     else
       Fail()
     end
-
-    _maybe_mute_or_unmute_upstreams()
 
   be update_router(router: Router) =>
     """
@@ -315,11 +378,53 @@ actor ConnectorSink is Sink
     None
 
   ///////////////
+  // 2PC glue funcs between this, ConnectorSinkNotify, and ConnectorSink2PC
+  ///////////////
+
+  fun ref twopc_phase1_reply(txn_id: String, commit: Bool) =>
+    """
+    This is a callback used by the ConnectorSinkNotify class to Inform
+    us that it received a 2PC phase 1 reply.
+    """
+    if _twopc.twopc_phase1_reply(txn_id, commit) then
+      _barrier_coordinator.ack_barrier(this, _twopc.barrier_token)
+    else
+      abort_decision("phase 1 ABORT", _twopc.txn_id, _twopc.barrier_token)
+    end
+
+  fun ref abort_decision(reason: String, txn_id: String,
+    barrier_token: CheckpointBarrierToken)
+  =>
+    ifdef "checkpoint_trace" then
+      @printf[I32]("2PC: abort_decision: txn_id %s %s\n".cstring(), txn_id.cstring(), reason.cstring())
+    end
+
+    _twopc.set_state_abort()
+    _barrier_coordinator.abort_barrier(barrier_token)
+
+  fun send_msg(sink: ConnectorSink ref, msg: cp.Message) =>
+    _notify.send_msg(sink, msg)
+
+  fun ref twopc_intro_done() =>
+    """
+    This callback is used by ConnectorSinkNotify when the 2PC intro
+    part of the connector sink protocol has finished.
+    """
+    _twopc.twopc_intro_done(this)
+
+  ///////////////
   // BARRIER
   ///////////////
   be receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
+    """
+    Process a barrier token of some type: autoscale, checkpoint,
+    rollback, etc.  For a particular barrier, we should receive
+    exactly one per input (blocking each input over which we
+    receive one), at which point we can unblock all inputs and
+    continue.
+    """
     ifdef "checkpoint_trace" then
       @printf[I32]("Receive barrier %s at ConnectorSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
     end
@@ -341,25 +446,34 @@ actor ConnectorSink is Sink
     end
 
     if _message_processor.barrier_in_progress() then
+      let do_ack = match barrier_token
+      | let _: CheckpointBarrierToken =>
+        // We need to control of acking & when barrier_complete() gets called.
+        false
+      else
+        true
+      end
       _message_processor.receive_barrier(input_id, producer,
-        barrier_token)
+        barrier_token where ack_barrier_if_complete = do_ack)
     else
       match _message_processor
       | let nsmp: NormalSinkMessageProcessor =>
-        try
-           _message_processor = BarrierSinkMessageProcessor(this,
-             _barrier_acker as BarrierSinkAcker)
-           _message_processor.receive_new_barrier(input_id, producer,
-             barrier_token)
-        else
-          Fail()
-        end
+        _use_barrier_processor()
+        _message_processor.receive_new_barrier(input_id, producer,
+          barrier_token)
       else
         Fail()
       end
     end
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
+    """
+    Our local barrier token processing has determined that we have
+    received all of the barriers for this autoscale/checkpoint/rollback/
+    whatever event.  This tells us nothing about the state of barrier
+    propagation or processing by other actors in this worker or in
+    any other worker.
+    """
     ifdef "checkpoint_trace" then
       @printf[I32]("Barrier %s complete at ConnectorSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
     end
@@ -368,10 +482,101 @@ actor ConnectorSink is Sink
     end
     match barrier_token
     | let sbt: CheckpointBarrierToken =>
+      if not _notify.twopc_intro_done then
+        // This sink applies Pony runtime backpressure when disconnected,
+        // so it's quite unlikely that we will get here: sending
+        // messages to us will block the senders.  However, the nature
+        // of backpressure may change over time as the runtime's
+        // backpressure system changes.
+        ifdef "checkpoint_trace" then
+          @printf[I32]("2PC: preemptive abort: connector sink not fully connected\n".cstring())
+        end
+        abort_decision("connector sink not fully connected",
+          _twopc.txn_id, _twopc.barrier_token)
+        _twopc.preemptive_txn_abort(sbt)
+        return
+      end
+
       checkpoint_state(sbt.id)
+      _notify.twopc_txn_id_current = _twopc.txn_id
+      match _twopc.barrier_complete(sbt)
+      | None =>
+        // If no data has been processed by the sink since the last
+        // checkpoint, then don't bother with 2PC, return early.
+
+        _barrier_coordinator.ack_barrier(this, sbt)
+        ifdef "checkpoint_trace" then
+          @printf[I32]("2PC: no data written during this checkpoint interval, skipping 2PC round\n".cstring())
+        end
+        return
+
+      | let msg: cp.MessageMsg =>
+        _notify.send_msg(this, msg)
+        ifdef "checkpoint_trace" then
+          @printf[I32]("2PC: sent phase 1 for txn_id %s\n".cstring(), _twopc.txn_id.cstring())
+        end
+      end
+
+      // As a 2PC participant as a Wallaroo *sink*, we cannot
+      // allow messages to be processed by this sink during 2PC,
+      // unless we make additional assumptions about the ability of
+      // the connector sink to be able to manage the storage of and
+      // possible rollback of data sent during a round of 2PC.
+      // We choose to assume that the client can only manage
+      // commit/abort decisions only on the range of output
+      // governed by a single round of 2PC.
+
+      try (_barrier_acker as BarrierSinkAcker).set_force_queue() else Fail end
+
+    | let srt: CheckpointRollbackBarrierToken =>
+      _use_normal_processor()
+    | let rbrt: CheckpointRollbackResumeBarrierToken =>
+      _resume_processing_messages()
+      _twopc.reset_state()
     end
+
+  be checkpoint_complete(checkpoint_id: CheckpointId) =>
+    ifdef "checkpoint_trace" then
+      @printf[I32]("2PC: Checkpoint complete %d at ConnectorSink %s\n".cstring(), checkpoint_id, _sink_id.string().cstring())
+    end
+
+    let cpoint_id = ifdef "test_disconnect_at_5" then "5" else "" end
+    let drop_phase2_msg = try if _twopc.txn_id.split("=")(1)? == cpoint_id then true else false end else false end
+
+    _twopc.checkpoint_complete(this, drop_phase2_msg)
+
+    ifdef "checkpoint_trace" then
+      try @printf[I32]("2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d _notify.twopc_txn_id_last_committed %s\n".cstring(), _twopc.last_offset, (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
+    end
+
+    if _twopc.txn_id == "" then
+      @printf[I32]("Error: checkpoint_complete() with empty _twopc.txn_id = %s.\n".cstring(), _twopc.txn_id.cstring())
+      Fail()
+    else
+      _notify.twopc_txn_id_last_committed = _twopc.txn_id
+      ifdef "checkpoint_trace" then
+        try @printf[I32]("2PC: DBGDBG: twopc_txn_id_last_committed = %s.\n".cstring(), (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
+      end
+    end
+    _twopc.reset_state()
+
+    _resume_processing_messages()
+
+    if drop_phase2_msg then
+      // Because we're using TCP, we get message loss only when
+      // the TCP connection is closed.  It doesn't matter why the
+      // connection is closed.  We have direct control over the
+      // timing here, so close it now.
+      _hard_close()
+      _schedule_reconnect()
+    end
+
+  fun ref _resume_processing_messages() =>
+    """
+    2nd-half logic for barrier_fully_acked().
+    """
     let queued = _message_processor.queued()
-    _message_processor = NormalSinkMessageProcessor(this)
+    _use_normal_processor()
     for q in queued.values() do
       match q
       | let qm: QueuedMessage =>
@@ -381,39 +586,101 @@ actor ConnectorSink is Sink
       end
     end
 
-  be checkpoint_complete(checkpoint_id: CheckpointId) =>
-    None
+  fun ref _use_normal_processor() =>
+    _message_processor = NormalSinkMessageProcessor(this)
 
-  fun ref _clear_barriers() =>
+  fun ref _use_barrier_processor() =>
     try
       (_barrier_acker as BarrierSinkAcker).clear()
+      _message_processor = BarrierSinkMessageProcessor(this,
+        _barrier_acker as BarrierSinkAcker)
     else
       Fail()
     end
-    _message_processor = NormalSinkMessageProcessor(this)
 
   ///////////////
   // CHECKPOINTS
   ///////////////
+
   fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
     """
-    ConnectorSinks don't currently write out any data as part of the checkpoint.
+    Serialize hard state (i.e., can't afford to lose it) and send
+    it to the local event log and reset 2PC state.
     """
+    if not (_twopc.state_is_1precommit() or _twopc.state_is_start()) then
+      @printf[I32]("2PC: ERROR: _twopc.state = %d\n".cstring(), _twopc.state())
+      Fail()
+    end
+
+    ifdef "checkpoint_trace" then
+      @printf[I32]("2PC: Checkpoint state %s at ConnectorSink %s, txn-id %s\n".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring(), _twopc.txn_id.cstring())
+    end
+
+    let wb: Writer = wb.create()
+    wb.u64_be(_twopc.current_offset.u64())
+    wb.u64_be(_notify.acked_point_of_ref)
+    let bs = wb.done()
+
     _event_log.checkpoint_state(_sink_id, checkpoint_id,
-      recover val Array[ByteSeq] end)
+      consume bs)
 
   be prepare_for_rollback() =>
-    _prepare_for_rollback()
+    ifdef "checkpoint_trace" then
+      @printf[I32]("Prepare for checkpoint rollback at ConnectorSink %s\n".cstring(), _sink_id.string().cstring())
+    end
+    // Don't call _use_normal_processor() here
 
   fun ref _prepare_for_rollback() =>
-    _clear_barriers()
+    _use_normal_processor()
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
   =>
     """
-    There is nothing for a ConnectorSink to rollback to.
+    If we're here, it's implicit that Wallaroo has determinted
+    the global status of this checkpoint_id: it was committed.
+    We may need to re-send phase2=commit for this checkpoint_id.
+    (But that's async from our point of view, beware tricksy bugs....)
     """
+    ifdef "checkpoint_trace" then
+      @printf[I32]("Rollback to %s at ConnectorSink %s\n".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring())
+      @printf[I32]("2PC: Rollback: twopc_state %d txn_id %s.\n".cstring(), _twopc.state(), _twopc.txn_id.cstring())
+    end
+
+    if _twopc.txn_id != "" then
+      // Phase 1 decision was abort + we haven't been disconnected.
+      // If we were disconnected + perform a local abort, then we
+      // arrive here with _twopc.txn_id="".  The last transaction,
+      // named by _twopc.txn_id_at_close, has already been aborted
+      // during the twopc_intro portion of the connector sink protocol.
+      _twopc.send_phase2(this, false)
+    end
+    _twopc.reset_state()
+
+    let r = Reader
+    r.append(payload)
+    let current_offset = try r.u64_be()?.usize() else Fail(); 0 end
+    _twopc.rollback(current_offset)
+    _notify.acked_point_of_ref = try r.u64_be()? else Fail(); 0 end
+    _notify.message_id = _twopc.last_offset.u64()
+
+    // The EventLog's payload's data doesn't include the last
+    // committed txn_id because at the time that payload was created,
+    // we didn't know if the txn-in-progress had committed globally.
+    // When rollback() is called here, we now know the global txn
+    // commit status: commit for checkpoint_id, all greater are invalid.
+    _notify.twopc_txn_id_last_committed =
+      _twopc.make_txn_id_string(checkpoint_id)
+    ifdef "checkpoint_trace" then
+      try @printf[I32]("DBGDBG: 2PC: twopc_txn_id_last_committed = %s.\n".cstring(), (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
+    end
+    _notify.twopc_current_txn_aborted = _notify.process_uncommitted_list(this)
+
+    ifdef "checkpoint_trace" then
+      @printf[I32]("DBGDBG: 2PC: twopc_current_txn_aborted = %s.\n".cstring(), _notify.twopc_current_txn_aborted.string().cstring())
+      @printf[I32]("2PC: Rollback: _twopc.last_offset %lu _twopc.current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s\n".cstring(), _twopc.last_offset, _twopc.current_offset, _notify.acked_point_of_ref, try (_notify.twopc_txn_id_last_committed as String).cstring() else "<<<None>>>".string() end, _sink_id.string().cstring())
+    end
+
     event_log.ack_rollback(_sink_id)
 
   ///////////////
@@ -439,14 +706,6 @@ actor ConnectorSink is Sink
             _writeable = true
             _readable = true
 
-            match _initializer
-            | let initializer: LocalTopologyInitializer =>
-              initializer.report_ready_to_work(this)
-              _initializer = None
-            else
-              Fail()
-            end
-
             _notify.connected(this)
             _pending_reads()
 
@@ -459,7 +718,6 @@ actor ConnectorSink is Sink
                 _release_backpressure()
               end
             end
-            _maybe_mute_or_unmute_upstreams()
           else
             // The connection failed, unsubscribe the event and close.
             @pony_asio_event_unsubscribe(event)
@@ -493,7 +751,6 @@ actor ConnectorSink is Sink
                 //sent all data; release backpressure
                 _release_backpressure()
               end
-              _maybe_mute_or_unmute_upstreams()
             end
           else
             // The connection failed, unsubscribe the event and close.
@@ -538,6 +795,13 @@ actor ConnectorSink is Sink
       end
 
       _try_shutdown()
+    end
+
+  fun ref report_ready_to_work() =>
+    match _initializer
+    | let initializer: LocalTopologyInitializer =>
+      initializer.report_ready_to_work(this)
+      _initializer = None
     end
 
   fun ref _writev(data: ByteSeqIter, tracking_id: (SeqId | None))
@@ -657,11 +921,12 @@ actor ConnectorSink is Sink
     @pony_os_socket_close[None](_fd)
     _fd = -1
 
+    _twopc.hard_close()
     _notify.closed(this)
 
   fun ref _pending_reads() =>
     """
-    Unless this connection is currently muted, read while data is available,
+    Read while data is available,
     guessing the next packet length as we go. If we read 4 kb of data, send
     ourself a resume message and stop reading, to avoid starving other actors.
     """
@@ -670,10 +935,6 @@ actor ConnectorSink is Sink
       var received_called: USize = 0
 
       while _readable and not _shutdown_peer do
-        if _muted then
-          return
-        end
-
         // Read as much data as possible.
         let len = @pony_os_recv[USize](
           _event,
@@ -741,7 +1002,6 @@ actor ConnectorSink is Sink
     writeable. On an error, dispose of the connection. Returns whether
     it sent all pending data or not.
     """
-    // TODO: Make writev_batch_size user configurable
     let writev_batch_size: USize = @pony_os_writev_max[I32]().usize()
     var num_to_send: USize = 0
     var bytes_to_send: USize = 0
@@ -915,46 +1175,15 @@ actor ConnectorSink is Sink
     end
 
   fun ref _apply_backpressure() =>
-    if not _throttled then
-      _throttled = true
-      _notify.throttled(this)
-    end
+    _notify.throttled(this)
     _writeable = false
     // this is safe because asio thread isn't currently subscribed
     // for a write event so will not be writing to the readable flag
     @pony_asio_event_set_writeable[None](_event, false)
     @pony_asio_event_resubscribe_write(_event)
-    _maybe_mute_or_unmute_upstreams()
 
   fun ref _release_backpressure() =>
-    if _throttled then
-      _throttled = false
-      _notify.unthrottled(this)
-      _maybe_mute_or_unmute_upstreams()
-    end
-
-  fun ref _maybe_mute_or_unmute_upstreams() =>
-    if _mute_outstanding then
-      if _can_send() then
-        _unmute_upstreams()
-      end
-    else
-      if not _can_send() then
-        _mute_upstreams()
-      end
-    end
-
-  fun ref _mute_upstreams() =>
-    for u in _upstreams.values() do
-      u.mute(this)
-    end
-    _mute_outstanding = true
-
-  fun ref _unmute_upstreams() =>
-    for u in _upstreams.values() do
-      u.unmute(this)
-    end
-    _mute_outstanding = false
+    _notify.unthrottled(this)
 
   fun _can_send(): Bool =>
     _connected and not _closed and _writeable
@@ -986,39 +1215,15 @@ actor ConnectorSink is Sink
     """
     None
 
-class ConnectorSinkNotify is WallarooOutgoingNetworkActorNotify
-  fun ref connecting(conn: WallarooOutgoingNetworkActor ref, count: U32) =>
-    None
+  fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
+    """
+    Generate a printable string of the contents of the given readseq to use in
+    error messages.
+    """
+    "[len=" + array.size().string() + ": " + ", ".join(array.values()) + "]"
 
-  fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
-    @printf[I32]("ConnectorSink connected\n".cstring())
-
-
-  fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
-    @printf[I32]("ConnectorSink connection closed\n".cstring())
-
-  fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
-    @printf[I32]("ConnectorSink connection failed\n".cstring())
-
-  fun ref sentv(conn: WallarooOutgoingNetworkActor ref,
-    data: ByteSeqIter): ByteSeqIter
-  =>
-    data
-
-  fun ref received(conn: WallarooOutgoingNetworkActor ref, data: Array[U8] iso,
-    times: USize): Bool
-  =>
-    true
-
-  fun ref expect(conn: WallarooOutgoingNetworkActor ref, qty: USize): USize =>
-    qty
-
-  fun ref throttled(conn: WallarooOutgoingNetworkActor ref) =>
-    @printf[I32]("ConnectorSink is experiencing back pressure\n".cstring())
-
-  fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
-    @printf[I32](("ConnectorSink is no longer experiencing" +
-      " back pressure\n").cstring())
+  fun get_2pc_state(): U8 =>
+    _twopc.state()
 
 class PauseBeforeReconnectConnectorSink is TimerNotify
   let _tcp_sink: ConnectorSink
@@ -1029,3 +1234,4 @@ class PauseBeforeReconnectConnectorSink is TimerNotify
   fun ref apply(timer: Timer, count: U64): Bool =>
     _tcp_sink.reconnect()
     false
+

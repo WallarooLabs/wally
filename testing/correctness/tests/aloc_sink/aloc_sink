@@ -1,0 +1,577 @@
+#!/usr/bin/env python3
+
+import asyncore
+import asynchat
+import logging
+import os
+import random
+import re
+import socket
+import struct
+import sys
+import time
+import traceback
+
+if os.environ.get('USE_FAKE_S3', '') == 'on':
+    import boto3
+
+
+# NOTES:
+#
+# 1. This server will truncate the out_path & out_path+".txnlog" files.
+#    If you want to preserve their data, then move them out of the way
+#    before starting this server.
+
+from wallaroo.experimental import connector_wire_messages as cwm
+
+TXN_COUNT = 0
+
+def parse_abort_rules(path):
+    a = []
+    try:
+        with open(path, 'rb') as f:
+            for l in f:
+                a.append(eval(l))
+        return a
+    except FileNotFoundError:
+        return []
+
+def reload_phase1_txn_state(path):
+    txn_state = {}
+    try:
+        with open(path, 'rb') as f:
+            for l in f:
+                a = eval(l)
+                if a[1] == '1-ok':
+                    txn_state[a[2]] = (True, a[3])
+                if a[1] == '1-rollback':
+                    txn_state[a[2]] = (False, a[3])
+                if (a[1] == '2-ok') or (a[1] == '2-rollback'):
+                    del txn_state[a[2]]
+    except FileNotFoundError:
+        True
+    return txn_state
+
+def look_for_forced_abort(path):
+    res = True # res will become self._txn_commit_next's value
+    try:
+        with open(path, 'rb') as f:
+            for l in f:
+                a = eval(l)
+                if a[1] == 'next-txn-force-abort':
+                    res = False
+                elif a[1] == '1-ok':
+                    if res == False:
+                        logging.critical('next-txn-force-abort followed by 1-ok')
+                        sys.exit(66)
+                    res = True
+                elif a[1] == '1-rollback':
+                    res = True
+        return res
+    except FileNotFoundError:
+        return False
+
+def look_for_orphaned_s3_phase2_data(path):
+    orphaned = {}
+    try:
+        with open(path, 'rb') as f:
+            for l in f:
+                a = eval(l)
+                op = a[1]
+                txn_id = a[2]
+                if op == '1-ok':
+                    where_list = a[3]
+                    if where_list == []:
+                        logging.critical('Empty where_list in {}'.format(l))
+                        sys.exit(66)
+                    for (stream_id, start_por, end_por) in where_list:
+                        if stream_id != 1:
+                            logging.critical('Bad stream_id in {}'.format(l))
+                            sys.exit(66)
+                    ## The first txn commit may be start=end=0.
+                    ## We don't write an S3 object for 0 bytes,
+                    ## so we don't include this case in orphaned.
+                    if (start_por == 0 and end_por == 0):
+                        ## Pretend that we've seen the 2-ok for 0 & 0.
+                        ## Then it will be filtered by the list comprehension
+                        ## at the end of this func.
+                        orphaned[txn_id] = (txn_id, start_por, end_por, True)
+                    else:
+                        orphaned[txn_id] = (txn_id, start_por, end_por, False)
+                elif op == '2-ok':
+                    if not (txn_id in orphaned):
+                        logging.critical('Expected txn_id {} in {}'.format(txn_id, l))
+                        sys.exit(66)
+                    logging.debug('2-ok l = {}'.format(l))
+                    logging.debug('blah = {}'.format(orphaned[txn_id]))
+                    q = orphaned[txn_id]
+                    orphaned[txn_id] = (q[0], q[1], q[2], True)
+                elif op == '2-s3-ok':
+                    try:
+                        del orphaned[txn_id]
+                    except:
+                        None # Should only happen in debugging/testing scenarios
+    except FileNotFoundError:
+        None
+    return list(x for x in orphaned.values() if x[3] == False)
+
+def read_chunk(path, start_offset, end_offset):
+    """
+    Return only if 100% successful.
+    """
+    try:
+        with open(path, 'rb') as f:
+            f.seek(start_offset)
+            return f.read(end_offset - start_offset)
+    except FileNotFoundError as e:
+        raise e
+
+HACK = 0
+
+class AsyncServer(asynchat.async_chat, object):
+    def __init__(self, handler_id, sock, out_path, abort_rule_path, s3_scheme, s3_bucket, s3_prefix, streams=None):
+        logging.debug("AsyncServer.__init__: {} {}".format(handler_id, sock))
+        self._id = handler_id
+        self._conn = sock
+        self._out_path = out_path
+        self._out = open(self._out_path, 'ab')
+        self._out_offset = self._out.tell()
+        logging.debug('top of AsyncServer self._out_offset = {}'.format(self._out_offset))
+        txn_log_path = self._out_path + ".txnlog"
+        self._txn_log = open(txn_log_path, 'ab')
+        self._abort_rule_path = abort_rule_path
+        asynchat.async_chat.__init__(self, sock=self._conn)
+        self.in_buffer = []
+        self.out_buffer = []
+        self.reading_header = True
+        self.set_terminator(4) # first frame header
+        self.in_handshake = True
+        self._streams = {} if streams is None else streams
+        self.received_count = 0
+        self._reset_count = {}
+        self._using_2pc = True
+        self._txn_state = {}
+        self._txn_stream_content = []
+        self._next_txn_force_abort_written = False
+        if s3_scheme == 'fake-s3':
+            self._s3 = boto3.resource('s3', endpoint_url='http://localhost:4569',
+                    aws_access_key_id='fakeid', aws_secret_access_key='fakekey')
+        elif s3_scheme == 's3':
+            # Rely on environment vars AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+            self._s3 = boto3.resource('s3')
+        else:
+            self._s3 = None
+        self._s3_chunk = b''
+
+        self._s3_bucket = s3_bucket
+        self._s3_prefix = s3_prefix
+
+        if self._s3 is not None:
+            try:
+                self._s3 = self._s3.create_bucket(Bucket=self._s3_bucket)
+            except Exception as e:
+                logging.critical('{}'.format(e))
+                sys.exit(66)
+
+        self._abort_rules = parse_abort_rules(self._abort_rule_path)
+        for t in self._abort_rules:
+            if t[0] == "stream-content":
+                stream_id = t[1]
+                regexp = t[2]
+                self._txn_stream_content.append((stream_id, regexp))
+                # NOTE: This type doesn't have extended disconnect control!
+
+        self._txn_state = reload_phase1_txn_state(txn_log_path)
+        logging.debug('restored txn state: {}'.format(self._txn_state))
+        self._txn_commit_next = look_for_forced_abort(txn_log_path)
+
+        orphaned = []
+        if self._s3 is not None:
+            orphaned = look_for_orphaned_s3_phase2_data(txn_log_path)
+        logging.debug('S3: orphaned {}'.format(orphaned))
+        if orphaned == []:
+            logging.info('found zero orphaned items')
+            None
+        elif len(orphaned) > 1:
+            logging.critical('expected max 1 orphaned item: {}'.format(orphaned))
+            sys.exit(66)
+        else:
+            (txn_id, start_por, end_por, _) = orphaned[0]
+            chunk = read_chunk(self._out_path, start_por, end_por)
+            self.log_it(['orphaned', (txn_id, start_por, end_por)])
+            self.write_to_s3_and_log(start_por, chunk, txn_id, 'orphaned')
+
+    def collect_incoming_data(self, data):
+        """Buffer the data"""
+        self.in_buffer.append(data)
+
+    def found_terminator(self):
+        """Data is going to be in two parts:
+        1. a 32-bit unsigned integer length header
+        2. a payload of the size specified by (1)
+        """
+        if self.reading_header:
+            # Read the header and set the terminator size for the payload
+            self.reading_header = False
+            h = struct.unpack(">I", b"".join(self.in_buffer))[0]
+            self.in_buffer = []
+            self.set_terminator(h)
+        else:
+            # Read the payload and pass it to _handle_frame
+            frame_data = b"".join(self.in_buffer)
+            self.in_buffer = []
+            self.set_terminator(4) # read next frame header
+            self.reading_header = True
+            self._handle_frame(frame_data)
+
+    def _handle_frame(self, frame):
+        self.update_received_count()
+        msg = cwm.Frame.decode(frame)
+        # Hello, Ok, Error, Notify, NotifyAck, Message, Ack, Restart
+        self.count = 0
+        if isinstance(msg, cwm.Hello):
+            if msg.version != "v0.0.1":
+                logging.critical('bad protocol version: {}'.format(msg.version))
+                sys.exit(66)
+            if msg.cookie != "Dragons Love Tacos!":
+                logging.critical('bad cookie: {}'.format(msg.cookie))
+                sys.exit(66)
+            # As of 2019-03-04, Wallaroo's connector sink is not managing
+            # credits and will rely solely on TCP backpressure for its
+            # own backpressure signalling.
+            ok = cwm.Ok(500, self._streams.values(), [])
+            self.write(ok)
+        elif isinstance(msg, cwm.Notify):
+            if msg.stream_id != 1:
+                logging.error("Unsupported stream id {}".format(msg.stream_id))
+                error = cwm.Error("Unsupported stream id {}".format(msg.stream_id))
+                self.write(error)
+                return
+            # respond with notifyack
+            try:
+                por = self._streams[msg.stream_id][2]
+            except:
+                por = 0
+            notify_ack = cwm.NotifyAck(
+                True,
+                msg.stream_id,
+                por)
+            self._streams[msg.stream_id] = [msg.stream_id,
+                                            msg.stream_name,
+                                            por]
+            self.write(notify_ack)
+        elif isinstance(msg, cwm.Message):
+            self.handle_message(msg)
+        elif isinstance(msg, cwm.Error):
+            # Got error message from worker
+            # close the connection and pass msg to the error handler
+            logging.error("Received an error message. closing the connection")
+            self.close()
+            raise Exception(msg.message)
+        else:
+            # write the original message back
+            self.write(msg)
+
+    def handle_message(self, msg):
+        if msg.stream_id == 0:
+            self.handle_message_stream0(msg)
+        else:
+            self.handle_message_streamx(msg)
+
+    def handle_message_stream0(self, msg):
+        msg2 = cwm.TwoPCFrame.decode(msg.message)
+        if isinstance(msg2, cwm.ListUncommitted):
+            uncommitted = list(self._txn_state.keys())
+            # DEBUG only: uncommitted.append("doesnt.exist.txn.aborting-wont-hurt.-----0-0")
+            reply = cwm.ReplyUncommitted(msg2.rtag, uncommitted)
+            reply_bytes = cwm.TwoPCFrame.encode(reply)
+            msg = cwm.Message(0, cwm.Message.Ephemeral, None, None, None, reply_bytes)
+            self.write(msg)
+            logging.debug('2PC: ListUncommitted resp: {}'.format(reply))
+
+            self.log_it(['list-uncommitted', uncommitted])
+        elif isinstance(msg2, cwm.TwoPCPhase1):
+            logging.debug('2PC: Phase 1 got {}'.format(msg2))
+            logging.debug('2PC: Phase 1 txn_state = {}'.format(self._txn_state))
+
+            # Sanity checks
+            start_por = -1
+            for (stream_id, start_por, end_por) in msg2.where_list:
+                if stream_id != 1:
+                    self._txn_commit_next = False
+                    logging.error('2PC: Phase 1 invalid stream_id {} in {}'
+                        .format(stream_id, msg2))
+                if start_por > end_por:
+                    self._txn_commit_next = False
+                    logging.error('2PC: Phase 1 invalid start_por {} end_por {}'
+                        .format(start_por, end_por))
+                if end_por > self._out_offset:
+                    self._txn_commit_next = False
+                    logging.error('2PC: Phase 1 invalid end_por {} file size {}'
+                        .format(end_por, self._out.tell()))
+
+            # Check local debugging/testing abort rules
+            global TXN_COUNT
+            TXN_COUNT += 1
+            close_before = False
+            close_after = False
+            for r in self._abort_rules:
+                if r[0] == 'local-txn':
+                    if TXN_COUNT == r[1]:
+                        try:
+                            success = r[2]
+                            self._txn_commit_next = success
+                            logging.info('2PC: abort={} next transaction: local txn count {}'
+                            .format(not success, TXN_COUNT))
+                            close_before = r[3]
+                            close_after = r[4]
+                        except:
+                            True
+                elif r[0] == 'txnid-regexp':
+                    if re.search(r[1], msg2.txn_id):
+                        try:
+                            success = r[2]
+                            self._txn_commit_next = success
+                            logging.info('2PC: abort={} next transaction: regexp {} matches txn_id {}'
+                                .format(success, r[1], msg2.txn_id))
+                            close_before = r[3]
+                            close_after = r[4]
+                        except:
+                            True
+
+            self.flush_fsync(self._out)
+            self.flush_fsync(self._txn_log)
+            success = self._txn_commit_next
+            if success and (self._s3 is not None) and start_por >= 0:
+                chunk = read_chunk(self._out_path, start_por, end_por)
+                logging.debug('S3: offset {} to {} len(chunk) = {}'.format(start_por, end_por, len(chunk)))
+                self._s3_chunk = chunk
+                self._s3_chunk_offset = start_por
+
+            self._txn_state[msg2.txn_id] = (success, msg2.where_list)
+            if success:
+                log_tag = '1-ok'
+            else:
+                log_tag = '1-rollback'
+            self.log_it([log_tag, msg2.txn_id, msg2.where_list])
+
+            if close_before:
+                self.log_it(['close', 'before reply'])
+                self.close()
+                return
+
+            reply = cwm.TwoPCReply(str(msg2.txn_id).encode('utf-8'), success)
+            reply_bytes = cwm.TwoPCFrame.encode(reply)
+            msg = cwm.Message(0, cwm.Message.Ephemeral, None, None, None, reply_bytes)
+            self.write(msg)
+
+            self._txn_commit_next = True
+            self._next_txn_force_abort_written = False
+
+            if close_after:
+                self.log_it(['close', 'after reply'])
+                self.close()
+                return
+        elif isinstance(msg2, cwm.TwoPCReply):
+            raise Exception("Bad stream ID 0 message: {}".format(msg2))
+        elif isinstance(msg2, cwm.TwoPCPhase2):
+            logging.debug('2PC: Phase 2 got {}'.format(msg2))
+            logging.debug('2PC: Phase 2 pre txn_state = {}'.format(self._txn_state))
+            if msg2.txn_id in self._txn_state:
+                (phase1_status, where_list) = self._txn_state[msg2.txn_id]
+                if not msg2.commit:
+                    for (stream_id, start_por, end_por) in where_list:
+                        if stream_id != 1:
+                            raise Exception('Phase 2 abort: bad stream_id {}'.
+                                format(stream_id))
+                        logging.info('2PC: truncating {} to offset {}'.format(self._out_path, start_por))
+                        self._out.truncate(start_por)
+                        self.flush_fsync(self._out)
+                        self._out_offset = start_por
+                        self._streams[stream_id][2] = start_por
+
+                if not phase1_status and msg2.commit:
+                    logging.fatal('2PC: Protocol error: phase 1 status was rollback but phase 2 says commit')
+                    sys.exit(66)
+
+                if msg2.commit and phase1_status:
+                    log_tag = '2-ok'
+                    offset = where_list[0][2]
+                else:
+                    log_tag = '2-rollback'
+                    offset = where_list[0][1]
+                self.log_it([log_tag, msg2.txn_id, offset])
+
+                if msg2.commit and phase1_status and \
+                        (self._s3 is not None) and (self._s3_chunk != b''):
+                    self.write_to_s3_and_log(self._s3_chunk_offset,
+                        self._s3_chunk, msg2.txn_id, 'normal')
+
+                del self._txn_state[msg2.txn_id]
+                logging.debug('2PC: Phase 2 post txn_state = {}'.format(self._txn_state))
+            else:
+                logging.error('2PC: Phase 2 got unknown txn_id {} commit {}'.format(msg2.txn_id, msg2.commit))
+                self.log_it(['2-error', msg2.txn_id, 'unknown txn_id, commit {}'.format(msg2.commit)])
+            # No reply is required for Phase 2
+        else:
+            raise Exception("Stream ID 0 not implemented, msg2 = {}".format(msg2))
+
+    def handle_message_streamx(self, msg):
+        bs = bytes(msg.message)
+
+        for (stream_id, regexp) in self._txn_stream_content:
+            if stream_id == msg.stream_id:
+                if re.search(regexp, str(bs)):
+                    self._txn_commit_next = False
+                    logging.info('2PC: abort next transaction: {} matches {}'
+                        .format(regexp, bs))
+
+        if msg.message_id != None:
+            logging.debug('msg.message_id = {}'.format(msg.message_id))
+            if self._out_offset == msg.message_id:
+                ret1 = self._out.write(bs)
+                if len(bs) != ret1:
+                    self._txn_commit_next = False
+                    raise Exception("File write error? {} != {} or {} != None".format(len(bs), ret1, ret2))
+                self._out_offset += len(msg.message)
+                self._streams[msg.stream_id][2] = msg.message_id
+                logging.debug('_out_offset is now {}'.format(self._out_offset))
+            elif self._out_offset < msg.message_id:
+                # TODO: After the bugfix in commit 88e4cdca2, this
+                # case should be impossible, and we ought to make this
+                # a fatal error.
+                m = 'ERROR: MISSING DATA: self._out_offset {} < msg.message_id {}'.format(self._out_offset, msg.message_id)
+                self._txn_commit_next = False
+                if not self._next_txn_force_abort_written:
+                    logging.error(m)
+                    self._next_txn_force_abort_written = True
+                    self.log_it(['next-txn-force-abort', m])
+            elif self._out_offset > msg.message_id:
+                logging.error('NOTICE: duplicate data: self._out_offset {} > msg.message_id {}'.format(self._out_offset, msg.message_id))
+                ## Deduplication case: we've already seen this, so
+                ## we don't take any further action.
+        else:
+            logging.critical('message has no message_id')
+            sys.exit(66)
+
+        if msg.flags & cwm.Message.Eos:
+            # ack eos
+            logging.debug("NH: acking eos for {}".format(msg))
+            self.write(cwm.Ack(credits = 1,
+                               acks= [(msg.stream_id, self._streams[msg.stream_id][2])]))
+
+    def write(self, msg):
+        logging.debug("write {}".format(msg))
+        data = cwm.Frame.encode(msg)
+        super(AsyncServer, self).push(data)
+
+    def update_received_count(self):
+        self.received_count += 1
+        if (not self._using_2pc) and self.received_count % 3 == 0:
+            logging.debug("Sending ack for streams!")
+            ack = cwm.Ack(
+                credits = 10,
+                acks = [
+                    (sid, por) for sid, _, por in self._streams.values()])
+            logging.debug('send ack msg: {}'.format(ack))
+            self.write(ack)
+        if self.received_count % 9999200 == 0:
+            # send a restart every 200 messages
+            logging.info('PERIODIC RESTART, what could possibly go wrong?')
+            self.write(cwm.Restart())
+
+    def handle_error(self):
+        _type, _value, _traceback = sys.exc_info()
+        traceback.print_exception(_type, _value, _traceback)
+
+    def close(self):
+        logging.info("Closing the connection")
+        logging.info("last received id by stream:\n\t{}".format(
+            "\n\t".join("{}, {}: {}".format(sid, sn, mid)
+                      for sid, sn, mid in self._streams.values())))
+        super(AsyncServer, self).close()
+        self.log_it(['connection-closed', True])
+        self.flush_fsync(self._out)
+
+    def flush_fsync(self, file):
+        """
+        Return only if 100% successful.
+        """
+        x = file.flush()
+        if x:
+            logging.critical('flush failed: {}'.format(x))
+            sys.exit(66)
+        x = os.fsync(file.fileno())
+        if x:
+            logging.critical('fsync failed: {}'.format(x))
+            sys.exit(66)
+
+    def log_it(self, log):
+        log.insert(0, time.time())
+        self._txn_log.write(bytes("{}\n".format(log).encode('utf-8')))
+        self.flush_fsync(self._txn_log)
+
+    def write_to_s3_and_log(self, chunk_offset, chunk, txn_id, why):
+        if self._s3 is not None:
+            name = '%s%016d' % (self._s3_prefix, chunk_offset)
+            while True:
+                try:
+                    res = self._s3.put_object(
+                        ACL='private',
+                        Body=chunk,
+                        Bucket=self._s3_bucket,
+                        Key=name)
+                    logging.debug('S3: put res = {}'.format(res))
+                    break
+                except Exception as e:
+                    logging.error('S3: ERROR: put res = {}'.format(e))
+                    time.sleep(2.0)
+            self.log_it(['2-s3-ok', txn_id, name, why])
+
+class EchoServer(asyncore.dispatcher):
+
+    def __init__(self, host, port, out_path, abort_rule_path,
+                 s3_scheme, s3_bucket, s3_prefix):
+        asyncore.dispatcher.__init__(self)
+        self.create_socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
+        self.set_reuse_addr()
+        self.bind((host, port))
+        self.listen(1)
+        self._out_path = out_path
+        self._abort_rule_path = abort_rule_path
+        self.count = 0
+        self.s3_scheme = s3_scheme
+        self.s3_bucket = s3_bucket
+        self.s3_prefix = s3_prefix
+        self._streams = {}
+
+    def handle_accepted(self, sock, addr):
+        logging.info('Incoming connection from %s' % repr(addr))
+        handler = AsyncServer(self.count, sock,
+            self._out_path, self._abort_rule_path, s3_scheme, s3_bucket, s3_prefix, self._streams)
+        self.count += 1
+
+fmt = '%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
+logging.root.formatter = logging.Formatter(fmt)
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(logging.root.formatter)
+logging.root.addHandler(stream_handler)
+logging.root.setLevel(logging.INFO)
+
+out_path = sys.argv[1]
+abort_rule_path = sys.argv[2]
+try:
+    s3_scheme = sys.argv[3]
+    s3_bucket = sys.argv[4]
+    s3_prefix = sys.argv[5]
+    logging.debug("s3_scheme: {}, s3_bucket: {}, s3_prefix: {}".format(s3_scheme, s3_bucket, s3_prefix))
+except:
+    s3_scheme = None
+    s3_bucket = None
+    s3_prefix = None
+logging.debug("out_path: {}".format(out_path))
+logging.info("abort_rule_path: {}".format(abort_rule_path))
+server = EchoServer('127.0.0.1', 7200, out_path, abort_rule_path, s3_scheme, s3_bucket, s3_prefix)
+logging.debug("server: {}".format(server))
+logging.debug("asyncore file: {}".format(asyncore.__file__))
+asyncore.loop(timeout=0.001)
