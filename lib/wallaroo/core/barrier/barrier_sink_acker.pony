@@ -28,6 +28,7 @@ class BarrierSinkAcker
   var _barrier_token: BarrierToken = InitialBarrierToken
   let _barrier_coordinator: BarrierCoordinator
   let _inputs_blocking: Map[RoutingId, Producer] = _inputs_blocking.create()
+  var _force_queue: Bool = false
 
   new create(sink_id: RoutingId, sink: Sink ref,
     barrier_coordinator: BarrierCoordinator)
@@ -43,16 +44,19 @@ class BarrierSinkAcker
     token < _barrier_token
 
   fun input_blocking(id: RoutingId): Bool =>
+    if _force_queue then
+      return true
+    end
     _inputs_blocking.contains(id)
 
   fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     _barrier_token = barrier_token
-    receive_barrier(step_id, producer, barrier_token)
+    receive_barrier(step_id, producer, barrier_token, true)
 
   fun ref receive_barrier(step_id: RoutingId, producer: Producer,
-    barrier_token: BarrierToken)
+    barrier_token: BarrierToken, ack_barrier_if_complete: Bool)
   =>
     if barrier_token != _barrier_token then
       @printf[I32]("SinkAcker: Expected %s, got %s\n".cstring(), _barrier_token.string().cstring(), barrier_token.string().cstring())
@@ -62,7 +66,7 @@ class BarrierSinkAcker
     let inputs = _sink.inputs()
     if inputs.contains(step_id) then
       _inputs_blocking(step_id) = producer
-      _check_completion(inputs)
+      _check_completion(inputs, ack_barrier_if_complete)
     else
       @printf[I32]("Failed to find step_id %s in inputs at Sink %s\n".cstring(), step_id.string().cstring(), _sink_id.string().cstring())
       Fail()
@@ -81,11 +85,19 @@ class BarrierSinkAcker
         Unreachable()
       end
     end
-    _check_completion(_sink.inputs())
+    _check_completion(_sink.inputs(), true)
 
-  fun ref _check_completion(inputs: Map[RoutingId, Producer] box) =>
+  fun ref _check_completion(inputs: Map[RoutingId, Producer] box,
+    ack_barrier_if_complete: Bool)
+   =>
     if inputs.size() == _inputs_blocking.size() then
-      _barrier_coordinator.ack_barrier(_sink, _barrier_token)
+      if ack_barrier_if_complete then
+        _barrier_coordinator.ack_barrier(_sink, _barrier_token)
+      else
+        // The sink has told us that it is responsible for calling
+        // _barrier_coordinator.ack_barrier()
+        None
+      end
       let b_token = _barrier_token
       clear()
       _sink.barrier_complete(b_token)
@@ -94,3 +106,7 @@ class BarrierSinkAcker
   fun ref clear() =>
     _inputs_blocking.clear()
     _barrier_token = InitialBarrierToken
+    _force_queue = false
+
+  fun ref set_force_queue() =>
+    _force_queue = true

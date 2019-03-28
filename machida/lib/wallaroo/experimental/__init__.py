@@ -61,6 +61,17 @@ def stream_message_encoder(func):
     C = wallaroo._wallaroo_wrap(func.__name__, func, wallaroo.ConnectorEncoder)
     return C()
 
+def octet_message_decoder(func):
+    wallaroo._validate_arity_compatability(func.__name__, func, 1)
+    C = wallaroo._wallaroo_wrap(func.__name__, func, wallaroo.OctetDecoder)
+    return C()
+
+
+def octet_message_encoder(func):
+    wallaroo._validate_arity_compatability(func.__name__, func, 1)
+    C = wallaroo._wallaroo_wrap(func.__name__, func, wallaroo.OctetEncoder)
+    return C()
+
 
 class SourceConnectorConfig(object):
     def __init__(self, name, encoder, decoder, port, cookie,
@@ -81,15 +92,16 @@ class SourceConnectorConfig(object):
 
 
 class SinkConnectorConfig(object):
-    def __init__(self, name, encoder, decoder, port, host='127.0.0.1'):
+    def __init__(self, name, encoder, decoder, port, cookie, host='127.0.0.1'):
         self._name = name
         self._host = host
         self._port = port
+        self._cookie = cookie
         self._encoder = encoder
         self._decoder = decoder
 
     def to_tuple(self):
-        return ("sink_connector", self._name, self._host, str(self._port), self._encoder, self._decoder)
+        return ("sink_connector", self._name, self._host, str(self._port), self._encoder, self._decoder, self._cookie)
 
 
 class BaseConnector(object):
@@ -743,11 +755,12 @@ class SinkConnector(object):
                     sink = step[1]
         if sink is None:
             raise RuntimeError("Unable to find a sink connector with the name " + params.connector_name)
-        (_, _name, host, port, _encoder, decoder) = sink
+        (_, _name, host, port, _encoder, decoder, cookie) = sink
         self.params = params
         self._decoder = decoder
         self._host = host
         self._port = port
+        self._cookie = cookie
         self._acceptor = None
         self._connections = []
         self._buffers = {}

@@ -1065,20 +1065,23 @@ primitive _SinkConfig
       KafkaSinkConfig[PyData val](encoder, consume ksco, (env.root as TCPConnectionAuth))
     | "sink_connector" =>
       let host = recover val
-        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 3)))
+        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 2)))
       end
 
       let port = recover val
-        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 4)))
+        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 3)))
       end
 
-      let encoderp = @PyTuple_GetItem(sink_config_tuple, 5)
+      let encoderp = @PyTuple_GetItem(sink_config_tuple, 4)
       Machida.inc_ref(encoderp)
       let encoder = recover val
         PyConnectorEncoder(encoderp)
       end
 
-      ConnectorSinkConfig[PyData val](encoder, host, port)
+      let cookie = recover val
+        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 6)))
+      end
+      ConnectorSinkConfig[PyData val](encoder, host, port, "v0.0.1", cookie)
     else
       error
     end

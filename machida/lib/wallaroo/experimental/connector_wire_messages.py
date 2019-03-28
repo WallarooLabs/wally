@@ -825,3 +825,215 @@ def test_frame():
 
     for msg in msgs:
         _test_frame_encode_decode(msg)
+
+####
+#### 2PC
+####
+
+class ListUncommitted(object):
+    """
+    ListUncommitted(rtag: U64)
+    """
+    def __init__(self, rtag):
+        self.rtag = rtag
+
+    def __str__(self):
+        return "ListUncommitted(rtag={!r})".format(self.rtag)
+
+    def __eq__(self, other):
+        return (self.rtag == other.rtag)
+
+    def encode(self):
+        return (struct.pack('>Q', self.rtag))
+
+    @staticmethod
+    def decode(bs):
+        reader = StringIO(bs)
+        rtag = struct.unpack(">Q", reader.read(8))[0]
+        return ListUncommitted(rtag)
+
+class ReplyUncommitted(object):
+    """
+    ReplyUncommitted(rtag: U64, txn_ids: Array[(txn_id: String])
+    """
+    def __init__(self, rtag, txn_ids):
+        self.rtag = rtag
+        self.txn_ids = txn_ids
+
+    def __str__(self):
+        return "ReplyUncommitted(rtag={!r}, txn_ids={!r})".format(self.rtag, self.txn_ids)
+
+    def __eq__(self, other):
+        return (self.rtag == other.rtag and
+                self.txn_ids == other.txn_ids)
+
+    def encode(self):
+        return (struct.pack('>QI', self.rtag, len(self.txn_ids)) +
+                b''.join((
+                    struct.pack('>H{}s'.format(len(txn_id)),
+                        len(txn_id), txn_id.encode("utf-8"))
+                    for txn_id in self.txn_ids)))
+
+    @staticmethod
+    def decode(bs):
+        reader = StringIO(bs)
+        credits = struct.unpack(">I", reader.read(4))[0]
+        acks_length = struct.unpack(">I", reader.read(4))[0]
+        acks = []
+        for _ in range(acks_length):
+            stream_id = struct.unpack(">Q", reader.read(8))[0]
+            point_of_ref = struct.unpack(">Q", reader.read(8))[0]
+            acks.append((stream_id, point_of_ref))
+        return Ack(credits, acks)
+
+def encode_phase2r(txn_id, commit):
+    if commit:
+        commit_c = b'\01'
+    else:
+        commit_c = b'\00'
+    return struct.pack(">H{}sc".format(len(txn_id)),
+                       len(txn_id),
+                       txn_id,
+                       commit_c)
+
+def decode_phase2r(bs):
+    reader = StringIO(bs)
+    length = struct.unpack(">H", reader.read(2))[0]
+    txn_id = reader.read(length).decode()
+    commit_c = reader.read(1)
+    if commit_c == b'\01':
+        commit = True
+    else:
+        commit = False
+    return (txn_id, commit)
+
+class TwoPCPhase1(object):
+    """
+    TwoPCPhase1(txn_id: String,
+      where_list: [(stream_id: U64, start_por: U64, end_por: U64)])
+    """
+    def __init__(self, txn_id, where_list):
+        self.txn_id = txn_id
+        self.where_list = where_list
+
+    def __str__(self):
+        return "TwoPCPhase1(txn_id={!r},where_list={!r})".format(self.txn_id, self.where_list)
+
+    def __eq__(self, other):
+        return (self.txn_id == other.txn_id and
+                self.where_list == other.where_list)
+
+    def encode(self):
+        return (struct.pack(">H{}sI".format(len(txn_id)),
+                            len(txn_id),
+                            txn_id,
+                            len(where_list)) +
+                    b''.join((
+                        struct.pack('>QQQ',
+                            stream_id, start_por, end_por)
+                        for (stream_id, start_por, end_por) in self.where_list)))
+
+    @staticmethod
+    def decode(bs):
+        reader = StringIO(bs)
+        length = struct.unpack(">H", reader.read(2))[0]
+        txn_id = reader.read(length).decode()
+        where_list = []
+        length = struct.unpack(">I", reader.read(4))[0]
+        for i in range(0, length):
+            stream_id = struct.unpack(">Q", reader.read(8))[0]
+            start_por = struct.unpack(">Q", reader.read(8))[0]
+            end_por = struct.unpack(">Q", reader.read(8))[0]
+            where_list.append((stream_id, start_por, end_por))
+        return TwoPCPhase1(txn_id, where_list)
+
+class TwoPCReply(object):
+    """
+    TwoPCReply(txn_id: String, commit: Boolean)
+    """
+    def __init__(self, txn_id, commit):
+        self.txn_id = txn_id
+        self.commit = commit
+
+    def __str__(self):
+        return "TwoPCReply(txn_id={!r},commit={!r})".format(self.txn_id, self.commit)
+
+    def __eq__(self, other):
+        return (self.txn_id == other.txn_id and
+                self.commit == other.commit)
+
+    def encode(self):
+        return encode_phase2r(self.txn_id, self.commit)
+
+    @staticmethod
+    def decode(bs):
+        (txn_id, commit) = decode_phase2r(bs)
+        return TwoPCReply(txn_id, commit)
+
+class TwoPCPhase2(object):
+    """
+    TwoPCPhase2(txn_id: String, commit: Boolean)
+    """
+    def __init__(self, txn_id, commit):
+        self.txn_id = txn_id
+        self.commit = commit
+
+    def __str__(self):
+        return "TwoPCPhase2(txn_id={!r},commit={!r})".format(self.txn_id, self.commit)
+
+    def __eq__(self, other):
+        return (self.txn_id == other.txn_id and
+                self.commit == other.commit)
+
+    def encode(self):
+        return encode_phase2r(self.txn_id, self.commit)
+
+    @staticmethod
+    def decode(bs):
+        (txn_id, commit) = decode_phase2r(bs)
+        return TwoPCPhase2(txn_id, commit)
+
+class TwoPCFrame(object):
+    _FRAME_TYPE_TUPLES = [(201, ListUncommitted) ,
+                          (202, ReplyUncommitted) ,
+                          (203, TwoPCPhase1),
+                          (204, TwoPCReply),
+                          (205, TwoPCPhase2)
+                          ]
+    _FRAME_TYPE_MAP = dict([(v, t) for v, t in _FRAME_TYPE_TUPLES] +
+                           [(t, v) for v, t in _FRAME_TYPE_TUPLES])
+
+    @classmethod
+    def encode(cls, msg):
+        frame_tag = cls._FRAME_TYPE_MAP[type(msg)]
+        data = msg.encode()
+        # Don't add length for this inner message type
+        return struct.pack('>B', frame_tag) + data
+
+    @classmethod
+    def decode(cls, bs): # bs does not include frame length header
+        frame_tag = struct.unpack('>B', bs[0:1])[0]
+        return cls._FRAME_TYPE_MAP[frame_tag].decode(bs[1:])
+
+    @staticmethod
+    def read_header(bs):
+        return struct.unpack('>I', bs[:4])[0]
+
+
+def _test_twopcframe_encode_decode(msg):
+    framed = TwoPCFrame.encode(msg)
+    decoded = TwoPCFrame.decode(framed[4:])
+    assert(decoded == msg)
+
+def test_frame():
+    assert(Frame.read_header(struct.pack('>I', 50)) == 50)
+    msgs = []
+    #msgs.append(ListUncommitted(77))
+    #msgs.append(ReplyUncommitted(...))
+    #msgs.append(TwoPCPhase1(...))
+    #msgs.append(TwoPCReply(...))
+    #msgs.append(TwoPCPhase2(...))
+    #msgs.append(TwoPCPhase1(...))
+
+    for msg in msgs:
+        _test_frame_encode_decode(msg)
