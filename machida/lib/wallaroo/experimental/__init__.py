@@ -145,9 +145,22 @@ class SourceConnector(BaseConnector):
 Stream = namedtuple('Stream', ['id', 'name', 'point_of_ref', 'is_open'])
 
 
+def _asyncore_loop(sentinel, timeout, socket_map):
+    poll_fun = asyncore.poll
+
+    try:
+        while not sentinel.is_set():
+            poll_fun(timeout=timeout, map=socket_map)
+            time.sleep(timeout)
+    except:
+        logging.exception("_asyyncore_loop exited!")
+    logging.debug("_asyncore_loop exiting")
+
+
 class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
     def __init__(self, version, cookie, program_name, instance_name,
                  host, port, delay=0):
+
         # connection details are given from the base
         self._host = host
         self._port = int(port)  # convert port to int
@@ -178,9 +191,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self._socket_map = {}
         self._asyncore_loop_timeout = 0.000001
         self._loop_sentinel = threading.Event()
-        self._loop = threading.Thread(target=self._asyncore_loop)
-        self._loop.daemon = True
-        self._loop.start()
+        self._loop = None
         self._async_init = False
 
         self._sent = 0
@@ -209,13 +220,18 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
     #############################################
     # asyncore loop to run in background thread #
     #############################################
-    def _asyncore_loop(self):
-        poll_fun = asyncore.poll
+    def _stop_asyncore_loop(self):
+        logging.debug("Stopping the asyncore loop")
+        self._loop_sentinel.set()
 
-        while not self._loop_sentinel.is_set():
-            poll_fun(timeout=self._asyncore_loop_timeout,
-                     map=self._socket_map)
-            time.sleep(self._asyncore_loop_timeout)
+    def _start_asyncore_loop(self):
+        self._loop_sentinel.clear()
+        self._loop = threading.Thread(target = _asyncore_loop,
+                                      args = (self._loop_sentinel,
+                                              self._asyncore_loop_timeout,
+                                              self._socket_map))
+        self._loop.daemon = True
+        self._loop.start()
 
     ###########################
     # Incoming communications #
@@ -344,7 +360,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         hello = cwm.Hello(self.version, self.cookie, self.program_name,
                           self.instance_name)
         self._conn.sendall(cwm.Frame.encode(hello))
-        logging.debug("ALOConnectorSource handshake sent")
         header_bytes = self._conn.recv(4)
         frame_size = struct.unpack('>I', header_bytes)[0]
         frame = self._conn.recv(frame_size)
@@ -357,11 +372,13 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         # set socket to nonblocking
         self._conn.setblocking(0)
         # handshake complete: initialize async_chat
-        logging.debug("ALOConnectorSource handshake complete")
-        self._async_init = True
-        asynchat.async_chat.__init__(self,
-                                     sock=self._conn,
-                                     map=self._socket_map)
+        self._start_asyncore_loop()
+        if not self._async_init:
+            self._async_init = True
+            asynchat.async_chat.__init__(self,
+                                         sock=self._conn,
+                                         map=self._socket_map)
+        self.set_socket(self._conn)
 
     def handle_write(self):
         """
@@ -398,7 +415,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             logging.info("AtLeastOnceConnector.shutdown(error={})".format(error))
         if self._async_init:
             self.del_channel(self._socket_map) # remove the connection from asyncore loop
-        self._loop_sentinel.set() # exit the asyncore loop
+        self._stop_asyncore_loop()
         try:
             self._conn.setblocking(1)
         except:
@@ -583,7 +600,12 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         # reset credits
         self.credits = 0
         # close connection
+        self._stop_asyncore_loop()
+        logging.debug("Removing socket from asyncore map")
+        self._socket_map.pop(self._conn.fileno(), None)
+        logging.debug("Closing socket {}".format(self._conn.fileno()))
         self._conn.close()
+        self._conn = None
         # close streams
         for sid, stream in self._streams.items():
             if stream.is_open:
@@ -621,8 +643,10 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         ```
         """
         _type, _value, _traceback = sys.exc_info()
-        traceback.print_exception(_type, _value, _traceback)
-        logging.error("Closing the connection after encountering an error")
+        exc_text = ''.join(
+                traceback.format_exception(_type, _value, _traceback)).strip()
+        logging.error("Closing the connection after encountering an"
+                      " error:\n%s", exc_text)
         self.error = _value
         self.close()
 
