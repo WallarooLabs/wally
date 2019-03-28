@@ -39,7 +39,7 @@ trait SinkMessageProcessor
     Fail()
 
   fun ref receive_barrier(step_id: RoutingId, producer: Producer,
-    barrier_token: BarrierToken)
+    barrier_token: BarrierToken, ack_barrier_if_complete: Bool = true)
   =>
     Fail()
 
@@ -81,9 +81,11 @@ type _Queued is (QueuedMessage | QueuedBarrier)
 class BarrierSinkMessageProcessor is SinkMessageProcessor
   let sink: Sink ref
   let _barrier_acker: BarrierSinkAcker
+  var _barrier_token: BarrierToken = InitialBarrierToken
   let _queued: Array[_Queued] = _queued.create()
 
-  new create(s: Sink ref, barrier_acker: BarrierSinkAcker) =>
+  new create(s: Sink ref, barrier_acker: BarrierSinkAcker)
+  =>
     sink = s
     _barrier_acker = barrier_acker
 
@@ -105,20 +107,22 @@ class BarrierSinkMessageProcessor is SinkMessageProcessor
     end
 
   fun barrier_in_progress(): Bool =>
-    true
+    _barrier_token != InitialBarrierToken
 
   fun ref receive_new_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
+    _barrier_token = barrier_token
     _barrier_acker.receive_new_barrier(input_id, producer, barrier_token)
 
   fun ref receive_barrier(input_id: RoutingId, producer: Producer,
-    barrier_token: BarrierToken)
+    barrier_token: BarrierToken, ack_barrier_if_complete: Bool = true)
   =>
     if _barrier_acker.input_blocking(input_id) then
       _queued.push(QueuedBarrier(input_id, producer, barrier_token))
     else
-      _barrier_acker.receive_barrier(input_id, producer, barrier_token)
+      _barrier_acker.receive_barrier(input_id, producer, barrier_token,
+        ack_barrier_if_complete)
     end
 
   fun ref queued(): Array[_Queued] =>

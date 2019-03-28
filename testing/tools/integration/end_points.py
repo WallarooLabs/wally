@@ -89,6 +89,7 @@ class SingleSocketReceiver(StoppableThread):
                 self.stop()
                 if data:
                     self.append(b''.join(data))
+                break
             # We must be careful not to accidentally join two separate lines
             # nor split a line
             split = buf.split(b'\n')  # '\n' show as '' in list after split

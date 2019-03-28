@@ -70,7 +70,7 @@ class val KafkaSinkBuilder
   fun apply(sink_name: String, event_log: EventLog,
     reporter: MetricsReporter iso, env: Env,
     barrier_coordinator: BarrierCoordinator, checkpoint_initiator: CheckpointInitiator,
-    recovering: Bool): Sink
+    recovering: Bool, worker_name_: WorkerName, auth_: AmbientAuth): Sink
   =>
     // generate md5 hash for sink id
     let rb: Reader = Reader
