@@ -515,15 +515,14 @@ actor ConnectorSink is Sink
       end
 
       // As a 2PC participant as a Wallaroo *sink*, we cannot
-      // allow messages to be processed by this sink during 2PC.
-      // If we allow messages to be processed & sent to the external
-      // connector sink, then if the global decision for message-ids
-      // X..Y is abort, then we will also need to abort any messages
-      // Y+1, Y+2, ... that slipped through during 2PC, which will
-      // be another round of 2PC of message-ids (Y+1)..(Y+n) plus
-      // forced abort.
-      // Instead of that mess, we force the barrier acker to
-      // queue all messages (including barrier messages).
+      // allow messages to be processed by this sink during 2PC,
+      // unless we make additional assumptions about the ability of
+      // the connector sink to be able to manage the storage of and
+      // possible rollback of data sent during a round of 2PC.
+      // We choose to assume that the client can only manage
+      // commit/abort decisions only on the range of output
+      // governed by a single round of 2PC.
+
       try (_barrier_acker as BarrierSinkAcker).set_force_queue() else Fail end
 
     | let srt: CheckpointRollbackBarrierToken =>
