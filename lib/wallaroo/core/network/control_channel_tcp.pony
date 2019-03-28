@@ -614,8 +614,9 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
       | let m: CleanShutdownMsg =>
         _recovery_file_cleaner.clean_shutdown()
       | let m: SourceListenerMsg =>
-        // debugging
-        @printf[I32]("Received SourceListenerMsg.\n".cstring())
+        ifdef "trace" then
+          @printf[I32]("Received SourceListenerMsg.\n".cstring())
+        end
         _router_registry.receive_source_listener_msg(m)
       | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown channel message type.\n".cstring())

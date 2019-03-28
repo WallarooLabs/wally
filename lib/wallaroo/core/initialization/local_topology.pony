@@ -1052,7 +1052,6 @@ actor LocalTopologyInitializer is LayoutInitializer
     _phase.report_initialized(initializable)
 
   fun ref _application_initialized(initializables: Initializables) =>
-    // _register_source_listeners()
     _phase = _ApplicationInitializedPhase(this, initializables)
 
   be report_ready_to_work(initializable: Initializable) =>
@@ -1274,11 +1273,16 @@ actor LocalTopologyInitializer is LayoutInitializer
     match _topology
     | let t: LocalTopology =>
       let current_worker_count = t.worker_names.size()
-      let new_t = local_topology_for_joining_worker(joining_worker_name)
+      let new_t = local_topology_for_joining_worker(t, joining_worker_name)
       _router_registry.worker_join(conn, joining_worker_name,
         joining_worker_count, new_t, current_worker_count)
     else
-      Fail()
+      Unreachable()
+      LocalTopology("", "", recover val Dag[StepInitializer] end,
+        recover val Map[U128, SetIs[RoutingId] val] end,
+        recover val Array[WorkerName] end, recover val SetIs[WorkerName] end,
+        recover val Map[RoutingId, Map[WorkerName, RoutingId] val] end,
+        0)
     end
 
   be connect_to_joining_workers(coordinator: String,
@@ -1494,21 +1498,11 @@ actor LocalTopologyInitializer is LayoutInitializer
     _outgoing_boundaries = consume bs
     _outgoing_boundary_builders = consume bbs
 
-  fun ref local_topology_for_joining_worker(
+  fun ref local_topology_for_joining_worker(t: LocalTopology,
     joining_worker_name: String): LocalTopology
   =>
-    match _topology
-    | let t: LocalTopology =>
-      t.add_new_worker(joining_worker_name)
-        .new_barrier_source_id(_routing_id_gen())
-    else
-      Unreachable()
-      LocalTopology("", "", recover val Dag[StepInitializer] end,
-        recover val Map[U128, SetIs[RoutingId] val] end,
-        recover val Array[WorkerName] end, recover val SetIs[WorkerName] end,
-        recover val Map[RoutingId, Map[WorkerName, RoutingId] val] end,
-        0)
-    end
+    t.add_new_worker(joining_worker_name)
+      .new_barrier_source_id(_routing_id_gen())
 
 
 ///////////////////////
