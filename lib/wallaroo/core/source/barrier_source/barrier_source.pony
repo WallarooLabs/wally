@@ -205,11 +205,23 @@ actor BarrierSource is Source
     end
 
   fun ref _unregister_output(source: String, id: RoutingId, c: Consumer) =>
-    match c
-    | let ob: OutgoingBoundary =>
-      ob.forward_unregister_producer(_source_id, id, this)
+    try
+      _source_outputs(source)?.remove(id)?
+      match c
+      | let ob: OutgoingBoundary =>
+        ob.forward_unregister_producer(_source_id, id, this)
+      else
+        c.unregister_producer(_source_id, this)
+      end
+      var last_one = true
+      for (p, outputs) in _source_outputs.pairs() do
+        if outputs.contains(id) then last_one = false end
+      end
+      if last_one then
+        _outputs.remove(id)?
+      end
     else
-      c.unregister_producer(_source_id, this)
+      Fail()
     end
 
   be register_downstream() =>
