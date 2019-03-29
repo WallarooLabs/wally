@@ -174,6 +174,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self._previous_ts = 0
 
         self._send_lock = threading.Lock()
+        self._write_lock = threading.Lock()
 
         # Stream details
         # live streams for this connection
@@ -395,27 +396,28 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         users must call `.write(msg)` directly in their own code, as well as
         `shutdown()` to ensure the outgoing queue is flushed.
         """
-        if hasattr(self, '__next__'):
-            # if delay is non-zero, return None if not enough time has elapsed
-            if self._delay > 0:
-                t = time.time()
-                if t - self._previous_ts < self._delay:
-                    return None
-                self._previous_ts = t
-                # continue
-            try:
-                while self.credits > 0:
-                    msg = self.__next__()
-                    if msg:
-                        self.write(msg)
-                    else:
-                        break
+        with self._write_lock:
+            if hasattr(self, '__next__'):
+                # if delay is non-zero, return None if not enough time has elapsed
+                if self._delay > 0:
+                    t = time.time()
+                    if t - self._previous_ts < self._delay:
+                        return None
+                    self._previous_ts = t
+                    # continue
+                try:
+                    while self.credits > 0:
+                        msg = self.__next__()
+                        if msg:
+                            self.write(msg)
+                        else:
+                            break
+                    self.initiate_send()
+                except StopIteration:
+                    self.initiate_send()
+                    self.shutdown()
+            else:
                 self.initiate_send()
-            except StopIteration:
-                self.initiate_send()
-                self.shutdown()
-        else:
-            self.initiate_send()
 
     def shutdown(self, error=None):
         if error is not None:
@@ -451,7 +453,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         return self.credits >= 0
 
     def write(self, msg):
-        logging.debug("write({})".format(msg))
+        logging.debug("write({}) START".format(msg))
         if isinstance(msg, cwm.Message):
             # TODO: what to do when stream is closed?
             # For now: if stream isn't open (or doesn't exist), raise error
@@ -459,10 +461,12 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             try:
                 if self._streams[msg.stream_id].is_open:
                     data = cwm.Frame.encode(msg)
+                    logging.debug("write calling _write({}) for Message".format(msg))
                     self._write(data)
                     # use up 1 credit
                     self.credits -= 1
                 else:
+                    logging.debug("")
                     raise
             except:
                 raise ProtocolError("Message cannot be sent. Stream ({}) is "
@@ -482,50 +486,49 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         else:
             raise ProtocolError("Can only send message types {{Hello, Notify, "
                                 "Message, Error}}. Received {}".format(msg))
+        logging.debug("write({}) END".format(msg))
 
     def _write(self, data):
         """
         Replaces asynchat.async_chat.push, which does a synchronous send
         i.e. without calling `initiate_send()` at the end
         """
-        with self._send_lock:
-            self._sent += 1
-            self.producer_fifo.append(data)
-            logging.debug("_write(): Added {} to fifo".format(cwm.Frame.decode(data[4:])))
+        self._sent += 1
+        self.producer_fifo.append(data)
+        logging.debug("_write(): Added {} to fifo".format(cwm.Frame.decode(data[4:])))
 
     def initiate_send(self):
-        with self._send_lock:
-            if self.connected:
-                logging.debug("initiate_send(): begin")
-                # collect data up to 65kb in size, send, repeat, until empty
-                obs = self.ac_out_buffer_size
-                q = self.producer_fifo
-                data = []
-                data_len = 0
-                while q:
-                    b = q.popleft()
-                    if b is None:
-                        self.handle_close()
-                        return
-                    elif not b:
-                        continue
-                    if not isinstance(b, bytes):
-                        b = b.encode()
-                    if data_len + len(b) > obs:
-                        self._send(b''.join(data))
-                        data = [b]
-                        logging.debug("initiate_send(): created new socket buffer")
-                        data_len = len(b)
-                        logging.debug("initiate_send(): added {} to socket buffer".format(
-                            cwm.Frame.decode(b[4:])))
-                    else:
-                        data.append(b)
-                        data_len += len(b)
-                        logging.debug("initiate_send(): added {} to socket buffer".format(
-                            cwm.Frame.decode(b[4:])))
-                if data:
-                    logging.debug("initiate_send(): END. calling _send")
+        if self.connected:
+            logging.debug("initiate_send(): begin")
+            # collect data up to 65kb in size, send, repeat, until empty
+            obs = self.ac_out_buffer_size
+            q = self.producer_fifo
+            data = []
+            data_len = 0
+            while q:
+                b = q.popleft()
+                if b is None:
+                    self.handle_close()
+                    return
+                elif not b:
+                    continue
+                if not isinstance(b, bytes):
+                    b = b.encode()
+                if data_len + len(b) > obs:
                     self._send(b''.join(data))
+                    data = [b]
+                    logging.debug("initiate_send(): created new socket buffer")
+                    data_len = len(b)
+                    logging.debug("initiate_send(): added {} to socket buffer".format(
+                        cwm.Frame.decode(b[4:])))
+                else:
+                    data.append(b)
+                    data_len += len(b)
+                    logging.debug("initiate_send(): added {} to socket buffer".format(
+                        cwm.Frame.decode(b[4:])))
+            if data:
+                logging.debug("initiate_send(): END. calling _send")
+                self._send(b''.join(data))
 
     def _send(self, data):
         logging.debug("NISAN")
