@@ -64,6 +64,11 @@ trait _CheckpointInitiatorPhase
     _invalid_call()
     Fail()
 
+  fun ref abort_checkpoint(checkpoint_id: CheckpointId,
+    checkpoint_initiator: CheckpointInitiator ref)
+  =>
+    checkpoint_initiator._abort_checkpoint(checkpoint_id)
+
   fun _invalid_call() =>
     @printf[I32]("Invalid call on checkpoint initiator phase %s\n".cstring(),
       name().cstring())
@@ -208,6 +213,11 @@ class _RollbackCheckpointInitiatorPhase is _CheckpointInitiatorPhase
   fun ref resume_checkpointing_from_rollback() =>
     _c_initiator.wait_for_next_checkpoint()
 
+  fun ref abort_checkpoint(checkpoint_id: CheckpointId,
+    checkpoint_initiator: CheckpointInitiator ref)
+  =>
+    None
+
 class _DisposedCheckpointInitiatorPhase is _CheckpointInitiatorPhase
   fun name(): String => "_DisposedCheckpointInitiatorPhase"
 
@@ -226,5 +236,10 @@ class _DisposedCheckpointInitiatorPhase is _CheckpointInitiatorPhase
 
   fun ref event_log_id_written(worker: WorkerName,
     checkpoint_id: CheckpointId)
+  =>
+    None
+
+  fun ref abort_checkpoint(checkpoint_id: CheckpointId,
+    checkpoint_initiator: CheckpointInitiator ref)
   =>
     None
