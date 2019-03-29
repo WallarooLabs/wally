@@ -306,14 +306,25 @@ actor CheckpointInitiator is Initializable
     other irreversible problem, then it will abort the checkpoint barrier.
     At this point, we must roll back to the last successful checkpoint.
     """
+    _phase.abort_checkpoint(checkpoint_id, this)
+
+  fun ref _abort_checkpoint(checkpoint_id: CheckpointId) =>
     if _primary_worker == _worker_name then
       @printf[I32]("CheckpointInitiator: Aborting Checkpoint %s\n".cstring(),
         checkpoint_id.string().cstring())
+      _phase = _RollbackCheckpointInitiatorPhase(this)
       match _recovery
       | let r: Recovery =>
         let ws: Array[WorkerName] iso = recover Array[WorkerName] end
         for w in _workers.values() do
           ws.push(w)
+        end
+        if checkpoint_id == 1 then
+          @printf[I32](("We are aborting the initial checkpoint, which " +
+            "should never happen.\n").cstring())
+          Fail()
+        else
+          r.update_checkpoint_id(_last_complete_checkpoint_id)
         end
         r.start_recovery(consume ws where with_reconnect = false)
       else
