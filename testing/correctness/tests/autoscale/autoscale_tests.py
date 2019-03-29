@@ -60,4 +60,4 @@ for api, cmd in APIS.items():
                 TC.create(AUTOSCALE_TEST_NAME_FMT, api, cmd, [o1])
             else:
                 TC.create(AUTOSCALE_TEST_NAME_FMT, api, cmd,
-                            [o1, Wait(2), o2])
+                            [o1, Wait(5), o2])

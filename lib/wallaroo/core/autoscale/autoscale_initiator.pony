@@ -17,6 +17,7 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 use "promises"
+use "time"
 use "wallaroo/core/common"
 use "wallaroo/core/barrier"
 use "wallaroo/core/checkpoint"
@@ -30,6 +31,9 @@ actor AutoscaleInitiator
   let _checkpoint_initiator: CheckpointInitiator
   var _current_autoscale_tokens: AutoscaleTokens
   var _autoscale_token_in_progress: Bool = false
+
+  //!@
+  var _timers: Timers = Timers
 
   new create(w_name: WorkerName, barrier_coordinator: BarrierCoordinator,
     checkpoint_initiator: CheckpointInitiator)
@@ -81,8 +85,14 @@ actor AutoscaleInitiator
       .next[None](recover this~autoscale_resume_complete() end)
       .next[None]({(_: None) => autoscale_resume_promise(None)})
 
-    _barrier_coordinator.inject_barrier(_current_autoscale_tokens.resume_token,
-      barrier_promise)
+    //!@
+    let t = Timer(_WaitForProducerRegistrations(_barrier_coordinator,
+      _current_autoscale_tokens.resume_token, barrier_promise), 3_000_000_000)
+    _timers(consume t)
+
+    //!@ Bring back
+    // _barrier_coordinator.inject_barrier(_current_autoscale_tokens.resume_token,
+    //   barrier_promise)
 
   be autoscale_barrier_complete(barrier_token: BarrierToken) =>
     if barrier_token != _current_autoscale_tokens.initial_token then Fail() end
@@ -96,3 +106,20 @@ actor AutoscaleInitiator
   be dispose() =>
     @printf[I32]("Shutting down AutoscaleInitiator\n".cstring())
     None
+
+
+class _WaitForProducerRegistrations is TimerNotify
+  let _b_coord: BarrierCoordinator
+  let _token: BarrierToken
+  let _promise: Promise[BarrierToken]
+
+  new iso create(b_coord: BarrierCoordinator, token: BarrierToken,
+    promise: Promise[BarrierToken])
+  =>
+    _b_coord = b_coord
+    _token = token
+    _promise = promise
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    _b_coord.inject_barrier(_token, _promise)
+    false

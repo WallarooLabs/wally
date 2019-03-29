@@ -126,6 +126,7 @@ class BarrierStepForwarder
       _step.barrier_complete(b_token)
     end
 
+
   fun ref clear() =>
     _inputs_blocking.clear()
     _removed_inputs.clear()
