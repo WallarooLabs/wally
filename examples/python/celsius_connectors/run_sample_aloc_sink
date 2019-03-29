@@ -122,13 +122,11 @@ except:
 
 time.sleep(1)
 source = subprocess.Popen([
-        "./at_least_once_feed",
-        "--application-module", "celsius",
-        "--connector", "celsius_feed",
-        "--celsius_feed-host", "127.0.0.1",
-        "--celsius_feed-port", "7100",
-        "--celsius_feed-timeout" "0.05",
-        "--celsius_feed-filenames", "celsius.msg,celsius.msg.2,celsius.msg.3"])
+    "../../../connectors/udp_source",
+    "--application-module", "celsius",
+    "--connector", "celsius_feed",
+    "--celsius_feed-host", "127.0.0.1",
+    "--celsius_feed-port", "8801"])
 source.poll()
 if source.returncode or sink.returncode:
     terminate()
