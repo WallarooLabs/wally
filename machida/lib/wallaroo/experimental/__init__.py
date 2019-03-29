@@ -173,7 +173,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self._delay = delay
         self._previous_ts = 0
 
-        self._send_lock = threading.Lock()
         self._write_lock = threading.Lock()
 
         # Stream details
@@ -225,7 +224,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
     # asyncore loop to run in background thread #
     #############################################
     def _stop_asyncore_loop(self):
-        logging.debug("Stopping the asyncore loop")
         self._loop_sentinel.set()
         self.discard_buffers()
 
@@ -313,7 +311,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             self.set_terminator(4)
 
     def _handle_notify_ack(self, msg):
-        logging.debug("_handle_notify_ack({})".format(msg))
         old = self._streams.get(msg.stream_id, None)
         if old is not None:
             new = Stream(old.id, old.name, msg.point_of_ref,
@@ -453,7 +450,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         return self.credits >= 0
 
     def write(self, msg):
-        logging.debug("write({}) START".format(msg))
         if isinstance(msg, cwm.Message):
             # TODO: what to do when stream is closed?
             # For now: if stream isn't open (or doesn't exist), raise error
@@ -461,12 +457,10 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             try:
                 if self._streams[msg.stream_id].is_open:
                     data = cwm.Frame.encode(msg)
-                    logging.debug("write calling _write({}) for Message".format(msg))
                     self._write(data)
                     # use up 1 credit
                     self.credits -= 1
                 else:
-                    logging.debug("")
                     raise
             except:
                 raise ProtocolError("Message cannot be sent. Stream ({}) is "
@@ -495,11 +489,9 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         """
         self._sent += 1
         self.producer_fifo.append(data)
-        logging.debug("_write(): Added {} to fifo".format(cwm.Frame.decode(data[4:])))
 
     def initiate_send(self):
         if self.connected:
-            logging.debug("initiate_send(): begin")
             # collect data up to 65kb in size, send, repeat, until empty
             obs = self.ac_out_buffer_size
             q = self.producer_fifo
@@ -517,22 +509,14 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 if data_len + len(b) > obs:
                     self._send(b''.join(data))
                     data = [b]
-                    logging.debug("initiate_send(): created new socket buffer")
                     data_len = len(b)
-                    logging.debug("initiate_send(): added {} to socket buffer".format(
-                        cwm.Frame.decode(b[4:])))
                 else:
                     data.append(b)
                     data_len += len(b)
-                    logging.debug("initiate_send(): added {} to socket buffer".format(
-                        cwm.Frame.decode(b[4:])))
             if data:
-                logging.debug("initiate_send(): END. calling _send")
                 self._send(b''.join(data))
 
     def _send(self, data):
-        logging.debug("NISAN")
-        logging.debug("_send({!r})".format(data))
         try:
             self.send(data)
             if self.data is not None:
@@ -554,7 +538,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self.shutdown(error=message)
 
     def notify(self, stream_id, stream_name=None, point_of_ref=None):
-        logging.debug("notify({}, {}, {})".format(stream_id, stream_name, point_of_ref))
         old = self._streams.get(stream_id, None)
         if old:
             if point_of_ref is None:

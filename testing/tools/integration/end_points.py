@@ -702,7 +702,6 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
         return self.position
 
     def reset(self, pos=None):
-        logging.debug("{} resetting positino to {}".format(self, pos))
         if pos is None:
             pos = self.start
         self.position = pos
@@ -718,7 +717,6 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
         self.position += 1
         val, pos, key = (self.position, self.position, self.key)
         payload = struct.pack('>Q{}s'.format(len(key)), val, key)
-        logging.debug("{} next value: {}".format(self, (key, val)))
         return (payload, pos)
 
     def close(self):

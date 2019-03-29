@@ -289,7 +289,7 @@ class ConnectorSourceNotify[In: Any val]
 
     try
       let data': Array[U8] val = consume data
-      ifdef debug then
+      ifdef "trace" then
         @printf[I32]("TRACE: decode data: %s\n".cstring(), _print_array[U8](data').cstring())
       end
       let connector_msg = cwm.Frame.decode(consume data')?
@@ -705,7 +705,6 @@ class ConnectorSourceNotify[In: Any val]
     w.done()
 
   fun ref prepare_for_rollback() =>
-  ifdef debug then @printf[I32]("prepare_for_rollback\n".cstring()) end
     if _session_active then
       _clear_streams()
       _prep_for_rollback = true
@@ -864,7 +863,7 @@ class ConnectorSourceNotify[In: Any val]
   fun ref stream_notify_result(source: ConnectorSource[In] ref,
     session_id: RoutingId, success: Bool, stream: StreamTuple)
   =>
-    ifdef debug then
+    ifdef "trace" then
       @printf[I32]("%s ::: stream_notify_result(%s, %s, StreamTuple(%s, %s, %s))\n".cstring(),
         WallClock.seconds().string().cstring(),
         session_id.string().cstring(),
