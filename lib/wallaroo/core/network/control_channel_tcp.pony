@@ -331,7 +331,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             Fail()
           end
         end
-      | let m: AnnounceConnectionsMsg =>
+      | let m: AnnounceConnectionsToJoiningWorkersMsg =>
         for w in m.control_addrs.keys() do
           try
             let host = m.control_addrs(w)?._1
@@ -358,8 +358,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           Fail()
         end
       | let m: AnnounceHashPartitionsGrowMsg =>
-        _router_registry.update_partition_routers_after_grow(m.joining_workers,
-          m.hash_partitions)
+        _router_registry.receive_hash_partitions(m.hash_partitions)
       | let m: ConnectedToJoiningWorkersMsg =>
         _router_registry.report_connected_to_joining_worker(m.sender)
       | let m: AnnounceNewSourceMsg =>
@@ -389,6 +388,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
       | let m: InitiateJoinMigrationMsg =>
         _router_registry.remote_join_migration_request(m.new_workers,
           m.checkpoint_id)
+      | let m: PreRegisterJoiningWorkersMsg =>
+        _router_registry.pre_register_joining_workers(m.joining_workers)
       | let m: AutoscaleCompleteMsg =>
         _router_registry.autoscale_complete()
       | let m: InitiateStopTheWorldForShrinkMigrationMsg =>
