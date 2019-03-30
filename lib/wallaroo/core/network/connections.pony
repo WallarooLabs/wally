@@ -291,7 +291,7 @@ actor Connections is Cluster
         end
       end
       try
-        let msg = ChannelMsgEncoder.announce_connections(
+        let msg = ChannelMsgEncoder.announce_connections_to_joining_workers(
           consume others_control, consume others_data,
           new_step_group_routing_ids, _auth)?
         _send_control(w1, msg)
