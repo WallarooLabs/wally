@@ -62,6 +62,7 @@ actor TCPSource[In: Any val] is Source
   ## Future work
   * Switch to requesting credits via promise
   """
+  let _self: TCPSource[In] tag = this
   let _source_id: RoutingId
   let _auth: AmbientAuth
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
@@ -356,6 +357,16 @@ actor TCPSource[In: Any val] is Source
     for (id, consumer) in outputs_to_remove.pairs() do
       _unregister_output(id, consumer)
     end
+
+  be ack_immediately(promise: Promise[Producer]) =>
+    let ps = Array[Promise[OutgoingBoundary]]
+    for ob in _outgoing_boundaries.values() do
+      let p = Promise[OutgoingBoundary]
+      ps.push(p)
+      ob.ack_immediately(p)
+    end
+    let promises = Promises[OutgoingBoundary].join(ps.values())
+    promises.next[None]({(_: Array[OutgoingBoundary] val) => promise(_self)})
 
   be dispose_with_promise(promise: Promise[None]) =>
     _dispose()

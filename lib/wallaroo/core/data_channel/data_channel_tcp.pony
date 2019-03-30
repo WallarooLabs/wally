@@ -314,6 +314,8 @@ class _DataReceiver is _DataReceiverWrapper
     | let dc: DataConnectMsg =>
       @printf[I32](("Received DataConnectMsg on DataChannel, but we already " +
         "have a DataReceiver for this connection.\n").cstring())
+    | let ia: DataReceiverAckImmediatelyMsg =>
+      _data_receiver.data_receiver_ack_immediately()
     | let km: KeyMigrationMsg =>
       ifdef "trace" then
         @printf[I32]("Received KeyMigrationMsg on Data Channel\n".cstring())

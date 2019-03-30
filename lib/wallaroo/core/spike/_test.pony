@@ -829,6 +829,9 @@ class NullWallarooOutgoingNetworkActor is WallarooOutgoingNetworkActor
   fun ref start_normal_sending() =>
     None
 
+  fun ref receive_immediate_ack() =>
+    None
+
   fun ref close() =>
     if _should_close then
       _h.complete_action("closed")

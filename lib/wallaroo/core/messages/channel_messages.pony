@@ -213,6 +213,12 @@ primitive ChannelMsgEncoder
   =>
     _encode(AckDataReceivedMsg(sender_name, sender_step_id, seq_id), auth)?
 
+  fun data_receiver_ack_immediately(auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(DataReceiverAckImmediatelyMsg, auth)?
+
+  fun immediate_ack(auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(ImmediateAckMsg, auth)?
+
   fun request_recovery_info(worker_name: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
@@ -293,6 +299,17 @@ primitive ChannelMsgEncoder
     """
     _encode(InitiateJoinMigrationMsg(new_workers, checkpoint_id), auth)?
 
+  fun pre_register_joining_workers(new_workers: Array[WorkerName] val,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    """
+    Joining workers need to know the names of the other joining workers
+    in order to correctly keep track of when to advance autoscale
+    phases. This message tells a joining worker of the other joining
+    workers names, but no other information about them.
+    """
+    _encode(PreRegisterJoiningWorkersMsg(new_workers), auth)?
+
   fun autoscale_complete(auth: AmbientAuth): Array[ByteSeq] val ? =>
     """
     The autoscale coordinator sends this message to indicate that autoscale is
@@ -327,13 +344,14 @@ primitive ChannelMsgEncoder
   =>
     _encode(InformOfBoundaryCountMsg(sender, count), auth)?
 
-  fun announce_connections(control_addrs: Map[String, (String, String)] val,
+  fun announce_connections_to_joining_workers(
+    control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val,
     new_step_group_routing_ids:
       Map[WorkerName, Map[RoutingId, RoutingId] val] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(AnnounceConnectionsMsg(control_addrs, data_addrs,
+    _encode(AnnounceConnectionsToJoiningWorkersMsg(control_addrs, data_addrs,
       new_step_group_routing_ids), auth)?
 
   fun announce_joining_workers(sender: WorkerName,
@@ -953,6 +971,9 @@ class val StartNormalDataSendingMsg is ChannelMsg
   new val create(last_id_seen': SeqId) =>
     last_id_seen = last_id_seen'
 
+primitive DataReceiverAckImmediatelyMsg is ChannelMsg
+primitive ImmediateAckMsg is ChannelMsg
+
 class val RequestBoundaryCountMsg is ChannelMsg
   let sender_name: String
 
@@ -1382,6 +1403,12 @@ class val InitiateJoinMigrationMsg is ChannelMsg
     new_workers = ws
     checkpoint_id = s_id
 
+class val PreRegisterJoiningWorkersMsg is ChannelMsg
+  let joining_workers: Array[String] val
+
+  new val create(ws: Array[String] val) =>
+    joining_workers = ws
+
 primitive AutoscaleCompleteMsg is ChannelMsg
 
 class val InitiateStopTheWorldForShrinkMigrationMsg is ChannelMsg
@@ -1403,7 +1430,7 @@ class val LeavingWorkerDoneMigratingMsg is ChannelMsg
   =>
     worker_name = name
 
-class val AnnounceConnectionsMsg is ChannelMsg
+class val AnnounceConnectionsToJoiningWorkersMsg is ChannelMsg
   let control_addrs: Map[String, (String, String)] val
   let data_addrs: Map[String, (String, String)] val
   let new_step_group_routing_ids:

@@ -51,6 +51,8 @@ interface WallarooOutgoingNetworkActor
     connection
     """
 
+  fun ref receive_immediate_ack()
+
   fun ref close()
     """
     Called to close the connection in a graceful fashion

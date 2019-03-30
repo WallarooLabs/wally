@@ -21,22 +21,22 @@ use "net"
 use "promises"
 use "time"
 use "wallaroo"
+use "wallaroo/core/autoscale"
+use "wallaroo/core/barrier"
 use "wallaroo/core/boundary"
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
+use "wallaroo/core/data_receiver"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
+use "wallaroo/core/network"
+use "wallaroo/core/recovery"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
-use "wallaroo/core/autoscale"
-use "wallaroo/core/barrier"
-use "wallaroo/core/data_receiver"
-use "wallaroo/core/network"
-use "wallaroo/core/recovery"
-use "wallaroo/core/checkpoint"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/messages"
 use "wallaroo_labs/mort"
@@ -170,6 +170,10 @@ actor RouterRegistry
     barrier_coordinator: BarrierCoordinator,
     checkpoint_initiator: CheckpointInitiator,
     autoscale_initiator: AutoscaleInitiator,
+    // TODO: Only a joining worker has workers available to pass in here
+    // which it needs to initialize Autoscale. We should probably
+    // refactor this.
+    workers: (Array[WorkerName] val | None) = None,
     contacted_worker: (WorkerName | None) = None)
   =>
     _auth = auth
@@ -190,10 +194,32 @@ actor RouterRegistry
         recover Map[RoutingId, Array[Step] val] end,
         recover Map[RoutingId, RoutingId] end)
     _initializer_name = initializer_name
-    _autoscale = Autoscale(_auth, _worker_name, this, _connections, is_joining)
+    _autoscale = Autoscale(_auth, _worker_name, this, _connections, is_joining,
+      workers)
 
   fun _worker_count(): USize =>
     _outgoing_boundaries.size() + 1
+
+  fun producers(): SetIs[Producer] =>
+    let ps: SetIs[Producer] = ps.create()
+    for p in _producers.values() do
+      ps.set(p)
+    end
+    ps
+
+  fun outgoing_boundaries(): SetIs[OutgoingBoundary] =>
+    let obs: SetIs[OutgoingBoundary] = obs.create()
+    for b in _outgoing_boundaries.values() do
+      obs.set(b)
+    end
+    obs
+
+  fun sources(): SetIs[Source] =>
+    let ss = SetIs[Source]
+    for s in _sources.values() do
+      ss.set(s)
+    end
+    ss
 
   be dispose() =>
     None
@@ -380,16 +406,16 @@ actor RouterRegistry
     let new_boundaries_sendable: Map[WorkerName, OutgoingBoundary] val =
       consume new_boundaries
 
-    for producers in _partition_router_subs.values() do
-      for producer in producers.values() do
+    for ps in _partition_router_subs.values() do
+      for producer in ps.values() do
         match producer
         | let s: Step =>
           s.add_boundaries(new_boundaries_sendable)
         end
       end
     end
-    for producers in _stateless_partition_router_subs.values() do
-      for producer in producers.values() do
+    for ps in _stateless_partition_router_subs.values() do
+      for producer in ps.values() do
         match producer
         | let s: Step =>
           s.add_boundaries(new_boundaries_sendable)
@@ -489,6 +515,7 @@ actor RouterRegistry
     try
       _partition_router_subs.insert_if_absent(step_group,
         SetIs[_RouterSub])?
+
       for sub in _partition_router_subs(step_group)?.values() do
         sub.update_router(partition_router)
       end
@@ -944,6 +971,28 @@ actor RouterRegistry
       source.reconnect_boundary(target_worker)
     end
 
+  be pre_register_joining_workers(ws: Array[WorkerName] val) =>
+    try
+      (_autoscale as Autoscale).pre_register_joining_workers(ws)
+    else
+      Fail()
+    end
+
+  be producer_acked_registering(p: Producer) =>
+    try
+      (_autoscale as Autoscale).producer_acked_registering(p)
+    else
+      Fail()
+    end
+
+  be boundary_acked_registering(b: OutgoingBoundary) =>
+    try
+      (_autoscale as Autoscale).boundary_acked_registering(b)
+    else
+      Fail()
+    end
+
+
   /////////////////////////////////////////////////////////////////////////////
   // NEW WORKER PARTITION MIGRATION
   /////////////////////////////////////////////////////////////////////////////
@@ -1035,6 +1084,18 @@ actor RouterRegistry
     else
       Fail()
     end
+
+    // Inform joining workers of joining worker names
+    try
+      let msg =
+        ChannelMsgEncoder.pre_register_joining_workers(target_workers, _auth)?
+      for w in target_workers.values() do
+        _connections.send_control(w, msg)
+      end
+    else
+      Fail()
+    end
+
     begin_join_migration(target_workers, next_checkpoint_id)
 
   fun ref begin_join_migration(target_workers: Array[WorkerName] val,
@@ -1109,33 +1170,43 @@ actor RouterRegistry
       Fail()
     end
 
-  fun ref all_join_migration_acks_received(
-    joining_workers: Array[WorkerName] val, is_coordinator: Bool)
+  fun ref inform_joining_workers_of_hash_partitions(
+    joining_workers: Array[WorkerName] val)
   =>
-    if is_coordinator then
-      let hash_partitions_trn = recover trn Map[RoutingId, HashPartitions] end
-      for (step_group, pr) in _partition_routers.pairs() do
-        hash_partitions_trn(step_group) = pr.hash_partitions()
+    let hash_partitions_trn = recover trn Map[RoutingId, HashPartitions] end
+    for (step_group, pr) in _partition_routers.pairs() do
+      hash_partitions_trn(step_group) = pr.hash_partitions()
+    end
+    let hash_partitions = consume val hash_partitions_trn
+    try
+      let msg = ChannelMsgEncoder.announce_hash_partitions_grow(_worker_name,
+        joining_workers, hash_partitions, _auth)?
+      for w in joining_workers.values() do
+        _connections.send_control(w, msg)
       end
-      let hash_partitions = consume val hash_partitions_trn
-      try
-        let msg = ChannelMsgEncoder.announce_hash_partitions_grow(_worker_name,
-          joining_workers, hash_partitions, _auth)?
-        for w in joining_workers.values() do
-          _connections.send_control(w, msg)
-        end
-      else
-        Fail()
-      end
+    else
+      Fail()
     end
     for w in joining_workers.values() do
       _checkpoint_initiator.add_worker(w)
     end
+
+  fun ref complete_join(joining_workers: Array[WorkerName] val,
+    is_coordinator: Bool)
+  =>
     _connections.request_cluster_unmute()
     _unmute_request(_worker_name)
 
-  be update_partition_routers_after_grow(
-    joining_workers: Array[WorkerName] val,
+  be receive_hash_partitions(
+    hash_partitions: Map[RoutingId, HashPartitions] val)
+  =>
+    try
+      (_autoscale as Autoscale).receive_hash_partitions(hash_partitions)
+    else
+      Fail()
+    end
+
+  fun ref update_hash_partitions(
     hash_partitions: Map[RoutingId, HashPartitions] val)
   =>
     """
@@ -1156,9 +1227,14 @@ actor RouterRegistry
   be ack_migration_batch_complete(sender_name: WorkerName) =>
     """
     Called when a new (joining) worker needs to ack to worker sender_name that
-    it's ready to start receiving messages after migration
+    it's ready to start receiving messages after migration. It will only
+    do this once it's ensured all of its producers have registered downstream.
     """
-    _connections.ack_migration_batch_complete(sender_name)
+    try
+      (_autoscale as Autoscale).worker_completed_migration_batch(sender_name)
+    else
+      Fail()
+    end
 
   fun ref _migrate_partition_steps(step_group: RoutingId,
     target_workers: Array[WorkerName] val, next_checkpoint_id: CheckpointId): Bool
