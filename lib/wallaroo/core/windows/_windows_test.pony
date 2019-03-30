@@ -130,7 +130,7 @@ class iso _TestSlidingWindowsOutputEventTimes is UnitTest
                             Seconds(131)-1
                             ], times)
 
-// TODO !@: Add tests that shows empty windows are created when an event
+// !TODO!: Add tests that shows empty windows are created when an event
 // 'in the future' comes in.
 
 class iso _TestOnTimeoutWatermarkTsIsJustBeforeNextWindowStart is UnitTest
@@ -184,7 +184,7 @@ class iso _TestTimeoutAfterEndOfWindowCausesFlush is UnitTest
     // then
     h.assert_array_eq[USize]([3], _ForceArray(res._1)?)
 
-class iso _Test10 is UnitTest  // !@
+class iso _Test10 is UnitTest  // TODO: Rename this test
   fun name(): String =>
     "windows/_Test10"
 
@@ -1002,7 +1002,7 @@ primitive _ForceArray
   fun apply(res: ComputationResult[USize]): Array[USize] val ? =>
     match res
     | let a: Array[(USize, U64)] val =>
-      // !@ return the tuple itself after all tests pass
+      // !TODO! return the tuple itself after all tests pass
       let a' = recover iso Array[USize] end
       for (o,ts) in a.values() do
         a'.push(o)
@@ -1022,7 +1022,7 @@ primitive _ForceArrayArray
   =>
     match res
     | let a: Array[(Array[USize] val, U64)] val =>
-      // !@ return the tuple itself after all tests pass
+      // !TODO! return the tuple itself after all tests pass
       let a' = recover iso Array[Array[USize] val] end
       for (subarray, _) in a.values() do
         let a'' = recover iso Array[USize] end

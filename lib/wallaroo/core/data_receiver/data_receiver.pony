@@ -207,6 +207,14 @@ actor DataReceiver is Producer
       @printf[I32]("Error creating ack data received message\n".cstring())
     end
 
+  be data_receiver_ack_immediately() =>
+    try
+      let ack_msg = ChannelMsgEncoder.immediate_ack(_auth)?
+      _write_on_conn(ack_msg)
+    else
+      Fail()
+    end
+
   /////////////////////////////////////////////////////////////////////////////
   // CONNECTION
   /////////////////////////////////////////////////////////////////////////////

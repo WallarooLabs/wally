@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 use "buffered"
 use "collections"
 use "net"
+use "promises"
 use "time"
 use "wallaroo/core/common"
 use "wallaroo/core/initialization"
@@ -166,6 +167,9 @@ actor OutgoingBoundary is Consumer
   var _reconnect_pause: U64 = _initial_reconnect_pause
   let _timers: Timers = Timers
 
+  var _pending_immediate_ack_promise:
+    (Promise[OutgoingBoundary] | None) = None
+
   new create(auth: AmbientAuth, worker_name: String, target_worker: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
     from: String = "", init_size: USize = 64, max_size: USize = 16384,
@@ -259,6 +263,23 @@ actor OutgoingBoundary is Consumer
       else
         Fail()
       end
+    end
+
+  be ack_immediately(p: Promise[OutgoingBoundary]) =>
+    _pending_immediate_ack_promise = p
+    try
+      let msg = ChannelMsgEncoder.data_receiver_ack_immediately(_auth)?
+      _writev(msg)
+    else
+      Fail()
+    end
+
+  fun ref receive_immediate_ack() =>
+    match _pending_immediate_ack_promise
+    | let p: Promise[OutgoingBoundary] => p(this)
+    else
+      @printf[I32](("OutgoingBoundary: Received immediate ack but " +
+        "had no corresponding pending promise.\n").cstring())
     end
 
   be reconnect() =>
@@ -563,6 +584,7 @@ actor OutgoingBoundary is Consumer
     _lowest_queue_id = _lowest_queue_id + _queue.size().u64()
     _queue.clear()
     _unsent.clear()
+    _pending_immediate_ack_promise = None
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
@@ -1166,6 +1188,8 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
           @printf[I32]("Received AckDataReceivedMsg at Boundary\n".cstring())
         end
         conn.receive_ack(aw.seq_id)
+      | let ia: ImmediateAckMsg =>
+        conn.receive_immediate_ack()
       else
         @printf[I32](("Unknown Wallaroo data message type received at " +
           "OutgoingBoundary.\n").cstring())

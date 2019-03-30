@@ -28,6 +28,8 @@ use "wallaroo/core/topology"
 trait tag Sink is (Consumer & DisposableActor & BarrierProcessor)
   be checkpoint_complete(checkpoint_id: CheckpointId)
   fun inputs(): Map[RoutingId, Producer] box
+  fun ref receive_immediate_ack() =>
+    None
 
 interface val SinkConfig[Out: Any val]
   fun apply(): SinkBuilder

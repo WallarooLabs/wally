@@ -240,7 +240,7 @@ class StatelessComputationRunner[In: Any val, Out: Any val] is Runner
           metrics_id + 1
         end
 
-      //!@ This is unnecessary work since we only ever pass along the
+      // !TODO! This is unnecessary work since we only ever pass along the
       // input watermark for stateless computations (i.e. the output
       // watermark always equals the input after each message).
       (let new_watermark_ts, let old_watermark_ts) =

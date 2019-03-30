@@ -18,13 +18,16 @@ Copyright 2018 The Wallaroo Authors.
 
 use "collections"
 use "net"
+use "promises"
+use "wallaroo/core/boundary"
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/network"
 use "wallaroo/core/router_registry"
-use "wallaroo/core/checkpoint"
+use "wallaroo/core/routing"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/string_set"
@@ -50,8 +53,15 @@ class Autoscale
       TODO: Handle these remaining phases here.
     7) _WaitingForJoinMigrationAcks: We wait for new workers to ack incoming
       join migration.
-    8) _WaitingForResumeTheWorld: Waiting for unmuting procedure to finish.
-    9) _WaitingForAutoscale: Autoscale is complete and we are back to our
+    8) _WaitingForProducersToRegister: Wait for all producers to ack having
+      registered downstream as producers.
+    9) _WaitingForBoundariesToAckRegistering: Wait for all boundaires to ack
+      sending register_producer messages downstream. [We rely on causal
+      message ordering here. Since we're requesting acks from boundaries
+      after all their upstream producers, we know these acks will be sent
+      after the boundaries have forwarded any register_producer messages.]
+    10) _WaitingForResumeTheWorld: Waiting for unmuting procedure to finish.
+    11) _WaitingForAutoscale: Autoscale is complete and we are back to our
       initial waiting state.
 
     JOIN (non-coordinator):
@@ -63,13 +73,32 @@ class Autoscale
       join migration to finish from our side (i.e. we've sent all steps).
     3) _WaitingForJoinMigrationAcks: We wait for new workers to ack incoming
       join migration.
-    4) _WaitingForResumeTheWorld: Waiting for unmuting procedure to finish.
-    5) _WaitingForAutoscale: Autoscale is complete and we are back to our
+    4) _WaitingForProducersToRegister: Wait for all producers to ack having
+      registered downstream as producers.
+    5) _WaitingForBoundariesToAckRegistering: Wait for all boundaires to ack
+      sending register_producer messages downstream. [We rely on causal
+      message ordering here. Since we're requesting acks from boundaries
+      after all their upstream producers, we know these acks will be sent
+      after the boundaries have forwarded any register_producer messages.]
+    6) _WaitingForResumeTheWorld: Waiting for unmuting procedure to finish.
+    7) _WaitingForAutoscale: Autoscale is complete and we are back to our
       initial waiting state.
 
     JOIN (joining worker):
-    1) _JoiningWorker: Wait for all steps to be migrated.
-    2) _WaitingForAutoscale: Autoscale is complete and we are back to our
+    1) _JoiningWorker: Wait for all other joiners to be initialized, all keys
+      to have been migrated, and all post-migration hash partitions to have
+      arrived.
+    2) _WaitingForProducersToRegister: Wait for all producers to ack having
+      registered downstream as producers. [We request the acks after the
+      last update_router call to a producer in response to a migrated key,
+      ensuring that an immediate ack is enough for this purpose.]
+    3) _WaitingForBoundariesToAckRegistering: Wait for all boundaires to ack
+      sending register_producer messages downstream. [We rely on causal
+      message ordering here. Since we're requesting acks from boundaries
+      after all their upstream producers, we know these acks will be sent
+      after the boundaries have forwarded any register_producer messages.]
+    4) _WaitingForResumeTheWorld: Waiting for unmuting procedure to finish.
+    5) _WaitingForAutoscale: Autoscale is complete and we are back to our
       initial waiting state.
 
     SHRINK (coordinator):
@@ -101,15 +130,27 @@ class Autoscale
   let _connections: Connections
   var _phase: _AutoscalePhase = _EmptyAutoscalePhase
 
-  new create(auth: AmbientAuth, worker_name: WorkerName,
-    rr: RouterRegistry ref, connections: Connections, is_joining: Bool)
+  new ref create(auth: AmbientAuth, worker_name: WorkerName,
+    rr: RouterRegistry ref, connections: Connections, is_joining: Bool,
+    workers: (Array[WorkerName] val | None) = None)
   =>
     _auth = auth
     _worker_name = worker_name
     _router_registry = rr
     _connections = connections
     if is_joining then
-      _phase = _JoiningWorker(this)
+      match workers
+      | let ws: Array[WorkerName] val =>
+        let non_joining_workers: SetIs[WorkerName] = SetIs[WorkerName]
+        for w in ws.values() do
+          if w != _worker_name then
+            non_joining_workers.set(w)
+          end
+        end
+        _phase = _JoiningWorker(_worker_name, this, non_joining_workers)
+      else
+        Fail()
+      end
     else
       _phase = _WaitingForAutoscale(this)
     end
@@ -258,6 +299,10 @@ class Autoscale
   =>
     _phase = _WaitingForJoinMigrationAcks(this, _auth, joining_workers,
       is_coordinator)
+    if is_coordinator then
+      _router_registry.inform_joining_workers_of_hash_partitions(
+        joining_workers)
+    end
     for target in joining_workers.values() do
       _router_registry.send_migration_batch_complete_msg(target)
     end
@@ -265,12 +310,79 @@ class Autoscale
   fun ref receive_join_migration_ack(worker: WorkerName) =>
     _phase.receive_join_migration_ack(worker)
 
+  fun ref pre_register_joining_workers(ws: Array[WorkerName] val) =>
+    _phase.pre_register_joining_workers(ws)
+
+  fun ref receive_hash_partitions(hp: Map[RoutingId, HashPartitions] val) =>
+    _phase.receive_hash_partitions(hp)
+
+  fun ref worker_completed_migration_batch(w: WorkerName) =>
+    _phase.worker_completed_migration(w)
+
+  fun ref update_hash_partitions(hp: Map[RoutingId, HashPartitions] val) =>
+    _router_registry.update_hash_partitions(hp)
+
+  fun ref wait_for_producers_to_register(completion_action: CompletionAction)
+  =>
+    let producers = SetIs[Producer]
+    for p in _router_registry.producers().values() do
+      producers.set(p)
+    end
+    for s in _router_registry.sources().values() do
+      producers.set(s)
+    end
+    _phase = _WaitingForProducersToRegister(this, producers,
+      completion_action)
+    let rr: RouterRegistry tag = _router_registry
+    for p in producers.values() do
+      let promise = Promise[Producer]
+      promise.next[None](rr~producer_acked_registering())
+      p.ack_immediately(promise)
+    end
+
+  fun ref producer_acked_registering(p: Producer) =>
+    _phase.producer_acked_registering(p)
+
+  fun ref request_boundaries_to_ack_registering(
+    completion_action: CompletionAction)
+  =>
+    let obs = _router_registry.outgoing_boundaries()
+    _phase = _WaitingForBoundariesToAckRegistering(this,
+      obs, completion_action)
+    let rr: RouterRegistry tag = _router_registry
+    for ob in obs.values() do
+      let promise = Promise[OutgoingBoundary]
+      promise.next[None](rr~boundary_acked_registering())
+      ob.ack_immediately(promise)
+    end
+
+  fun ref boundary_acked_registering(b: OutgoingBoundary) =>
+    _phase.boundary_acked_registering(b)
+
+  fun ref ack_all_producers_have_registered(
+    non_joining_workers: SetIs[WorkerName])
+  =>
+    _phase = _WaitingForResumeTheWorld(this, _auth, false)
+    for w in non_joining_workers.values() do
+      _connections.ack_migration_batch_complete(w)
+    end
+
+  fun ref complete_join(
+    joining_workers: Array[WorkerName] val, is_coordinator: Bool)
+  =>
+    _router_registry.complete_join(joining_workers, is_coordinator)
+    _phase = _WaitingForResumeTheWorld(this, _auth, is_coordinator)
+
   fun ref all_join_migration_acks_received(
     joining_workers: Array[WorkerName] val, is_coordinator: Bool)
   =>
-    _phase = _WaitingForResumeTheWorld(this, _auth, is_coordinator)
-    _router_registry.all_join_migration_acks_received(joining_workers,
-      is_coordinator)
+    let completion_action = object ref
+        let a: Autoscale ref = this
+        fun ref apply() =>
+          a.complete_join(joining_workers, is_coordinator)
+      end
+
+    wait_for_producers_to_register(completion_action)
 
   fun ref inject_shrink_autoscale_barrier(
     remaining_workers: Array[WorkerName] val,
@@ -399,6 +511,26 @@ trait _AutoscalePhase
     Fail()
 
   fun ref receive_join_migration_ack(worker: WorkerName) =>
+    _invalid_call()
+    Fail()
+
+  fun ref worker_completed_migration(w: WorkerName) =>
+    _invalid_call()
+    Fail()
+
+  fun ref pre_register_joining_workers(ws: Array[WorkerName] val) =>
+    _invalid_call()
+    Fail()
+
+  fun ref receive_hash_partitions(hp: Map[RoutingId, HashPartitions] val) =>
+    _invalid_call()
+    Fail()
+
+  fun ref producer_acked_registering(p: Producer) =>
+    _invalid_call()
+    Fail()
+
+  fun ref boundary_acked_registering(b: OutgoingBoundary) =>
     _invalid_call()
     Fail()
 
@@ -826,13 +958,118 @@ class _WaitingForJoinMigrationAcks is _AutoscalePhase
     end
 
 class _JoiningWorker is _AutoscalePhase
+  """
+  A joining worker needs to ensure that all other joiners have been
+  initialized, that all keys have been migrated, and that it has
+  received the post-migration hash partitions before it can proceed
+  to checking that all producers have registered downstream (since
+  before these conditions have been met, it's still possible for there to
+  be more register_producer calls).
+  """
+  let _worker_name: WorkerName
   let _autoscale: Autoscale ref
+  let _non_joining_workers: SetIs[WorkerName] = _non_joining_workers.create()
+  let _completed_migration_workers: SetIs[WorkerName] =
+    _completed_migration_workers.create()
+  var _joining_workers: (SetIs[WorkerName] | None) = None
+  let _registered_joining_workers: SetIs[WorkerName] =
+    _registered_joining_workers.create()
+  var _hash_partitions: (Map[RoutingId, HashPartitions] val | None) = None
 
-  new create(autoscale: Autoscale ref) =>
+  new create(worker_name: WorkerName, autoscale: Autoscale ref,
+    non_joining_workers: SetIs[WorkerName])
+  =>
     @printf[I32]("AUTOSCALE: Joining Worker\n".cstring())
+    _worker_name = worker_name
     _autoscale = autoscale
+    for w in non_joining_workers.values() do
+      _non_joining_workers.set(w)
+    end
+    Invariant(_non_joining_workers.size() > 0)
 
   fun name(): String => "JoiningWorker"
+
+  fun ref worker_join(conn: TCPConnection, worker: WorkerName,
+    worker_count: USize, local_topology: LocalTopology,
+    current_worker_count: USize)
+  =>
+    None
+
+  fun ref worker_connected_to_joining_workers(worker: WorkerName) =>
+    None
+
+  fun ref stop_the_world_for_join_migration_initiated(coordinator: WorkerName,
+    joining_workers: Array[WorkerName] val)
+  =>
+    None
+
+  fun ref join_migration_initiated(checkpoint_id: CheckpointId) =>
+    None
+
+  fun ref pre_register_joining_workers(ws: Array[WorkerName] val) =>
+    let joining_workers = SetIs[WorkerName]
+    for w in ws.values() do
+      if w != _worker_name then
+        joining_workers.set(w)
+      end
+    end
+    _joining_workers = joining_workers
+    _check_complete()
+
+  fun ref joining_worker_initialized(worker: WorkerName,
+    step_group_routing_ids: Map[RoutingId, RoutingId] val)
+  =>
+    Invariant(worker != _worker_name)
+    _registered_joining_workers.set(worker)
+    _check_complete()
+
+  fun ref receive_hash_partitions(hp: Map[RoutingId, HashPartitions] val) =>
+    _hash_partitions = hp
+    _check_complete()
+
+  fun ref worker_completed_migration(worker: WorkerName) =>
+    _completed_migration_workers.set(worker)
+    _check_complete()
+
+  fun ref _check_complete() =>
+    if (_non_joining_workers.size() == _completed_migration_workers.size())
+    then
+      match _joining_workers
+      | let jw: SetIs[WorkerName] =>
+        match _hash_partitions
+        | let hp: Map[RoutingId, HashPartitions] val =>
+          if jw.size() == _registered_joining_workers.size() then
+            let completion_action = object ref
+                fun ref apply() =>
+                  _autoscale.ack_all_producers_have_registered(
+                    _non_joining_workers)
+              end
+            _autoscale.update_hash_partitions(hp)
+            _autoscale.wait_for_producers_to_register(completion_action)
+          end
+        end
+      end
+    end
+
+class _WaitingForProducersToRegister is _AutoscalePhase
+  let _autoscale: Autoscale ref
+  let _producers: SetIs[Producer] = _producers.create()
+  let _acked_producers: SetIs[Producer] = _acked_producers.create()
+  let _completion_action: CompletionAction
+
+  new create(autoscale: Autoscale ref,
+    producers: SetIs[Producer], completion_action: CompletionAction)
+  =>
+    @printf[I32](("AUTOSCALE: Joining worker waiting for Producers " +
+      "to register\n").cstring())
+    _autoscale = autoscale
+    for p in producers.values() do
+      _producers.set(p)
+    end
+    Invariant(_producers.size() > 0)
+    _completion_action = completion_action
+
+  fun name(): String => "_WaitingForProducersToRegister"
 
   fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
@@ -856,8 +1093,67 @@ class _JoiningWorker is _AutoscalePhase
   fun ref join_migration_initiated(checkpoint_id: CheckpointId) =>
     None
 
-  fun ref autoscale_complete() =>
-    _autoscale.mark_autoscale_complete()
+  fun ref producer_acked_registering(p: Producer) =>
+    _acked_producers.set(p)
+    _check_complete()
+
+  fun ref _check_complete() =>
+    if _producers.size() == _acked_producers.size() then
+      _autoscale.request_boundaries_to_ack_registering(_completion_action)
+    end
+
+class _WaitingForBoundariesToAckRegistering is _AutoscalePhase
+  let _autoscale: Autoscale ref
+  let _boundaries: SetIs[OutgoingBoundary] = _boundaries.create()
+  let _acked_boundaries: SetIs[OutgoingBoundary] =
+    _acked_boundaries.create()
+  let _completion_action: CompletionAction
+
+  new create(autoscale: Autoscale ref, boundaries: SetIs[OutgoingBoundary],
+    completion_action: CompletionAction)
+  =>
+    @printf[I32](("AUTOSCALE: Joining worker waiting for boundaries " +
+      "to ack forwarding register messages\n").cstring())
+    _autoscale = autoscale
+    for b in boundaries.values() do
+      _boundaries.set(b)
+    end
+    Invariant(_boundaries.size() > 0)
+    _completion_action = completion_action
+
+  fun name(): String => "_WaitingForBoundariesToAckRegistering"
+
+  fun ref worker_join(conn: TCPConnection, worker: WorkerName,
+    worker_count: USize, local_topology: LocalTopology,
+    current_worker_count: USize)
+  =>
+    None
+
+  fun ref joining_worker_initialized(worker: WorkerName,
+    step_group_routing_ids: Map[RoutingId, RoutingId] val)
+  =>
+    None
+
+  fun ref worker_connected_to_joining_workers(worker: WorkerName) =>
+    None
+
+  fun ref stop_the_world_for_join_migration_initiated(coordinator: WorkerName,
+    joining_workers: Array[WorkerName] val)
+  =>
+    None
+
+  fun ref join_migration_initiated(checkpoint_id: CheckpointId) =>
+    None
+
+  fun ref boundary_acked_registering(b: OutgoingBoundary) =>
+    _acked_boundaries.set(b)
+    _check_complete()
+
+  fun ref _check_complete() =>
+    if _boundaries.size() == _acked_boundaries.size() then
+      _completion_action()
+    end
+
 
 /////////////////////////////////////////////////
 // SHRINK PHASES
@@ -1039,3 +1335,7 @@ class _WaitingForResumeTheWorld is _AutoscalePhase
       end
     end
     _autoscale.mark_autoscale_complete()
+
+
+interface CompletionAction
+  fun ref apply()

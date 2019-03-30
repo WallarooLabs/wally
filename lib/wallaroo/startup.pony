@@ -342,8 +342,8 @@ actor Startup
       let router_registry = RouterRegistry(auth, _startup_options.worker_name,
         data_receivers, connections, this,
         _startup_options.stop_the_world_pause, _is_joining, initializer_name,
-        barrier_coordinator, checkpoint_initiator, autoscale_initiator,
-        initializer_name)
+        barrier_coordinator, checkpoint_initiator, autoscale_initiator
+        where contacted_worker = initializer_name)
       router_registry.set_event_log(event_log)
       _router_registry = router_registry
 
@@ -548,11 +548,19 @@ actor Startup
       let data_receivers = DataReceivers(auth, connections,
         _startup_options.worker_name, consume reporter)
 
+      let non_joining_workers: Array[WorkerName] iso =
+        recover Array[WorkerName] end
+      for w in m.worker_names.values() do
+        if w != _startup_options.worker_name then
+          non_joining_workers.push(w)
+        end
+      end
+
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,
         connections, this, _startup_options.stop_the_world_pause, _is_joining,
         initializer_name, barrier_coordinator, checkpoint_initiator,
-        autoscale_initiator, m.sender_name)
+        autoscale_initiator, consume non_joining_workers, m.sender_name)
       router_registry.set_event_log(event_log)
       _router_registry = router_registry
 

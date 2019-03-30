@@ -388,11 +388,10 @@ actor BarrierCoordinator is Initializable
       "for unknown barrier token %s. Did we rollback?\n").cstring(),
       call_name.cstring(), barrier_token.string().cstring())
 
-  // !@ TODO: Can we come up with more descriptive name?
+  // !TODO!: Can we come up with more descriptive name?
   be remote_initiate_barrier(primary_worker: WorkerName,
     barrier_token: BarrierToken)
   =>
-    //!@
     ifdef debug then
       Invariant(_primary_worker != _worker_name)
     end
