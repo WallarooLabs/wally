@@ -42,6 +42,7 @@ trait tag Producer is (Muteable & Resilient)
   be remove_route_to_consumer(id: RoutingId, c: Consumer)
   be register_downstream()
   be dispose_with_promise(promise: Promise[None])
+  be ack_immediately(p: Promise[Producer]) => p(this)
 
 interface tag RouterUpdatable
   be update_router(r: Router)
