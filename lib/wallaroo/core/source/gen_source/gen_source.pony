@@ -33,20 +33,20 @@ use "net"
 use "promises"
 use "serialise"
 use "time"
+use "wallaroo/core/barrier"
 use "wallaroo/core/boundary"
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
-use "wallaroo/core/partitioning"
+use "wallaroo/core/data_receiver"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/metrics"
+use "wallaroo/core/partitioning"
+use "wallaroo/core/recovery"
+use "wallaroo/core/router_registry"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
-use "wallaroo/core/barrier"
-use "wallaroo/core/data_receiver"
-use "wallaroo/core/recovery"
-use "wallaroo/core/router_registry"
-use "wallaroo/core/checkpoint"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
 
@@ -474,10 +474,10 @@ actor GenSource[V: Any val] is Source
       end
     end
 
-  be barrier_fully_acked(token: BarrierToken) =>
+  be checkpoint_complete(checkpoint_id: CheckpointId) =>
     ifdef "checkpoint_trace" then
-      @printf[I32]("barrier_complete at GenSource %s\n".cstring(),
-        _source_id.string().cstring())
+      @printf[I32]("Checkpoint %s complete at GenSource %s\n".cstring(),
+        checkpoint_id.string().cstring(), _source_id.string().cstring())
     end
     None
 

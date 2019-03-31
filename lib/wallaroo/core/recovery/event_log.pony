@@ -93,7 +93,7 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
     _replay_complete_markers.create()
   let _config: EventLogConfig
   let _the_journal: SimpleJournal
-  var _barrier_initiator: (BarrierInitiator | None) = None
+  var _barrier_coordinator: (BarrierCoordinator | None) = None
   var _checkpoint_initiator: (CheckpointInitiator | None) = None
   var num_encoded: USize = 0
   var _flush_waiting: USize = 0
@@ -170,8 +170,8 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
   be fail() =>
     Fail()
 
-  be set_barrier_initiator(barrier_initiator: BarrierInitiator) =>
-    _barrier_initiator = barrier_initiator
+  be set_barrier_coordinator(barrier_coordinator: BarrierCoordinator) =>
+    _barrier_coordinator = barrier_coordinator
 
   be set_checkpoint_initiator(checkpoint_initiator: CheckpointInitiator) =>
     _checkpoint_initiator = checkpoint_initiator
@@ -433,7 +433,7 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
       let rotation_promise = Promise[BarrierToken]
       rotation_promise.next[None](recover this~rotate_file() end)
       try
-        (_barrier_initiator as BarrierInitiator).inject_blocking_barrier(
+        (_barrier_coordinator as BarrierCoordinator).inject_blocking_barrier(
           LogRotationBarrierToken(_log_rotation_id, _worker_name),
             rotation_promise, LogRotationResumeBarrierToken(_log_rotation_id,
             _worker_name))
@@ -480,7 +480,7 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
       _backend_bytes_after_checkpoint = _backend.bytes_written()
       let rotation_resume_promise = Promise[BarrierToken]
       try
-        (_barrier_initiator as BarrierInitiator).inject_barrier(
+        (_barrier_coordinator as BarrierCoordinator).inject_barrier(
           LogRotationResumeBarrierToken(_log_rotation_id, _worker_name),
             rotation_resume_promise)
       else

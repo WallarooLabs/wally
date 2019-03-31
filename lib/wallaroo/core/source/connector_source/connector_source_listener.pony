@@ -30,19 +30,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use "collections"
 use "wallaroo/core/boundary"
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
-use "wallaroo/core/partitioning"
 use "wallaroo/core/data_receiver"
-use "wallaroo/core/recovery"
-use "wallaroo/core/router_registry"
-use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/metrics"
+use "wallaroo/core/partitioning"
+use "wallaroo/core/recovery"
+use "wallaroo/core/router_registry"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
+use "wallaroo_labs/mort"
+
 
 actor ConnectorSourceListener[In: Any val] is SourceListener
   """
@@ -214,6 +216,14 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     end
 
     _outgoing_boundary_builders = consume new_boundary_builders
+
+  be checkpoint_complete(checkpoint_id: CheckpointId) =>
+    for s in _connected_sources.values() do
+      s.checkpoint_complete(checkpoint_id)
+    end
+    for s in _available_sources.values() do
+      s.checkpoint_complete(checkpoint_id)
+    end
 
   be dispose() =>
     @printf[I32]("Shutting down ConnectorSourceListener\n".cstring())

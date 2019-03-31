@@ -310,18 +310,18 @@ actor Startup
       _connections = connections
       connections.register_disposable(this)
 
-      let barrier_initiator = BarrierInitiator(auth,
+      let barrier_coordinator = BarrierCoordinator(auth,
         _startup_options.worker_name, connections, initializer_name,
         _is_recovering)
-      connections.register_disposable(barrier_initiator)
-      event_log.set_barrier_initiator(barrier_initiator)
+      connections.register_disposable(barrier_coordinator)
+      event_log.set_barrier_coordinator(barrier_coordinator)
 
       // TODO: We currently set the primary checkpoint initiator worker to the
       // initializer.
       let checkpoint_initiator = CheckpointInitiator(auth,
         _startup_options.worker_name, initializer_name, connections,
         _startup_options.time_between_checkpoints, event_log,
-        barrier_initiator, _checkpoint_ids_file,
+        barrier_coordinator, _checkpoint_ids_file,
         _the_journal as SimpleJournal, _startup_options.do_local_file_io
         where is_active = _startup_options.checkpoints_enabled,
           is_recovering = _is_recovering)
@@ -329,7 +329,7 @@ actor Startup
       connections.register_disposable(checkpoint_initiator)
 
       let autoscale_initiator = AutoscaleInitiator(
-        _startup_options.worker_name, barrier_initiator, checkpoint_initiator)
+        _startup_options.worker_name, barrier_coordinator, checkpoint_initiator)
       connections.register_disposable(autoscale_initiator)
 
       _setup_shutdown_handler(connections, this, auth)
@@ -342,7 +342,7 @@ actor Startup
       let router_registry = RouterRegistry(auth, _startup_options.worker_name,
         data_receivers, connections, this,
         _startup_options.stop_the_world_pause, _is_joining, initializer_name,
-        barrier_initiator, checkpoint_initiator, autoscale_initiator,
+        barrier_coordinator, checkpoint_initiator, autoscale_initiator,
         initializer_name)
       router_registry.set_event_log(event_log)
       _router_registry = router_registry
@@ -360,7 +360,7 @@ actor Startup
           _app_name, _startup_options.worker_name,
           _env, auth, connections, router_registry, metrics_conn,
           _startup_options.is_initializer, data_receivers, event_log, recovery,
-          recovery_reconnecter, checkpoint_initiator, barrier_initiator,
+          recovery_reconnecter, checkpoint_initiator, barrier_coordinator,
           _local_topology_file, _data_channel_file, _worker_names_file,
           local_keys_filepath,
           _the_journal as SimpleJournal, _startup_options.do_local_file_io)
@@ -399,7 +399,7 @@ actor Startup
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections, _startup_options.is_initializer,
           _cluster_initializer, local_topology_initializer, recovery,
-          recovery_reconnecter, router_registry, barrier_initiator,
+          recovery_reconnecter, router_registry, barrier_coordinator,
           checkpoint_initiator, control_channel_filepath,
           d_host, d_service, event_log,
           this, _the_journal as SimpleJournal,
@@ -525,21 +525,21 @@ actor Startup
       _connections = connections
       connections.register_disposable(this)
 
-      let barrier_initiator = BarrierInitiator(auth,
+      let barrier_coordinator = BarrierCoordinator(auth,
         _startup_options.worker_name, connections, initializer_name)
-      event_log.set_barrier_initiator(barrier_initiator)
+      event_log.set_barrier_coordinator(barrier_coordinator)
 
       let checkpoint_initiator = CheckpointInitiator(auth,
         _startup_options.worker_name, m.primary_checkpoint_worker, connections,
         _startup_options.time_between_checkpoints, event_log,
-        barrier_initiator, _checkpoint_ids_file,
+        barrier_coordinator, _checkpoint_ids_file,
         _the_journal as SimpleJournal, _startup_options.do_local_file_io
         where is_active = _startup_options.checkpoints_enabled)
       checkpoint_initiator.initialize_checkpoint_id(
         (m.checkpoint_id, m.rollback_id))
 
       let autoscale_initiator = AutoscaleInitiator(
-        _startup_options.worker_name, barrier_initiator, checkpoint_initiator)
+        _startup_options.worker_name, barrier_coordinator, checkpoint_initiator)
 
       _setup_shutdown_handler(connections, this, auth)
 
@@ -551,7 +551,7 @@ actor Startup
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,
         connections, this, _startup_options.stop_the_world_pause, _is_joining,
-        initializer_name, barrier_initiator, checkpoint_initiator,
+        initializer_name, barrier_coordinator, checkpoint_initiator,
         autoscale_initiator, m.sender_name)
       router_registry.set_event_log(event_log)
       _router_registry = router_registry
@@ -570,7 +570,7 @@ actor Startup
           _env, auth, connections, router_registry, metrics_conn,
           _startup_options.is_initializer, data_receivers,
           event_log, recovery, recovery_reconnecter, checkpoint_initiator,
-          barrier_initiator, _local_topology_file, _data_channel_file,
+          barrier_coordinator, _local_topology_file, _data_channel_file,
           _worker_names_file, local_keys_filepath,
           _the_journal as SimpleJournal, _startup_options.do_local_file_io
           where is_joining = true)
@@ -616,7 +616,7 @@ actor Startup
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections, _startup_options.is_initializer,
           _cluster_initializer, local_topology_initializer, recovery,
-          recovery_reconnecter, router_registry, barrier_initiator,
+          recovery_reconnecter, router_registry, barrier_coordinator,
           checkpoint_initiator, control_channel_filepath,
           _startup_options.my_d_host, _startup_options.my_d_service,
           event_log, this, _the_journal as SimpleJournal,
