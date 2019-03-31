@@ -153,6 +153,9 @@ actor CheckpointInitiator is Initializable
     initializer.report_ready_to_work(this)
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
+
+  be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
     ifdef "resilience" then
       if _worker_name == _primary_worker then
         _phase.start_checkpoint_timer(1_000_000_000, this)

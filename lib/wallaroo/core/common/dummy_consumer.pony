@@ -69,6 +69,9 @@ actor DummyConsumer is Consumer
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
+  be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
+
   be receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>

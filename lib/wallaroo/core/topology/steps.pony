@@ -158,6 +158,9 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
+  be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
+
   fun ref metrics_reporter(): MetricsReporter =>
     _metrics_reporter
 

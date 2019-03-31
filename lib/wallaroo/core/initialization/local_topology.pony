@@ -375,7 +375,8 @@ actor LocalTopologyInitializer is LayoutInitializer
   fun ref _initialize(initializables: Initializables,
     cluster_initializer: (ClusterInitializer | None) = None,
     checkpoint_target: (CheckpointId | None) = None,
-    recovering_without_resilience: Bool = false)
+    recovering_without_resilience: Bool = false,
+    workers_ready_to_work: SetIs[WorkerName] = SetIs[WorkerName])
   =>
     _recovering =
       match checkpoint_target
@@ -939,7 +940,8 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         /////////////////////////////////////////
         // Kick off final initialization Phases
-        _phase = _ApplicationBeginReportingPhase(this, initializables)
+        _phase = _ApplicationBeginReportingPhase(this, initializables,
+          workers_ready_to_work)
         _phase.begin_reporting()
 
         @printf[I32]("Local topology initialized.\n".cstring())
@@ -1024,22 +1026,31 @@ actor LocalTopologyInitializer is LayoutInitializer
   be report_created(initializable: Initializable) =>
     _phase.report_created(initializable)
 
-  fun ref _application_created(initializables: Initializables) =>
-    _phase = _ApplicationCreatedPhase(this, initializables)
+  fun ref _application_created(initializables: Initializables,
+    workers_ready_to_work: SetIs[WorkerName])
+  =>
+    _phase = _ApplicationCreatedPhase(this, initializables,
+      workers_ready_to_work)
 
   be report_initialized(initializable: Initializable) =>
     _phase.report_initialized(initializable)
 
-  fun ref _application_initialized(initializables: Initializables) =>
+  fun ref _application_initialized(initializables: Initializables,
+    workers_ready_to_work: SetIs[WorkerName])
+  =>
     _spin_up_source_listeners()
-    _phase = _ApplicationInitializedPhase(this, initializables)
+    _phase = _ApplicationInitializedPhase(this, initializables,
+      workers_ready_to_work)
 
   be report_ready_to_work(initializable: Initializable) =>
     _phase.report_ready_to_work(initializable)
 
-  fun ref _initializables_ready_to_work(initializables: Initializables) =>
+  fun ref _initializables_ready_to_work(initializables: Initializables,
+    workers_ready_to_work: SetIs[WorkerName])
+  =>
     _phase = _InitializablesReadyToWorkPhase(this, initializables,
-      _recovery_ready_to_work, _event_log_ready_to_work)
+      _recovery_ready_to_work, _event_log_ready_to_work,
+      workers_ready_to_work)
 
     match _topology
     | let t: LocalTopology =>
@@ -1073,9 +1084,57 @@ actor LocalTopologyInitializer is LayoutInitializer
 
     _phase.report_recovery_ready_to_work()
 
-  fun ref application_ready_to_work(initializables: Initializables) =>
-    _phase = _ApplicationReadyToWorkPhase(this, initializables)
+  fun ref send_worker_ready_to_work_report() =>
+    try
+      let msg = ChannelMsgEncoder.report_worker_ready_to_work(_worker_name,
+        _auth)?
+      _connections.send_control("initializer", msg)
+    else
+      Fail()
+    end
+
+  be worker_report_ready_to_work(w: WorkerName) =>
+    _phase.worker_report_ready_to_work(w)
+
+  be all_workers_ready_to_work() =>
+    _phase.all_workers_ready_to_work()
+
+  fun ref application_ready_to_work(initializables: Initializables,
+    workers_ready_to_work: SetIs[WorkerName])
+  =>
+    match _topology
+    | let t: LocalTopology =>
+      if _is_joining then
+        @printf[I32]("Joining worker: Skipping Phase III\n".cstring())
+        _cluster_ready_to_work(initializables)
+      else
+        _phase = _ApplicationReadyToWorkPhase(this, initializables,
+          t.worker_names, workers_ready_to_work, _is_initializer)
+        _phase.worker_report_ready_to_work(_worker_name)
+      end
+    else
+      Fail()
+    end
+
+  fun ref _cluster_ready_to_work(initializables: Initializables) =>
+    _phase = _ClusterReadyToWorkPhase(this, initializables)
     _start_sources()
+
+    match _topology
+    | let t: LocalTopology =>
+      try
+        let msg = ChannelMsgEncoder.all_workers_ready_to_work(_auth)?
+        for w in t.worker_names.values() do
+          if w != _worker_name then
+            _connections.send_control(w, msg)
+          end
+        end
+      else
+        Fail()
+      end
+    else
+      Fail()
+    end
 
     if _is_initializer then
       match _cluster_initializer

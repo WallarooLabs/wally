@@ -123,6 +123,9 @@ actor BarrierCoordinator is Initializable
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
+  be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
+
   be add_worker(w: WorkerName) =>
     if not _disposed then
       ifdef "checkpoint_trace" then

@@ -59,6 +59,9 @@ actor EmptySink is Sink
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
+  be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
+
   be register_producer(id: RoutingId, producer: Producer) =>
     None
 

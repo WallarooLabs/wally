@@ -295,7 +295,11 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         | let ci: ClusterInitializer =>
           ci.connections_ready(m.worker_name)
         end
-      | let m: CreateDataChannelListener val =>
+      | let m: ReportWorkerReadyToWorkMsg =>
+        _layout_initializer.worker_report_ready_to_work(m.worker_name)
+      | let m: AllWorkersReadyToWorkMsg =>
+        _layout_initializer.all_workers_ready_to_work()
+      | let m: CreateDataChannelListener =>
         ifdef "trace" then
           @printf[I32](("Received CreateDataChannelListener on Control " +
             "Channel\n").cstring())
