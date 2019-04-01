@@ -480,7 +480,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         else:
             raise ProtocolError("Can only send message types {{Hello, Notify, "
                                 "Message, Error}}. Received {}".format(msg))
-        logging.debug("write({}) END".format(msg))
 
     def _write(self, data):
         """
