@@ -63,7 +63,7 @@ if [[ "${TEST_CUSTOM}" == "custom" ]]; then
   CUSTOM_MESSAGE="with custom artifacts"
   pushd "${WALLAROO_DIR}"
   CUSTOM_WALLAROO_SOURCE_TGZ_URL="${WALLAROO_DIR}/wallaroo.tgz"
-  CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL="${WALLAROO_DIR}/Wallaroo_Metrics_UI-x86_64.AppImage"
+  CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL="${WALLAROO_DIR}/Wallaroo_Metrics_UI*-x86_64.AppImage"
   if [[ ! -e "${CUSTOM_WALLAROO_SOURCE_TGZ_URL}" ]]; then
     echo "Building wallaroo source archive for testing using custom artifacts..."
     make build-wallaroo-source-archive

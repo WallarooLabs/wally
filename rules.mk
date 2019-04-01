@@ -741,7 +741,7 @@ clean-docker: ## cleanup docker images and containers
 
 # rule to clean everything
 clean: clean-$(ROOT_TARGET_SUFFIX) ## Clean all projects (pony & monhub) and cleanup docker images
-	$(QUIET)rm -f $(abs_wallaroo_dir)/wallaroo.tgz $(abs_wallaroo_dir)/Wallaroo_Metrics_UI-x86_64.AppImage $(abs_wallaroo_dir)/linuxdeploy-x86_64.AppImage
+	$(QUIET)rm -f $(abs_wallaroo_dir)/wallaroo.tgz $(abs_wallaroo_dir)/Wallaroo_Metrics_UI*-x86_64.AppImage $(abs_wallaroo_dir)/linuxdeploy-x86_64.AppImage
 	$(QUIET)rm -rf $(abs_wallaroo_dir)/squashfs-root $(abs_wallaroo_dir)/metrics_ui.AppDir
 	$(QUIET)rm -f $(abs_wallaroo_dir)/AppRun $(abs_wallaroo_dir)/metrics_ui.desktop $(abs_wallaroo_dir)/metrics_ui.png
 	$(QUIET)rm -f lib/wallaroo/wallaroo lib/wallaroo/wallaroo.o
