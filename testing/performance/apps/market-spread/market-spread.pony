@@ -128,11 +128,11 @@ primitive CheckMarketData is StateComputation[
     match msg
     | let order: FixOrderMessage val =>
       if state.should_reject_trades then
-        let res = OrderResult(order, state.last_bid, state.last_offer,
-          WallClock.nanoseconds())
-        res
+        OrderResult(order, state.last_bid, state.last_offer,
+          WallClock.nanoseconds() where accept' = false)
       else
-        None
+        OrderResult(order, state.last_bid, state.last_offer,
+          WallClock.nanoseconds() where accept' = true)
       end
     | let nbbo: FixNbboMessage val =>
       let offer_bid_difference = nbbo.offer_px() - nbbo.bid_px()
@@ -196,16 +196,19 @@ class OrderResult
   let bid: F64
   let offer: F64
   let timestamp: U64
+  let accept: Bool
 
   new val create(order': FixOrderMessage val,
     bid': F64,
     offer': F64,
-    timestamp': U64)
+    timestamp': U64,
+    accept': Bool)
   =>
     order = order'
     bid = bid'
     offer = offer'
     timestamp = timestamp'
+    accept = accept'
 
   fun string(): String =>
     (order.symbol().clone().>append(", ")
@@ -216,7 +219,8 @@ class OrderResult
       .>append(order.side().string()).>append(", ")
       .>append(bid.string()).>append(", ")
       .>append(offer.string()).>append(", ")
-      .>append(timestamp.string())).clone()
+      .>append(timestamp.string()).>append(", ")
+      .>append(accept.string())).clone()
 
 primitive OrderResultEncoder
   fun apply(r: OrderResult val, wb: Writer = Writer): Array[ByteSeq] val =>
@@ -224,7 +228,7 @@ primitive OrderResultEncoder
       @printf[I32](("!!" + r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
     end
     //Header (size == 55 bytes)
-    let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
+    let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8 + 1
     wb.u32_be(msgs_size.u32())
     //Fields
     match r.order.side()
@@ -239,4 +243,5 @@ primitive OrderResultEncoder
     wb.f64_be(r.bid)
     wb.f64_be(r.offer)
     wb.u64_be(r.timestamp)
+    wb.u8(if r.accept then 1 else 0 end)
     wb.done()
