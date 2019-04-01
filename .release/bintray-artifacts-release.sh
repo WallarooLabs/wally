@@ -118,7 +118,7 @@ build_metrics_ui_appimage() {
 
   sudo make clean-monitoring_hub
 
-  mv Wallaroo_Metrics_UI-x86_64.AppImage "$metrics_ui_appimage"
+  mv Wallaroo_Metrics_UI*-x86_64.AppImage "$metrics_ui_appimage"
 }
 
 build_wallaroo_source_archive() {
