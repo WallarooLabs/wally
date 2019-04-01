@@ -65,6 +65,7 @@ class _StreamState
   var last_acked: PointOfReference // last message id that was checkpointed
   var last_seen: PointOfReference  // last seen message id
   var last_checkpoint: CheckpointId // last checkpoint id
+  var close_on_or_after: CheckpointId = 0 // First checkpoint where sream ca be closed
 
   new ref create(stream_id: StreamId, stream_name: String,
     last_seen': PointOfReference,
@@ -396,12 +397,29 @@ class ConnectorSourceNotify[In: Any val]
             if cwm.Eos.is_set(m.flags) then
               // Process EOS
               @printf[I32](("ConnectorSource[%s] received EOS for stream_id"
-                + " %s\n").cstring(), _source_name.string().cstring(),
-                m.stream_id.string().cstring())
+                + " %s. Last_acked: %s, last_seen :%s\n").cstring(),
+                _source_name.string().cstring(),
+                m.stream_id.string().cstring(),
+                s.last_acked.string().cstring(),
+                s.last_seen.string().cstring())
               // 1. remove state from _active_streams
-              try _active_streams.remove(m.stream_id)? end
+              try
+                _active_streams.remove(m.stream_id)?
+                @printf[I32]("Successfully removed %s from _active\n".cstring(),
+                m.stream_id.string().cstring())
+              else
+                @printf[I32](("Something went wrong trying to remove %s " +
+                  "from _active\n").cstring(),
+                  m.stream_id.string().cstring())
+                error
+              end
               // 2. add state to _pending_close
               ifdef "resilience" then
+                // Set the first barrier we can close this stream on
+                // to the current barrier id + 1
+                // This prevents premature stream closure without checkpointing
+                // and acking the last_seen value after an EOS
+                s.close_on_or_after = _barrier_checkpoint_id + 1
                 _pending_close.update(m.stream_id, s)
               else
                 // respond immediately
@@ -792,16 +810,22 @@ class ConnectorSourceNotify[In: Any val]
 
   fun ref _process_acks_for_pending_close(source: ConnectorSource[In] ref) =>
     for (stream_id, s) in _pending_close.pairs() do
-      ifdef "trace" then
+      ifdef debug then
         @printf[I32]("%s ::: Processing ack for %s at %s\n".cstring(),
           WallClock.seconds().string().cstring(),
           stream_id.string().cstring(), s.last_acked.string().cstring())
       end
-      _pending_acks.push((stream_id, s.last_acked))
-      _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
+      if s.close_on_or_after <= _barrier_checkpoint_id then
+        try _pending_close.remove(stream_id)? end
+        _pending_acks.push((stream_id, s.last_acked))
+        _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
+      else
+        ifdef debug then
+          @printf[I32]("Stream_id %s is not ready to close.\n".cstring(),
+            stream_id.string().cstring())
+        end
+      end
     end
-    // clear _pending_close
-    _pending_close.clear()
     if (_fsm_state is _ProtoFsmStreaming) or
        (_fsm_state is _ProtoFsmShrinking) then
       _send_acks(source)

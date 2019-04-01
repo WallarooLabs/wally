@@ -363,6 +363,8 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             # check if there's an eos pending this ack
             eos_point_of_ref = self.pending_eos_ack.get(stream.id, None)
             if eos_point_of_ref:
+                logging.debug("Stream {} is awaiting EOS Ack for {}"
+                              .format(stream, eos_point_of_ref))
                 # source was pending eos ack
                 # check ack's point of ref
                 if stream.point_of_ref == eos_point_of_ref:
