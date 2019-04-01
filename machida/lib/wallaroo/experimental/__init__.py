@@ -604,7 +604,8 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             event_time = ts,
             key = en_key,
             message = None)
-        logging.info("Sending End of Stream {}".format(msg))
+        logging.info("Sending End of Stream {} for point_of_ref : {}"
+                     .format(msg, point_of_ref))
         self.write(msg)
         # this isn't used currently.
         # see connectors.py:MultiSourceConnector for an example implementing
