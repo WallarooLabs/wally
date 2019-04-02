@@ -276,7 +276,6 @@ class ConnectorSourceNotify[In: Any val]
     if _prep_for_rollback then
       // Anything that the connector sends us is ignored while we wait
       // for the rollback to finish.  Tell the connector to restart later.
-      //send_restart()
       return _continue_perhaps(source)
     end
 
@@ -964,14 +963,10 @@ class ConnectorSourceNotify[In: Any val]
     _credits = _credits + new_credits
 
   fun ref send_restart(source: ConnectorSource[In] ref) =>
-    ifdef "trace" then
-      @printf[I32]("TRACE: %s.%s()\n".cstring(),
-        __loc.type_name().cstring(), __loc.method_name().cstring())
-    end
+    @printf[I32]("Sending RESTART(%s:%s)\n".cstring(),
+      host.cstring(), service.cstring())
     _send_reply(source, cwm.RestartMsg(host + ":" + service))
-    source.close()
-    // The .close() method ^^^ calls our closed() method which will
-    // twiddle all of the appropriate state variables.
+    _clear_and_relinquish_all()
 
   fun _send_reply(source: ConnectorSource[In] ref, msg: cwm.Message) =>
     let w1: Writer = w1.create()
