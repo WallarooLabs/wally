@@ -349,11 +349,13 @@ def start_runners(runners, command, source_addrs, sink_addrs, metrics_addr,
         try:
             assert(r.is_alive())
         except RunnerHasntStartedError as err:
-            try:
-                time.sleep(0.2)
-                assert(r.is_alive())
-            except:
-                raise err
+            for x in range(8):
+                try:
+                    time.sleep(0.25)
+                    assert(r.is_alive())
+                except:
+                    if x == 7:
+                        raise err
         except Exception as err:
             stdout = r.get_output()
             raise ClusterError(
@@ -429,11 +431,13 @@ def add_runner(worker_id, runners, command, source_addrs, sink_addrs, metrics_ad
     try:
         assert(runner.is_alive())
     except RunnerHasntStartedError as err:
-        try:
-            time.sleep(0.5)
-            assert(r.is_alive())
-        except:
-            raise err
+        for x in range(8):
+            try:
+                time.sleep(0.25)
+                assert(runner.is_alive())
+            except:
+                if x == 7:
+                    raise err
     except Exception as err:
         raise CrashedWorkerError
     try:
