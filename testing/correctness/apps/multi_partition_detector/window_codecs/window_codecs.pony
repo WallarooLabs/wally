@@ -77,7 +77,7 @@ primitive PartitionedU64FramedHandler is FramedSourceHandler[Message]
         (let sec', let ns') = Time.now()
         let us' = ns' / 1000
       try
-        let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." + us'.string())
+        let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." + us'.string())?
         @printf[I32]("%s Source decoded: %s\n".cstring(), ts'.cstring(),
           m.string().cstring())
       end
