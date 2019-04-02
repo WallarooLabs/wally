@@ -5,20 +5,29 @@ container:
   memory: 24
 
 task:
-  name: "xenial correctness tests (resiience)"
-
+  name: "build-resilience"
   install_script:
     - .cirrusci/clone_tracker.sh
 
   test_script:
-    - make integration-tests-testing-correctness-tests-all resilience=on debug=true
-
+    - make build-testing-correctness-tests-all resilience=on debug=true
 
 task:
-  name: "xenial correctness tests"
+  name: "correctness-tests-resilience"
+  depends_on: build-resilience
+  test_script:
+    - make integration-tests-testing-correctness-tests-all resilience=on debug=true
 
+task:
+  name: "build"
   install_script:
     - .cirrusci/clone_tracker.sh
 
+  test_script:
+    - make build-testing-correctness-tests-all debug=true
+
+task:
+  name: "correctness-tests"
+  depends_on: build
   test_script:
     - make integration-tests-testing-correctness-tests-all debug=true
