@@ -365,13 +365,13 @@ def _test_resilience(command, ops=[], initial=None, source_type='tcp',
             except:
                 crashed_workers = list(
                     filter(lambda r: r.returncode not in (0,-9,-15),
-                           persistent_data.get('runner_data')))
+                           persistent_data.get('runner_data', [])))
                 if crashed_workers:
                     logging.error("Some workers exited badly. The last {} lines of "
                         "each were:\n\n{}"
                         .format(FROM_TAIL,
                             runner_data_format(
-                                persistent_data.get('runner_data'),
+                                persistent_data.get('runner_data', []),
                                 from_tail=FROM_TAIL)))
                 raise
         else: # no exception
