@@ -34,7 +34,7 @@ APIS = {
         {'app': 'multi_partition_detector',
          'cmd': 'multi_partition_detector --depth 1 --run-with-resilience',
          'validation_cmd': 'python ../../apps/multi_partition_detector/_validate.py --output {out_file}'}],
-    'python': [
+    'python2': [
         {'app': 'multi_partition_detector',
          'cmd': 'machida --application-module multi_partition_detector --depth 1 --run-with-resilience',
          'validation_cmd': 'python ../../apps/multi_partition_detector/_validate.py --output {out_file}'},
