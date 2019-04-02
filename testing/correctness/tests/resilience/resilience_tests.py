@@ -130,14 +130,3 @@ for api, group in APIS.items():
 #    command = 'multi_partition_detector --depth 1'
 #    ops = [Crash(2, pause=False), Wait(2), Recover(2, resume=False)]
 #    _test_resilience(command, ops, validation_cmd=False)
-
-
-
-
-
-# Sleep between tests for an arbitrary amount of time
-# This is supposed to help CircleCI low-resource machines cope with all the
-# processes we're starting in these tests
-import time
-def teardown_function(function):
-    time.sleep(2)
