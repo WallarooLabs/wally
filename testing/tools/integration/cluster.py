@@ -428,6 +428,12 @@ def add_runner(worker_id, runners, command, source_addrs, sink_addrs, metrics_ad
     # check the runner hasn't exited with any errors
     try:
         assert(runner.is_alive())
+    except RunnerHasntStartedError as err:
+        try:
+            time.sleep(0.5)
+            assert(r.is_alive())
+        except:
+            raise err
     except Exception as err:
         raise CrashedWorkerError
     try:
