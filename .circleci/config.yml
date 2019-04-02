@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -16,7 +16,7 @@ jobs:
       - run: changelog-tool verify CHANGELOG.md
   integration-tests:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -28,7 +28,7 @@ jobs:
           path: /tmp/wallaroo_test_errors
   integration-tests-with-resilience:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -40,7 +40,7 @@ jobs:
           path: /tmp/wallaroo_test_errors
   unit-tests:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
