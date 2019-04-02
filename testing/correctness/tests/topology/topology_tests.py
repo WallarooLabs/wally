@@ -217,7 +217,7 @@ def create_test(api, cmd, validation_cmd, steps, workers=1):
 
 
 # Create tests!
-APIS = {'python': {'cmd': 'machida --application-module app_gen',
+APIS = {'python2': {'cmd': 'machida --application-module app_gen',
                    'validation_cmd': 'python2 app_gen.py'},
        'python3': {'cmd': 'machida3 --application-module app_gen',
                     'validation_cmd': 'python3 app_gen.py'},
