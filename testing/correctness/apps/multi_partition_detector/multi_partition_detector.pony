@@ -182,9 +182,11 @@ class MultiPartitionGenerator
         ifdef debug then
             (let sec', let ns') = Time.now()
             let us' = ns' / 1000
-            let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." + us'.string())
-          @printf[I32]("%s Source decoded: %s\n".cstring(), ts'.cstring(),
-            m.string().cstring())
+            try
+              let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." + us'.string())?
+              @printf[I32]("%s Source decoded: %s\n".cstring(), ts'.cstring(),
+                m.string().cstring())
+            end
         end
 
         consume m
