@@ -129,7 +129,11 @@ actor InitialNbboFileGenerator
     _rejected_instruments = rejected_instruments
     _nonrejected_instruments = nonrejected_instruments
     let date = PosixDate(_time._1, _time._2)
-    _utc_timestamp = date.format("%Y%m%d-%H:%M:%S.000")
+    try
+      _utc_timestamp = date.format("%Y%m%d-%H:%M:%S.000")?
+    else
+      _utc_timestamp = "0"
+    end
 
   be generate_and_write() =>
     generate_nbbo_messages(_rejected_instruments, true)
