@@ -16,6 +16,9 @@ task:
   name: "correctness-tests-resilience"
   depends_on: build-resilience
   test_script:
+
+    - ulimit -c unlimited
+    - ulimit -a
     - make integration-tests-testing-correctness-tests-all resilience=on debug=true
 
 task:
@@ -30,4 +33,6 @@ task:
   name: "correctness-tests"
   depends_on: build
   test_script:
+    - ulimit -c unlimited
+    - ulimit -a
     - make integration-tests-testing-correctness-tests-all debug=true
