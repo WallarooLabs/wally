@@ -1,0 +1,24 @@
+# Global default container
+container:
+  image: wallaroolabs/wallaroo-ci:2018.10.17.1
+  cpu: 8
+  memory: 24
+
+task:
+  name: "xenial correctness tests (resiience)"
+
+  install_script:
+    - .cirrusci/clone_tracker.sh
+
+  test_script:
+    - make integration-tests-testing-correctness-tests-all resilience=on debug=true
+
+
+task:
+  name: "xenial correctness tests"
+
+  install_script:
+    - .cirrusci/clone_tracker.sh
+
+  test_script:
+    - make integration-tests-testing-correctness-tests-all debug=true
