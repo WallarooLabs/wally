@@ -90,11 +90,3 @@ for api, cmd in APIS.items():
                               source_name = SOURCE_NAME,
                               source_type = src_type,
                               source_number = 1)
-
-
-# Sleep between tests for an arbitrary amount of time
-# This is supposed to help CircleCI low-resource machines cope with all the
-# processes we're starting in these tests
-import time
-def teardown_function(function):
-    time.sleep(2)
