@@ -5,34 +5,30 @@ container:
   memory: 24
 
 task:
-  name: "build-resilience"
+  name: "correctness-tests-resilience"
   install_script:
     - .cirrusci/clone_tracker.sh
-
   test_script:
-    - make build-testing-correctness-tests-all resilience=on debug=true
-
-task:
-  name: "correctness-tests-resilience"
-  depends_on: build-resilience
-  test_script:
-
     - ulimit -c unlimited
     - ulimit -a
-    - make integration-tests-testing-correctness-tests-all resilience=on debug=true
-
-task:
-  name: "build"
-  install_script:
-    - .cirrusci/clone_tracker.sh
-
-  test_script:
-    - make build-testing-correctness-tests-all debug=true
+    - make integration-tests-testing-correctness-tests-autoscale-all debug=true resilience=on pytest_exp='-k pony'
+    - make integration-tests-testing-correctness-tests-autoscale-all debug=true resilience=on pytest_exp='-k python2'
+    - make integration-tests-testing-correctness-tests-autoscale-all debug=true resilience=on pytest_exp='-k python3'
+    - make integration-tests-testing-correctness-tests-resilience-all debug=true resilience=on pytest_exp='-k pony'
+    - make integration-tests-testing-correctness-tests-resilience-all debug=true resilience=on pytest_exp='-k python2'
+    - make integration-tests-testing-correctness-tests-resilience-all debug=true resilience=on pytest_exp='-k python3'
+    - make integration-tests-testing-correctness-tests-topology-all debug=true resilience=on pytest_exp='-k python2'
+    - make integration-tests-testing-correctness-tests-topology-all debug=true resilience=on pytest_exp='-k python3'
 
 task:
   name: "correctness-tests"
-  depends_on: build
+  install_script:
+    - .cirrusci/clone_tracker.sh
   test_script:
     - ulimit -c unlimited
     - ulimit -a
-    - make integration-tests-testing-correctness-tests-all debug=true
+    - make integration-tests-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k pony'
+    - make integration-tests-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python2'
+    - make integration-tests-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python3'
+    - make integration-tests-testing-correctness-tests-topology-all debug=true pytest_exp='-k python2'
+    - make integration-tests-testing-correctness-tests-topology-all debug=true pytest_exp='-k python3'
