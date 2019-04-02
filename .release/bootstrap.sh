@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 export DEBIAN_FRONTEND=noninteractive
 
-export PONYC_VERSION="0.25.0"
+export PONYC_VERSION="0.28.0"
 export OTP_VERSION="1:20.1-1"
 export ELIXIR_VERSION="1.5.2-1"
 export GO_VERSION="1.9.4"
@@ -20,7 +20,7 @@ install_ponyc() {
 
   echo "** Installing latest ponyc ${PONYC_VERSION} from bintray"
 
-  sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys "E04F0923 B3B48BDA"
+  sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "E04F0923 B3B48BDA"
   sudo add-apt-repository "deb https://dl.bintray.com/pony-language/ponylang-debian  $(lsb_release -cs) main"
   sudo apt-get update
 
@@ -32,7 +32,7 @@ install_ponyc() {
 install_pony_stable() {
   echo "** Installing pony-stable"
 
-  sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys "E04F0923 B3B48BDA"
+  sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "E04F0923 B3B48BDA"
   sudo add-apt-repository "deb https://dl.bintray.com/pony-language/ponylang-debian  $(lsb_release -cs) main"
   sudo apt-get update
   sudo apt-get -V -y install pony-stable
@@ -145,7 +145,7 @@ install_go() {
 install_changelog_tool() {
   git clone https://github.com/ponylang/changelog-tool
   cd changelog-tool
-  git checkout 7b0d91c2cf2b3edae1cc337ae035e49184f8659a
+  git checkout 093343ba9e469ccc3836393bf154ac6e1302d411
   make
   sudo make install
 }
