@@ -114,7 +114,7 @@ actor InitialNbboFileGenerator
   let _time: (I64 val, I64 val) = Time.now()
   var _rejected_instruments: Array[InstrumentData val] val
   var _nonrejected_instruments: Array[InstrumentData val] val
-  var _utc_timestamp: String
+  var _utc_timestamp: String = "0"
 
 
   new create(env: Env,
@@ -131,8 +131,6 @@ actor InitialNbboFileGenerator
     let date = PosixDate(_time._1, _time._2)
     try
       _utc_timestamp = date.format("%Y%m%d-%H:%M:%S.000")?
-    else
-      _utc_timestamp = "0"
     end
 
   be generate_and_write() =>
