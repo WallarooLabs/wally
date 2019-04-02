@@ -1,7 +1,7 @@
 FROM ubuntu:16.04
 
-ENV PONYC_VERSION 0.25.0
-ENV PONY_STABLE_VERSION 0.1.4
+ENV PONYC_VERSION 0.28.0
+ENV PONY_STABLE_VERSION 0.2.0
 ENV OTP_VERSION 1:20.2.2
 ENV ELIXIR_VERSION 1.5.2-1
 
@@ -12,7 +12,7 @@ RUN apt-get update \
      curl \
      gnupg2 \
      software-properties-common \
-  && apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys "E04F0923 B3B48BDA" \
+  && apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "E04F0923 B3B48BDA" \
   && add-apt-repository "deb https://dl.bintray.com/pony-language/ponylang-debian  $(lsb_release -cs) main" \
   && apt-get update \
   && apt-get install -y \

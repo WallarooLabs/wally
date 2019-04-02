@@ -10,7 +10,7 @@ jobs:
 
   unit-tests:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -18,7 +18,7 @@ jobs:
 
   integration-tests:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -35,7 +35,7 @@ jobs:
 
   integration-tests-correctness:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -45,7 +45,7 @@ jobs:
 
   integration-tests-resilience:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -56,7 +56,7 @@ jobs:
 
   integration-tests-resilience-correctness:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -66,7 +66,7 @@ jobs:
 
   autoscale-tests-pony:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -79,7 +79,7 @@ jobs:
 
   autoscale-tests-pony-resilience:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -92,7 +92,7 @@ jobs:
 
   autoscale-tests-python2:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -105,7 +105,7 @@ jobs:
 
   autoscale-tests-python2-resilience:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -118,7 +118,7 @@ jobs:
 
   autoscale-tests-python3:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -131,7 +131,7 @@ jobs:
 
   autoscale-tests-python3-resilience:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -144,7 +144,7 @@ jobs:
 
   resilience-tests-pony:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -157,7 +157,7 @@ jobs:
 
   resilience-tests-python2:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -170,7 +170,7 @@ jobs:
 
   resilience-tests-python3:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -183,7 +183,7 @@ jobs:
 
   topology-tests-python2:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -196,7 +196,7 @@ jobs:
 
   topology-tests-python3-resilience:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -209,7 +209,7 @@ jobs:
 
   topology-tests-python3:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -222,7 +222,7 @@ jobs:
 
   topology-tests-python3-resilience:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+      - image: wallaroolabs/wallaroo-ci:2019.04.02.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
