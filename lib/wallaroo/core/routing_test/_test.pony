@@ -225,7 +225,7 @@ class iso _TestAdjustHashPartitions is UnitTest
     CompareWeights(norm_w_hpa16, norm_w_hpb16, "up to n16", __loc.line())?
 
     // n -> n+1: weights of direct path = weights of adjusted HashPartitions
-    more = recover 
+    more = recover
       ["n17"; "n18"; "n19"; "n20"; "n21"; "n22"; "n24"; "n25"; "n26"; "n27"]end
     for c in more.values() do
       weights.push((c, 1))
@@ -361,12 +361,7 @@ class _TestPonycheckStateful is Property1[(Array[TestOp])]
     // If max_claimant_name=100, then this test should run in under 20 seconds.
     let max_claimant_name: USize = 75
 
-    let gen_hash_op = try Generators.one_of[HashOp]([
-        HashOpAdd; HashOpRemove ])?
-      else
-        Fail()
-        Generators.unit[HashOp](HashOpAdd)
-      end
+    let gen_hash_op =  Generators.one_of[HashOp]([HashOpAdd; HashOpRemove])
 
     // We are going to generate Array[USize] and rely on TestOp.create()
     // to convert the integers into claimant name strings.
@@ -445,7 +440,7 @@ class _TestPonycheckStateful is Property1[(Array[TestOp])]
 
       _sanity_checks(who, sut, ph)
     end
-    
+
     // Final sanity checks & model properties
     _sanity_checks(who, sut, ph)
 
