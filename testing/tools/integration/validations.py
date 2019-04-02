@@ -24,9 +24,9 @@ def validate_migration(pre_partitions, post_partitions, workers):
     - Test that no "joining" workers are present in the pre set
     - Test that no "leaving" workers are present in the post set
     - Test that state partitions moved between the pre_partitions map and
-      the post_partitions map.
+      the post_partitions map if they needed to
     - Test that all of the states present in the `pre` set are also present
-      in the `post` set. New state are allowed in the `post` because of
+      in the `post` set. New states are allowed in the `post` because of
       dynamic partitioning (new partitions may be created in real time).
     """
     # prepare some useful sets for set-wise comparison
@@ -47,6 +47,7 @@ def validate_migration(pre_partitions, post_partitions, workers):
         assert((pre_workers - joining) == pre_workers)
     except:
         raise MigrationError("Joining-workers-in-pre-set error.")
+
     # test no leaving workers are present in post set
     logging.debug("test no leaving workers are present in post set")
     try:
@@ -80,11 +81,16 @@ def validate_migration(pre_partitions, post_partitions, workers):
             raise MigrationError("State {!r} is missing from post_partitions"
                 .format(state))
         # Test some partitions moved
-        try:
-            assert(pre_partitions[state] != post_partitions[state])
-        except:
-            raise MigrationError("Partitions for state {!r} did not move"
-                .format(state))
+        for key, worker in pre_partitions[state].items():
+            try:
+                if worker in leaving:
+                    assert(pre_partitions[state] != post_partitions[state])
+                else:
+                    continue
+            except:
+                raise MigrationError("Partition {!r} for state {!r} did not "
+                    "move from worker {!r}"
+                    .format(key, state, worker))
 
 
 def is_processing(status):
