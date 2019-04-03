@@ -223,10 +223,6 @@ workflows:
       - verify-changelog
       - unit-tests
 
-      - unit-tests-release:
-          requires:
-            - unit-tests
-
       - integration-tests:
           requires:
             - unit-tests
