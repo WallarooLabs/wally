@@ -8,21 +8,13 @@ jobs:
       - run: .circleci/clone_tracker.sh
       - run: changelog-tool verify CHANGELOG.md
 
-  unit-tests-debug:
+  unit-tests:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
       - run: make unit-tests debug=true
-
-  unit-tests-release:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
-    steps:
-      - checkout
-      - run: .circleci/clone_tracker.sh
-      - run: make unit-tests
 
   integration-tests:
     docker:
@@ -229,22 +221,19 @@ workflows:
     jobs:
       # must pass first
       - verify-changelog
-
-      - unit-tests-debug:
-          requires:
-            - verify-changelog
+      - unit-tests
 
       - unit-tests-release:
           requires:
-            - unit-tests-debug
+            - unit-tests
 
       - integration-tests:
           requires:
-            - unit-tests-debug
+            - unit-tests
 
       - integration-tests-resilience:
           requires:
-            - unit-tests-debug
+            - unit-tests
 
       - autoscale-tests-pony:
           requires:
