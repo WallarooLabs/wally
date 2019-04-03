@@ -24,7 +24,7 @@ jobs:
       - run: .circleci/clone_tracker.sh
       - run: make unit-tests
 
-  free-candy-tests:
+  integration-tests:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
     steps:
@@ -42,7 +42,7 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  free-candy-tests-resilience:
+  integration-tests-resilience:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
     steps:
@@ -54,7 +54,7 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  bees-knees-1:
+  autoscale-tests-pony:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
     steps:
@@ -67,7 +67,7 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  bees-knees-2:
+  autoscale-tests-pony-resilience:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
     steps:
@@ -80,7 +80,7 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  bees-knees-3:
+  autoscale-tests-python2:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
     steps:
@@ -93,7 +93,7 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  bees-knees-4:
+  autoscale-tests-python2-resilience:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
     steps:
@@ -106,7 +106,7 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  bees-knees-5:
+  autoscale-tests-python3:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
     steps:
@@ -119,7 +119,7 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  bees-knees-6:
+  autoscale-tests-python3-resilience:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
     steps:
@@ -132,7 +132,7 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  bees-knees-7:
+  resilience-tests-pony:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
     steps:
@@ -145,7 +145,7 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  bees-knees-8:
+  resilience-tests-python2:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
     steps:
@@ -158,7 +158,7 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  bees-knees-9:
+  resilience-tests-python3:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
     steps:
@@ -171,7 +171,7 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  bees-knees-10:
+  topology-tests-python2:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
     steps:
@@ -184,7 +184,7 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  bees-knees-11:
+  topology-tests-python3-resilience:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
     steps:
@@ -197,7 +197,7 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  bees-knees-12:
+  topology-tests-python3:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
     steps:
@@ -210,7 +210,7 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  bees-knees-13:
+  topology-tests-python3-resilience:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
     steps:
@@ -238,75 +238,75 @@ workflows:
           requires:
             - unit-tests-debug
 
-      - free-candy-tests:
+      - integration-tests:
           requires:
             - unit-tests-debug
 
-      - free-candy-tests-resilience:
+      - integration-tests-resilience:
           requires:
             - unit-tests-debug
 
-      - bees-knees-1:
+      - autoscale-tests-pony:
           requires:
-            - free-candy-tests
-            - free-candy-tests-resilience
+            - integration-tests
+            - integration-tests-resilience
 
-      - bees-knees-2:
+      - autoscale-tests-pony-resilience:
           requires:
-            - free-candy-tests
-            - free-candy-tests-resilience
+            - integration-tests
+            - integration-tests-resilience
 
-      - bees-knees-3:
+      - autoscale-tests-python2:
           requires:
-            - free-candy-tests
-            - free-candy-tests-resilience
+            - integration-tests
+            - integration-tests-resilience
 
-      - bees-knees-4:
+      - autoscale-tests-python2-resilience:
           requires:
-            - free-candy-tests
-            - free-candy-tests-resilience
+            - integration-tests
+            - integration-tests-resilience
 
-      - bees-knees-5:
+      - autoscale-tests-python3:
           requires:
-            - free-candy-tests
-            - free-candy-tests-resilience
+            - integration-tests
+            - integration-tests-resilience
 
-      - bees-knees-6:
+      - autoscale-tests-python3-resilience:
           requires:
-            - free-candy-tests
-            - free-candy-tests-resilience
+            - integration-tests
+            - integration-tests-resilience
 
-      - bees-knees-7:
+      - resilience-tests-pony:
           requires:
-            - free-candy-tests
-            - free-candy-tests-resilience
+            - integration-tests
+            - integration-tests-resilience
 
-      - bees-knees-8:
+      - resilience-tests-python2:
           requires:
-            - free-candy-tests
-            - free-candy-tests-resilience
+            - integration-tests
+            - integration-tests-resilience
 
-      - bees-knees-9:
+      - resilience-tests-python3:
           requires:
-            - free-candy-tests
-            - free-candy-tests-resilience
+            - integration-tests
+            - integration-tests-resilience
 
-      - bees-knees-10:
+      - topology-tests-python2:
           requires:
-            - free-candy-tests
-            - free-candy-tests-resilience
+            - integration-tests
+            - integration-tests-resilience
 
-      - bees-knees-11:
+      - topology-tests-python3-resilience:
           requires:
-            - free-candy-tests
-            - free-candy-tests-resilience
+            - integration-tests
+            - integration-tests-resilience
 
-      - bees-knees-12:
+      - topology-tests-python3:
           requires:
-            - free-candy-tests
-            - free-candy-tests-resilience
+            - integration-tests
+            - integration-tests-resilience
 
-      - bees-knees-13:
+      - topology-tests-python3-resilience:
           requires:
-            - free-candy-tests
-            - free-candy-tests-resilience
+            - integration-tests
+            - integration-tests-resilience
