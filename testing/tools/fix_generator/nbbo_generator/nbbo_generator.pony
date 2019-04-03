@@ -157,7 +157,7 @@ actor NbboFilesGenerator
     try
       var output_file = File(FilePath(_auth, _output_path)?)
       let date = PosixDate(_time._1 + sec.i64(), _time._2)
-      let utc_timestamp = "0"
+      var utc_timestamp = "0"
       try
         utc_timestamp = date.format("%Y%m%d-%H:%M:%S.000")?
       end
