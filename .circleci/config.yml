@@ -290,7 +290,7 @@ workflows:
 
       - bees-knees-12:
           requires:
-          -k- free-candy-tests
+            - free-candy-tests
 
       - bees-knees-13:
           requires:
