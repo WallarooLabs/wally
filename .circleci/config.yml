@@ -30,6 +30,15 @@ jobs:
       - run: make test-utils-all debug=true
       - run: make test-testing-tools-all debug=true
       - run: make test-testing-performance-all debug=true
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  integration-tests-correctness:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
       - run: make test-testing-correctness-apps-all debug=true
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
@@ -40,8 +49,16 @@ jobs:
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
-      - run: make test-demos-all debug=true resilience=on
-      - run: make test-examples-all debug=true resilience=on
+      - run: make test-testing-correctness-apps-all debug=true resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  integration-tests-resilience-correctness:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
       - run: make test-testing-correctness-apps-all debug=true resilience=on
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
@@ -227,71 +244,105 @@ workflows:
           requires:
             - unit-tests
 
+      - integration-tests-correctness:
+          requires:
+            - unit-tests
+
       - integration-tests-resilience:
+          requires:
+            - unit-tests
+
+      - integration-tests-resilience-correctness:
           requires:
             - unit-tests
 
       - autoscale-tests-pony:
           requires:
             - integration-tests
+            - integration-tests-correctness
             - integration-tests-resilience
+            - integration-tests-resilience-correctness
 
       - autoscale-tests-pony-resilience:
           requires:
             - integration-tests
+            - integration-tests-correctness
             - integration-tests-resilience
+            - integration-tests-resilience-correctness
 
       - autoscale-tests-python2:
           requires:
             - integration-tests
+            - integration-tests-correctness
             - integration-tests-resilience
+            - integration-tests-resilience-correctness
 
       - autoscale-tests-python2-resilience:
           requires:
             - integration-tests
+            - integration-tests-correctness
             - integration-tests-resilience
+            - integration-tests-resilience-correctness
 
       - autoscale-tests-python3:
           requires:
             - integration-tests
+            - integration-tests-correctness
             - integration-tests-resilience
+            - integration-tests-resilience-correctness
 
       - autoscale-tests-python3-resilience:
           requires:
             - integration-tests
+            - integration-tests-correctness
             - integration-tests-resilience
+            - integration-tests-resilience-correctness
 
       - resilience-tests-pony:
           requires:
             - integration-tests
+            - integration-tests-correctness
             - integration-tests-resilience
+            - integration-tests-resilience-correctness
 
       - resilience-tests-python2:
           requires:
             - integration-tests
+            - integration-tests-correctness
             - integration-tests-resilience
+            - integration-tests-resilience-correctness
 
       - resilience-tests-python3:
           requires:
             - integration-tests
+            - integration-tests-correctness
             - integration-tests-resilience
+            - integration-tests-resilience-correctness
 
       - topology-tests-python2:
           requires:
             - integration-tests
+            - integration-tests-correctness
             - integration-tests-resilience
+            - integration-tests-resilience-correctness
 
       - topology-tests-python3-resilience:
           requires:
             - integration-tests
+            - integration-tests-correctness
             - integration-tests-resilience
+            - integration-tests-resilience-correctness
 
       - topology-tests-python3:
           requires:
             - integration-tests
+            - integration-tests-correctness
             - integration-tests-resilience
+            - integration-tests-resilience-correctness
 
       - topology-tests-python3-resilience:
           requires:
             - integration-tests
+            - integration-tests-correctness
             - integration-tests-resilience
+            - integration-tests-resilience-correctness
