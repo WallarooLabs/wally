@@ -77,12 +77,9 @@ fi
 
 # distributions to test. format is "DOCKER_REPO VAGRANT_BOX"
 declare -a DISTROS_TO_TEST=(
-"debian:jessie,debian/jessie64"
 "debian:stretch,debian/stretch64"
-"ubuntu:trusty,ubuntu/trusty64"
 "ubuntu:xenial,ubuntu/xenial64"
 "ubuntu:bionic,ubuntu/bionic64"
-"ubuntu:artful,ubuntu/artful64"
 "centos:7,centos/7"
 "fedora:27,fedora/27-cloud-base"
 "fedora:28,fedora/28-cloud-base"
