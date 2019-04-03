@@ -73,7 +73,7 @@ jobs:
       - run: |
           ulimit -c unlimited
           ulimit -a
-          make test-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k pony'
+          make integration-tests-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k pony'
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
@@ -86,7 +86,7 @@ jobs:
       - run: |
           ulimit -c unlimited
           ulimit -a
-          make test-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k pony' resilience=on
+          make integration-tests-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k pony' resilience=on
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
@@ -99,7 +99,7 @@ jobs:
       - run: |
           ulimit -c unlimited
           ulimit -a
-          make test-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python2'
+          make integration-tests-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python2'
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
@@ -112,7 +112,7 @@ jobs:
       - run: |
           ulimit -c unlimited
           ulimit -a
-          make test-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python2' resilience=on
+          make integration-tests-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python2' resilience=on
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
@@ -125,7 +125,7 @@ jobs:
       - run: |
           ulimit -c unlimited
           ulimit -a
-          make test-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python3'
+          make integration-tests-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python3'
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
@@ -138,7 +138,7 @@ jobs:
       - run: |
           ulimit -c unlimited
           ulimit -a
-          make test-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python3' resilience=on
+          make integration-tests-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python3' resilience=on
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
@@ -151,7 +151,7 @@ jobs:
       - run: |
           ulimit -c unlimited
           ulimit -a
-          make test-testing-correctness-tests-resilience-all debug=true pytest_exp='-k pony' resilience=on
+          make integration-tests-testing-correctness-tests-resilience-all debug=true pytest_exp='-k pony' resilience=on
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
@@ -164,7 +164,7 @@ jobs:
       - run: |
           ulimit -c unlimited
           ulimit -a
-          make test-testing-correctness-tests-resilience-all debug=true pytest_exp='-k python2' resilience=on
+          make integration-tests-testing-correctness-tests-resilience-all debug=true pytest_exp='-k python2' resilience=on
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
@@ -177,7 +177,7 @@ jobs:
       - run: |
           ulimit -c unlimited
           ulimit -a
-          make test-testing-correctness-tests-resilience-all debug=true pytest_exp='-k python3' resilience=on
+          make integration-tests-testing-correctness-tests-resilience-all debug=true pytest_exp='-k python3' resilience=on
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
@@ -190,7 +190,7 @@ jobs:
       - run: |
           ulimit -c unlimited
           ulimit -a
-          make test-testing-correctness-tests-topology-all debug=true pytest_exp='-k python2'
+          make integration-tests-testing-correctness-tests-topology-all debug=true pytest_exp='-k python2'
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
@@ -203,7 +203,7 @@ jobs:
       - run: |
           ulimit -c unlimited
           ulimit -a
-          make test-testing-correctness-tests-topology-all debug=true pytest_exp='-k python2' resilience=on
+          make integration-tests-testing-correctness-tests-topology-all debug=true pytest_exp='-k python2' resilience=on
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
@@ -216,7 +216,7 @@ jobs:
       - run: |
           ulimit -c unlimited
           ulimit -a
-          make test-testing-correctness-tests-topology-all debug=true pytest_exp='-k python3'
+          make integration-tests-testing-correctness-tests-topology-all debug=true pytest_exp='-k python3'
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
@@ -229,7 +229,7 @@ jobs:
       - run: |
           ulimit -c unlimited
           ulimit -a
-          make test-testing-correctness-tests-topology-all debug=true pytest_exp='-k python3' resilience=on
+          make integration-tests-testing-correctness-tests-topology-all debug=true pytest_exp='-k python3' resilience=on
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
