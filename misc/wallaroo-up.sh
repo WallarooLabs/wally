@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # md5 for validatiing script checksum
-MD5="2d83bfc6a87364f4abb20cc04e5d4777  -"
+MD5="eae63fc0fd14ff46d05176e148fa578d  -"
 
 set -eEuo pipefail
 
@@ -50,6 +50,7 @@ W0.5.4=0.25.0
 W0.5.3=0.24.4
 W0.5.2=0.24.4
 Wuse-ponyc-0.25=0.25.0
+Wponyc-0.27.0=0.28.0
 Wmaster=
 "
 
@@ -66,18 +67,14 @@ ol-7
 amzn-2
 fedora-27
 fedora-28
-ubuntu-trusty
 ubuntu-xenial
-ubuntu-artful
 ubuntu-bionic
-debian-jessie
 debian-stretch
 debian-buster
 "
 
 VALID_DISTRO_VERSIONS_PYTHON3="
 ubuntu-xenial
-ubuntu-artful
 ubuntu-bionic
 debian-stretch
 debian-buster
@@ -352,10 +349,6 @@ get_distribution_version() {
             ;;
             9)
               dist_version="stretch"
-            ;;
-            8)
-              dist_version="jessie"
-            ;;
           esac
         fi
       ;;
@@ -447,16 +440,6 @@ install_required_dependencies() {
         PKGS_TO_INSTALL="$PKGS_TO_INSTALL ponyc=${PONYC_VERSION}"
       fi
       PKGS_TO_INSTALL="$PKGS_TO_INSTALL libssl-dev make pony-stable libsnappy-dev liblz4-dev"
-
-      # if jessie/trusty add in wallaroolabs-debian repo for backport of liblz4 needed by Wallaroo
-      case "$dist_version" in
-        jessie|trusty)
-          if ! apt-cache policy 2>&1 | grep wallaroolabs-debian > /dev/null 2>&1; then
-            run_cmd "apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 379CE192D401AB61 $REDIRECT" root retry
-            run_cmd "add-apt-repository 'deb https://wallaroo-labs.bintray.com/wallaroolabs-debian ${dist_version} main' $REDIRECT" root
-          fi
-        ;;
-      esac
 
       # add in ponylang-debian repo for ponylang install
       if ! apt-cache policy 2>&1 | grep pony-language/ponylang-debian > /dev/null 2>&1; then
