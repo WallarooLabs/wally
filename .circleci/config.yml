@@ -22,14 +22,14 @@ jobs:
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
-      - run: make test-lib-all debug=true
-      - run: make test-demos-all debug=true
-      - run: make test-examples-all debug=true
-      - run: make test-giles-all debug=true
-      - run: make test-monitoring_hub-all debug=true
-      - run: make test-utils-all debug=true
-      - run: make test-testing-tools-all debug=true
-      - run: make test-testing-performance-all debug=true
+      - run: make integration-tests-lib-all debug=true
+      - run: make integration-tests-demos-all debug=true
+      - run: make integration-tests-examples-all debug=true
+      - run: make integration-tests-giles-all debug=true
+      - run: make integration-tests-monitoring_hub-all debug=true
+      - run: make integration-tests-utils-all debug=true
+      - run: make integration-tests-testing-tools-all debug=true
+      - run: make integration-tests-testing-performance-all debug=true
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
@@ -39,7 +39,7 @@ jobs:
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
-      - run: make test-testing-correctness-apps-all debug=true
+      - run: make integration-tests-testing-correctness-apps-all debug=true
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
@@ -49,8 +49,8 @@ jobs:
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
-      - run: make test-demos-all debug=true resilience=on
-      - run: make test-examples-all debug=true resilience=on
+      - run: make integration-tests-demos-all debug=true resilience=on
+      - run: make integration-tests-examples-all debug=true resilience=on
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
@@ -60,7 +60,7 @@ jobs:
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
-      - run: make test-testing-correctness-apps-all debug=true resilience=on
+      - run: make integration-tests-testing-correctness-apps-all debug=true resilience=on
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
