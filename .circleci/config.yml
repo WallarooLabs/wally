@@ -232,66 +232,66 @@ workflows:
       - build
 
       - unit-tests-debug:
-        requires:
-          - verify-changelog
-          - build
+          requires:
+            - verify-changelog
+            - build
 
       - unit-tests-release:
-        requires:
-          - unit-tests-debug
+          requires:
+            - unit-tests-debug
 
       - free-candy-tests:
-        requires:
-          - unit-tests-debug
+          requires:
+            - unit-tests-debug
 
       - bees-knees-1:
-        requires:
-          - free-candy-tests
+          requires:
+            - free-candy-tests
 
       - bees-knees-2:
-        requires:
-          - free-candy-tests
+          requires:
+            - free-candy-tests
 
       - bees-knees-3:
-        requires:
-          - free-candy-tests
+          requires:
+            - free-candy-tests
 
       - bees-knees-4:
-        requires:
-          - free-candy-tests
+          requires:
+            - free-candy-tests
 
       - bees-knees-5:
-        requires:
-          - free-candy-tests
+          requires:
+            - free-candy-tests
 
       - bees-knees-6:
-        requires:
-          - free-candy-tests
+          requires:
+            - free-candy-tests
 
       - bees-knees-7:
-        requires:
-          - free-candy-tests
+          requires:
+            - free-candy-tests
 
       - bees-knees-8:
-        requires:
-          - free-candy-tests
+          requires:
+            - free-candy-tests
 
       - bees-knees-9:
-        requires:
-          - free-candy-tests
+          requires:
+            - free-candy-tests
 
       - bees-knees-10:
-        requires:
-          - free-candy-tests
+          requires:
+            - free-candy-tests
 
       - bees-knees-11:
-        requires:
-          - free-candy-tests
+          requires:
+            - free-candy-tests
 
       - bees-knees-12:
-        requires:
-          - free-candy-tests
+          requires:
+          -k- free-candy-tests
 
       - bees-knees-13:
-        requires:
-          - free-candy-tests
+          requires:
+            - free-candy-tests
