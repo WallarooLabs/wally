@@ -15,16 +15,13 @@ Wallaroo Up has been tested on:
 - CentOS 7
 - Debian
   - Buster (Testing)
-  - Jessie
   - Stretch
 - Fedora
   - 27
   - 28
 - Oracle Linux 7
 - Ubuntu
-  - Artful
   - Bionic
-  - Trusty
   - Xenial
 
 It should also work on Red Hat Enterprise Linux 7.
