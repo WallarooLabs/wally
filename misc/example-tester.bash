@@ -1,6 +1,7 @@
 #!/bin/bash
 
 HERE=$(dirname "$(readlink -e "${0}")")
+echo $HERE
 WALLAROO_DIR="$(readlink -e "${HERE}/..")"
 . "$(readlink -e "${WALLAROO_DIR}/bin/activate")"
 
@@ -234,7 +235,7 @@ parse_and_run() {
     # temporarily disable pipefail and then extract out shell commands for current shell
     set +o pipefail
     # shellcheck disable=SC2016
-    SHELL_COMMAND=$(sed -n "/Shell $old_c:/,/Shell $c:/p" "${file_to_parse}"  | sed -n '/```/,/```/p' | grep -v '```' | tr '\n' '@' | sed 's#\\@# #g' | tr '@' '\n' | tr -s ' ')
+    SHELL_COMMAND=$(sed -n "/Shell $old_c:/,/Shell $c:/p" "${file_to_parse}"  | sed -n '/```/,/```/p' | grep -v '```' | tr '\n' '%' | sed 's#\\%# #g' | tr '%' '\n' | tr -s ' ')
     set -o pipefail
 
     # if no shell commands for current shell, assume we're at end of README
