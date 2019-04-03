@@ -49,7 +49,8 @@ jobs:
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
-      - run: make test-testing-correctness-apps-all debug=true resilience=on
+      - run: make test-demos-all debug=true resilience=on
+      - run: make test-examples-all debug=true resilience=on
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
