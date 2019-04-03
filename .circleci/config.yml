@@ -7,6 +7,7 @@ jobs:
       - checkout
       - run: .circleci/clone_tracker.sh
       - run: make build debug=true
+
   verify-changelog:
     docker:
       - image: ponylang/changelog-tool:release
@@ -14,43 +15,283 @@ jobs:
       - checkout
       - run: .circleci/clone_tracker.sh
       - run: changelog-tool verify CHANGELOG.md
-  integration-tests:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
-    steps:
-      - checkout
-      - run: .circleci/clone_tracker.sh
-      - run: |
-          ulimit -c unlimited
-          ulimit -a
-          make integration-tests debug=true
-      - store_artifacts:
-          path: /tmp/wallaroo_test_errors
-  integration-tests-with-resilience:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
-    steps:
-      - checkout
-      - run: .circleci/clone_tracker.sh
-      - run: |
-          ulimit -c unlimited
-          ulimit -a
-          make integration-tests-testing-correctness-tests-all resilience=on debug=true
-      - store_artifacts:
-          path: /tmp/wallaroo_test_errors
-  unit-tests:
+
+  unit-tests-debug:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
       - run: make unit-tests debug=true
+
+  unit-tests-release:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: make unit-tests
+
+  free-candy-tests:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: make test-lib-all debug=true
+      - run: make test-lib-all debug=true resilience=on
+      - run: make test-demos-all deug=true
+      - run: make test-demos-all debug=true resilience=on
+      - run: make test-examples-all debug=true
+      - run: make test-examples-all debug=true resilience=on
+      - run: make test-giles-all debug=true
+      - run: make test-monitoring_hub-all debug=true
+      - run: make test-utils-all debug=true
+      - run: make test-testing-tools-all debug=true
+      - run: make test-testing-performance-all debug=true
+      - run: make test-testing-correctness-apps-all debug=true
+      - run: make test-testing-correctness-apps-all debug=true resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  bees-knees-1:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make test-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k pony'
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  bees-knees-2:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make test-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k pony' resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  bees-knees-3:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make test-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python2'
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  bees-knees-4:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make test-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python2' resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  bees-knees-5:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make test-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python3'
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  bees-knees-6:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make test-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python3' resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  bees-knees-7:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make test-testing-correctness-tests-resilience-all debug=true pytest_exp='-k pony' resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  bees-knees-8:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make test-testing-correctness-tests-resilience-all debug=true pytest_exp='-k python2' resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  bees-knees-9:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make test-testing-correctness-tests-resilience-all debug=true pytest_exp='-k python3' resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  bees-knees-10:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make test-testing-correctness-tests-topology-all debug=true pytest_exp='-k python2'
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  bees-knees-11:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make test-testing-correctness-tests-topology-all debug=true pytest_exp='-k python2' resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  bees-knees-12:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make test-testing-correctness-tests-topology-all debug=true pytest_exp='-k python3'
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  bees-knees-13:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make test-testing-correctness-tests-topology-all debug=true pytest_exp='-k python3' resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
 workflows:
   version: 2
   test:
     jobs:
-      - build
+      # must pass first
       - verify-changelog
-      - integration-tests
-      - integration-tests-with-resilience
-      - unit-tests
+      - build
+
+      - unit-tests-debug:
+        requires:
+          - verify-changelog
+          - build
+
+      - unit-tests-release:
+        requires:
+          - unit-tests-debug
+
+      - free-candy-tests:
+        requires:
+          - unit-tests-debug
+
+      - bees-knees-1:
+        requires:
+          - free-candy-tests
+
+      - bees-knees-2:
+        requires:
+          - free-candy-tests
+
+      - bees-knees-3:
+        requires:
+          - free-candy-tests
+
+      - bees-knees-4:
+        requires:
+          - free-candy-tests
+
+      - bees-knees-5:
+        requires:
+          - free-candy-tests
+
+      - bees-knees-6:
+        requires:
+          - free-candy-tests
+
+      - bees-knees-7:
+        requires:
+          - free-candy-tests
+
+      - bees-knees-8:
+        requires:
+          - free-candy-tests
+
+      - bees-knees-9:
+        requires:
+          - free-candy-tests
+
+      - bees-knees-10:
+        requires:
+          - free-candy-tests
+
+      - bees-knees-11:
+        requires:
+          - free-candy-tests
+
+      - bees-knees-12:
+        requires:
+          - free-candy-tests
+
+      - bees-knees-13:
+        requires:
+          - free-candy-tests
