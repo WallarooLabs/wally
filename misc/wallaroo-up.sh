@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # md5 for validatiing script checksum
-MD5="eae63fc0fd14ff46d05176e148fa578d  -"
+MD5="d2694be4690ec1835393f30f50aa34b5  -"
 
 set -eEuo pipefail
 
 WALLAROO_UP_DEST_DEFAULT=~/wallaroo-tutorial
 WALLAROO_UP_DEST_ARG="$WALLAROO_UP_DEST_DEFAULT"
 WALLAROO_UP_INSTALL_TYPE=UNSPECIFIED
-WALLAROO_VERSION_DEFAULT=0.6.1
+WALLAROO_VERSION_DEFAULT=latest
 WALLAROO_VERSION="$WALLAROO_VERSION_DEFAULT"
 WALLAROO_TOOLS_TO_BUILD="build-giles-sender-all build-utils-all"
 
@@ -51,6 +51,7 @@ W0.5.3=0.24.4
 W0.5.2=0.24.4
 Wuse-ponyc-0.25=0.25.0
 Wponyc-0.27.0=0.28.0
+Wlatest=0.28.0
 Wmaster=
 "
 
