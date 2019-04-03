@@ -6,7 +6,7 @@ rvm:
 notifications:
   email: false
 
-dist: trusty
+dist: xenial
 sudo: required
 
 services: docker
