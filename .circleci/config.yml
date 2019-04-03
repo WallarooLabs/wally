@@ -242,54 +242,71 @@ workflows:
           requires:
             - unit-tests-debug
 
+      - free-candy-tests-resilience:
+          requires:
+            - unit-tests-debug
+
       - bees-knees-1:
           requires:
             - free-candy-tests
+            - free-candy-tests-resilience
 
       - bees-knees-2:
           requires:
             - free-candy-tests
+            - free-candy-tests-resilience
 
       - bees-knees-3:
           requires:
             - free-candy-tests
+            - free-candy-tests-resilience
 
       - bees-knees-4:
           requires:
             - free-candy-tests
+            - free-candy-tests-resilience
 
       - bees-knees-5:
           requires:
             - free-candy-tests
+            - free-candy-tests-resilience
 
       - bees-knees-6:
           requires:
             - free-candy-tests
+            - free-candy-tests-resilience
 
       - bees-knees-7:
           requires:
             - free-candy-tests
+            - free-candy-tests-resilience
 
       - bees-knees-8:
           requires:
             - free-candy-tests
+            - free-candy-tests-resilience
 
       - bees-knees-9:
           requires:
             - free-candy-tests
+            - free-candy-tests-resilience
 
       - bees-knees-10:
           requires:
             - free-candy-tests
+            - free-candy-tests-resilience
 
       - bees-knees-11:
           requires:
             - free-candy-tests
+            - free-candy-tests-resilience
 
       - bees-knees-12:
           requires:
             - free-candy-tests
+            - free-candy-tests-resilience
 
       - bees-knees-13:
           requires:
             - free-candy-tests
+            - free-candy-tests-resilience
