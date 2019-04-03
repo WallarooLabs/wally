@@ -40,7 +40,7 @@ if os.environ.get("resilience") == 'on':
 
 def _test_partition_query(command):
     with LoggingTestContext() as ctx:
-        with ctx.Cluster(command=command, workers=3) as cluster:
+        with ctx.Cluster(command=command, workers=3, sources=["Dummy"]) as cluster:
             q = Query(cluster, "partition-query")
             got = q.result()['initializer']
 
@@ -52,7 +52,7 @@ def _test_partition_query(command):
 
 def _test_partition_count_query(command):
     with LoggingTestContext() as ctx:
-        with ctx.Cluster(command=command) as cluster:
+        with ctx.Cluster(command=command, sources=["Dummy"]) as cluster:
             given_data_sent(cluster)
             got = Query(cluster, "partition-count-query").result()['initializer']
 
@@ -66,7 +66,7 @@ def _test_partition_count_query(command):
 
 def _test_cluster_status_query(command):
     with LoggingTestContext() as ctx:
-        with ctx.Cluster(command=command, workers=2) as cluster:
+        with ctx.Cluster(command=command, workers=2, sources=["Dummy"]) as cluster:
             q = Query(cluster, "cluster-status-query")
             got = q.result()
 
@@ -80,7 +80,7 @@ def _test_cluster_status_query(command):
 def _test_source_ids_query(command):
     defined_source_parallelism = 13 # see dummy.py TCPSourceconfig
     with LoggingTestContext() as ctx:
-        with ctx.Cluster(command=command, sources=1) as cluster:
+        with ctx.Cluster(command=command, sources=["Dummy"]) as cluster:
             given_data_sent(cluster)
             q = Query(cluster, "source-ids-query")
             got = q.result()['initializer']
@@ -91,7 +91,7 @@ def _test_source_ids_query(command):
 
 def _test_state_entity_query(command):
     with LoggingTestContext() as ctx:
-        with ctx.Cluster(command=command, workers=2) as cluster:
+        with ctx.Cluster(command=command, workers=2, sources=["Dummy"]) as cluster:
             given_data_sent(cluster)
             got = Query(cluster, "state-entity-query").result()
 
@@ -124,7 +124,7 @@ def _test_state_entity_query(command):
 
 def _test_state_entity_count_query(command):
     with LoggingTestContext() as ctx:
-        with ctx.Cluster(command=command, workers=2) as cluster:
+        with ctx.Cluster(command=command, workers=2, sources=["Dummy"]) as cluster:
             given_data_sent(cluster)
             q = Query(cluster, "state-entity-count-query")
             got = q.result()
@@ -139,7 +139,7 @@ def _test_state_entity_count_query(command):
 
 def _test_stateless_partition_query(command):
     with LoggingTestContext() as ctx:
-        with ctx.Cluster(command=command, workers=2) as cluster:
+        with ctx.Cluster(command=command, workers=2, sources=["Dummy"]) as cluster:
             got = Query(cluster, "stateless-partition-query").result()
 
         for w, res in got.items():
@@ -151,7 +151,7 @@ def _test_stateless_partition_query(command):
 
 def _test_stateless_partition_count_query(command):
     with LoggingTestContext() as ctx:
-        with ctx.Cluster(command=command, workers=2) as cluster:
+        with ctx.Cluster(command=command, workers=2, sources=["Dummy"]) as cluster:
             got = Query(cluster, "stateless-partition-count-query").result()
 
         for w, res in got.items():
@@ -163,7 +163,7 @@ def _test_stateless_partition_count_query(command):
 def given_data_sent(cluster):
     values = [chr(x+65) for x in range(INPUT_ITEMS)]
     reader = Reader(iter_generator(values))
-    sender = Sender(cluster.source_addrs[0],
+    sender = Sender(cluster.source_addrs[0]["Dummy"],
                     reader,
                     batch_size=50, interval=0.05, reconnect=True)
     cluster.add_sender(sender, start=True)
