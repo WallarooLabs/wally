@@ -277,7 +277,6 @@ actor RouterRegistry
     _source_listeners.set(source_listener)
     _connections.register_disposable(source_listener)
 
-
   be register_data_channel_listener(dchl: DataChannelListener) =>
     _data_channel_listeners.set(dchl)
     if _waiting_to_finish_join and
