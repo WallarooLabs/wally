@@ -240,12 +240,15 @@ class ConnectorSourceNotify[In: Any val]
     end
 
   fun ref received(source: ConnectorSource[In] ref, data: Array[U8] iso): Bool =>
+    // ignore messages if session isn't active
+    // necessary for dealing with overflow data during restart
+    if not _session_active then return true end
+
     if _header then
       try
         let payload_size: USize = _handler.payload_length(consume data)?
-
-        source.expect(payload_size)
         _header = false
+        source.expect(payload_size)
       else
         Fail()
       end
@@ -287,8 +290,9 @@ class ConnectorSourceNotify[In: Any val]
       _send_acks(source)
     end
 
+    let data': Array[U8] val = consume data
+    let data'': Array[U8] val = recover data'.clone() end
     try
-      let data': Array[U8] val = consume data
       ifdef "trace" then
         @printf[I32]("TRACE: decode data: %s\n".cstring(), _print_array[U8](data').cstring())
       end
@@ -338,7 +342,7 @@ class ConnectorSourceNotify[In: Any val]
         @printf[I32]("Received ERROR msg from client: %s\n".cstring(),
           m.message.cstring())
         source.close()
-        return _continue_perhaps(source)
+        return false
 
       | let m: cwm.NotifyMsg =>
         ifdef "trace" then
@@ -505,6 +509,8 @@ class ConnectorSourceNotify[In: Any val]
       @printf[I32](("Unable to decode message at " + _pipeline_name +
         " source\n").cstring())
       ifdef debug then
+        @printf[I32]("Message bytes: %s\n".cstring(),
+          _print_array[U8](data'').cstring())
         Fail()
       end
       return _to_error_state(source, "Unable to decode message")
@@ -587,8 +593,8 @@ class ConnectorSourceNotify[In: Any val]
     _continue_perhaps(source)
 
   fun ref _continue_perhaps(source: ConnectorSource[In] ref): Bool =>
-    source.expect(_header_size)
     _header = true
+    source.expect(_header_size)
     _continue_perhaps2()
 
   fun ref _continue_perhaps2(): Bool =>
@@ -623,7 +629,8 @@ class ConnectorSourceNotify[In: Any val]
   // Connection State Management
   //////////////////////////////
   fun ref accepted(source: ConnectorSource[In] ref, session_id: RoutingId) =>
-    @printf[I32]((_source_name + ": accepted a connection\n").cstring())
+    @printf[I32]((_source_name + ": accepted a connection 0x%lx\n").cstring(),
+      source)
     if _fsm_state isnt _ProtoFsmDisconnected then
       @printf[I32]("ERROR: %s.connected: state is %d\n".cstring(),
         __loc.type_name().cstring(), _fsm_state())
@@ -941,7 +948,7 @@ class ConnectorSourceNotify[In: Any val]
 
     _fsm_state = _ProtoFsmError
     source.close()
-    _continue_perhaps2()
+    false
 
   fun ref _send_acks(source: ConnectorSource[In] ref) =>
     let new_credits = _max_credits - _credits
@@ -970,6 +977,7 @@ class ConnectorSourceNotify[In: Any val]
       host.cstring(), service.cstring())
     _send_reply(source, cwm.RestartMsg(host + ":" + service))
     _clear_and_relinquish_all()
+    _session_active = false
 
   fun _send_reply(source: ConnectorSource[In] ref, msg: cwm.Message) =>
     let w1: Writer = w1.create()
