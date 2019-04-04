@@ -141,10 +141,8 @@ multi_partition_detector_test_python_alo_10_worker:
 multi_partition_detector_test_python:
 	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
 	integration_test \
-		--sequence-sender '(0,100]' Detector '>I' key_0 \
-		--sequence-sender '(0,100]' Detector '>I' key_1 \
-		--sequence-sender '(100,200]' Detector '>I' key_0 \
-		--sequence-sender '(100,200]' Detector '>I' key_1 \
+		--sequence-sender '(0,200]' Detector '>I' key_0 \
+		--sequence-sender '(0,200]' Detector '>I' key_1 \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module multi_partition_detector $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --output' \
