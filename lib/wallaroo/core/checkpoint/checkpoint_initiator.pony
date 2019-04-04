@@ -364,6 +364,8 @@ actor CheckpointInitiator is Initializable
       Fail()
     end
 
+  // fun ref event_log_write_checkpoint_id(checkpoint_id: CheckpointId,
+  //   token: CheckpointBarrierToken, repeating: Bool)
   fun ref event_log_write_checkpoint_id(checkpoint_id: CheckpointId,
     token: CheckpointBarrierToken)
   =>
@@ -407,12 +409,11 @@ actor CheckpointInitiator is Initializable
         end
         _save_checkpoint_id(st.id, _last_rollback_id)
         _last_complete_checkpoint_id = st.id
-
+        _propagate_checkpoint_complete(st.id)
         try
           let msg = ChannelMsgEncoder.commit_checkpoint_id(st.id,
             _last_rollback_id, _worker_name, _auth)?
           _connections.send_control_to_cluster(msg)
-          _propagate_checkpoint_complete(st.id)
         else
           Fail()
         end
