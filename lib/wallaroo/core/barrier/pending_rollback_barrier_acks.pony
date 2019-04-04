@@ -17,6 +17,7 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 use "wallaroo/core/common"
+use "wallaroo/core/sink"
 
 
 class PendingRollbackBarrierAcks
@@ -24,7 +25,7 @@ class PendingRollbackBarrierAcks
   var latest_rollback_token: CheckpointRollbackBarrierToken =
     CheckpointRollbackBarrierToken(0, 0)
 
-  let barrier_acks: Array[(BarrierReceiver, CheckpointRollbackBarrierToken)] =
+  let barrier_acks: Array[(Sink, CheckpointRollbackBarrierToken)] =
     barrier_acks.create()
   let worker_barrier_start_acks:
     Array[(WorkerName, CheckpointRollbackBarrierToken)] =
@@ -32,8 +33,7 @@ class PendingRollbackBarrierAcks
   let worker_barrier_acks: Array[(WorkerName, CheckpointRollbackBarrierToken)] =
     worker_barrier_acks.create()
 
-  fun ref ack_barrier(s: BarrierReceiver,
-    barrier_token: CheckpointRollbackBarrierToken)
+  fun ref ack_barrier(s: Sink, barrier_token: CheckpointRollbackBarrierToken)
   =>
     if barrier_token > latest_rollback_token then
       latest_rollback_token = barrier_token

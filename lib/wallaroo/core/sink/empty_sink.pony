@@ -100,6 +100,9 @@ actor EmptySink is Sink
   fun ref barrier_complete(barrier_token: BarrierToken) =>
     None
 
+  be barrier_fully_acked(token: BarrierToken) =>
+    None
+
   fun inputs(): Map[RoutingId, Producer] box =>
     Map[RoutingId, Producer]
 

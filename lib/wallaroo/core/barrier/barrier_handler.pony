@@ -27,7 +27,7 @@ use "wallaroo_labs/string_set"
 trait BarrierHandler
   fun name(): String
   fun in_progress(): Bool
-  fun ref ack_barrier(s: BarrierReceiver) =>
+  fun ref ack_barrier(s: Sink) =>
     _invalid_call()
     Fail()
 
@@ -59,8 +59,8 @@ class PendingBarrierHandler is BarrierHandler
   let _worker_name: String
   let _initiator: BarrierInitiator ref
   let _barrier_token: BarrierToken
-  let _sinks: SetIs[BarrierReceiver] = _sinks.create()
-  let _acked_sinks: SetIs[BarrierReceiver] = _acked_sinks.create()
+  let _sinks: SetIs[Sink] = _sinks.create()
+  let _acked_sinks: SetIs[Sink] = _acked_sinks.create()
   let _result_promise: BarrierResultPromise
   let _workers: SetIs[String] = _workers.create()
   let _workers_acked_start: SetIs[String] = _workers_acked_start.create()
@@ -69,7 +69,7 @@ class PendingBarrierHandler is BarrierHandler
   let _primary_worker: String
 
   new create(worker_name: String, i: BarrierInitiator ref,
-    barrier_token: BarrierToken, sinks: SetIs[BarrierReceiver] box,
+    barrier_token: BarrierToken, sinks: SetIs[Sink] box,
     ws: StringSet box, result_promise: BarrierResultPromise,
     primary_worker: String)
   =>
@@ -94,7 +94,7 @@ class PendingBarrierHandler is BarrierHandler
   fun _is_primary(): Bool =>
     _worker_name == _primary_worker
 
-  fun ref ack_barrier(s: BarrierReceiver) =>
+  fun ref ack_barrier(s: Sink) =>
     """
     If we receive barrier acks in this phase, we hold on to them for later.
     """
@@ -104,7 +104,8 @@ class PendingBarrierHandler is BarrierHandler
 
   fun ref worker_ack_barrier_start(w: String) =>
     ifdef "checkpoint_trace" then
-      @printf[I32]("worker_ack_barrier_start from PendingBarrierHandler\n".cstring())
+      @printf[I32]("worker_ack_barrier_start from PendingBarrierHandler\n"
+        .cstring())
     end
     ifdef debug then
       Invariant(if _is_primary() then
@@ -146,7 +147,7 @@ class PendingBarrierHandler is BarrierHandler
     end
 
   fun ref _start_barrier() =>
-    let acked_sinks = recover iso SetIs[BarrierReceiver] end
+    let acked_sinks = recover iso SetIs[Sink] end
     for s in _acked_sinks.values() do
       acked_sinks.set(s)
     end
@@ -161,15 +162,15 @@ class InProgressPrimaryBarrierHandler is BarrierHandler
   let _worker_name: String
   let _initiator: BarrierInitiator ref
   let _barrier_token: BarrierToken
-  let _sinks: SetIs[BarrierReceiver] = _sinks.create()
-  let _acked_sinks: SetIs[BarrierReceiver] = _acked_sinks.create()
+  let _sinks: SetIs[Sink] = _sinks.create()
+  let _acked_sinks: SetIs[Sink] = _acked_sinks.create()
   let _result_promise: BarrierResultPromise
   let _workers: SetIs[String] = _workers.create()
   let _workers_acked: SetIs[String] = _workers_acked.create()
 
   new create(worker_name: String, i: BarrierInitiator ref,
-    barrier_token: BarrierToken, acked_sinks: SetIs[BarrierReceiver] box,
-    acked_ws: SetIs[String] box, sinks: SetIs[BarrierReceiver] box,
+    barrier_token: BarrierToken, acked_sinks: SetIs[Sink] box,
+    acked_ws: SetIs[String] box, sinks: SetIs[Sink] box,
     ws: StringSet box, result_promise: BarrierResultPromise)
   =>
     _worker_name = worker_name
@@ -195,7 +196,7 @@ class InProgressPrimaryBarrierHandler is BarrierHandler
   fun in_progress(): Bool =>
     true
 
-  fun ref ack_barrier(s: BarrierReceiver) =>
+  fun ref ack_barrier(s: Sink) =>
     if not _sinks.contains(s) then Fail() end
 
     _acked_sinks.set(s)
@@ -225,12 +226,12 @@ class InProgressPrimaryBarrierHandler is BarrierHandler
 class InProgressSecondaryBarrierHandler is BarrierHandler
   let _initiator: BarrierInitiator ref
   let _barrier_token: BarrierToken
-  let _sinks: SetIs[BarrierReceiver] = _sinks.create()
-  let _acked_sinks: SetIs[BarrierReceiver] = _acked_sinks.create()
+  let _sinks: SetIs[Sink] = _sinks.create()
+  let _acked_sinks: SetIs[Sink] = _acked_sinks.create()
   let _primary_worker: String
 
   new create(i: BarrierInitiator ref, barrier_token: BarrierToken,
-    acked_sinks: SetIs[BarrierReceiver] box, sinks: SetIs[BarrierReceiver] box,
+    acked_sinks: SetIs[Sink] box, sinks: SetIs[Sink] box,
     primary_worker: String)
   =>
     _initiator = i
@@ -249,7 +250,7 @@ class InProgressSecondaryBarrierHandler is BarrierHandler
   fun in_progress(): Bool =>
     true
 
-  fun ref ack_barrier(s: BarrierReceiver) =>
+  fun ref ack_barrier(s: Sink) =>
     if not _sinks.contains(s) then Fail() end
 
     _acked_sinks.set(s)
