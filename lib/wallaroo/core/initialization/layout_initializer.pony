@@ -35,6 +35,10 @@ trait tag LayoutInitializer
 
   be report_ready_to_work(initializable: Initializable)
 
+  be worker_report_ready_to_work(w: WorkerName)
+
+  be all_workers_ready_to_work()
+
   be receive_immigrant_key(msg: KeyMigrationMsg)
 
   be update_boundaries(bs: Map[String, OutgoingBoundary] val,

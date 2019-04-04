@@ -409,6 +409,9 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
+  be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
+
   //////////////
   // AUTOSCALE
   /////////////
