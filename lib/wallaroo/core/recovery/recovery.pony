@@ -17,6 +17,7 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 use "promises"
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
 use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
@@ -24,7 +25,6 @@ use "wallaroo/core/barrier"
 use "wallaroo/core/data_receiver"
 use "wallaroo/core/network"
 use "wallaroo/core/router_registry"
-use "wallaroo/core/checkpoint"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
 
@@ -105,7 +105,7 @@ actor Recovery
   be worker_ack_register_producers(w: WorkerName) =>
     _recovery_phase.worker_ack_register_producers(w)
 
-  be rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
+  be rollback_barrier_fully_acked(token: CheckpointRollbackBarrierToken) =>
     _recovery_phase.rollback_barrier_complete(token)
 
   be data_receivers_ack() =>
@@ -201,7 +201,7 @@ actor Recovery
       @printf[I32]("|~~ - Recovery Phase: Rollback Barrier - ~~|\n".cstring())
       let promise = Promise[CheckpointRollbackBarrierToken]
       promise.next[None]({(token: CheckpointRollbackBarrierToken) =>
-        _self.rollback_barrier_complete(token)
+        _self.rollback_barrier_fully_acked(token)
       })
       _checkpoint_initiator.initiate_rollback(promise, _worker_name)
 

@@ -407,6 +407,9 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
       end
     end
 
+  be barrier_fully_acked(token: BarrierToken) =>
+    None
+
   fun ref _clear_barriers() =>
     try
       (_barrier_acker as BarrierSinkAcker).clear()
