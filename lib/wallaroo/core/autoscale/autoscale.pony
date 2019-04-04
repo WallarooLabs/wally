@@ -1060,7 +1060,7 @@ class _WaitingForProducersToRegister is _AutoscalePhase
   new create(autoscale: Autoscale ref,
     producers: SetIs[Producer], completion_action: CompletionAction)
   =>
-    @printf[I32](("AUTOSCALE: Joining worker waiting for Producers " +
+    @printf[I32](("AUTOSCALE: Waiting for Producers " +
       "to register\n").cstring())
     _autoscale = autoscale
     for p in producers.values() do
@@ -1112,7 +1112,7 @@ class _WaitingForBoundariesToAckRegistering is _AutoscalePhase
   new create(autoscale: Autoscale ref, boundaries: SetIs[OutgoingBoundary],
     completion_action: CompletionAction)
   =>
-    @printf[I32](("AUTOSCALE: Joining worker waiting for boundaries " +
+    @printf[I32](("AUTOSCALE: Worker waiting for boundaries " +
       "to ack forwarding register messages\n").cstring())
     _autoscale = autoscale
     for b in boundaries.values() do

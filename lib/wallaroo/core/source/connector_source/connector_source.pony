@@ -597,9 +597,6 @@ actor ConnectorSource[In: Any val] is Source
           .cstring(), token.string().cstring())
       end
       _initiate_barrier(token)
-    else
-      @printf[I32]("ConnectorSource received initiate_barrier %s NOT IS_PENDING AND NOT DISPOSED\n"
-          .cstring(), token.string().cstring())
     end
 
   fun ref _initiate_barrier(token: BarrierToken) =>
