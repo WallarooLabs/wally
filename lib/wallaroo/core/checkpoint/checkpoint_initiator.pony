@@ -64,7 +64,6 @@ actor CheckpointInitiator is Initializable
   var _time_between_checkpoints: U64
   let _event_log: EventLog
   let _barrier_initiator: BarrierInitiator
-
   var _recovery: (Recovery | None) = None
 
   // Used as a way to identify outdated timer-based initiate_checkpoint calls
@@ -238,7 +237,8 @@ actor CheckpointInitiator is Initializable
 
       let barrier_promise = Promise[BarrierToken]
       barrier_promise.next[None](
-        recover this~checkpoint_barrier_complete() end)
+        recover this~checkpoint_barrier_complete() end,
+        recover this~abort_checkpoint(_current_checkpoint_id) end)
       _barrier_initiator.inject_barrier(token, barrier_promise)
 
       _phase = _CheckpointingPhase(token, this)
@@ -284,6 +284,35 @@ actor CheckpointInitiator is Initializable
         .cstring(), token.string().cstring())
     end
     _phase.checkpoint_barrier_complete(token)
+
+  be abort_checkpoint(checkpoint_id: CheckpointId) =>
+    """
+    If a sink fails to successfully precommit its outputs, or runs into some
+    other irreversible problem, then it will abort the checkpoint barrier.
+    At this point, we must roll back to the last successful checkpoint.
+    """
+    if _primary_worker == _worker_name then
+      @printf[I32]("CheckpointInitiator: Aborting Checkpoint %s\n".cstring(),
+        checkpoint_id.string().cstring())
+      match _recovery
+      | let r: Recovery =>
+        let ws: Array[WorkerName] iso = recover Array[WorkerName] end
+        for w in _workers.values() do
+          ws.push(w)
+        end
+        r.start_recovery(consume ws where with_reconnect = false)
+      else
+        Fail()
+      end
+    else
+      try
+        let msg = ChannelMsgEncoder.abort_checkpoint(checkpoint_id,
+          _worker_name, _auth)?
+        _connections.send_control(_primary_worker, msg)
+      else
+        Fail()
+      end
+    end
 
   be event_log_checkpoint_complete(worker: WorkerName,
     checkpoint_id: CheckpointId)

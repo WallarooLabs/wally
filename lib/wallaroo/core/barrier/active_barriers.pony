@@ -83,6 +83,16 @@ class ActiveBarriers
       end
     end
 
+  fun ref abort_barrier(s: Sink, barrier_token: BarrierToken) =>
+    try
+      _barriers(barrier_token)?.abort_barrier(s)
+    else
+      ifdef debug then
+        @printf[I32](("ActiveBarriers: abort_barrier on unknown " +
+          "barrier %s.\n").cstring(), barrier_token.string().cstring())
+      end
+    end
+
   fun ref worker_ack_barrier_start(w: String, barrier_token: BarrierToken) =>
     try
       _barriers(barrier_token)?.worker_ack_barrier_start(w)

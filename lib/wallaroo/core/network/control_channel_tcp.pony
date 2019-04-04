@@ -489,6 +489,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _barrier_initiator.worker_ack_barrier(m.sender, m.token)
       | let m: BarrierFullyAckedMsg =>
         _barrier_initiator.remote_barrier_fully_acked(m.token)
+      | let m: AbortCheckpointMsg =>
+        _checkpoint_initiator.abort_checkpoint(m.checkpoint_id)
       | let m: EventLogInitiateCheckpointMsg =>
         let promise = Promise[CheckpointId]
         promise.next[None]({(s_id: CheckpointId) =>

@@ -33,7 +33,7 @@ trait _RecoveryPhase
   fun name(): String
 
   fun ref start_recovery(workers: Array[WorkerName] val,
-    recovery: Recovery ref)
+    recovery: Recovery ref, with_reconnect: Bool)
   =>
     _invalid_call()
     Fail()
@@ -93,9 +93,9 @@ class _AwaitRecovering is _RecoveryPhase
   fun name(): String => "_AwaitRecovering"
 
   fun ref start_recovery(workers: Array[WorkerName] val,
-    recovery: Recovery ref)
+    recovery: Recovery ref, with_reconnect: Bool)
   =>
-    recovery._start_reconnect(workers)
+    recovery._start_reconnect(workers, with_reconnect)
 
 class _BoundariesReconnect is _RecoveryPhase
   let _recovery_reconnecter: RecoveryReconnecter
@@ -278,6 +278,12 @@ class _Rollback is _RecoveryPhase
 class _FinishedRecovering is _RecoveryPhase
   fun name(): String => "_FinishedRecovering"
 
+  fun ref start_recovery(workers: Array[WorkerName] val,
+    recovery: Recovery ref, with_reconnect: Bool)
+  =>
+    @printf[I32]("Online recovery initiated.\n".cstring())
+    recovery._start_reconnect(workers, with_reconnect)
+
   fun ref recovery_reconnect_finished() =>
     None
 
@@ -288,6 +294,12 @@ class _FinishedRecovering is _RecoveryPhase
 
 class _RecoveryOverrideAccepted is _RecoveryPhase
   fun name(): String => "_RecoveryOverrideAccepted"
+
+  fun ref start_recovery(workers: Array[WorkerName] val,
+    recovery: Recovery ref, with_reconnect: Bool)
+  =>
+    @printf[I32]("Online recovery initiated.\n".cstring())
+    recovery._start_reconnect(workers, with_reconnect)
 
   fun ref recovery_reconnect_finished() =>
     None
