@@ -31,6 +31,10 @@ trait BarrierHandler
     _invalid_call()
     Fail()
 
+  fun ref abort_barrier(s: Sink) =>
+    _invalid_call()
+    Fail()
+
   fun ref worker_ack_barrier_start(w: String)
   =>
     _invalid_call()
@@ -101,6 +105,9 @@ class PendingBarrierHandler is BarrierHandler
     if not _sinks.contains(s) then Fail() end
 
     _acked_sinks.set(s)
+
+  fun ref abort_barrier(s: Sink) =>
+    _result_promise.reject()
 
   fun ref worker_ack_barrier_start(w: String) =>
     ifdef "checkpoint_trace" then
@@ -202,11 +209,15 @@ class InProgressPrimaryBarrierHandler is BarrierHandler
     _acked_sinks.set(s)
     check_for_completion()
 
+  fun ref abort_barrier(s: Sink) =>
+    _result_promise.reject()
+
   fun ref worker_ack_barrier(w: String) =>
     """
     If we receive worker acks in this phase, we hold on to them for later.
     """
-    @printf[I32]("worker_ack_barrier from InProgressPrimaryBarrierHandler\n".cstring())
+    @printf[I32]("worker_ack_barrier from InProgressPrimaryBarrierHandler\n"
+      .cstring())
     ifdef debug then
       Invariant(SetHelpers[String].contains[String](_workers, w))
       Invariant(not SetHelpers[String].contains[String](_workers_acked, w))
@@ -260,6 +271,9 @@ class InProgressSecondaryBarrierHandler is BarrierHandler
     end
 
     check_for_completion()
+
+  fun ref abort_barrier(s: Sink) =>
+    _initiator.abort_pending_barrier(_barrier_token)
 
   fun ref check_for_completion() =>
     ifdef "checkpoint_trace" then

@@ -62,7 +62,7 @@ actor BarrierInitiator is Initializable
 
   // When we send barriers to a different primary worker, we use this map
   // to call the correct promise when those barriers are complete.
-  let _pending_promises: Map[BarrierToken, Promise[BarrierToken]] =
+  let _pending_promises: Map[BarrierToken, BarrierResultPromise] =
     _pending_promises.create()
 
   // TODO: Currently, we can only inject barriers from one primary worker
@@ -472,6 +472,13 @@ actor BarrierInitiator is Initializable
     end
     _phase.ack_barrier(s, barrier_token, _active_barriers)
 
+  be abort_barrier(s: Sink, barrier_token: BarrierToken) =>
+    """
+    Called by a sink that determines a protocol underlying a barrier
+    must be aborted.
+    """
+    _active_barriers.abort_barrier(s, barrier_token)
+
   be worker_ack_barrier(w: String, barrier_token: BarrierToken) =>
     _phase.worker_ack_barrier(w, barrier_token, _active_barriers)
 
@@ -534,6 +541,13 @@ actor BarrierInitiator is Initializable
       Fail()
     end
     barrier_fully_acked(barrier_token, result_promise)
+
+  fun ref abort_pending_barrier(barrier_token: BarrierToken) =>
+    try
+      _pending_promises(barrier_token)?.reject()
+    else
+      Fail()
+    end
 
   fun ref barrier_fully_acked(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
