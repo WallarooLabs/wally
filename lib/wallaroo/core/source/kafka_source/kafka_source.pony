@@ -20,20 +20,21 @@ use "buffered"
 use "collections"
 use "pony-kafka"
 use "promises"
-use "wallaroo_labs/guid"
-use "wallaroo/core/boundary"
-use "wallaroo/core/common"
-use "wallaroo/core/invariant"
-use "wallaroo/core/source"
 use "wallaroo/core/barrier"
+use "wallaroo/core/boundary"
+use "wallaroo/core/checkpoint"
+use "wallaroo/core/common"
+use "wallaroo/core/initialization"
+use "wallaroo/core/invariant"
+use "wallaroo/core/metrics"
 use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
-use "wallaroo/core/checkpoint"
-use "wallaroo_labs/mort"
-use "wallaroo/core/initialization"
-use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
+use "wallaroo/core/source"
 use "wallaroo/core/topology"
+use "wallaroo_labs/guid"
+use "wallaroo_labs/mort"
+
 
 actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   let _source_id: RoutingId
@@ -333,7 +334,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       end
     end
 
-  be barrier_fully_acked(token: BarrierToken) =>
+  be checkpoint_complete(checkpoint_id: CheckpointId) =>
     None
 
   //////////////

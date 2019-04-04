@@ -65,7 +65,7 @@ trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
   be mute(a: Any tag)
   be unmute(a: Any tag)
   be initiate_barrier(token: BarrierToken)
-  be barrier_fully_acked(token: BarrierToken)
+  be checkpoint_complete(checkpoint_id: CheckpointId)
   be update_worker_data_service(worker_name: String,
     host: String, service: String)
   // Called to indicate that an in progress checkpoint when Source was created
@@ -90,3 +90,4 @@ trait tag SourceListener is (DisposableActor & BoundaryUpdatable &
   be receive_msg(msg: SourceListenerMsg)
   be begin_join_migration(joining_workers: Array[WorkerName] val)
   be begin_shrink_migration(leaving_workers: Array[WorkerName] val)
+  be checkpoint_complete(checkpoint_id: CheckpointId)
