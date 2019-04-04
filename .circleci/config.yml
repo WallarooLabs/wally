@@ -1,12 +1,5 @@
 version: 2
 jobs:
-  build:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
-    steps:
-      - checkout
-      - run: .circleci/clone_tracker.sh
-      - run: make build debug=true
   verify-changelog:
     docker:
       - image: ponylang/changelog-tool:release
@@ -14,30 +7,7 @@ jobs:
       - checkout
       - run: .circleci/clone_tracker.sh
       - run: changelog-tool verify CHANGELOG.md
-  integration-tests:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
-    steps:
-      - checkout
-      - run: .circleci/clone_tracker.sh
-      - run: |
-          ulimit -c unlimited
-          ulimit -a
-          make integration-tests debug=true
-      - store_artifacts:
-          path: /tmp/wallaroo_test_errors
-  integration-tests-with-resilience:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
-    steps:
-      - checkout
-      - run: .circleci/clone_tracker.sh
-      - run: |
-          ulimit -c unlimited
-          ulimit -a
-          make integration-tests-testing-correctness-tests-all resilience=on debug=true
-      - store_artifacts:
-          path: /tmp/wallaroo_test_errors
+
   unit-tests:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.10.17.1
@@ -45,12 +15,335 @@ jobs:
       - checkout
       - run: .circleci/clone_tracker.sh
       - run: make unit-tests debug=true
+
+  integration-tests:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: make integration-tests-lib-all debug=true
+      - run: make integration-tests-demos-all debug=true
+      - run: make integration-tests-examples-all debug=true
+      - run: make integration-tests-giles-all debug=true
+      - run: make integration-tests-monitoring_hub-all debug=true
+      - run: make integration-tests-utils-all debug=true
+      - run: make integration-tests-testing-tools-all debug=true
+      - run: make integration-tests-testing-performance-all debug=true
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  integration-tests-correctness:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: make integration-tests-testing-correctness-apps-all debug=true
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  integration-tests-resilience:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: make integration-tests-demos-all debug=true resilience=on
+      - run: make integration-tests-examples-all debug=true resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  integration-tests-resilience-correctness:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: make integration-tests-testing-correctness-apps-all debug=true resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  autoscale-tests-pony:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make integration-tests-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k pony'
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  autoscale-tests-pony-resilience:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make integration-tests-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k pony' resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  autoscale-tests-python2:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make integration-tests-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python2'
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  autoscale-tests-python2-resilience:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make integration-tests-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python2' resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  autoscale-tests-python3:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make integration-tests-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python3'
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  autoscale-tests-python3-resilience:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make integration-tests-testing-correctness-tests-autoscale-all debug=true pytest_exp='-k python3' resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  resilience-tests-pony:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make integration-tests-testing-correctness-tests-resilience-all debug=true pytest_exp='-k pony' resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  resilience-tests-python2:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make integration-tests-testing-correctness-tests-resilience-all debug=true pytest_exp='-k python2' resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  resilience-tests-python3:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make integration-tests-testing-correctness-tests-resilience-all debug=true pytest_exp='-k python3' resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  topology-tests-python2:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make integration-tests-testing-correctness-tests-topology-all debug=true pytest_exp='-k python2'
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  topology-tests-python3-resilience:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make integration-tests-testing-correctness-tests-topology-all debug=true pytest_exp='-k python2' resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  topology-tests-python3:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make integration-tests-testing-correctness-tests-topology-all debug=true pytest_exp='-k python3'
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  topology-tests-python3-resilience:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2018.10.17.1
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make integration-tests-testing-correctness-tests-topology-all debug=true pytest_exp='-k python3' resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
 workflows:
   version: 2
   test:
     jobs:
-      - build
+      # must pass first
       - verify-changelog
-      - integration-tests
-      - integration-tests-with-resilience
       - unit-tests
+
+      - integration-tests:
+          requires:
+            - unit-tests
+
+      - integration-tests-correctness:
+          requires:
+            - unit-tests
+
+      - integration-tests-resilience:
+          requires:
+            - unit-tests
+
+      - integration-tests-resilience-correctness:
+          requires:
+            - unit-tests
+
+      - autoscale-tests-pony:
+          requires:
+            - integration-tests
+            - integration-tests-correctness
+            - integration-tests-resilience
+#            - integration-tests-resilience-correctness
+
+      - autoscale-tests-pony-resilience:
+          requires:
+            - integration-tests
+            - integration-tests-correctness
+            - integration-tests-resilience
+#            - integration-tests-resilience-correctness
+
+      - autoscale-tests-python2:
+          requires:
+            - integration-tests
+            - integration-tests-correctness
+            - integration-tests-resilience
+#            - integration-tests-resilience-correctness
+
+      - autoscale-tests-python2-resilience:
+          requires:
+            - integration-tests
+            - integration-tests-correctness
+            - integration-tests-resilience
+#            - integration-tests-resilience-correctness
+
+      - autoscale-tests-python3:
+          requires:
+            - integration-tests
+            - integration-tests-correctness
+            - integration-tests-resilience
+#            - integration-tests-resilience-correctness
+
+      - autoscale-tests-python3-resilience:
+          requires:
+            - integration-tests
+            - integration-tests-correctness
+            - integration-tests-resilience
+#            - integration-tests-resilience-correctness
+
+      - resilience-tests-pony:
+          requires:
+            - integration-tests
+            - integration-tests-correctness
+            - integration-tests-resilience
+#            - integration-tests-resilience-correctness
+
+      - resilience-tests-python2:
+          requires:
+            - integration-tests
+            - integration-tests-correctness
+            - integration-tests-resilience
+#            - integration-tests-resilience-correctness
+
+      - resilience-tests-python3:
+          requires:
+            - integration-tests
+            - integration-tests-correctness
+            - integration-tests-resilience
+#            - integration-tests-resilience-correctness
+
+      - topology-tests-python2:
+          requires:
+            - integration-tests
+            - integration-tests-correctness
+            - integration-tests-resilience
+#            - integration-tests-resilience-correctness
+
+      - topology-tests-python3-resilience:
+          requires:
+            - integration-tests
+            - integration-tests-correctness
+            - integration-tests-resilience
+#            - integration-tests-resilience-correctness
+
+      - topology-tests-python3:
+          requires:
+            - integration-tests
+            - integration-tests-correctness
+            - integration-tests-resilience
+#            - integration-tests-resilience-correctness
+
+      - topology-tests-python3-resilience:
+          requires:
+            - integration-tests
+            - integration-tests-correctness
+            - integration-tests-resilience
+#            - integration-tests-resilience-correctness
