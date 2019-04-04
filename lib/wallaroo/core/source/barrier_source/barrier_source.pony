@@ -18,16 +18,16 @@ Copyright 2018 The Wallaroo Authors.
 
 use "collections"
 use "promises"
+use "wallaroo/core/barrier"
 use "wallaroo/core/boundary"
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
 use "wallaroo/core/metrics"
+use "wallaroo/core/recovery"
+use "wallaroo/core/router_registry"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
-use "wallaroo/core/barrier"
-use "wallaroo/core/recovery"
-use "wallaroo/core/router_registry"
-use "wallaroo/core/checkpoint"
 use "wallaroo_labs/mort"
 
 
@@ -282,9 +282,10 @@ actor BarrierSource is Source
       end
     end
 
-  be barrier_fully_acked(token: BarrierToken) =>
+  be checkpoint_complete(checkpoint_id: CheckpointId) =>
     ifdef "checkpoint_trace" then
-      @printf[I32]("barrier_complete at BarrierSource %s\n".cstring(), _source_id.string().cstring())
+      @printf[I32]("Checkpoint %s complete at BarrierSource %s\n".cstring(),
+        checkpoint_id.string().cstring(), _source_id.string().cstring())
     end
     None
 

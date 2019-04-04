@@ -32,20 +32,22 @@ use "buffered"
 use "collections"
 use "crypto"
 use "wallaroo/core/boundary"
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
-use "wallaroo/core/partitioning"
 use "wallaroo/core/data_receiver"
-use "wallaroo/core/recovery"
-use "wallaroo/core/router_registry"
-use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
+use "wallaroo/core/partitioning"
+use "wallaroo/core/recovery"
+use "wallaroo/core/router_registry"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
+use "wallaroo_labs/mort"
+
 
 actor TCPSourceListener[In: Any val] is SourceListener
   """
@@ -230,6 +232,14 @@ actor TCPSourceListener[In: Any val] is SourceListener
     end
 
     _outgoing_boundary_builders = consume new_boundary_builders
+
+  be checkpoint_complete(checkpoint_id: CheckpointId) =>
+    for s in _connected_sources.values() do
+      s.checkpoint_complete(checkpoint_id)
+    end
+    for s in _available_sources.values() do
+      s.checkpoint_complete(checkpoint_id)
+    end
 
   be dispose() =>
     @printf[I32]("Shutting down TCPSourceListener\n".cstring())

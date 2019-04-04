@@ -408,20 +408,30 @@ primitive ChannelMsgEncoder
   =>
   _encode(ForwardedInjectBarrierFullyAckedMsg(token), auth)?
 
+  fun forwarded_inject_barrier_aborted(token: BarrierToken,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+  _encode(ForwardedInjectBarrierAbortedMsg(token), auth)?
+
   fun remote_initiate_barrier(sender: WorkerName, token: BarrierToken,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(RemoteInitiateBarrierMsg(sender, token), auth)?
 
-  fun worker_ack_barrier_start(sender: WorkerName, token: BarrierToken,
+  fun remote_abort_barrier(sender: WorkerName, token: BarrierToken,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(WorkerAckBarrierStartMsg(sender, token), auth)?
+    _encode(RemoteAbortBarrierMsg(sender, token), auth)?
 
   fun worker_ack_barrier(sender: WorkerName, token: BarrierToken,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(WorkerAckBarrierMsg(sender, token), auth)?
+
+  fun worker_abort_barrier(sender: WorkerName, token: BarrierToken,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(WorkerAbortBarrierMsg(sender, token), auth)?
 
   fun forward_barrier(target_step_id: RoutingId,
     origin_step_id: RoutingId, token: BarrierToken, seq_id: SeqId,
@@ -429,11 +439,6 @@ primitive ChannelMsgEncoder
   =>
     _encode(ForwardBarrierMsg(target_step_id, origin_step_id, token,
       seq_id), auth)?
-
-  fun barrier_fully_acked(token: BarrierToken, auth: AmbientAuth):
-    Array[ByteSeq] val ?
-  =>
-    _encode(BarrierFullyAckedMsg(token), auth)?
 
   fun abort_checkpoint(checkpoint_id: CheckpointId, sender: WorkerName,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -1496,6 +1501,12 @@ class val ForwardedInjectBarrierFullyAckedMsg is ChannelMsg
   new val create(token': BarrierToken) =>
     token = token'
 
+class val ForwardedInjectBarrierAbortedMsg is ChannelMsg
+  let token: BarrierToken
+
+  new val create(token': BarrierToken) =>
+    token = token'
+
 class val RemoteInitiateBarrierMsg is ChannelMsg
   let sender: WorkerName
   let token: BarrierToken
@@ -1504,7 +1515,7 @@ class val RemoteInitiateBarrierMsg is ChannelMsg
     sender = sender'
     token = token'
 
-class val WorkerAckBarrierStartMsg is ChannelMsg
+class val RemoteAbortBarrierMsg is ChannelMsg
   let sender: WorkerName
   let token: BarrierToken
 
@@ -1513,6 +1524,14 @@ class val WorkerAckBarrierStartMsg is ChannelMsg
     token = token'
 
 class val WorkerAckBarrierMsg is ChannelMsg
+  let sender: WorkerName
+  let token: BarrierToken
+
+  new val create(sender': WorkerName, token': BarrierToken) =>
+    sender = sender'
+    token = token'
+
+class val WorkerAbortBarrierMsg is ChannelMsg
   let sender: WorkerName
   let token: BarrierToken
 
@@ -1534,13 +1553,6 @@ class val ForwardBarrierMsg is ChannelMsg
     origin_id = origin_id'
     token = token'
     seq_id = seq_id'
-
-class val BarrierFullyAckedMsg is ChannelMsg
-  let token: BarrierToken
-
-  new val create(token': BarrierToken)
-  =>
-    token = token'
 
 class val AbortCheckpointMsg is ChannelMsg
   let checkpoint_id: CheckpointId
