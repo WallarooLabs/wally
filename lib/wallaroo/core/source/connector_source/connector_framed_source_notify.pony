@@ -757,10 +757,10 @@ class ConnectorSourceNotify[In: Any val]
     send_restart(source)
 
   fun ref initiate_barrier(checkpoint_id: CheckpointId) =>
-    @printf[I32]("Initiate_barrier(%s) at %s\n".cstring(),
-      checkpoint_id.string().cstring(), WallClock.seconds().string().cstring())
     _barrier_ongoing = true
-    Invariant(checkpoint_id > _barrier_checkpoint_id)
+    ifdef debug then
+      Invariant(checkpoint_id > _barrier_checkpoint_id)
+    end
     _barrier_checkpoint_id = checkpoint_id
 
     if _session_active then
@@ -784,7 +784,9 @@ class ConnectorSourceNotify[In: Any val]
   =>
     // update barrier state and check checkpoint_id matches our local knowledge
     _barrier_ongoing = false
-    Invariant(checkpoint_id == _barrier_checkpoint_id)
+    ifdef debug then
+      Invariant(checkpoint_id == _barrier_checkpoint_id)
+    end
 
     if _session_active then
       _process_acks_for_active(source)
@@ -956,6 +958,7 @@ class ConnectorSourceNotify[In: Any val]
     _pending_acks.clear()
     // only send acks if there are new credits or new acks to send
     if (new_credits > 0) or (acks.size() > 0) then
+      // !TODO!: Is this too noisy?
       @printf[I32]("Sending acks for %s streams\n".cstring(),
         _pending_acks.size().string().cstring())
       _send_reply(source, cwm.AckMsg(new_credits, consume acks))
