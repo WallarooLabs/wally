@@ -185,6 +185,14 @@ primitive ChannelMsgEncoder
   =>
     _encode(ConnectionsReadyMsg(worker_name), auth)?
 
+  fun report_worker_ready_to_work(worker_name: WorkerName, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(ReportWorkerReadyToWorkMsg(worker_name), auth)?
+
+  fun all_workers_ready_to_work(auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(AllWorkersReadyToWorkMsg, auth)?
+
   fun create_data_channel_listener(workers: Array[String] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -938,6 +946,14 @@ class val ConnectorLeaderNameResponseMsg is SourceListenerMsg
 
   fun source_name(): String =>
     _source_name
+
+class val ReportWorkerReadyToWorkMsg is ChannelMsg
+  let worker_name: WorkerName
+
+  new val create(name: WorkerName) =>
+    worker_name = name
+
+primitive AllWorkersReadyToWorkMsg is ChannelMsg
 
 class val CreateDataChannelListener is ChannelMsg
   let workers: Array[String] val

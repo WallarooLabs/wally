@@ -236,6 +236,9 @@ actor OutgoingBoundary is Consumer
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
+  be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
+
   be quick_initialize(initializer: LayoutInitializer) =>
     """
     Called when initializing as part of a new worker joining a running cluster.

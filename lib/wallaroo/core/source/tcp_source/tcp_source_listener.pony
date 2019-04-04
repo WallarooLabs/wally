@@ -379,6 +379,9 @@ actor TCPSourceListener[In: Any val] is SourceListener
     initializer.report_ready_to_work(this)
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
+
+  be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
     _start_sources()
 
   //////////////

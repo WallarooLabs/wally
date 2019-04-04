@@ -193,6 +193,9 @@ actor ConnectorSink is Sink
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
+  be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
+
   fun ref _initial_connect() =>
     @printf[I32]("ConnectorSink initializing connection to %s:%s\n".cstring(),
       _host.cstring(), _service.cstring())

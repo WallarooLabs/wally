@@ -73,3 +73,8 @@ class Initializables
     for i in _initializables.values() do
       i.application_ready_to_work(initializer)
     end
+
+  fun ref cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
+    for i in _initializables.values() do
+      i.cluster_ready_to_work(initializer)
+    end
