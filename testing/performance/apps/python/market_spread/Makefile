@@ -41,37 +41,38 @@ STRUCT_MARKET_SPREAD_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(rules_mk_path)
 
 build-testing-performance-apps-python-market_spread: build-machida
+build-testing-performance-apps-python-market_spread: build-machida3
 integration-tests-testing-performance-apps-python-market_spread: build-testing-performance-apps-python-market_spread
 
 integration-tests-testing-performance-apps-python-market_spread: struct_market_spread_py_test
+integration-tests-testing-performance-apps-python-market_spread: struct_market_spread_py3_test
+
 
 struct_market_spread_py_test:
-	cd $(MARKET_SPREAD_PY_PATH) && \
+	cd $(STRUCT_MARKET_SPREAD_PY_PATH) && \
 	python _test/gen.py && \
 	integration_test \
-		--framed-file-sender _market.txt 1 \
-		--framed-file-sender _orders.txt 0 \
+		--framed-file-sender _market.txt "'Market Data'" \
+		--framed-file-sender _orders.txt Orders \
 		--log-level error \
 		--command 'machida --application-module market_spread $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _test/validate.py --expected $(MARKET_SPREAD_PY_PATH)/_expected.txt --output' \
+		--validation-cmd 'python _test/validate.py --expected _expected.txt --output' \
 		--output 'received.txt' \
 		--workers 5 \
-		--sources 2 \
 		--sink-mode framed \
 		--sink-expect 1000
 
 struct_market_spread_py3_test:
-	cd $(MARKET_SPREAD_PY_PATH) && \
+	cd $(STRUCT_MARKET_SPREAD_PY_PATH) && \
 	python _test/gen.py && \
 	integration_test \
-		--framed-file-sender _market.txt 1 \
-		--framed-file-sender _orders.txt 0 \
+		--framed-file-sender _market.txt "'Market Data'" \
+		--framed-file-sender _orders.txt Orders \
 		--log-level error \
 		--command 'machida3 --application-module market_spread $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _test/validate.py --expected $(MARKET_SPREAD_PY_PATH)/_expected.txt --output' \
+		--validation-cmd 'python _test/validate.py --expected _expected.txt --output' \
 		--output 'received.txt' \
 		--workers 5 \
-		--sources 2 \
 		--sink-mode framed \
 		--sink-expect 1000
 

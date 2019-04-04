@@ -36,12 +36,12 @@ def application_setup(args):
     orders = wallaroo.source("Orders",
         wallaroo.TCPSourceConfig("Orders", inputs["Orders"]["host"],
                                  inputs["Orders"]["port"],
-                                 decode_order))
+                                 order_decoder))
 
     market_data = wallaroo.source("Market Data",
         wallaroo.TCPSourceConfig("Market Data", inputs["Market Data"]["host"],
                                  inputs["Market Data"]["port"],
-                                 decode_market_data))
+                                 market_data_decoder))
 
     pipeline = (orders.merge(market_data)
         .key_by(extract_symbol)
