@@ -513,11 +513,8 @@ actor BarrierCoordinator is Initializable
   be register_barrier_source(b_source: BarrierSource) =>
     _injector_collector.register_barrier_source(b_source)
 
-  be register_source(source: Source, source_id: RoutingId) =>
-    _injector_collector.register_source(source, source_id)
-
-  be unregister_source(source: Source, source_id: RoutingId) =>
-    _injector_collector.unregister_source(source, source_id)
+  be register_source_coordinator(sc: SourceCoordinator) =>
+    _injector_collector.register_source_coordinator(sc)
 
   be ack_barrier(s: Sink, barrier_token: BarrierToken) =>
     """

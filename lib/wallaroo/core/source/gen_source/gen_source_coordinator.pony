@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 use "buffered"
 use "collections"
 use "crypto"
+use "wallaroo/core/barrier"
 use "wallaroo/core/boundary"
 use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
@@ -186,11 +187,6 @@ actor GenSourceCoordinator[In: Any val] is SourceCoordinator
 
     _outgoing_boundary_builders = consume new_boundary_builders
 
-  be checkpoint_complete(checkpoint_id: CheckpointId) =>
-    for s in _sources.values() do
-      s.checkpoint_complete(checkpoint_id)
-    end
-
   be dispose() =>
     @printf[I32]("Shutting down GenSourceCoordinator\n".cstring())
 
@@ -218,6 +214,19 @@ actor GenSourceCoordinator[In: Any val] is SourceCoordinator
 
   be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
     _start_sources()
+
+  //////////////
+  // BARRIER
+  //////////////
+  be initiate_barrier(token: BarrierToken) =>
+    for s in _sources.values() do
+      s.initiate_barrier(token)
+    end
+
+  be checkpoint_complete(checkpoint_id: CheckpointId) =>
+    for s in _sources.values() do
+      s.checkpoint_complete(checkpoint_id)
+    end
 
   //////////////
   // AUTOSCALE

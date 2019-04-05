@@ -273,7 +273,6 @@ actor RouterRegistry
     _producers.set(source)
     _sources(source_id) = source
     _source_ids(digestof source) = source_id
-    _barrier_coordinator.register_source(source, source_id)
 
     if not _stop_the_world_in_process and _application_ready_to_work then
       source.unmute(_dummy_consumer)
@@ -286,8 +285,7 @@ actor RouterRegistry
       _unregister_producer(source)
       _sources.remove(source_id)?
       _source_ids.remove(digestof source)?
-      _barrier_coordinator.unregister_source(source, source_id)
-       _connections.register_disposable(source)
+      _connections.register_disposable(source)
       // _connections.notify_cluster_of_source_leaving(source_id)
     else
       ifdef debug then
@@ -303,6 +301,7 @@ actor RouterRegistry
     _source_coordinators.set(source_coordinator)
     _connections.register_disposable(source_coordinator)
     _checkpoint_initiator.register_source_coordinator(source_coordinator)
+    _barrier_coordinator.register_source_coordinator(source_coordinator)
 
   be register_data_channel_listener(dchl: DataChannelListener) =>
     _data_channel_listeners.set(dchl)

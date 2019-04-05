@@ -21,6 +21,7 @@ use "collections"
 use "crypto"
 use "net"
 use "pony-kafka"
+use "wallaroo/core/barrier"
 use "wallaroo/core/boundary"
 use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
@@ -376,13 +377,6 @@ actor KafkaSourceCoordinator[In: Any val] is (SourceCoordinator & KafkaClientMan
 
     _outgoing_boundary_builders = consume new_boundary_builders
 
-  be checkpoint_complete(checkpoint_id: CheckpointId) =>
-    for m in _kafka_topic_partition_sources.values() do
-      for s in m.values() do
-        s.checkpoint_complete(checkpoint_id)
-      end
-    end
-
   be dispose() =>
     None
 
@@ -411,6 +405,23 @@ actor KafkaSourceCoordinator[In: Any val] is (SourceCoordinator & KafkaClientMan
 
   be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
+
+  //////////////
+  // BARRIER
+  //////////////
+  be initiate_barrier(token: BarrierToken) =>
+    for pmap in _kafka_topic_partition_sources.values() do
+      for s in pmap.values() do
+        s.initiate_barrier(token)
+      end
+    end
+
+  be checkpoint_complete(checkpoint_id: CheckpointId) =>
+    for pmap in _kafka_topic_partition_sources.values() do
+      for s in pmap.values() do
+        s.checkpoint_complete(checkpoint_id)
+      end
+    end
 
   //////////////
   // AUTOSCALE
