@@ -705,8 +705,18 @@ actor ConnectorSource[In: Any val] is Source
           end
         else
           // We're already connected, unsubscribe the event and close.
-          @pony_asio_event_unsubscribe(event)
-          @pony_os_socket_close[None](fd)
+
+          /**** TODO: Upgrade to ponyc 0.27.0 or later:
+          if not @pony_asio_event_get_disposable(event) then
+            @pony_asio_event_unsubscribe(event)
+          end
+          ****/
+          @pony_asio_event_unsubscribe(event) // temp, until 0.27.0 or later
+
+          if _connected then
+            @pony_os_socket_close[None](fd)
+          end
+          _try_shutdown()
         end
       else
         // It's not our event.
