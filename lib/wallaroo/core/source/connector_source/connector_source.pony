@@ -607,7 +607,7 @@ actor ConnectorSource[In: Any val] is Source
 
     match token
     | let sbt: CheckpointBarrierToken =>
-      _notify.initiate_barrier(sbt.id)
+      _notify.initiate_checkpoint(sbt.id)
       checkpoint_state(sbt.id)
     end
     for (o_id, o) in _outputs.pairs() do
@@ -624,7 +624,7 @@ actor ConnectorSource[In: Any val] is Source
       @printf[I32]("Checkpoint %s complete at ConnectorSource %s\n".cstring(),
         checkpoint_id.string().cstring(), _source_id.string().cstring())
     end
-    _notify.barrier_complete(this, checkpoint_id)
+    _notify.checkpoint_complete(this, checkpoint_id)
 
   //////////////
   // CHECKPOINTS

@@ -77,15 +77,6 @@ class NormalStepMessageProcessor is StepMessageProcessor
   fun ref queued(): Array[_Queued] =>
     Array[_Queued]
 
-class NoProcessingStepMessageProcessor is StepMessageProcessor
-  let step: Step ref
-
-  new create(s: Step ref) =>
-    step = s
-
-  fun ref queued(): Array[_Queued] =>
-    Array[_Queued]
-
 type _Queued is (QueuedMessage | QueuedBarrier)
 
 class BarrierStepMessageProcessor is StepMessageProcessor

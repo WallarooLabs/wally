@@ -180,7 +180,6 @@ class ConnectorSourceNotify[In: Any val]
   var _listener: ConnectorSourceCoordinator[In]
 
   // Barrier/checkpoint id tracking
-  var _barrier_ongoing: Bool = false
   var _barrier_checkpoint_id: CheckpointId = 0
 
   // we need these for RestartMsg(host, port)
@@ -286,7 +285,7 @@ class ConnectorSourceNotify[In: Any val]
     if (_credits <= _refill_credits) and
         (_fsm_state is _ProtoFsmStreaming) then
       // Our client's credits are running low and we haven't replenished
-      // them after barrier_complete() processing.  Replenish now.
+      // them after checkpoint_complete() processing.  Replenish now.
       _send_acks(source)
     end
 
@@ -762,45 +761,46 @@ class ConnectorSourceNotify[In: Any val]
     _prep_for_rollback = false
     send_restart(source)
 
-  fun ref initiate_barrier(checkpoint_id: CheckpointId) =>
-    _barrier_ongoing = true
-    ifdef debug then
-      Invariant(checkpoint_id > _barrier_checkpoint_id)
-    end
-    _barrier_checkpoint_id = checkpoint_id
+  fun ref initiate_checkpoint(checkpoint_id: CheckpointId) =>
+    if not _prep_for_rollback then
+      ifdef debug then
+        Invariant(checkpoint_id > _barrier_checkpoint_id)
+      end
+      _barrier_checkpoint_id = checkpoint_id
 
-    if _session_active then
-      // update last_acked and last_checkpoint for all streams in
-      // _active_streams and _pending_close
-      for s_map in [_active_streams ; _pending_close].values() do
-        for s in s_map.values() do
-          ifdef debug then
-            @printf[I32]("%s ::: Updating stream_id %s last acked to %s\n"
-              .cstring(), WallClock.seconds().string().cstring(),
-              s.id.string().cstring(), s.last_seen.string().cstring())
+      if _session_active then
+        // update last_acked and last_checkpoint for all streams in
+        // _active_streams and _pending_close
+        for s_map in [_active_streams ; _pending_close].values() do
+          for s in s_map.values() do
+            ifdef debug then
+              @printf[I32]("%s ::: Updating stream_id %s last acked to %s\n"
+                .cstring(), WallClock.seconds().string().cstring(),
+                s.id.string().cstring(), s.last_seen.string().cstring())
+            end
+            s.last_checkpoint = checkpoint_id
+            s.last_acked = s.last_seen
           end
-          s.last_checkpoint = checkpoint_id
-          s.last_acked = s.last_seen
         end
       end
     end
 
-  fun ref barrier_complete(source: ConnectorSource[In] ref,
+  fun ref checkpoint_complete(source: ConnectorSource[In] ref,
     checkpoint_id: CheckpointId)
   =>
-    // update barrier state and check checkpoint_id matches our local knowledge
-    _barrier_ongoing = false
-    ifdef debug then
-      Invariant(checkpoint_id == _barrier_checkpoint_id)
-    end
+    if not _prep_for_rollback then
+      ifdef debug then
+        Invariant(checkpoint_id == _barrier_checkpoint_id)
+      end
 
-    if _session_active then
-      _process_acks_for_active(source)
+      if _session_active then
+        _process_acks_for_active(source)
 
-      // process acks for EOS/_pending_close streams
-      _process_acks_for_pending_close(source)
-      // process any stream relinquish requests
-      _relinquish_streams()
+        // process acks for EOS/_pending_close streams
+        _process_acks_for_pending_close(source)
+        // process any stream relinquish requests
+        _relinquish_streams()
+      end
     end
 
   /////////////////////////

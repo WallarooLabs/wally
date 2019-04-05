@@ -194,14 +194,6 @@ actor TCPSourceCoordinator[In: Any val] is SourceCoordinator
       s.unmute(this)
     end
 
-  be recovery_protocol_complete() =>
-    """
-    Called when Recovery is finished. At that point, we can tell sources that
-    from our perspective it's safe to unmute and begin listening for new
-    connections.
-    """
-    _start_sources()
-
   be update_router(router: Router) =>
     _router = router
 
