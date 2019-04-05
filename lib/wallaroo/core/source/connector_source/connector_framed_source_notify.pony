@@ -291,12 +291,11 @@ class ConnectorSourceNotify[In: Any val]
     end
 
     let data': Array[U8] val = consume data
-    let data'': Array[U8] val = recover data'.clone() end
     try
       ifdef "trace" then
         @printf[I32]("TRACE: decode data: %s\n".cstring(), _print_array[U8](data').cstring())
       end
-      let connector_msg = cwm.Frame.decode(consume data')?
+      let connector_msg = cwm.Frame.decode(data')?
       match connector_msg
       | let m: cwm.HelloMsg =>
         ifdef "trace" then
@@ -510,7 +509,7 @@ class ConnectorSourceNotify[In: Any val]
         " source\n").cstring())
       ifdef debug then
         @printf[I32]("Message bytes: %s\n".cstring(),
-          _print_array[U8](data'').cstring())
+          _print_array[U8](data').cstring())
         Fail()
       end
       return _to_error_state(source, "Unable to decode message")
