@@ -17,19 +17,35 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 use "net"
+use "wallaroo/core/common"
+use "wallaroo/core/messages"
+use "wallaroo_labs/mort"
+
 
 actor ControlConnection
+  let _auth: AmbientAuth
+  let _worker_name: WorkerName
+  let _target_name: WorkerName
+  let _c_service: String
   let _connections: Connections
+  var _identified: Bool = false
   var _control_sender: _TCPConnectionControlSender =
     _PreTCPConnectionControlSender
 
-  new create(connections: Connections) =>
+  new create(auth: AmbientAuth, worker_name: WorkerName,
+    target_name: WorkerName, c_service: String, connections: Connections)
+  =>
+    _auth = auth
+    _worker_name = worker_name
+    _target_name = target_name
+    _c_service = c_service
     _connections = connections
 
   be connected(conn: TCPConnection) =>
     _connections.register_disposable(conn)
     _control_sender.flush(conn)
     _control_sender = _PostTCPConnectionControlSender(conn)
+    if not _identified then _identify_control_port() end
 
   be closed(conn: TCPConnection) =>
     _control_sender = _PreTCPConnectionControlSender
@@ -43,6 +59,16 @@ actor ControlConnection
   be dispose() =>
     @printf[I32]("Shutting down ControlConnection\n".cstring())
     _control_sender.dispose()
+
+  fun ref _identify_control_port() =>
+    try
+      let message = ChannelMsgEncoder.identify_control_port(_worker_name,
+        _c_service, _auth)?
+      _connections.send_control(_target_name, message)
+    else
+      Fail()
+    end
+    _identified = true
 
 trait _TCPConnectionControlSender
   fun ref write(data: ByteSeq)
