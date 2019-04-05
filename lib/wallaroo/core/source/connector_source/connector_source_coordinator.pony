@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use "collections"
 use "promises"
+use "wallaroo/core/barrier"
 use "wallaroo/core/boundary"
 use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
@@ -251,14 +252,6 @@ actor ConnectorSourceCoordinator[In: Any val] is SourceCoordinator
 
     _outgoing_boundary_builders = consume new_boundary_builders
 
-  be checkpoint_complete(checkpoint_id: CheckpointId) =>
-    for (_, s) in _connected_sources.values() do
-      s.checkpoint_complete(checkpoint_id)
-    end
-    for (_, s) in _available_sources.values() do
-      s.checkpoint_complete(checkpoint_id)
-    end
-
   be dispose() =>
     @printf[I32]("Shutting down ConnectorSourceCoordinator\n".cstring())
     _close()
@@ -444,6 +437,25 @@ actor ConnectorSourceCoordinator[In: Any val] is SourceCoordinator
       (_initializer as LocalTopologyInitializer).report_initialized(this)
     else
       Fail()
+    end
+
+  //////////////
+  // BARRIER
+  //////////////
+  be initiate_barrier(token: BarrierToken) =>
+    for (_, s) in _connected_sources.values() do
+      s.initiate_barrier(token)
+    end
+    for (_, s) in _available_sources.values() do
+      s.initiate_barrier(token)
+    end
+
+  be checkpoint_complete(checkpoint_id: CheckpointId) =>
+    for (_, s) in _connected_sources.values() do
+      s.checkpoint_complete(checkpoint_id)
+    end
+    for (_, s) in _available_sources.values() do
+      s.checkpoint_complete(checkpoint_id)
     end
 
   //////////////

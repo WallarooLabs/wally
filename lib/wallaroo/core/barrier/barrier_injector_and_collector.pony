@@ -51,7 +51,8 @@ actor BarrierInjectorAndCollector
   let _aborted_barriers: Array[BarrierToken] = Array[BarrierToken](256)
 
   var _barrier_sources: SetIs[BarrierSource] = _barrier_sources.create()
-  let _sources: Map[RoutingId, Source] = _sources.create()
+  let _source_coordinators: SetIs[SourceCoordinator] =
+    _source_coordinators.create()
   let _sinks: SetIs[Sink] = _sinks.create()
 
   var _disposed: Bool = false
@@ -75,15 +76,8 @@ actor BarrierInjectorAndCollector
   be register_barrier_source(b_source: BarrierSource) =>
     _barrier_sources.set(b_source)
 
-  be register_source(source: Source, source_id: RoutingId) =>
-    _sources(source_id) = source
-
-  be unregister_source(source: Source, source_id: RoutingId) =>
-    try
-      _sources.remove(source_id)?
-    else
-      Fail()
-    end
+  be register_source_coordinator(sc: SourceCoordinator) =>
+    _source_coordinators.set(sc)
 
   be inject_barrier(barrier_token: BarrierToken) =>
     if not _disposed and not _aborted_barriers.contains(barrier_token) then
@@ -96,11 +90,11 @@ actor BarrierInjectorAndCollector
       end
 
       ifdef "checkpoint_trace" then
-        @printf[I32]("Calling initiate_barrier at %s sources\n".cstring(),
-          _sources.size().string().cstring())
+        @printf[I32]("Calling initiate_barrier at %s source coordinators\n"
+          .cstring(), _source_coordinators.size().string().cstring())
       end
-      for s in _sources.values() do
-        s.initiate_barrier(barrier_token)
+      for sc in _source_coordinators.values() do
+        sc.initiate_barrier(barrier_token)
       end
 
       // It's possible we've already initiated this if a sink ack arrived
