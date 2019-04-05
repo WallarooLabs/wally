@@ -90,35 +90,25 @@ class ControlChannelListenNotifier is TCPListenNotify
     _c_service = control_service
 
   fun ref listening(listen: TCPListener ref) =>
-    try
-      if not _is_initializer then
-        _connections.register_my_control_addr(_c_host, _c_service)
-      end
-      _router_registry.register_control_channel_listener(listen)
-
-      if _recovery_file.exists() then
-        @printf[I32]("Recovery file exists for control channel\n".cstring())
-      end
-
-      let message = ChannelMsgEncoder.identify_control_port(_worker_name,
-        _c_service, _auth)?
-      _connections.send_control_to_cluster(message)
-
-      let f = AsyncJournalledFile(_recovery_file, _the_journal, _auth,
-        _do_local_file_io)
-      f.print(_c_host)
-      f.print(_c_service)
-      f.sync()
-      f.dispose()
-      // TODO: AsyncJournalledFile does not provide implicit sync semantics here
-
-      @printf[I32]((_worker_name + " control: listening on " + _c_host +
-        ":" + _c_service + "\n").cstring())
-    else
-      @printf[I32]((_worker_name + " control: couldn't get local address %s:%s\n")
-        .cstring(), _c_host.cstring(), _c_service.cstring())
-      listen.close()
+    if not _is_initializer then
+      _connections.register_my_control_addr(_c_host, _c_service)
     end
+    _router_registry.register_control_channel_listener(listen)
+
+    if _recovery_file.exists() then
+      @printf[I32]("Recovery file exists for control channel\n".cstring())
+    end
+
+    let f = AsyncJournalledFile(_recovery_file, _the_journal, _auth,
+      _do_local_file_io)
+    f.print(_c_host)
+    f.print(_c_service)
+    f.sync()
+    f.dispose()
+    // TODO: AsyncJournalledFile does not provide implicit sync semantics here
+
+    @printf[I32]((_worker_name + " control: listening on " + _c_host +
+      ":" + _c_service + "\n").cstring())
 
   fun ref not_listening(listen: TCPListener ref) =>
     @printf[I32]((_worker_name + " control: unable to listen on (%s:%s)\n")

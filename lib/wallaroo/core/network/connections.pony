@@ -57,6 +57,10 @@ actor Connections is Cluster
   let _data_conn_builders: Map[WorkerName, OutgoingBoundaryBuilder] =
     _data_conn_builders.create()
   let _data_conns: Map[WorkerName, OutgoingBoundary] = _data_conns.create()
+  // Any pending control connections we received before we knew our own
+  // control service. (TargetWorker, TargetHost, TargetService)
+  let _pending_control_connections: Array[(WorkerName, String, String)] =
+    _pending_control_connections.create()
   let _metrics_conn: MetricsSink
   let _metrics_host: String
   let _metrics_service: String
@@ -112,6 +116,10 @@ actor Connections is Cluster
 
   be register_my_control_addr(host: String, service: String) =>
     _my_control_addr = (host, service)
+    for pcc in _pending_control_connections.values() do
+      _create_control_connection(pcc._1, pcc._2, pcc._3)
+    end
+    _pending_control_connections.clear()
 
   be register_my_data_addr(host: String, service: String) =>
     _my_data_addr = (host, service)
@@ -578,34 +586,41 @@ actor Connections is Cluster
         "while recovering\n").cstring())
     end
 
-  be create_control_connection(target_name: String, host: String,
+  be create_control_connection(target_name: WorkerName, host: String,
     service: String)
   =>
     @printf[I32]("_create_control_connection: call from line %d\n".cstring(), __loc.line())
     _create_control_connection(target_name, host, service)
 
-  fun ref _create_control_connection(target_name: String, host: String,
+  fun ref _create_control_connection(target_name: WorkerName, host: String,
     service: String)
   =>
-    @printf[I32]("_create_control_connection: target_name %s host %s service %s\n".cstring(), target_name.cstring(), host.cstring(), service.cstring())
-    _control_addrs(target_name) = (host, service)
-    let tcp_conn_wrapper =
-      if _control_conns.contains(target_name) then
-        try
-          _control_conns(target_name)?
+    let my_control_service = _my_control_addr._2
+    if my_control_service == "" then
+      _pending_control_connections.push((target_name, host, service))
+    else
+      @printf[I32]("_create_control_connection: target_name %s host %s service %s\n".cstring(), target_name.cstring(), host.cstring(), service.cstring())
+      _control_addrs(target_name) = (host, service)
+      let tcp_conn_wrapper =
+        if _control_conns.contains(target_name) then
+          try
+            _control_conns(target_name)?
+          else
+            Unreachable(); ControlConnection(_auth, _worker_name, target_name,
+              _my_control_addr._2, this)
+          end
         else
-          Unreachable(); ControlConnection(this)
+          ControlConnection(_auth, _worker_name, target_name,
+            _my_control_addr._2, this)
         end
-      else
-        ControlConnection(this)
-      end
-    _control_conns(target_name) = tcp_conn_wrapper
-    _register_disposable(tcp_conn_wrapper)
-    let control_notifier: TCPConnectionNotify iso =
-      ControlSenderConnectNotifier(_auth, target_name, host, service,
-        tcp_conn_wrapper, this)
-    let control_conn: TCPConnection =
-      TCPConnection(_auth, consume control_notifier, host, service)
+      _control_conns(target_name) = tcp_conn_wrapper
+      _register_disposable(tcp_conn_wrapper)
+      let control_notifier: TCPConnectionNotify iso =
+        ControlSenderConnectNotifier(_auth, target_name, host, service,
+          tcp_conn_wrapper, this)
+      let control_conn: TCPConnection =
+        TCPConnection(_auth, consume control_notifier, host, service)
+    end
 
   be create_data_connection(target_name: String, host: String,
     service: String)
