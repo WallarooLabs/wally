@@ -203,7 +203,7 @@ class BarrierStepMessageProcessor is StepMessageProcessor
 
   fun ref prepare_for_rollback(token: BarrierToken) =>
     if higher_priority(token) then
-      _step.clear_barriers()
+      _step.finish_preparing_for_rollback()
     end
 
   fun ref remove_input(input_id: RoutingId) =>

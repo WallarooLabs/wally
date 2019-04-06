@@ -93,7 +93,6 @@ actor ConnectorSink is Sink
   let _env: Env
   var _message_processor: SinkMessageProcessor = EmptySinkMessageProcessor
   let _barrier_coordinator: BarrierCoordinator
-  var _barrier_acker: (BarrierSinkAcker | None) = None
   let _checkpoint_initiator: CheckpointInitiator
   // Steplike
   let _sink_id: RoutingId
@@ -195,7 +194,6 @@ actor ConnectorSink is Sink
     _from = from
     _connect_count = 0
     _twopc = ConnectorSink2PC(_notify.stream_name)
-    _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_coordinator)
     _message_processor = NormalSinkMessageProcessor(this)
 
   //
@@ -430,41 +428,23 @@ actor ConnectorSink is Sink
     end
     process_barrier(input_id, producer, barrier_token)
 
+  fun ref receive_new_barrier(input_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    _message_processor = BarrierSinkMessageProcessor(_sink_id, this,
+      barrier_token)
+    _message_processor.receive_barrier(input_id, producer,
+      barrier_token)
+
   fun ref process_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     match barrier_token
     | let srt: CheckpointRollbackBarrierToken =>
-      try
-        let b_acker = _barrier_acker as BarrierSinkAcker
-        if b_acker.higher_priority(srt) then
-          _prepare_for_rollback()
-        end
-      else
-        Fail()
-      end
+      _message_processor.prepare_for_rollback(barrier_token)
     end
-
-    if _message_processor.barrier_in_progress() then
-      let do_ack = match barrier_token
-      | let _: CheckpointBarrierToken =>
-        // We need to control of acking & when barrier_complete() gets called.
-        false
-      else
-        true
-      end
-      _message_processor.receive_barrier(input_id, producer,
-        barrier_token where ack_barrier_if_complete = do_ack)
-    else
-      match _message_processor
-      | let nsmp: NormalSinkMessageProcessor =>
-        _use_barrier_processor()
-        _message_processor.receive_new_barrier(input_id, producer,
-          barrier_token)
-      else
-        Fail()
-      end
-    end
+    _message_processor.receive_barrier(input_id, producer,
+      barrier_token)
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
     """
@@ -477,11 +457,10 @@ actor ConnectorSink is Sink
     ifdef "checkpoint_trace" then
       @printf[I32]("Barrier %s complete at ConnectorSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
     end
-    ifdef debug then
-      Invariant(_message_processor.barrier_in_progress())
-    end
+    var ack_now = true
     match barrier_token
     | let sbt: CheckpointBarrierToken =>
+      ack_now = false
       if not _notify.twopc_intro_done then
         // This sink applies Pony runtime backpressure when disconnected,
         // so it's quite unlikely that we will get here: sending
@@ -503,7 +482,6 @@ actor ConnectorSink is Sink
       | None =>
         // If no data has been processed by the sink since the last
         // checkpoint, then don't bother with 2PC, return early.
-
         _barrier_coordinator.ack_barrier(this, sbt)
         ifdef "checkpoint_trace" then
           @printf[I32]("2PC: no data written during this checkpoint interval, skipping 2PC round\n".cstring())
@@ -526,13 +504,17 @@ actor ConnectorSink is Sink
       // commit/abort decisions only on the range of output
       // governed by a single round of 2PC.
 
-      try (_barrier_acker as BarrierSinkAcker).set_force_queue() else Fail end
+      _message_processor = QueuingSinkMessageProcessor(_sink_id,
+        this)
 
     | let srt: CheckpointRollbackBarrierToken =>
       _use_normal_processor()
     | let rbrt: CheckpointRollbackResumeBarrierToken =>
       _resume_processing_messages()
       _twopc.reset_state()
+    end
+    if ack_now then
+      _barrier_coordinator.ack_barrier(this, barrier_token)
     end
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
@@ -589,15 +571,6 @@ actor ConnectorSink is Sink
   fun ref _use_normal_processor() =>
     _message_processor = NormalSinkMessageProcessor(this)
 
-  fun ref _use_barrier_processor() =>
-    try
-      (_barrier_acker as BarrierSinkAcker).clear()
-      _message_processor = BarrierSinkMessageProcessor(this,
-        _barrier_acker as BarrierSinkAcker)
-    else
-      Fail()
-    end
-
   ///////////////
   // CHECKPOINTS
   ///////////////
@@ -630,7 +603,7 @@ actor ConnectorSink is Sink
     end
     // Don't call _use_normal_processor() here
 
-  fun ref _prepare_for_rollback() =>
+  fun ref finish_preparing_for_rollback() =>
     _use_normal_processor()
 
   be rollback(payload: ByteSeq val, event_log: EventLog,

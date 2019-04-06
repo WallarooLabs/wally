@@ -28,6 +28,13 @@ use "wallaroo/core/topology"
 trait tag Sink is (Consumer & DisposableActor & BarrierProcessor)
   be checkpoint_complete(checkpoint_id: CheckpointId)
   fun inputs(): Map[RoutingId, Producer] box
+  // Called by SinkMessageProcessor when a barrier is being handled
+  // for the first time.
+  fun ref receive_new_barrier(input_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
+  // Called by SinkMessageProcessor when the sink needs to do final
+  // cleanup work for rollback.
+  fun ref finish_preparing_for_rollback()
   fun ref receive_immediate_ack() =>
     None
 
