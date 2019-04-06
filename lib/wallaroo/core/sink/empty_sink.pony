@@ -95,9 +95,17 @@ actor EmptySink is Sink
   =>
     None
 
+  fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    None
+
   fun ref process_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
+    None
+
+  fun ref finish_preparing_for_rollback() =>
     None
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
