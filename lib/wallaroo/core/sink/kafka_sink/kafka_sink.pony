@@ -48,7 +48,6 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   let _metrics_reporter: MetricsReporter
   var _initializer: (LocalTopologyInitializer | None) = None
   let _barrier_coordinator: BarrierCoordinator
-  var _barrier_acker: (BarrierSinkAcker | None) = None
   let _checkpoint_initiator: CheckpointInitiator
 
   // Consumer
@@ -104,7 +103,6 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
              end
 
     _message_processor = NormalSinkMessageProcessor(this)
-    _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_coordinator)
 
   fun ref create_producer_mapping(client: KafkaClient, mapping: KafkaProducerMapping):
     (KafkaProducerMapping | None)
@@ -359,44 +357,27 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   =>
     process_barrier(input_id, producer, barrier_token)
 
+  fun ref receive_new_barrier(input_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    _message_processor = BarrierSinkMessageProcessor(_sink_id, this,
+      barrier_token)
+    _message_processor.receive_barrier(input_id, producer,
+      barrier_token)
+
   fun ref process_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     match barrier_token
     | let srt: CheckpointRollbackBarrierToken =>
-      try
-        let b_acker = _barrier_acker as BarrierSinkAcker
-        if b_acker.higher_priority(srt) then
-          _prepare_for_rollback()
-        end
-      else
-        Fail()
-      end
+      _message_processor.prepare_for_rollback(barrier_token)
     end
 
-    if _message_processor.barrier_in_progress() then
-      _message_processor.receive_barrier(input_id, producer,
-        barrier_token)
-    else
-      match _message_processor
-      | let nsmp: NormalSinkMessageProcessor =>
-        try
-           _message_processor = BarrierSinkMessageProcessor(this,
-             _barrier_acker as BarrierSinkAcker)
-           _message_processor.receive_new_barrier(input_id, producer,
-             barrier_token)
-        else
-          Fail()
-        end
-      else
-        Fail()
-      end
-    end
+    _message_processor.receive_barrier(input_id, producer,
+      barrier_token)
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
-    ifdef debug then
-      Invariant(_message_processor.barrier_in_progress())
-    end
+    _barrier_coordinator.ack_barrier(this, barrier_token)
     match barrier_token
     | let sbt: CheckpointBarrierToken =>
       checkpoint_state(sbt.id)
@@ -415,14 +396,6 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
     None
 
-  fun ref _clear_barriers() =>
-    try
-      (_barrier_acker as BarrierSinkAcker).clear()
-    else
-      Fail()
-    end
-    _message_processor = NormalSinkMessageProcessor(this)
-
   ///////////////
   // CHECKPOINTS
   ///////////////
@@ -434,10 +407,10 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
       recover val Array[ByteSeq] end)
 
   be prepare_for_rollback() =>
-    _prepare_for_rollback()
+    finish_preparing_for_rollback()
 
-  fun ref _prepare_for_rollback() =>
-    _clear_barriers()
+  fun ref finish_preparing_for_rollback() =>
+    _message_processor = NormalSinkMessageProcessor(this)
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)

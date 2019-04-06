@@ -505,12 +505,12 @@ actor Step is (Producer & Consumer & BarrierProcessor)
         _id.string().cstring())
     end
 
-  fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
+  fun ref receive_new_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     _step_message_processor = BarrierStepMessageProcessor(this,
       _id)
-    _step_message_processor.receive_new_barrier(step_id, producer,
+    _step_message_processor.receive_new_barrier(input_id, producer,
       barrier_token)
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
@@ -541,9 +541,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       end
     end
 
-  fun ref clear_barriers() =>
-    _step_message_processor = NormalStepMessageProcessor(this)
-
   //////////////
   // CHECKPOINTS
   //////////////
@@ -555,7 +552,10 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
 
   be prepare_for_rollback() =>
-    clear_barriers()
+    finish_preparing_for_rollback()
+
+  fun ref finish_preparing_for_rollback() =>
+    _step_message_processor = NormalStepMessageProcessor(this)
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
