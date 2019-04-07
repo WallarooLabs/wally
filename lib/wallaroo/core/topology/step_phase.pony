@@ -17,35 +17,42 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
-use "wallaroo_labs/mort"
-use "wallaroo/core/boundary"
-use "wallaroo/core/invariant"
-use "wallaroo/core/topology"
 use "wallaroo/core/barrier"
+use "wallaroo/core/boundary"
 use "wallaroo/core/checkpoint"
+use "wallaroo/core/common"
+use "wallaroo/core/invariant"
+use "wallaroo/core/metrics"
+use "wallaroo/core/rebalancing"
+use "wallaroo_labs/mort"
 
-//!@ TODO: Rename this StepPhase
-trait StepMessageProcessor
+
+trait StepPhase
+  fun name(): String
+
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, key: Key, event_ts: U64, watermark_ts: U64,
     i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64)
   =>
-    Fail()
+    _invalid_call(); Fail()
 
-  fun barrier_in_progress(): Bool =>
-    false
+  fun ref trigger_timeout(step: Step ref) =>
+    """
+    We trigger in all cases unless we're disposed.
+    """
+    step.finish_triggering_timeout()
 
   fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref prepare_for_rollback(token: BarrierToken) =>
     """
@@ -66,25 +73,35 @@ trait StepMessageProcessor
     """
     None
 
-  fun ref queued(): Array[_Queued]
-
-class EmptyStepMessageProcessor is StepMessageProcessor
-  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, key: Key, event_ts: U64, watermark_ts: U64,
-    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    Fail()
-
   fun ref queued(): Array[_Queued] =>
+    _invalid_call(); Fail()
     Array[_Queued]
 
-class NormalStepMessageProcessor is StepMessageProcessor
+  fun send_state(step: Step ref, runner: Runner, id: RoutingId,
+    boundary: OutgoingBoundary, step_group: RoutingId, key: Key,
+    checkpoint_id: CheckpointId, auth: AmbientAuth)
+  =>
+    """
+    We should only be sending state in normal processing mode.
+    """
+    _invalid_call(); Fail()
+
+  fun ref dispose(step: Step ref) =>
+    step.finish_disposing()
+
+  fun _invalid_call() =>
+    @printf[I32]("Invalid call on step phase %s\n".cstring(), name().cstring())
+
+class _InitialStepPhase is StepPhase
+  fun name(): String => __loc.type_name()
+
+class _NormalStepPhase is StepPhase
   let _step: Step ref
 
   new create(s: Step ref) =>
     _step = s
+
+  fun name(): String => __loc.type_name()
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, key: Key, event_ts: U64, watermark_ts: U64,
@@ -101,22 +118,32 @@ class NormalStepMessageProcessor is StepMessageProcessor
   =>
     _step.receive_new_barrier(step_id, producer, barrier_token)
 
+  fun send_state(step: Step ref, runner: Runner, id: RoutingId,
+    boundary: OutgoingBoundary, step_group: RoutingId, key: Key,
+    checkpoint_id: CheckpointId, auth: AmbientAuth)
+  =>
+    StepStateMigrator.send_state(step, runner, id, boundary, step_group,
+      key, checkpoint_id, auth)
+
   fun ref queued(): Array[_Queued] =>
     Array[_Queued]
 
 type _Queued is (QueuedMessage | QueuedBarrier)
 
-class BarrierStepMessageProcessor is StepMessageProcessor
+class _BarrierStepPhase is StepPhase
   let _step: Step ref
   let _step_id: RoutingId
-  var _barrier_token: BarrierToken = InitialBarrierToken
+  let _barrier_token: BarrierToken
   let _inputs_blocking: Map[RoutingId, Producer] = _inputs_blocking.create()
   let _removed_inputs: SetIs[RoutingId] = _removed_inputs.create()
   var _queued: Array[_Queued] = _queued.create()
 
-  new create(s: Step ref, s_id: RoutingId) =>
+  new create(s: Step ref, s_id: RoutingId, token: BarrierToken) =>
     _step = s
     _step_id = s_id
+    _barrier_token = token
+
+  fun name(): String => __loc.type_name()
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, key: Key, event_ts: U64, watermark_ts: U64,
@@ -145,20 +172,8 @@ class BarrierStepMessageProcessor is StepMessageProcessor
   fun ref higher_priority(token: BarrierToken): Bool =>
     token > _barrier_token
 
-  fun ref lower_priority(token: BarrierToken): Bool =>
-    token < _barrier_token
-
-  fun barrier_in_progress(): Bool =>
-    _barrier_token != InitialBarrierToken
-
   fun input_blocking(id: RoutingId): Bool =>
     _inputs_blocking.contains(id)
-
-  fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
-    barrier_token: BarrierToken)
-  =>
-    _barrier_token = barrier_token
-    receive_barrier(step_id, producer, barrier_token)
 
   fun ref receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
@@ -166,11 +181,12 @@ class BarrierStepMessageProcessor is StepMessageProcessor
     if input_blocking(input_id) then
       _queued.push(QueuedBarrier(input_id, producer, barrier_token))
     else
-      // If this new token is a higher priority token, then the forwarder
-      // should have already been cleared to make way for it.
       ifdef debug then
         if barrier_token > _barrier_token then
-          @printf[I32]("Invariant violation: received barrier %s is greater than current barrier %s at Step %s\n".cstring(), barrier_token.string().cstring(), _barrier_token.string().cstring(), _step_id.string().cstring())
+          @printf[I32](("Invariant violation: received barrier %s is " +
+            "greater than current barrier %s at Step %s\n").cstring(),
+            barrier_token.string().cstring(),
+            _barrier_token.string().cstring(), _step_id.string().cstring())
         end
 
         Invariant(not (barrier_token > _barrier_token))
@@ -182,11 +198,13 @@ class BarrierStepMessageProcessor is StepMessageProcessor
         return
       end
 
-      if barrier_token != _barrier_token then
-        @printf[I32]("Received %s when still processing %s at step %s\n"
-          .cstring(), barrier_token.string().cstring(),
-          _barrier_token.string().cstring(), _step_id.string().cstring())
-        Fail()
+      ifdef debug then
+        if barrier_token != _barrier_token then
+          @printf[I32]("Received %s when still processing %s at step %s\n"
+            .cstring(), barrier_token.string().cstring(),
+            _barrier_token.string().cstring(), _step_id.string().cstring())
+          Fail()
+        end
       end
 
       let inputs = _step.inputs()
@@ -195,7 +213,9 @@ class BarrierStepMessageProcessor is StepMessageProcessor
         check_completion(inputs)
       else
         if not _removed_inputs.contains(input_id) then
-          @printf[I32]("%s: Forwarder at %s doesn't know about %s\n".cstring(), barrier_token.string().cstring(), _step_id.string().cstring(), input_id.string().cstring())
+          @printf[I32]("%s: Step %s doesn't know about %s\n".cstring(),
+            barrier_token.string().cstring(), _step_id.string().cstring(),
+            input_id.string().cstring())
           Fail()
         end
       end
@@ -241,7 +261,7 @@ class BarrierStepMessageProcessor is StepMessageProcessor
       _step.barrier_complete(b_token)
     end
 
-class DisposedStepMessageProcessor is StepMessageProcessor
+class _DisposedStepPhase is StepPhase
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, key: Key, event_ts: U64, watermark_ts: U64,
     i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
@@ -250,8 +270,10 @@ class DisposedStepMessageProcessor is StepMessageProcessor
   =>
     None
 
-  fun barrier_in_progress(): Bool =>
-    false
+  fun name(): String => __loc.type_name()
+
+  fun ref trigger_timeout(step: Step ref) =>
+    None
 
   fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
@@ -265,3 +287,12 @@ class DisposedStepMessageProcessor is StepMessageProcessor
 
   fun ref queued(): Array[_Queued] =>
     Array[_Queued]
+
+  fun send_state(step: Step ref, runner: Runner, id: RoutingId,
+    boundary: OutgoingBoundary, step_group: RoutingId, key: Key,
+    checkpoint_id: CheckpointId, auth: AmbientAuth)
+  =>
+    None
+
+  fun ref dispose(step: Step ref) =>
+    None

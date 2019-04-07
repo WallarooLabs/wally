@@ -34,8 +34,7 @@ trait _EventLogPhase
   fun ref initiate_checkpoint(checkpoint_id: CheckpointId,
     promise: Promise[CheckpointId], event_log: EventLog ref)
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref checkpoint_state(resilient_id: RoutingId,
     checkpoint_id: CheckpointId, payload: Array[ByteSeq] val,
@@ -44,44 +43,35 @@ trait _EventLogPhase
     @printf[I32]("checkpoint_state() for resilient %s, checkpoint_id %s\n"
       .cstring(), resilient_id.string().cstring(),
       checkpoint_id.string().cstring())
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref state_checkpointed(resilient_id: RoutingId) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref write_initial_checkpoint_id(checkpoint_id: CheckpointId) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref write_checkpoint_id(checkpoint_id: CheckpointId,
     promise: Promise[CheckpointId])
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref checkpoint_id_written(checkpoint_id: CheckpointId,
     promise: Promise[CheckpointId])
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref expect_rollback_count(count: USize) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref ack_rollback(resilient_id: RoutingId) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref complete_early() =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref check_completion() =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref dispose(event_log: EventLog ref) =>
     event_log._dispose()

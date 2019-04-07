@@ -39,7 +39,7 @@ use "wallaroo_labs/time"
 actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   // Steplike
   let _name: String
-  var _message_processor: SinkMessageProcessor = EmptySinkMessageProcessor
+  var _phase: SinkPhase = InitialSinkPhase
   let _sink_id: RoutingId
   let _event_log: EventLog
   var _recovering: Bool
@@ -102,7 +102,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
                ""
              end
 
-    _message_processor = NormalSinkMessageProcessor(this)
+    _phase = NormalSinkPhase(this)
 
   fun ref create_producer_mapping(client: KafkaClient, mapping: KafkaProducerMapping):
     (KafkaProducerMapping | None)
@@ -285,7 +285,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    _message_processor.process_message[D](metric_name, pipeline_time_spent,
+    _phase.process_message[D](metric_name, pipeline_time_spent,
       data, key, event_ts, watermark_ts, i_producer_id, i_producer, msg_uid,
       frac_ids, i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
 
@@ -360,9 +360,9 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   fun ref receive_new_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    _message_processor = BarrierSinkMessageProcessor(_sink_id, this,
+    _phase = BarrierSinkPhase(_sink_id, this,
       barrier_token)
-    _message_processor.receive_barrier(input_id, producer,
+    _phase.receive_barrier(input_id, producer,
       barrier_token)
 
   fun ref process_barrier(input_id: RoutingId, producer: Producer,
@@ -370,10 +370,10 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   =>
     match barrier_token
     | let srt: CheckpointRollbackBarrierToken =>
-      _message_processor.prepare_for_rollback(barrier_token)
+      _phase.prepare_for_rollback(barrier_token)
     end
 
-    _message_processor.receive_barrier(input_id, producer,
+    _phase.receive_barrier(input_id, producer,
       barrier_token)
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
@@ -382,8 +382,8 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     | let sbt: CheckpointBarrierToken =>
       checkpoint_state(sbt.id)
     end
-    let queued = _message_processor.queued()
-    _message_processor = NormalSinkMessageProcessor(this)
+    let queued = _phase.queued()
+    _phase = NormalSinkPhase(this)
     for q in queued.values() do
       match q
       | let qm: QueuedMessage =>
@@ -410,7 +410,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     finish_preparing_for_rollback()
 
   fun ref finish_preparing_for_rollback() =>
-    _message_processor = NormalSinkMessageProcessor(this)
+    _phase = NormalSinkPhase(this)
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)

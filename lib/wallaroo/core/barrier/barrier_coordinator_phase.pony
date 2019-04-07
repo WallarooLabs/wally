@@ -29,12 +29,10 @@ trait _BarrierCoordinatorPhase
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref source_registration_complete(s: Source) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ready_for_next_token(): Bool =>
     false
@@ -53,16 +51,13 @@ trait _BarrierCoordinatorPhase
     end
 
   fun ref ack_barrier(s: Sink, barrier_token: BarrierToken) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref worker_ack_barrier(w: WorkerName, barrier_token: BarrierToken) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref barrier_fully_acked(token: BarrierToken) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun _invalid_call() =>
     @printf[I32]("Invalid call on barrier initiator phase %s\n".cstring(),

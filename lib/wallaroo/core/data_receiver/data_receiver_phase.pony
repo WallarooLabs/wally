@@ -31,18 +31,15 @@ trait _DataReceiverPhase
     pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
     token: BarrierToken, seq_id: SeqId)
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref data_connect(highest_seq_id: SeqId) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun _invalid_call() =>
     @printf[I32]("Invalid call on Data Receiver phase %s\n".cstring(),

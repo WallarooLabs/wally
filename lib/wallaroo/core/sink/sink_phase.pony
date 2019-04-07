@@ -24,40 +24,42 @@ use "wallaroo/core/topology"
 use "wallaroo/core/barrier"
 use "wallaroo/core/checkpoint"
 
-trait SinkMessageProcessor
+trait SinkPhase
+  fun name(): String
+
   fun ref process_message[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
     watermark_ts: U64, i_producer_id: RoutingId, i_producer: Producer,
     msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    _invalid_call(); Fail()
 
   fun ref receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref prepare_for_rollback(token: BarrierToken) =>
-    Fail()
-
-  fun ref queued(): Array[_Queued]
-
-class EmptySinkMessageProcessor is SinkMessageProcessor
-  fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
-    watermark_ts: U64, i_producer_id: RoutingId, i_producer: Producer,
-    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref queued(): Array[_Queued] =>
+    _invalid_call(); Fail()
     Array[_Queued]
 
-class NormalSinkMessageProcessor is SinkMessageProcessor
+  fun _invalid_call() =>
+    @printf[I32]("Invalid call on sink phase %s\n".cstring(), name().cstring())
+
+class InitialSinkPhase is SinkPhase
+  fun name(): String => __loc.type_name()
+
+class NormalSinkPhase is SinkPhase
   let _sink: Sink ref
 
   new create(s: Sink ref) =>
     _sink = s
+
+  fun name(): String => __loc.type_name()
 
   fun ref process_message[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
@@ -82,18 +84,19 @@ class NormalSinkMessageProcessor is SinkMessageProcessor
 
 type _Queued is (QueuedMessage | QueuedBarrier)
 
-class BarrierSinkMessageProcessor is SinkMessageProcessor
+class BarrierSinkPhase is SinkPhase
   let _sink_id: RoutingId
   let _sink: Sink ref
   var _barrier_token: BarrierToken
   let _inputs_blocking: Map[RoutingId, Producer] = _inputs_blocking.create()
   let _queued: Array[_Queued] = _queued.create()
-  var _force_queue: Bool = false
 
   new create(sink_id: RoutingId, sink: Sink ref, token: BarrierToken) =>
     _sink_id = sink_id
     _sink = sink
     _barrier_token = token
+
+  fun name(): String => __loc.type_name()
 
   fun ref process_message[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
@@ -115,20 +118,24 @@ class BarrierSinkMessageProcessor is SinkMessageProcessor
   fun ref receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    if barrier_token != _barrier_token then
-      @printf[I32]("SinkAcker: Expected %s, got %s\n".cstring(), _barrier_token.string().cstring(), barrier_token.string().cstring())
-      Fail()
-    end
-
     if input_blocking(input_id) then
       _queued.push(QueuedBarrier(input_id, producer, barrier_token))
     else
+      ifdef debug then
+        if barrier_token != _barrier_token then
+          @printf[I32]("Sink: Expected %s, got %s\n".cstring(),
+            _barrier_token.string().cstring(),
+            barrier_token.string().cstring())
+          Fail()
+        end
+      end
       let inputs = _sink.inputs()
       if inputs.contains(input_id) then
         _inputs_blocking(input_id) = producer
         _check_completion(inputs)
       else
-        @printf[I32]("Failed to find input_id %s in inputs at Sink %s\n".cstring(), input_id.string().cstring(), _sink_id.string().cstring())
+        @printf[I32]("Failed to find input_id %s in inputs at Sink %s\n"
+          .cstring(), input_id.string().cstring(), _sink_id.string().cstring())
         Fail()
       end
     end
@@ -148,13 +155,7 @@ class BarrierSinkMessageProcessor is SinkMessageProcessor
   fun ref higher_priority(token: BarrierToken): Bool =>
     token > _barrier_token
 
-  fun ref lower_priority(token: BarrierToken): Bool =>
-    token < _barrier_token
-
   fun input_blocking(id: RoutingId): Bool =>
-    if _force_queue then
-      return true
-    end
     _inputs_blocking.contains(id)
 
   fun ref remove_input(input_id: RoutingId) =>
@@ -177,10 +178,7 @@ class BarrierSinkMessageProcessor is SinkMessageProcessor
       _sink.barrier_complete(_barrier_token)
     end
 
-  fun ref set_force_queue() =>
-    _force_queue = true
-
-class QueuingSinkMessageProcessor is SinkMessageProcessor
+class QueuingSinkPhase is SinkPhase
   let _sink_id: RoutingId
   let _sink: Sink ref
   let _queued: Array[_Queued] = _queued.create()
@@ -188,6 +186,8 @@ class QueuingSinkMessageProcessor is SinkMessageProcessor
   new create(sink_id: RoutingId, sink: Sink ref) =>
     _sink_id = sink_id
     _sink = sink
+
+  fun name(): String => __loc.type_name()
 
   fun ref process_message[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,

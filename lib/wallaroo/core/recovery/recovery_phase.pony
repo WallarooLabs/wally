@@ -35,49 +35,39 @@ trait _RecoveryPhase
   fun ref start_recovery(workers: Array[WorkerName] val,
     recovery: Recovery ref, with_reconnect: Bool)
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref start_reconnect() =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref recovery_reconnect_finished() =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref rollback_prep_complete() =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref worker_ack_local_keys_rollback(w: WorkerName, checkpoint_id: CheckpointId)
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref worker_ack_register_producers(w: WorkerName) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref data_receivers_ack() =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref ack_recovery_initiated(w: WorkerName,
     token: CheckpointRollbackBarrierToken)
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref rollback_complete(worker: WorkerName,
     token: CheckpointRollbackBarrierToken)
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref try_override_recovery(worker: WorkerName,
     token: CheckpointRollbackBarrierToken, recovery: Recovery ref): Bool
