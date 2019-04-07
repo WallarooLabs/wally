@@ -66,7 +66,7 @@ actor CheckpointInitiator is Initializable
   let _barrier_coordinator: BarrierCoordinator
   var _recovery: (Recovery | None) = None
 
-  let _source_listeners: SetIs[SourceListener] = _source_listeners.create()
+  let _source_coordinators: SetIs[SourceCoordinator] = _source_coordinators.create()
   let _sinks: SetIs[Sink] = _sinks.create()
 
   // Used as a way to identify outdated timer-based initiate_checkpoint calls
@@ -199,11 +199,11 @@ actor CheckpointInitiator is Initializable
   be unregister_sink(sink: Sink) =>
     _sinks.unset(sink)
 
-  be register_source_listener(source_listener: SourceListener) =>
-    _source_listeners.set(source_listener)
+  be register_source_coordinator(source_coordinator: SourceCoordinator) =>
+    _source_coordinators.set(source_coordinator)
 
-  be unregister_source_listener(source_listener: SourceListener) =>
-    _source_listeners.unset(source_listener)
+  be unregister_source_coordinator(source_coordinator: SourceCoordinator) =>
+    _source_coordinators.unset(source_coordinator)
 
   be lookup_next_checkpoint_id(p: Promise[CheckpointId]) =>
     p(_last_complete_checkpoint_id + 1)
@@ -449,8 +449,8 @@ actor CheckpointInitiator is Initializable
     end
 
   fun _propagate_checkpoint_complete(checkpoint_id: CheckpointId) =>
-    for sl in _source_listeners.values() do
-      sl.checkpoint_complete(checkpoint_id)
+    for sc in _source_coordinators.values() do
+      sc.checkpoint_complete(checkpoint_id)
     end
     for s in _sinks.values() do
       s.checkpoint_complete(checkpoint_id)

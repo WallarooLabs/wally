@@ -17,6 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "wallaroo"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/partitioning"
@@ -30,7 +31,7 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
-class val TCPSourceListenerBuilder[In: Any val] is SourceListenerBuilder
+class val ConnectorSourceCoordinatorBuilder[In: Any val]
   let _worker_name: WorkerName
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
@@ -45,11 +46,16 @@ class val TCPSourceListenerBuilder[In: Any val] is SourceListenerBuilder
   let _layout_initializer: LayoutInitializer
   let _recovering: Bool
   let _target_router: Router
+  let _connections: Connections
+  let _workers_list: Array[WorkerName] val
+  let _is_joining: Bool
   let _parallelism: USize
   let _handler: FramedSourceHandler[In] val
   let _host: String
   let _service: String
-  let _valid: Bool
+  let _cookie: String
+  let _max_credits: U32
+  let _refill_credits: U32
 
   new val create(worker_name: WorkerName, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
@@ -59,8 +65,12 @@ class val TCPSourceListenerBuilder[In: Any val] is SourceListenerBuilder
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     recovering: Bool, target_router: Router = EmptyRouter,
-    parallelism: USize, handler: FramedSourceHandler[In] val,
-    host: String, service: String, valid: Bool)
+    connections: Connections, workers_list: Array[WorkerName] val,
+    is_joining: Bool,
+    parallelism: USize,
+    handler: FramedSourceHandler[In] val,
+    host: String, service: String, cookie: String,
+    max_credits: U32, refill_credits: U32)
   =>
     _worker_name = worker_name
     _pipeline_name = pipeline_name
@@ -76,34 +86,45 @@ class val TCPSourceListenerBuilder[In: Any val] is SourceListenerBuilder
     _layout_initializer = layout_initializer
     _recovering = recovering
     _target_router = target_router
+    _connections = connections
+    _workers_list = workers_list
+    _is_joining = is_joining
     _parallelism = parallelism
     _handler = handler
     _host = host
     _service = service
-    _valid = valid
+    _cookie = cookie
+    _max_credits = max_credits
+    _refill_credits = refill_credits
 
-  fun apply(env: Env): SourceListener =>
-    TCPSourceListener[In](env, _worker_name, _pipeline_name, _runner_builder,
-      _partitioner_builder, _router, _metrics_conn, _metrics_reporter.clone(),
-      _router_registry,
+  fun apply(env: Env): SourceCoordinator =>
+    ConnectorSourceCoordinator[In](env, _worker_name, _pipeline_name,
+      _runner_builder, _partitioner_builder,
+      _router, _metrics_conn, _metrics_reporter.clone(), _router_registry,
       _outgoing_boundary_builders, _event_log, _auth, _layout_initializer,
-      _recovering, _target_router, _parallelism, _handler, _host, _service,
-      _valid)
+      _recovering, _target_router, _connections,
+      _workers_list, _is_joining, _parallelism, _handler, _host, _service,
+      _cookie, _max_credits, _refill_credits)
 
-class val TCPSourceListenerBuilderBuilder[In: Any val] is
-  SourceListenerBuilderBuilder
-  let _source_config: TCPSourceConfig[In]
+class val ConnectorSourceCoordinatorBuilderBuilder[In: Any val] is
+  SourceCoordinatorBuilderBuilder
+  let _source_config: ConnectorSourceConfig[In]
 
-  new val create(source_config: TCPSourceConfig[In])
+  new val create(source_config: ConnectorSourceConfig[In])
   =>
     _source_config = source_config
 
-  fun apply(worker_name: String, pipeline_name: String,
-    runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
-    router: Router, metrics_conn: MetricsSink,
-    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
+  fun apply(worker_name: String,
+    pipeline_name: String,
+    runner_builder: RunnerBuilder,
+    partitioner_builder: PartitionerBuilder,
+    router: Router,
+    metrics_conn: MetricsSink,
+    metrics_reporter: MetricsReporter iso,
+    router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
-    event_log: EventLog, auth: AmbientAuth,
+    event_log: EventLog,
+    auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     recovering: Bool,
     worker_source_config: WorkerSourceConfig,
@@ -111,22 +132,23 @@ class val TCPSourceListenerBuilderBuilder[In: Any val] is
     workers_list: Array[WorkerName] val,
     is_joining: Bool,
     target_router: Router = EmptyRouter):
-    TCPSourceListenerBuilder[In]
+    ConnectorSourceCoordinatorBuilder[In]
   =>
     match worker_source_config
-    | let config: WorkerTCPSourceConfig =>
-      TCPSourceListenerBuilder[In](worker_name, pipeline_name, runner_builder,
-        partitioner_builder, router, metrics_conn, consume metrics_reporter,
-        router_registry, outgoing_boundary_builders, event_log, auth,
-        layout_initializer, recovering, target_router,
-        _source_config.parallelism, _source_config.handler,
-        config.host, config.service, config.valid)
+    | let config: WorkerConnectorSourceConfig =>
+      ConnectorSourceCoordinatorBuilder[In](worker_name, pipeline_name,
+        runner_builder, partitioner_builder, router, metrics_conn,
+        consume metrics_reporter, router_registry, outgoing_boundary_builders,
+        event_log, auth, layout_initializer, recovering, target_router,
+        connections, workers_list, is_joining, _source_config.parallelism,
+        _source_config.handler, config.host, config.service, config.cookie,
+        config.max_credits, config.refill_credits)
     else
       Unreachable()
-      TCPSourceListenerBuilder[In](worker_name, pipeline_name, runner_builder,
-        partitioner_builder, router, metrics_conn, consume metrics_reporter,
-        router_registry, outgoing_boundary_builders, event_log, auth,
-        layout_initializer, recovering, target_router,
-        _source_config.parallelism, _source_config.handler,
-        "0", "0", false)
+      ConnectorSourceCoordinatorBuilder[In](worker_name, pipeline_name,
+        runner_builder, partitioner_builder, router, metrics_conn,
+        consume metrics_reporter, router_registry, outgoing_boundary_builders,
+        event_log, auth, layout_initializer, recovering, target_router,
+        connections, workers_list, is_joining, _source_config.parallelism,
+        _source_config.handler, "0", "0", "0", 0, 0)
     end

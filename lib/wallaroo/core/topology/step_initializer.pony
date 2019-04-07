@@ -89,17 +89,17 @@ class val SourceData
   let _comp_name: String
   let _runner_builder: RunnerBuilder
   let _partitioner_builder: PartitionerBuilder
-  let _source_listener_builder_builder: SourceListenerBuilderBuilder
+  let _source_coordinator_builder_builder: SourceCoordinatorBuilderBuilder
 
   new val create(id': RoutingId, name': String, r: RunnerBuilder,
-    s: SourceListenerBuilderBuilder, partitioner_builder': PartitionerBuilder)
+    s: SourceCoordinatorBuilderBuilder, partitioner_builder': PartitionerBuilder)
   =>
     _id = id'
     _name = name'
     _comp_name = "| " + _name + " source | " + r.name() + "|"
     _runner_builder = r
     _partitioner_builder = partitioner_builder'
-    _source_listener_builder_builder = s
+    _source_coordinator_builder_builder = s
 
   fun runner_builder(): RunnerBuilder => _runner_builder
 
@@ -113,8 +113,8 @@ class val SourceData
   fun partitioner_builder(): PartitionerBuilder => _partitioner_builder
   fun parallelism(): USize => 1
 
-  fun source_listener_builder_builder(): SourceListenerBuilderBuilder =>
-    _source_listener_builder_builder
+  fun source_coordinator_builder_builder(): SourceCoordinatorBuilderBuilder =>
+    _source_coordinator_builder_builder
 
 class val EgressBuilder
   let _name: String

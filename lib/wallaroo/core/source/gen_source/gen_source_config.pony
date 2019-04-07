@@ -27,8 +27,8 @@ class val GenSourceConfig[In: Any val] is SourceConfig
   new val create(gen: GenSourceGeneratorBuilder[In]) =>
     _worker_source_config = WorkerGenSourceConfig[In](gen)
 
-  fun val source_listener_builder_builder(): GenSourceListenerBuilderBuilder[In] =>
-    GenSourceListenerBuilderBuilder[In]
+  fun val source_coordinator_builder_builder(): GenSourceCoordinatorBuilderBuilder[In] =>
+    GenSourceCoordinatorBuilderBuilder[In]
 
   fun default_partitioner_builder(): PartitionerBuilder =>
     RandomPartitionerBuilder

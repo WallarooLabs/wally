@@ -41,9 +41,9 @@ class val KafkaSourceConfig[In: Any val] is SourceConfig
     auth = auth'
     _worker_source_config = WorkerKafkaSourceConfig(source_name, consume ksco)
 
-  fun val source_listener_builder_builder(): KafkaSourceListenerBuilderBuilder[In]
+  fun val source_coordinator_builder_builder(): KafkaSourceCoordinatorBuilderBuilder[In]
   =>
-    KafkaSourceListenerBuilderBuilder[In](this)
+    KafkaSourceCoordinatorBuilderBuilder[In](this)
 
   fun default_partitioner_builder(): PartitionerBuilder =>
     PassthroughPartitionerBuilder

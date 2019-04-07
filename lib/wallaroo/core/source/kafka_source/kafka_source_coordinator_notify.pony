@@ -24,7 +24,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
-class KafkaSourceListenerNotify[In: Any val]
+class KafkaSourceCoordinatorNotify[In: Any val]
   let _pipeline_name: String
   let _auth: AmbientAuth
   let _handler: SourceHandler[In] val

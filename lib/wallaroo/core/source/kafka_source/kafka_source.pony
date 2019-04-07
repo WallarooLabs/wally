@@ -69,7 +69,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
   let _metrics_reporter: MetricsReporter
 
-  let _listen: KafkaSourceListener[In]
+  let _listen: KafkaSourceCoordinator[In]
   let _notify: KafkaSourceNotify[In]
 
   var _muted: Bool = true
@@ -93,7 +93,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   let _kc: KafkaClient tag
 
   new create(source_id: RoutingId, auth: AmbientAuth, name: String,
-    listen: KafkaSourceListener[In], notify: KafkaSourceNotify[In] iso,
+    listen: KafkaSourceCoordinator[In], notify: KafkaSourceNotify[In] iso,
     event_log: EventLog, router': Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,

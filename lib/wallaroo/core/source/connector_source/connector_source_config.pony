@@ -115,10 +115,10 @@ class val ConnectorSourceConfig[In: Any val] is SourceConfig
       opts.host, opts.service, opts.cookie, opts.max_credits,
       opts.refill_credits)
 
-  fun val source_listener_builder_builder():
-    ConnectorSourceListenerBuilderBuilder[In]
+  fun val source_coordinator_builder_builder():
+    ConnectorSourceCoordinatorBuilderBuilder[In]
   =>
-    ConnectorSourceListenerBuilderBuilder[In](this)
+    ConnectorSourceCoordinatorBuilderBuilder[In](this)
 
   fun default_partitioner_builder(): PartitionerBuilder =>
     PassthroughPartitionerBuilder

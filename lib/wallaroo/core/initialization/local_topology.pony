@@ -249,12 +249,12 @@ actor LocalTopologyInitializer is LayoutInitializer
   // Map from the source name to the WorkerSourceConfig
   let _worker_source_configs: Map[SourceName, WorkerSourceConfig] val
 
-  // Accumulate all SourceListenerBuilders so we can build them
+  // Accumulate all SourceCoordinatorBuilders so we can build them
   // once EventLog signals we're ready
-  let sl_builders: Array[SourceListenerBuilder] =
-    recover iso Array[SourceListenerBuilder] end
-  let sl_actors: Array[SourceListener] =
-    recover iso Array[SourceListener] end
+  let _sc_builders: Array[SourceCoordinatorBuilder] =
+    recover iso Array[SourceCoordinatorBuilder] end
+  let _sc_actors: Array[SourceCoordinator] =
+    recover iso Array[SourceCoordinator] end
 
   // Cluster Management
   var _cluster_manager: (ClusterManager | None) = None
@@ -842,23 +842,23 @@ actor LocalTopologyInitializer is LayoutInitializer
                     .cstring())
                 let worker_source_config =
                   _worker_source_configs(source_name)?
-                // Set up SourceListener builders
+                // Set up SourceCoordinator builders
                 let source_runner_builder = source_data.runner_builder()
                 let partitioner_builder = source_data.partitioner_builder()
                 // pass in list of workers
-                let sl_builder_builder =
-                  source_data.source_listener_builder_builder()
+                let sc_builder_builder =
+                  source_data.source_coordinator_builder_builder()
                 // TODO [post-source-migration]: add an existing-worker name
                 // That isn't currently joining so we can get registry leader
                 // (e.g. either initializer at startup or any one of the
                 // "non-joining" workers in a join)
-                let sl_builder = sl_builder_builder(_worker_name,
+                let sc_builder = sc_builder_builder(_worker_name,
                   source_name, source_runner_builder, partitioner_builder,
                   out_router, _metrics_conn, consume source_reporter,
                   _router_registry, _outgoing_boundary_builders, _event_log,
                   _auth, this, _recovering, worker_source_config, _connections,
                   t.worker_names, _is_joining)
-                sl_builders.push(sl_builder)
+                _sc_builders.push(sc_builder)
               else
                 Fail()
               end
@@ -873,10 +873,10 @@ actor LocalTopologyInitializer is LayoutInitializer
             nodes_to_initialize.push(next_node)
           end
         end
-        for b in sl_builders.values() do
+        for b in _sc_builders.values() do
           let ba = b.apply(_env)
           initializables.set(ba)
-          sl_actors.push(ba)
+          _sc_actors.push(ba)
         end
 
         //////////////////////////////////////////////////////////////////////
@@ -1044,7 +1044,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 // INITIALIZATION PHASES
 //////////////////////////
   be report_created(initializable: Initializable) =>
-    _register_source_listeners()
+    _register_source_coordinators()
     _phase.report_created(initializable)
 
   fun ref _application_created(initializables: Initializables,
@@ -1164,9 +1164,9 @@ actor LocalTopologyInitializer is LayoutInitializer
       end
     end
 
-  fun ref _register_source_listeners() =>
-    for sl in sl_actors.values() do
-      _router_registry.register_source_listener(sl)
+  fun ref _register_source_coordinators() =>
+    for sca in _sc_actors.values() do
+      _router_registry.register_source_coordinator(sca)
     end
 
 ///////////////////////

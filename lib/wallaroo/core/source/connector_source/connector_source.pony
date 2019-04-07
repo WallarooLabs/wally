@@ -85,7 +85,7 @@ actor ConnectorSource[In: Any val] is Source
   let _pending_barriers: Array[BarrierToken] = _pending_barriers.create()
 
   // Connector
-  let _listen: ConnectorSourceListener[In]
+  let _listen: ConnectorSourceCoordinator[In]
   let _notify: ConnectorSourceNotify[In]
   var _next_size: USize = 0
   var _max_size: USize = 0
@@ -134,7 +134,7 @@ actor ConnectorSource[In: Any val] is Source
   var _session_id: RoutingId = 0
 
   new create(source_id: RoutingId, auth: AmbientAuth,
-    listen: ConnectorSourceListener[In],
+    listen: ConnectorSourceCoordinator[In],
     notify_parameters: ConnectorSourceNotifyParameters[In],
     event_log: EventLog, router': Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,

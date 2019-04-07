@@ -631,11 +631,11 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _event_log.start_rotation()
       | let m: CleanShutdownMsg =>
         _recovery_file_cleaner.clean_shutdown()
-      | let m: SourceListenerMsg =>
+      | let m: SourceCoordinatorMsg =>
         ifdef "trace" then
-          @printf[I32]("Received SourceListenerMsg.\n".cstring())
+          @printf[I32]("Received SourceCoordinatorMsg.\n".cstring())
         end
-        _router_registry.receive_source_listener_msg(m)
+        _router_registry.receive_source_coordinator_msg(m)
       | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown channel message type.\n".cstring())
       else

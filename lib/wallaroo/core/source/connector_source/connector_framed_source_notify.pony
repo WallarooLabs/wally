@@ -177,7 +177,7 @@ class ConnectorSourceNotify[In: Any val]
   var _router: Router
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
-  var _listener: ConnectorSourceListener[In]
+  var _listener: ConnectorSourceCoordinator[In]
 
   // Barrier/checkpoint id tracking
   var _barrier_ongoing: Bool = false
@@ -213,7 +213,7 @@ class ConnectorSourceNotify[In: Any val]
 
   new create(source_id': RoutingId,
     parameters: ConnectorSourceNotifyParameters[In],
-    listener': ConnectorSourceListener[In])
+    listener': ConnectorSourceCoordinator[In])
   =>
     source_id = source_id'
     _pipeline_name = parameters.pipeline_name
@@ -649,7 +649,7 @@ class ConnectorSourceNotify[In: Any val]
     @printf[I32]("ConnectorSource connection closed 0x%lx\n".cstring(), source)
     _session_active = false
     _fsm_state = _ProtoFsmDisconnected
-    // TODO [post-source-migration] When the SourceListener actors are added
+    // TODO [post-source-migration] When the SourceCoordinator actors are added
     // to participate in rollback, the following assumptions become true:
     //   1. we relinquish streams with last_seen value
     //   2. on rollback, global registry rolls back too.

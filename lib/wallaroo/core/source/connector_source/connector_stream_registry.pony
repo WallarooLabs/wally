@@ -55,7 +55,7 @@ class val StreamTuple
     last_acked = point_of_ref
 
 class GlobalConnectorStreamRegistry[In: Any val]
-  let _listener: ConnectorSourceListener[In] tag
+  let _listener: ConnectorSourceCoordinator[In] tag
   var _worker_name: String
   let _source_name: String
   let _connections: Connections
@@ -66,7 +66,8 @@ class GlobalConnectorStreamRegistry[In: Any val]
   var _is_shrinking: Bool = false
   var _leader_name: String = "initializer"
   var _active_streams: Map[StreamId, WorkerName] = _active_streams.create()
-  var _inactive_streams: Map[StreamId, StreamTuple] =  _inactive_streams.create()
+  var _inactive_streams: Map[StreamId, StreamTuple] =
+    _inactive_streams.create()
   var _source_addrs: Map[WorkerName, (String, String)] =
     _source_addrs.create()
   let _source_addrs_reallocation: Map[WorkerName, (String, String)] =
@@ -80,7 +81,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
   var _local_registry: (LocalConnectorStreamRegistry[In] | None ) = None
   let _auth: AmbientAuth
 
-  new create(listener: ConnectorSourceListener[In],
+  new create(listener: ConnectorSourceCoordinator[In],
     auth: AmbientAuth,
     worker_name: WorkerName, source_name: String,
     connections: Connections, host: String, service: String,
@@ -215,7 +216,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     _leader_name = msg.leader_name
     _is_joining = false
     // TODO [source-migration]: should the global registry be able to notify
-    // the SourceListener (via local registry or some other fashion) that
+    // the SourceCoordinator (via local registry or some other fashion) that
     // they can update their _is_joining state and subsequently
     // "report_initialized" or should this be done via a Promise?
     try
@@ -733,10 +734,10 @@ class LocalConnectorStreamRegistry[In: Any val]
   var _shrinking_sources: Map[RoutingId, ConnectorSource[In]] =
     _shrinking_sources.create()
 
-  // ConnectorSourceListener
-  let _listener: ConnectorSourceListener[In] tag
+  // ConnectorSourceCoordinator
+  let _listener: ConnectorSourceCoordinator[In] tag
 
-  new ref create(listener: ConnectorSourceListener[In] tag,
+  new ref create(listener: ConnectorSourceCoordinator[In] tag,
     auth: AmbientAuth,
     worker_name: WorkerName, source_name: String,
     connections: Connections, host: String, service: String,
@@ -754,7 +755,7 @@ class LocalConnectorStreamRegistry[In: Any val]
   // MESSAGE HANDLING
   ///////////////////
 
-  fun ref listener_msg_received(msg: SourceListenerMsg) =>
+  fun ref listener_msg_received(msg: SourceCoordinatorMsg) =>
     // we only care for messages that belong to this source name
     if (msg.source_name() == _source_name) then
       match msg
@@ -901,8 +902,8 @@ class LocalConnectorStreamRegistry[In: Any val]
   =>
     if success then
       // update locally
-      _active_streams(stream.id) = ActiveStreamTuple[In](stream.id, stream.name,
-        stream.last_acked, stream.last_acked, connector_source)
+      _active_streams(stream.id) = ActiveStreamTuple[In](stream.id,
+        stream.name, stream.last_acked, stream.last_acked, connector_source)
     end
     promise(NotifyResult[In](connector_source, success, stream))
 

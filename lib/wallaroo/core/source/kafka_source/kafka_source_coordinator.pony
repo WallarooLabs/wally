@@ -37,8 +37,8 @@ use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
 
-class val KafkaSourceListenerBuilderBuilder[In: Any val] is
-  SourceListenerBuilderBuilder
+class val KafkaSourceCoordinatorBuilderBuilder[In: Any val] is
+  SourceCoordinatorBuilderBuilder
 
   let _source_config: KafkaSourceConfig[In]
 
@@ -65,18 +65,18 @@ class val KafkaSourceListenerBuilderBuilder[In: Any val] is
     workers_list: Array[WorkerName] val,
     is_joining: Bool,
     target_router: Router = EmptyRouter):
-    KafkaSourceListenerBuilder[In]
+    KafkaSourceCoordinatorBuilder[In]
   =>
     match worker_source_config
     | let config: WorkerKafkaSourceConfig =>
-      KafkaSourceListenerBuilder[In](worker_name, pipeline_name,
+      KafkaSourceCoordinatorBuilder[In](worker_name, pipeline_name,
         runner_builder, partitioner_builder, router, metrics_conn,
         consume metrics_reporter, router_registry, outgoing_boundary_builders,
         event_log, auth, layout_initializer, recovering, target_router,
         config.ksco, _source_config.handler, _source_config.auth)
     else
       Unreachable()
-      KafkaSourceListenerBuilder[In](worker_name, pipeline_name,
+      KafkaSourceCoordinatorBuilder[In](worker_name, pipeline_name,
         runner_builder, partitioner_builder, router, metrics_conn,
         consume metrics_reporter, router_registry, outgoing_boundary_builders,
         event_log, auth, layout_initializer, recovering, target_router,
@@ -85,7 +85,7 @@ class val KafkaSourceListenerBuilderBuilder[In: Any val] is
         _source_config.handler, _source_config.auth)
     end
 
-class val KafkaSourceListenerBuilder[In: Any val]
+class val KafkaSourceCoordinatorBuilder[In: Any val]
   let _worker_name: WorkerName
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
@@ -132,8 +132,8 @@ class val KafkaSourceListenerBuilder[In: Any val]
     _handler = handler
     _tcp_auth = tcp_auth
 
-  fun apply(env: Env): SourceListener =>
-    KafkaSourceListener[In](env, _worker_name, _pipeline_name, _runner_builder,
+  fun apply(env: Env): SourceCoordinator =>
+    KafkaSourceCoordinator[In](env, _worker_name, _pipeline_name, _runner_builder,
       _partitioner_builder, _router, _metrics_conn, _metrics_reporter.clone(),
       _router_registry,
       _outgoing_boundary_builders, _event_log, _auth, _layout_initializer,
@@ -155,7 +155,7 @@ class MapPartitionConsumerMessageHandler is KafkaConsumerMessageHandler
     recover iso MapPartitionConsumerMessageHandler(_consumers) end
 
 
-actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
+actor KafkaSourceCoordinator[In: Any val] is (SourceCoordinator & KafkaClientManager)
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _env: Env
 
@@ -177,7 +177,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   let _handler: SourceHandler[In] val
   let _tcp_auth: TCPConnectionAuth
 
-  let _notify: KafkaSourceListenerNotify[In]
+  let _notify: KafkaSourceCoordinatorNotify[In]
 
   var _kc: (KafkaClient tag | None) = None
   let _kafka_topic_partition_sources:
@@ -214,7 +214,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     _handler = handler
     _tcp_auth = tcp_auth
 
-    _notify = KafkaSourceListenerNotify[In](_pipeline_name, _auth,
+    _notify = KafkaSourceCoordinatorNotify[In](_pipeline_name, _auth,
       _handler, _runner_builder, _partitioner_builder, _router,
       _metrics_reporter.clone(), _event_log, _target_router)
 
@@ -227,7 +227,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
         spr.partition_routing_id(), this)
     end
 
-  fun ref _start_listening() =>
+  fun ref _create_client() =>
     // create kafka client
     _kc = match KafkaConfigFactory(_ksco, _env.out)
     | let kc: KafkaConfig val =>
@@ -392,7 +392,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   be remove_worker(worker: WorkerName) =>
     None
 
-  be receive_msg(msg: SourceListenerMsg) =>
+  be receive_msg(msg: SourceCoordinatorMsg) =>
     None
 
   // Application startup lifecycle events
@@ -403,7 +403,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
-    _start_listening()
+    _create_client()
     initializer.report_ready_to_work(this)
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
@@ -416,8 +416,8 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   // AUTOSCALE
   /////////////
   be begin_join_migration(joining_workers: Array[WorkerName] val) =>
-    _router_registry.source_listener_migration_complete(this)
+    _router_registry.source_coordinator_migration_complete(this)
 
   be begin_shrink_migration(leaving_workers: Array[WorkerName] val) =>
-    _router_registry.source_listener_migration_complete(this)
+    _router_registry.source_coordinator_migration_complete(this)
 
