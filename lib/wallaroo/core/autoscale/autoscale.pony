@@ -473,93 +473,73 @@ trait _AutoscalePhase
     worker_count: USize, local_topology: LocalTopology,
     current_worker_count: USize)
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref update_checkpoint_id(checkpoint_id: CheckpointId,
     rollback_id: RollbackId)
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref grow_autoscale_barrier_complete() =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref worker_connected_to_joining_workers(worker: WorkerName) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref stop_the_world_for_join_migration_initiated(coordinator: WorkerName,
     joining_workers: Array[WorkerName] val)
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref join_migration_initiated(checkpoint_id: CheckpointId) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref all_migration_complete() =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref receive_join_migration_ack(worker: WorkerName) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref worker_completed_migration(w: WorkerName) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref pre_register_joining_workers(ws: Array[WorkerName] val) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref receive_hash_partitions(hp: Map[RoutingId, HashPartitions] val) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref producer_acked_registering(p: Producer) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref boundary_acked_registering(b: OutgoingBoundary) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref stop_the_world_for_shrink_migration_initiated(
     coordinator: WorkerName, remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref shrink_autoscale_barrier_complete() =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref leaving_worker_finished_migration(worker: WorkerName) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref receive_leaving_migration_ack(worker: WorkerName) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref producers_disposed() =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref autoscale_complete() =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref _invalid_call() =>
     @printf[I32]("Invalid call on autoscale phase %s\n".cstring(),

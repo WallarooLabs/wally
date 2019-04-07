@@ -52,8 +52,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   let _event_log: EventLog
   var _seq_id_generator: StepSeqIdGenerator = StepSeqIdGenerator
 
-  //!@ TODO: Rename this _phase
-  var _step_message_processor: StepMessageProcessor = EmptyStepMessageProcessor
+  var _phase: StepPhase = _InitialStepPhase
 
   // _routes contains one route per Consumer
   let _routes: SetIs[Consumer] = _routes.create()
@@ -118,7 +117,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       _register_output(c_id, consumer)
     end
 
-    _step_message_processor = NormalStepMessageProcessor(this)
+    _phase = _NormalStepPhase(this)
 
     match _runner
     | let tr: TimeoutTriggeringRunner =>
@@ -182,7 +181,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       _register_output(c_id, consumer)
     end
 
-    _step_message_processor.check_completion(inputs())
+    _phase.check_completion(inputs())
 
   fun ref _register_output(id: RoutingId, c: Consumer) =>
     if _outputs.contains(id) then
@@ -282,7 +281,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     ifdef "trace" then
       @printf[I32]("Received msg at Step\n".cstring())
     end
-    _step_message_processor.run[D](metric_name, pipeline_time_spent, data, key,
+    _phase.run[D](metric_name, pipeline_time_spent, data, key,
       event_ts, watermark_ts, i_producer_id, i_producer, msg_uid, frac_ids,
       i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
 
@@ -364,7 +363,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       try
         _inputs.remove(id)?
       else Fail() end
-      _step_message_processor.remove_input(id)
+      _phase.remove_input(id)
 
       var have_input = false
       for i in _inputs.values() do
@@ -398,24 +397,18 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
 
   be dispose_with_promise(promise: Promise[None]) =>
-    _dispose()
+    _phase.dispose(this)
     promise(None)
 
   be dispose() =>
-    _dispose()
+    _phase.dispose(this)
 
-  fun ref _dispose() =>
-    //!@ We shouldn't be matching a phase
-    match _step_message_processor
-    | let dsmp: DisposedStepMessageProcessor =>
-      None
-    else
-      @printf[I32]("Disposing Step %s\n".cstring(), _id.string().cstring())
-      _event_log.unregister_resilient(_id, this)
-      _unregister_all_outputs()
-      _timers.dispose()
-      _step_message_processor = DisposedStepMessageProcessor
-    end
+  fun ref finish_disposing() =>
+    @printf[I32]("Disposing Step %s\n".cstring(), _id.string().cstring())
+    _event_log.unregister_resilient(_id, this)
+    _unregister_all_outputs()
+    _timers.dispose()
+    _phase = _DisposedStepPhase
 
   ///////////////
   // GROW-TO-FIT
@@ -433,14 +426,8 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     checkpoint_id: CheckpointId)
   =>
     ifdef "autoscale" then
-      //!@ We shouldn't be matching a phase
-      match _step_message_processor
-      | let nmp: NormalStepMessageProcessor =>
-        StepStateMigrator.send_state(this, _runner, _id, boundary, step_group,
-          key, checkpoint_id, _auth)
-      else
-        Fail()
-      end
+      _phase.send_state(this, _runner, _id, boundary, step_group,
+        key, checkpoint_id, _auth)
     end
 
   fun ref register_key(step_group: RoutingId, key: Key) =>
@@ -472,33 +459,14 @@ actor Step is (Producer & Consumer & BarrierProcessor)
           step_id.string().cstring())
       end
       // TODO: We can find a way to handle this behavior by
-      // the StepMessageProcessor itself.
+      // the StepPhase itself.
       match barrier_token
       | let srt: CheckpointRollbackBarrierToken =>
-        _step_message_processor.prepare_for_rollback(srt)
+        _phase.prepare_for_rollback(srt)
       end
 
-      _step_message_processor.receive_barrier(step_id, producer,
+      _phase.receive_barrier(step_id, producer,
           barrier_token)
-
-      //!@
-      // if _step_message_processor.barrier_in_progress() then
-      //   _step_message_processor.receive_barrier(step_id, producer,
-      //     barrier_token)
-      // else
-      //   match _step_message_processor
-      //   | let nsmp: NormalStepMessageProcessor =>
-      //     _step_message_processor = BarrierStepMessageProcessor(this,
-      //       _id)
-      //     _step_message_processor.receive_new_barrier(step_id, producer,
-      //       barrier_token)
-      //   | let dmp: DisposedStepMessageProcessor => None
-      //   else
-      //     // TODO: Should barriers be possible in other states?
-      //     Fail()
-      //   end
-      // end
-      //!@
     else
       @printf[I32](("Received barrier from unregistered input %s at step " +
         "%s. \n").cstring(), step_id.string().cstring(),
@@ -508,30 +476,20 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   fun ref receive_new_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    _step_message_processor = BarrierStepMessageProcessor(this,
-      _id)
-    _step_message_processor.receive_new_barrier(input_id, producer,
-      barrier_token)
+    _phase = _BarrierStepPhase(this, _id, barrier_token)
+    _phase.receive_barrier(input_id, producer, barrier_token)
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
     ifdef "checkpoint_trace" then
       @printf[I32]("Barrier complete at Step %s\n".cstring(),
         _id.string().cstring())
     end
-    ifdef debug then
-      Invariant(
-        //!@ We shouldn't be matching a phase
-        match _step_message_processor
-        | let dsmp: DisposedStepMessageProcessor => true
-        else _step_message_processor.barrier_in_progress() end
-      )
-    end
     match barrier_token
     | let sbt: CheckpointBarrierToken =>
       checkpoint_state(sbt.id)
     end
-    let queued = _step_message_processor.queued()
-    _step_message_processor = NormalStepMessageProcessor(this)
+    let queued = _phase.queued()
+    _phase = _NormalStepPhase(this)
     for q in queued.values() do
       match q
       | let qm: QueuedMessage =>
@@ -555,7 +513,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     finish_preparing_for_rollback()
 
   fun ref finish_preparing_for_rollback() =>
-    _step_message_processor = NormalStepMessageProcessor(this)
+    _phase = _NormalStepPhase(this)
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
@@ -595,14 +553,13 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     _timers(Timer(StepTimeoutNotify(this), t))
 
   be trigger_timeout() =>
-    //!@ We shouldn't be matching a phase
-    match _step_message_processor
-    | let d: DisposedStepMessageProcessor => None
+    _phase.trigger_timeout(this)
+
+  fun ref finish_triggering_timeout() =>
+    match _runner
+    | let tr: TimeoutTriggeringRunner =>
+      tr.on_timeout(_id, this, _router, _metrics_reporter, _watermarks)
     else
-      match _runner
-      | let tr: TimeoutTriggeringRunner =>
-        tr.on_timeout(_id, this, _router, _metrics_reporter, _watermarks)
-      else
-        Fail()
-      end
+      Fail()
     end
+

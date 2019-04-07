@@ -81,7 +81,7 @@ actor TCPSink is Sink
     was acknowleged.)
   """
   let _env: Env
-  var _message_processor: SinkMessageProcessor = EmptySinkMessageProcessor
+  var _phase: SinkPhase = InitialSinkPhase
   let _barrier_coordinator: BarrierCoordinator
   let _checkpoint_initiator: CheckpointInitiator
   // Steplike
@@ -171,7 +171,7 @@ actor TCPSink is Sink
     _service = service
     _from = from
     _connect_count = 0
-    _message_processor = NormalSinkMessageProcessor(this)
+    _phase = NormalSinkPhase(this)
     _mute_upstreams()
 
   //
@@ -209,7 +209,7 @@ actor TCPSink is Sink
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    _message_processor.process_message[D](metric_name, pipeline_time_spent,
+    _phase.process_message[D](metric_name, pipeline_time_spent,
       data, key, event_ts, watermark_ts, i_producer_id, i_producer, msg_uid,
       frac_ids, i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
 
@@ -327,9 +327,9 @@ actor TCPSink is Sink
   fun ref receive_new_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    _message_processor = BarrierSinkMessageProcessor(_sink_id, this,
+    _phase = BarrierSinkPhase(_sink_id, this,
       barrier_token)
-    _message_processor.receive_barrier(input_id, producer,
+    _phase.receive_barrier(input_id, producer,
       barrier_token)
 
   fun ref process_barrier(input_id: RoutingId, producer: Producer,
@@ -337,10 +337,10 @@ actor TCPSink is Sink
   =>
     match barrier_token
     | let srt: CheckpointRollbackBarrierToken =>
-      _message_processor.prepare_for_rollback(barrier_token)
+      _phase.prepare_for_rollback(barrier_token)
     end
 
-    _message_processor.receive_barrier(input_id, producer,
+    _phase.receive_barrier(input_id, producer,
       barrier_token)
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
@@ -353,8 +353,8 @@ actor TCPSink is Sink
     | let sbt: CheckpointBarrierToken =>
       checkpoint_state(sbt.id)
     end
-    let queued = _message_processor.queued()
-    _message_processor = NormalSinkMessageProcessor(this)
+    let queued = _phase.queued()
+    _phase = NormalSinkPhase(this)
     for q in queued.values() do
       match q
       | let qm: QueuedMessage =>
@@ -381,7 +381,7 @@ actor TCPSink is Sink
     finish_preparing_for_rollback()
 
   fun ref finish_preparing_for_rollback() =>
-    _message_processor = NormalSinkMessageProcessor(this)
+    _phase = NormalSinkPhase(this)
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)

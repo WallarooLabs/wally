@@ -27,25 +27,6 @@ trait val BarrierToken is (Hashable & Equatable[BarrierToken] &
   PartialComparable[BarrierToken])
   fun string(): String
 
-primitive InitialBarrierToken is BarrierToken
-  fun eq(that: box->BarrierToken): Bool =>
-    match that
-    | let ifa: InitialBarrierToken =>
-      true
-    else
-      false
-    end
-
-  fun hash(): USize => 0
-
-  fun lt(that: box->BarrierToken): Bool =>
-    false
-  fun gt(that: box->BarrierToken): Bool =>
-    false
-
-  fun string(): String =>
-    "InitialBarrierToken"
-
 class val AutoscaleBarrierToken is BarrierToken
   let _worker: String
   let _id: AutoscaleId

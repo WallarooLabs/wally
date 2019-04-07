@@ -91,7 +91,7 @@ actor ConnectorSink is Sink
     was acknowleged.)
   """
   let _env: Env
-  var _message_processor: SinkMessageProcessor = EmptySinkMessageProcessor
+  var _phase: SinkPhase = InitialSinkPhase
   let _barrier_coordinator: BarrierCoordinator
   let _checkpoint_initiator: CheckpointInitiator
   // Steplike
@@ -194,7 +194,7 @@ actor ConnectorSink is Sink
     _from = from
     _connect_count = 0
     _twopc = ConnectorSink2PC(_notify.stream_name)
-    _message_processor = NormalSinkMessageProcessor(this)
+    _phase = NormalSinkPhase(this)
 
   //
   // Application Lifecycle events
@@ -230,7 +230,7 @@ actor ConnectorSink is Sink
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    _message_processor.process_message[D](metric_name, pipeline_time_spent,
+    _phase.process_message[D](metric_name, pipeline_time_spent,
       data, key, event_ts, watermark_ts, i_producer_id, i_producer, msg_uid,
       frac_ids, i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
 
@@ -431,9 +431,9 @@ actor ConnectorSink is Sink
   fun ref receive_new_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    _message_processor = BarrierSinkMessageProcessor(_sink_id, this,
+    _phase = BarrierSinkPhase(_sink_id, this,
       barrier_token)
-    _message_processor.receive_barrier(input_id, producer,
+    _phase.receive_barrier(input_id, producer,
       barrier_token)
 
   fun ref process_barrier(input_id: RoutingId, producer: Producer,
@@ -441,9 +441,9 @@ actor ConnectorSink is Sink
   =>
     match barrier_token
     | let srt: CheckpointRollbackBarrierToken =>
-      _message_processor.prepare_for_rollback(barrier_token)
+      _phase.prepare_for_rollback(barrier_token)
     end
-    _message_processor.receive_barrier(input_id, producer,
+    _phase.receive_barrier(input_id, producer,
       barrier_token)
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
@@ -504,7 +504,7 @@ actor ConnectorSink is Sink
       // commit/abort decisions only on the range of output
       // governed by a single round of 2PC.
 
-      _message_processor = QueuingSinkMessageProcessor(_sink_id,
+      _phase = QueuingSinkPhase(_sink_id,
         this)
 
     | let srt: CheckpointRollbackBarrierToken =>
@@ -557,7 +557,7 @@ actor ConnectorSink is Sink
     """
     2nd-half logic for barrier_fully_acked().
     """
-    let queued = _message_processor.queued()
+    let queued = _phase.queued()
     _use_normal_processor()
     for q in queued.values() do
       match q
@@ -569,7 +569,7 @@ actor ConnectorSink is Sink
     end
 
   fun ref _use_normal_processor() =>
-    _message_processor = NormalSinkMessageProcessor(this)
+    _phase = NormalSinkPhase(this)
 
   ///////////////
   // CHECKPOINTS
