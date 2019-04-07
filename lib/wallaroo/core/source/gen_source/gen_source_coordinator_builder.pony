@@ -31,7 +31,7 @@ use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
 
-class val GenSourceListenerBuilder[In: Any val]
+class val GenSourceCoordinatorBuilder[In: Any val]
   let _worker_name: WorkerName
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
@@ -74,13 +74,14 @@ class val GenSourceListenerBuilder[In: Any val]
     _target_router = target_router
     _generator = generator
 
-  fun apply(env: Env): SourceListener =>
-    GenSourceListener[In](env, _worker_name, _pipeline_name, _runner_builder,
-      _partitioner_builder, _router, _metrics_conn, _metrics_reporter.clone(),
-      _router_registry, _outgoing_boundary_builders, _event_log, _auth,
-      _layout_initializer, _recovering, _target_router, _generator)
+  fun apply(env: Env): SourceCoordinator =>
+    GenSourceCoordinator[In](env, _worker_name, _pipeline_name,
+      _runner_builder, _partitioner_builder, _router, _metrics_conn,
+      _metrics_reporter.clone(), _router_registry, _outgoing_boundary_builders,
+      _event_log, _auth, _layout_initializer, _recovering, _target_router,
+      _generator)
 
-class val GenSourceListenerBuilderBuilder[In: Any val]
+class val GenSourceCoordinatorBuilderBuilder[In: Any val]
 
   fun apply(worker_name: String, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
@@ -95,19 +96,20 @@ class val GenSourceListenerBuilderBuilder[In: Any val]
     workers_list: Array[WorkerName] val,
     is_joining: Bool,
     target_router: Router = EmptyRouter):
-    GenSourceListenerBuilder[In]
+    GenSourceCoordinatorBuilder[In]
   =>
     match worker_source_config
     | let config: WorkerGenSourceConfig[In] =>
-      GenSourceListenerBuilder[In](worker_name, pipeline_name, runner_builder,
-        partitioner_builder, router, metrics_conn, consume metrics_reporter,
-        router_registry, outgoing_boundary_builders, event_log, auth,
-        layout_initializer, recovering, target_router, config.generator)
+      GenSourceCoordinatorBuilder[In](worker_name, pipeline_name,
+        runner_builder, partitioner_builder, router, metrics_conn,
+        consume metrics_reporter, router_registry, outgoing_boundary_builders,
+        event_log, auth, layout_initializer, recovering, target_router,
+        config.generator)
     else
       Unreachable()
-      GenSourceListenerBuilder[In](worker_name, pipeline_name, runner_builder,
-        partitioner_builder, router, metrics_conn, consume metrics_reporter,
-        router_registry, outgoing_boundary_builders, event_log, auth,
-        layout_initializer, recovering, target_router,
+      GenSourceCoordinatorBuilder[In](worker_name, pipeline_name,
+        runner_builder, partitioner_builder, router, metrics_conn,
+        consume metrics_reporter, router_registry, outgoing_boundary_builders,
+        event_log, auth, layout_initializer, recovering, target_router,
         EmptyGenSourceGeneratorBuilder[In])
     end

@@ -103,8 +103,8 @@ class val TCPSourceConfig[In: Any val] is SourceConfig
     _worker_source_config = WorkerTCPSourceConfig(opts.source_name, opts.host,
       opts.service, opts.valid)
 
-  fun val source_listener_builder_builder(): TCPSourceListenerBuilderBuilder[In] =>
-    TCPSourceListenerBuilderBuilder[In](this)
+  fun val source_coordinator_builder_builder(): TCPSourceCoordinatorBuilderBuilder[In] =>
+    TCPSourceCoordinatorBuilderBuilder[In](this)
 
   fun default_partitioner_builder(): PartitionerBuilder =>
     RandomPartitionerBuilder

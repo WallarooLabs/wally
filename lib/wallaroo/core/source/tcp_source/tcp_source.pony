@@ -81,7 +81,7 @@ actor TCPSource[In: Any val] is Source
   let _pending_barriers: Array[BarrierToken] = _pending_barriers.create()
 
   // TCP
-  let _listen: TCPSourceListener[In]
+  let _listen: TCPSourceCoordinator[In]
   let _notify: TCPSourceNotify[In]
   var _next_size: USize = 0
   var _max_size: USize = 0
@@ -117,7 +117,7 @@ actor TCPSource[In: Any val] is Source
   var _next_checkpoint_id: CheckpointId = 1
 
   new create(source_id: RoutingId, auth: AmbientAuth,
-    listen: TCPSourceListener[In], notify: TCPSourceNotify[In] iso,
+    listen: TCPSourceCoordinator[In], notify: TCPSourceNotify[In] iso,
     event_log: EventLog, router': Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,

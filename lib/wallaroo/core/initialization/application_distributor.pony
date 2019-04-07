@@ -310,7 +310,7 @@ actor ApplicationDistributor is Distributor
           let r_builder = RunnerSequenceBuilder(
             recover Array[RunnerBuilder] end where parallelism' = 0)
           let source_data = SourceData(node.id, source_name, r_builder,
-            sc.source_listener_builder_builder(), partitioner_builder)
+            sc.source_coordinator_builder_builder(), partitioner_builder)
 
           interm_graph.add_node(source_data, node.id)
         else

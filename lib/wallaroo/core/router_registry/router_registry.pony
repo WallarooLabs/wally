@@ -102,7 +102,7 @@ actor RouterRegistry
 
   let _producers: SetIs[Producer] = _producers.create()
   let _sources: Map[RoutingId, Source] = _sources.create()
-  let _source_listeners: SetIs[SourceListener] = _source_listeners.create()
+  let _source_coordinators: SetIs[SourceCoordinator] = _source_coordinators.create()
   // Map from Source digestof value to source id
   let _source_ids: Map[USize, RoutingId] = _source_ids.create()
   let _data_channel_listeners: SetIs[DataChannelListener] =
@@ -132,8 +132,8 @@ actor RouterRegistry
   // TODO: Add management of pending source listeners to Autoscale protocol
   // class
   // Source Listeners migrated out and waiting for acknowledgment
-    let _source_listeners_waiting_list: SetIs[SourceListener] =
-    _source_listeners_waiting_list.create()
+    let _source_coordinators_waiting_list: SetIs[SourceCoordinator] =
+    _source_coordinators_waiting_list.create()
 
   // Workers in running cluster that have been stopped for stop the world
   let _stopped_worker_waiting_list: StringSet =
@@ -299,10 +299,10 @@ actor RouterRegistry
   be register_remote_source(sender: WorkerName, source_id: RoutingId) =>
     None
 
-  be register_source_listener(source_listener: SourceListener) =>
-    _source_listeners.set(source_listener)
-    _connections.register_disposable(source_listener)
-    _checkpoint_initiator.register_source_listener(source_listener)
+  be register_source_coordinator(source_coordinator: SourceCoordinator) =>
+    _source_coordinators.set(source_coordinator)
+    _connections.register_disposable(source_coordinator)
+    _checkpoint_initiator.register_source_coordinator(source_coordinator)
 
   be register_data_channel_listener(dchl: DataChannelListener) =>
     _data_channel_listeners.set(dchl)
@@ -449,8 +449,8 @@ actor RouterRegistry
       Map[WorkerName, OutgoingBoundaryBuilder] val =
         consume new_boundary_builders
 
-    for source_listener in _source_listeners.values() do
-      source_listener.add_boundary_builders(new_boundary_builders_sendable)
+    for source_coordinator in _source_coordinators.values() do
+      source_coordinator.add_boundary_builders(new_boundary_builders_sendable)
     end
 
     for source in _sources.values() do
@@ -571,8 +571,8 @@ actor RouterRegistry
     for source in _sources.values() do
       source.remove_boundary(worker)
     end
-    for source_listener in _source_listeners.values() do
-      source_listener.remove_boundary(worker)
+    for source_coordinator in _source_coordinators.values() do
+      source_coordinator.remove_boundary(worker)
     end
 
     match _local_topology_initializer
@@ -591,8 +591,8 @@ actor RouterRegistry
 
     let boundary_builders_to_send = consume val boundary_builders
 
-    for source_listener in _source_listeners.values() do
-      source_listener.update_boundary_builders(boundary_builders_to_send)
+    for source_coordinator in _source_coordinators.values() do
+      source_coordinator.update_boundary_builders(boundary_builders_to_send)
     end
 
   be producers_register_downstream(promise: Promise[None]) =>
@@ -809,7 +809,7 @@ actor RouterRegistry
 
   fun ref try_to_resume_processing_immediately() =>
     if ((_key_waiting_list.size() == 0) and
-        (_source_listeners_waiting_list.size() == 0))
+        (_source_coordinators_waiting_list.size() == 0))
     then
       try
         (_autoscale as Autoscale).all_migration_complete()
@@ -1070,8 +1070,8 @@ actor RouterRegistry
     // Update BarrierCoordinator about new workers
     for w in target_workers.values() do
       _barrier_coordinator.add_worker(w)
-      for source_listener in _source_listeners.values() do
-        source_listener.add_worker(w)
+      for source_coordinator in _source_coordinators.values() do
+        source_coordinator.add_worker(w)
       end
     end
 
@@ -1104,12 +1104,12 @@ actor RouterRegistry
     """
     Begin partition migration to joining workers
     """
-    for source_listener in _source_listeners.values() do
-      _source_listeners_waiting_list.set(source_listener)
-      source_listener.begin_join_migration(target_workers)
+    for source_coordinator in _source_coordinators.values() do
+      _source_coordinators_waiting_list.set(source_coordinator)
+      source_coordinator.begin_join_migration(target_workers)
     end
     if ((_partition_routers.size() == 0) and
-        (_source_listeners_waiting_list.size() == 0))
+        (_source_coordinators_waiting_list.size() == 0))
     then
       //no steps have been migrated
       @printf[I32](("Resuming message processing immediately. No partitions " +
@@ -1141,9 +1141,9 @@ actor RouterRegistry
       try_to_resume_processing_immediately()
     end
 
-  be source_listener_migration_complete(source_listener: SourceListener) =>
+  be source_coordinator_migration_complete(source_coordinator: SourceCoordinator) =>
     try
-      _source_listeners_waiting_list.extract(source_listener)?
+      _source_coordinators_waiting_list.extract(source_coordinator)?
       try_to_resume_processing_immediately()
     end
 
@@ -1396,7 +1396,7 @@ actor RouterRegistry
       _stateless_partition_routers(p_id) = new_router
     end
     // Inform remaining source listeners of shrink
-    for listener in _source_listeners.values() do
+    for listener in _source_coordinators.values() do
       listener.begin_shrink_migration(leaving_workers)
     end
 
@@ -1422,14 +1422,14 @@ actor RouterRegistry
       Fail()
     end
 
-    for source_listener in _source_listeners.values() do
-      _source_listeners_waiting_list.set(source_listener)
-      source_listener.begin_shrink_migration(leaving_workers)
+    for source_coordinator in _source_coordinators.values() do
+      _source_coordinators_waiting_list.set(source_coordinator)
+      source_coordinator.begin_shrink_migration(leaving_workers)
     end
 
     _leaving_workers = leaving_workers
     if ((_partition_routers.size() == 0) and
-        (_source_listeners_waiting_list.size() == 0))
+        (_source_coordinators_waiting_list.size() == 0))
     then
       @printf[I32](("No partitions to migrate.\n").cstring())
       try
@@ -1537,8 +1537,8 @@ actor RouterRegistry
     for w in leaving_workers.values() do
       _barrier_coordinator.remove_worker(w)
       _checkpoint_initiator.remove_worker(w)
-      for source_listener in _source_listeners.values() do
-        source_listener.remove_worker(w)
+      for source_coordinator in _source_coordinators.values() do
+        source_coordinator.remove_worker(w)
       end
       // !TODO!: Do we need this ??
       _unmute_request(w)
@@ -1640,10 +1640,10 @@ actor RouterRegistry
       source.update_worker_data_service(worker, host, service)
     end
 
-  be receive_source_listener_msg(msg: SourceListenerMsg) =>
-    _receive_source_listener_msg(msg)
+  be receive_source_coordinator_msg(msg: SourceCoordinatorMsg) =>
+    _receive_source_coordinator_msg(msg)
 
-  fun ref _receive_source_listener_msg(msg: SourceListenerMsg) =>
-    for source_listener in _source_listeners.values() do
-      source_listener.receive_msg(msg)
+  fun ref _receive_source_coordinator_msg(msg: SourceCoordinatorMsg) =>
+    for source_coordinator in _source_coordinators.values() do
+      source_coordinator.receive_msg(msg)
     end

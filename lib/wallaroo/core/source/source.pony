@@ -34,7 +34,7 @@ type SourceName is String
 
 interface val SourceConfig
   fun default_partitioner_builder(): PartitionerBuilder
-  fun val source_listener_builder_builder(): SourceListenerBuilderBuilder
+  fun val source_coordinator_builder_builder(): SourceCoordinatorBuilderBuilder
   fun worker_source_config(): WorkerSourceConfig
 
 interface val TypedSourceConfig[In: Any val] is SourceConfig
@@ -74,11 +74,7 @@ trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
   // initialization order of events.
   be first_checkpoint_complete()
 
-// !TODO! We need to rename SourceListener to something more generic, possibly
-// SourceManager, since its role is to manage local sources, but not
-// necessarily listen (e.g. if it's pull-based). When this is renamed, we
-// also need to rename `start_listening`
-trait tag SourceListener is (DisposableActor & BoundaryUpdatable &
+trait tag SourceCoordinator is (DisposableActor & BoundaryUpdatable &
   Initializable)
   be update_router(router: StatePartitionRouter)
   be add_boundary_builders(
@@ -87,7 +83,7 @@ trait tag SourceListener is (DisposableActor & BoundaryUpdatable &
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
   be add_worker(worker: WorkerName)
   be remove_worker(worker: WorkerName)
-  be receive_msg(msg: SourceListenerMsg)
+  be receive_msg(msg: SourceCoordinatorMsg)
   be begin_join_migration(joining_workers: Array[WorkerName] val)
   be begin_shrink_migration(leaving_workers: Array[WorkerName] val)
   be checkpoint_complete(checkpoint_id: CheckpointId)

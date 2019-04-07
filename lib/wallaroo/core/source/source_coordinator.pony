@@ -32,10 +32,10 @@ use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
 
-interface val SourceListenerBuilder
-  fun apply(env: Env /***SLF, the_journal: SimpleJournal, do_local_file_io: Bool ***/): SourceListener
+interface val SourceCoordinatorBuilder
+  fun apply(env: Env /***SLF, the_journal: SimpleJournal, do_local_file_io: Bool ***/): SourceCoordinator
 
-interface val SourceListenerBuilderBuilder
+interface val SourceCoordinatorBuilderBuilder
   fun apply(worker_name: String,
     pipeline_name: String,
     runner_builder: RunnerBuilder,
@@ -55,4 +55,4 @@ interface val SourceListenerBuilderBuilder
     workers_list: Array[WorkerName] val,
     is_joining: Bool,
     target_router: Router = EmptyRouter):
-    SourceListenerBuilder
+    SourceCoordinatorBuilder

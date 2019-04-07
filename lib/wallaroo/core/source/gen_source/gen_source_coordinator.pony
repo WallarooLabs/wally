@@ -54,9 +54,9 @@ interface _Sourcey
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val):
     Source
 
-actor GenSourceListener[In: Any val] is SourceListener
+actor GenSourceCoordinator[In: Any val] is SourceCoordinator
   """
-  # GenSourceListener
+  # GenSourceCoordinator
   """
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _generator: GenSourceGeneratorBuilder[In]
@@ -130,8 +130,8 @@ actor GenSourceListener[In: Any val] is SourceListener
     let source_id = try rb.u128_le()? else Fail(); 0 end
 
     let source = GenSource[In](source_id, _auth, _pipeline_name,
-      _runner_builder, _partitioner_builder, _router, _target_router, _generator,
-      _event_log, _outgoing_boundary_builders, _layout_initializer,
+      _runner_builder, _partitioner_builder, _router, _target_router,
+      _generator, _event_log, _outgoing_boundary_builders, _layout_initializer,
       _metrics_reporter.clone(), _router_registry)
 
     source.mute(this)
@@ -192,7 +192,7 @@ actor GenSourceListener[In: Any val] is SourceListener
     end
 
   be dispose() =>
-    @printf[I32]("Shutting down GenSourceListener\n".cstring())
+    @printf[I32]("Shutting down GenSourceCoordinator\n".cstring())
 
   be add_worker(worker: WorkerName) =>
     None
@@ -200,7 +200,7 @@ actor GenSourceListener[In: Any val] is SourceListener
   be remove_worker(worker: WorkerName) =>
     None
 
-  be receive_msg(msg: SourceListenerMsg) =>
+  be receive_msg(msg: SourceCoordinatorMsg) =>
     None
 
   // Application startup lifecycle events
@@ -223,8 +223,8 @@ actor GenSourceListener[In: Any val] is SourceListener
   // AUTOSCALE
   /////////////
   be begin_join_migration(joining_workers: Array[WorkerName] val) =>
-    _router_registry.source_listener_migration_complete(this)
+    _router_registry.source_coordinator_migration_complete(this)
 
   be begin_shrink_migration(leaving_workers: Array[WorkerName] val) =>
-    _router_registry.source_listener_migration_complete(this)
+    _router_registry.source_coordinator_migration_complete(this)
 

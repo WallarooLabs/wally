@@ -698,7 +698,7 @@ primitive ChannelMsgDecoder
 
 trait val ChannelMsg
 
-trait val SourceListenerMsg is ChannelMsg
+trait val SourceCoordinatorMsg is ChannelMsg
   fun source_name(): String
 
 class val UnknownChannelMsg is ChannelMsg
@@ -767,7 +767,7 @@ class val ConnectionsReadyMsg is ChannelMsg
   new val create(name: WorkerName) =>
     worker_name = name
 
-class val ConnectorNewLeaderMsg is SourceListenerMsg
+class val ConnectorNewLeaderMsg is SourceCoordinatorMsg
   let leader_name: WorkerName
   let _source_name: String
 
@@ -778,7 +778,7 @@ class val ConnectorNewLeaderMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
-class val ConnectorLeaderStateReceivedAckMsg is SourceListenerMsg
+class val ConnectorLeaderStateReceivedAckMsg is SourceCoordinatorMsg
   let leader_name: WorkerName
   let _source_name: String
 
@@ -789,7 +789,7 @@ class val ConnectorLeaderStateReceivedAckMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
-class val ConnectorAddSourceAddrMsg is SourceListenerMsg
+class val ConnectorAddSourceAddrMsg is SourceCoordinatorMsg
   let worker_name: String
   let _source_name: String
   let host: String
@@ -806,7 +806,7 @@ class val ConnectorAddSourceAddrMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
-class val ConnectorLeadershipRelinquishMsg is SourceListenerMsg
+class val ConnectorLeadershipRelinquishMsg is SourceCoordinatorMsg
   let worker_name: String
   let _source_name: String
   let active_streams: Map[StreamId, WorkerName] val
@@ -827,7 +827,7 @@ class val ConnectorLeadershipRelinquishMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
-class val ConnectorStreamsRelinquishMsg is SourceListenerMsg
+class val ConnectorStreamsRelinquishMsg is SourceCoordinatorMsg
   let worker_name: WorkerName
   let _source_name: String
   let streams: Array[StreamTuple] val
@@ -842,7 +842,7 @@ class val ConnectorStreamsRelinquishMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
-class val ConnectorWorkerShrinkCompleteMsg is SourceListenerMsg
+class val ConnectorWorkerShrinkCompleteMsg is SourceCoordinatorMsg
   let worker_name: WorkerName
   let _source_name: String
 
@@ -854,7 +854,7 @@ class val ConnectorWorkerShrinkCompleteMsg is SourceListenerMsg
     _source_name
 
 
-class val ConnectorStreamsShrinkMsg is SourceListenerMsg
+class val ConnectorStreamsShrinkMsg is SourceCoordinatorMsg
   let worker_name: WorkerName
   let _source_name: String
   let streams: Array[StreamTuple] val
@@ -871,7 +871,7 @@ class val ConnectorStreamsShrinkMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
-class val ConnectorStreamsShrinkResponseMsg is SourceListenerMsg
+class val ConnectorStreamsShrinkResponseMsg is SourceCoordinatorMsg
   let _source_name: String
   let streams: Array[StreamTuple] val
   let host: String
@@ -890,7 +890,7 @@ class val ConnectorStreamsShrinkResponseMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
-class val ConnectorStreamNotifyMsg is SourceListenerMsg
+class val ConnectorStreamNotifyMsg is SourceCoordinatorMsg
   let worker_name: WorkerName
   let _source_name: String
   let stream: StreamTuple
@@ -908,7 +908,7 @@ class val ConnectorStreamNotifyMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
-class val ConnectorStreamNotifyResponseMsg is SourceListenerMsg
+class val ConnectorStreamNotifyResponseMsg is SourceCoordinatorMsg
   let _source_name: String
   let stream: StreamTuple
   let request_id: ConnectorStreamNotifyId
@@ -925,7 +925,7 @@ class val ConnectorStreamNotifyResponseMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
-class val ConnectorLeaderNameRequestMsg is SourceListenerMsg
+class val ConnectorLeaderNameRequestMsg is SourceCoordinatorMsg
   let _source_name: String
   let worker_name: WorkerName
 
@@ -936,7 +936,7 @@ class val ConnectorLeaderNameRequestMsg is SourceListenerMsg
   fun source_name(): String =>
     _source_name
 
-class val ConnectorLeaderNameResponseMsg is SourceListenerMsg
+class val ConnectorLeaderNameResponseMsg is SourceCoordinatorMsg
   let _source_name: String
   let leader_name: WorkerName
 

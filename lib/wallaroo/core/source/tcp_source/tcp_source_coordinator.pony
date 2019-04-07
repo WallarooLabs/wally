@@ -28,8 +28,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+use "buffered"
 use "collections"
-use "promises"
+use "crypto"
 use "wallaroo/core/boundary"
 use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
@@ -38,7 +39,6 @@ use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
-use "wallaroo/core/network"
 use "wallaroo/core/partitioning"
 use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
@@ -49,14 +49,13 @@ use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
 
-actor ConnectorSourceListener[In: Any val] is SourceListener
+actor TCPSourceCoordinator[In: Any val] is SourceCoordinator
   """
-  # ConnectorSourceListener
+  # TCPSourceCoordinator
   """
-  let _routing_id_gen: DeterministicSourceIdGenerator = DeterministicSourceIdGenerator
+  let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _env: Env
   let _worker_name: WorkerName
-
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
   let _partitioner_builder: PartitionerBuilder
@@ -70,34 +69,26 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   let _layout_initializer: LayoutInitializer
   let _recovering: Bool
   let _target_router: Router
-  let _connections: Connections
   let _parallelism: USize
   let _handler: FramedSourceHandler[In] val
   let _host: String
   let _service: String
-  let _cookie: String
-  let _max_credits: U32
-  let _refill_credits: U32
+  let _valid: Bool
 
   var _fd: U32 = U32.max_value()
   var _event: AsioEventID = AsioEvent.none()
-  let _limit: USize
+  var _limit: USize = 0
   var _count: USize = 0
   var _closed: Bool = false
-  var _init_size: USize
-  var _max_size: USize
+  var _init_size: USize = 0
+  var _max_size: USize = 0
 
-  let _connected_sources: SetIs[(RoutingId, ConnectorSource[In])] =
-    _connected_sources.create()
-  let _available_sources: Array[(RoutingId, ConnectorSource[In])] =
-    _available_sources.create()
+  let _connected_sources: SetIs[TCPSource[In]] = _connected_sources.create()
+  let _available_sources: Array[TCPSource[In]] = _available_sources.create()
 
-  // Stream Registry for managing updates to local and global stream state
-  let _stream_registry: LocalConnectorStreamRegistry[In]
-
-  var _is_joining: Bool
-
+  // Lifecycle
   var _initializer: (LocalTopologyInitializer | None) = None
+  var _initialized: Bool = false
 
   new create(env: Env, worker_name: WorkerName, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
@@ -107,12 +98,8 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     recovering: Bool, target_router: Router = EmptyRouter,
-    connections: Connections, workers_list: Array[WorkerName] val,
-    is_joining: Bool,
-    parallelism: USize,
-    handler: FramedSourceHandler[In] val,
-    host: String, service: String, cookie: String,
-    max_credits: U32, refill_credits: U32,
+    parallelism: USize, handler: FramedSourceHandler[In] val,
+    host: String, service: String, valid: Bool,
     init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -133,23 +120,17 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     _layout_initializer = layout_initializer
     _recovering = recovering
     _target_router = target_router
-    _connections = connections
-    _is_joining = is_joining
     _parallelism = parallelism
     _handler = handler
     _host = host
     _service = service
-    _cookie = cookie
-    _max_credits = max_credits
-    _refill_credits = refill_credits
+    _valid = valid
+
+    _event = AsioEvent.none()
+    _fd = @pony_asio_event_fd(_event)
     _limit = parallelism
     _init_size = init_size
     _max_size = max_size
-
-    // Pass LocalConnectorStreamRegistry the parameters it needs to create
-    // its own instance of the GlobalConnectorStreamRegistry
-    _stream_registry = _stream_registry.create(this, _auth, _worker_name,
-      _pipeline_name, _connections, _host, _service, workers_list, _is_joining)
 
     match router
     | let pr: StatePartitionRouter =>
@@ -161,18 +142,20 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     end
 
     @printf[I32]((pipeline_name + " source will listen (but not yet) on "
-      + host + ":" + service + "\n").cstring())
-
-    let notify_parameters = ConnectorSourceNotifyParameters[In](_pipeline_name,
-      _env, _auth, _handler, _runner_builder, _partitioner_builder, _router,
-        _metrics_reporter.clone(), _event_log, _target_router, _cookie,
-        _max_credits, _refill_credits, _host, _service)
+          + host + ":" + service + "\n").cstring())
 
     for i in Range(0, _limit) do
-      let source_name = _worker_name + _pipeline_name + i.string()
-      let source_id = try _routing_id_gen(source_name)? else Fail(); 0 end
-      let source = ConnectorSource[In](source_id, _auth, this,
-         notify_parameters, _event_log, _router,
+      let name = _worker_name + ":" + _pipeline_name + " source " + i.string()
+      let temp_id = MD5(name)
+      let rb = Reader
+      rb.append(temp_id)
+      let source_id = try rb.u128_le()? else Fail(); 0 end
+
+      let notify = TCPSourceNotify[In](source_id, _pipeline_name, _env,
+        _auth, _handler, _runner_builder, _partitioner_builder, _router,
+        _metrics_reporter.clone(), _event_log, _target_router)
+      let source = TCPSource[In](source_id, _auth, this,
+        consume notify, _event_log, _router,
         _outgoing_boundary_builders, _layout_initializer,
         _metrics_reporter.clone(), _router_registry)
       source.mute(this)
@@ -187,31 +170,34 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
           spr.partition_routing_id(), source)
       end
 
-      _available_sources.push((source_id, source))
+      _available_sources.push(source)
     end
 
   fun ref _start_listening() =>
-    _event = @pony_os_listen_tcp[AsioEventID](this,
-      _host.cstring(), _service.cstring())
-    _fd = @pony_asio_event_fd(_event)
-    _notify_listening()
-    ifdef debug then
-      @printf[I32]("Socket for %s now listening on %s:%s\n".cstring(),
-        _pipeline_name.cstring(), _host.cstring(), _service.cstring())
+    if _valid then
+      _event = @pony_os_listen_tcp[AsioEventID](this,
+        _host.cstring(), _service.cstring())
+      _fd = @pony_asio_event_fd(_event)
+      _notify_listening()
+      ifdef debug then
+        @printf[I32]("Socket for %s now listening on %s:%s\n".cstring(),
+          _pipeline_name.cstring(), _host.cstring(), _service.cstring())
+      end
     end
 
   fun ref _start_sources() =>
-    for (source_id, s) in _available_sources.values() do
+    for s in _available_sources.values() do
       s.unmute(this)
     end
-    for (source_id, s) in _connected_sources.values() do
+    for s in _connected_sources.values() do
       s.unmute(this)
     end
 
   be recovery_protocol_complete() =>
     """
     Called when Recovery is finished. At that point, we can tell sources that
-    from our perspective it's safe to unmute and start listening.
+    from our perspective it's safe to unmute and begin listening for new
+    connections.
     """
     _start_sources()
 
@@ -251,15 +237,15 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     _outgoing_boundary_builders = consume new_boundary_builders
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
-    for (_, s) in _connected_sources.values() do
+    for s in _connected_sources.values() do
       s.checkpoint_complete(checkpoint_id)
     end
-    for (_, s) in _available_sources.values() do
+    for s in _available_sources.values() do
       s.checkpoint_complete(checkpoint_id)
     end
 
   be dispose() =>
-    @printf[I32]("Shutting down ConnectorSourceListener\n".cstring())
+    @printf[I32]("Shutting down TCPSourceCoordinator\n".cstring())
     _close()
 
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
@@ -279,14 +265,14 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       _event = AsioEvent.none()
     end
 
-  be _conn_closed(source_id: RoutingId, s: ConnectorSource[In]) =>
+  be _conn_closed(s: TCPSource[In]) =>
     """
     An accepted connection has closed. If we have dropped below the limit, try
     to accept new connections.
     """
-    if _connected_sources.contains((source_id, s)) then
-      _connected_sources.unset((source_id, s))
-      _available_sources.push((source_id, s))
+    if _connected_sources.contains(s) then
+      _connected_sources.unset(s)
+      _available_sources.push(s)
     else
       Fail()
     end
@@ -300,42 +286,15 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
       _accept()
     end
 
-  ///////////////////////
-  // Inter-worker actions
-  // These are called via the connections or router actors (typically)
-  ///////////////////////
   be add_worker(worker: WorkerName) =>
-    _stream_registry.add_worker(worker)
+    None
 
   be remove_worker(worker: WorkerName) =>
-    _stream_registry.remove_worker(worker)
+    None
 
-  be receive_msg(msg: SourceListenerMsg) =>
-    _stream_registry.listener_msg_received(msg)
+  be receive_msg(msg: SourceCoordinatorMsg) =>
+    None
 
-  ////////////////////////////////////////
-  // Asynchronous stream registry actions
-  // These are called by a ConnectorSource (via it's notify class)
-  ////////////////////////////////////////
-  be purge_pending_requests(session_id: RoutingId) =>
-    _stream_registry.purge_pending_requests(session_id)
-
-  be streams_relinquish(source_id: RoutingId, streams: Array[StreamTuple] val)
-  =>
-    _stream_registry.streams_relinquish(source_id, streams)
-
-  be stream_notify(request_id: ConnectorStreamNotifyId,
-    stream_id: StreamId, stream_name: String,
-    point_of_ref: PointOfReference = 0,
-    promise: Promise[NotifyResult[In]],
-    connector_source: ConnectorSource[In] tag)
-  =>
-    _stream_registry.stream_notify(request_id,
-      stream_id, stream_name, point_of_ref, promise, connector_source)
-
-  ///////////////////////
-  // Listener Connector
-  ///////////////////////
   fun ref _accept(ns: U32 = 0) =>
     """
     Accept connections as long as we have spawned fewer than our limit.
@@ -343,7 +302,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     if _closed then
       return
     elseif _count >= _limit then
-      @printf[I32]("ConnectorSourceListener: Already reached connection limit\n"
+      @printf[I32]("TCPSourceCoordinator: Already reached connection limit\n"
         .cstring())
       return
     end
@@ -368,9 +327,9 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     Spawn a new connection.
     """
     try
-      (let source_id, let source) = _available_sources.pop()?
+      let source = _available_sources.pop()?
       source.accept(ns, _init_size, _max_size)
-      _connected_sources.set((source_id, source))
+      _connected_sources.set(source)
       _count = _count + 1
     else
       @pony_os_socket_close[None](ns)
@@ -416,13 +375,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer) =>
-    // Hold onto initializer so we can report initialized once the global
-    // registry receives the leader name
-    _initializer = initializer
-    @printf[I32]("ConnectorSourceListener for: %s created.\n".cstring(), _pipeline_name.cstring())
-    if not _is_joining then
-      report_initialized()
-    end
+    initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
     _start_listening()
@@ -434,30 +387,11 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
     _start_sources()
 
-  be report_initialized() =>
-    @printf[I32]("ConnectorSourceListener for: %s reporting initialized.\n".cstring(), _pipeline_name.cstring())
-    _is_joining = false
-    try
-      (_initializer as LocalTopologyInitializer).report_initialized(this)
-    else
-      Fail()
-    end
-
   //////////////
   // AUTOSCALE
   /////////////
   be begin_join_migration(joining_workers: Array[WorkerName] val) =>
-    @printf[I32]("ConnectorSourceListener completed join migration.\n"
-      .cstring())
-    _router_registry.source_listener_migration_complete(this)
+    _router_registry.source_coordinator_migration_complete(this)
 
   be begin_shrink_migration(leaving_workers: Array[WorkerName] val) =>
-    @printf[I32]("ConnectorSourceListener beginning shrink migration.\n"
-      .cstring())
-    // this gets called on both remaining and leaving workers
-    _stream_registry.begin_shrink(leaving_workers, _connected_sources)
-
-  be complete_shrink_migration() =>
-    @printf[I32]("ConnectorSourceListener completing shrink migration.\n"
-      .cstring())
-    _router_registry.source_listener_migration_complete(this)
+    _router_registry.source_coordinator_migration_complete(this)
