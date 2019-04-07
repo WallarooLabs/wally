@@ -31,8 +31,7 @@ trait _CheckpointInitiatorPhase
   fun ref start_checkpoint_timer(time_until_next_checkpoint: U64,
     checkpoint_initiator: CheckpointInitiator ref)
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref initiate_checkpoint(checkpoint_group: USize,
     checkpoint_initiator: CheckpointInitiator ref)
@@ -45,24 +44,20 @@ trait _CheckpointInitiatorPhase
     None
 
   fun ref checkpoint_barrier_complete(token: BarrierToken) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref event_log_checkpoint_complete(worker: WorkerName,
     checkpoint_id: CheckpointId)
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref event_log_id_written(worker: WorkerName,
     checkpoint_id: CheckpointId)
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref resume_checkpointing_from_rollback() =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref abort_checkpoint(checkpoint_id: CheckpointId,
     checkpoint_initiator: CheckpointInitiator ref)

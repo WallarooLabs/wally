@@ -202,24 +202,20 @@ interface _RecoveryReconnecter
 trait _ReconnectPhase
   fun name(): String
   fun ref add_expected_boundary_count(worker: WorkerName, count: USize) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref add_reconnected_boundary(worker: WorkerName,
     boundary_id: RoutingId) ?
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref add_boundary_reconnect_complete(worker: WorkerName,
     boundary_id: RoutingId)
   =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref check_completion() =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun _invalid_call() =>
     @printf[I32]("Invalid call on recovery reconnecter phase %s\n".cstring(),

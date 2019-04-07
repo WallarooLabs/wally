@@ -68,28 +68,22 @@ trait LocalTopologyInitializerPhase
     end
 
   fun ref begin_reporting() =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref report_created(initializable: Initializable) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref report_initialized(initializable: Initializable) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref report_ready_to_work(initializable: Initializable) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref worker_report_ready_to_work(w: WorkerName) =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref all_workers_ready_to_work() =>
-    _invalid_call()
-    Fail()
+    _invalid_call(); Fail()
 
   fun ref report_event_log_ready_to_work() =>
     // !TODO!: For now, this is partially handled by the
