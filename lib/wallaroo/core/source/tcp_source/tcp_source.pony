@@ -531,14 +531,9 @@ actor TCPSource[In: Any val] is Source
           end
         else
           // We're already connected, unsubscribe the event and close.
-
-          /**** TODO: Upgrade to ponyc 0.27.0 or later:
-          if not @pony_asio_event_get_disposable(event) then
+          if not AsioEvent.disposable(flags) then
             @pony_asio_event_unsubscribe(event)
           end
-          ****/
-          @pony_asio_event_unsubscribe(event) // temp, until 0.27.0 or later
-
           if _connected then
             @pony_os_socket_close[None](fd)
           end
