@@ -104,8 +104,6 @@ actor TCPSource[In: Any val] is Source
   var _max_received_count: U8 = 50
   let _muted_by: SetIs[Any tag] = _muted_by.create()
 
-  var _is_pending: Bool = true
-
   let _router_registry: RouterRegistry
 
   let _event_log: EventLog
@@ -151,7 +149,7 @@ actor TCPSource[In: Any val] is Source
     _notify.update_boundaries(_outgoing_boundaries)
 
     // register resilient with event log
-    _event_log.register_resilient_source(_source_id, this)
+    _event_log.register_resilient(_source_id, this)
 
     _mute()
     ifdef "resilience" then
@@ -189,7 +187,6 @@ actor TCPSource[In: Any val] is Source
     wait until this is called to start processing.
     """
     _unmute_local()
-    _is_pending = false
     for (id, c) in _outputs.pairs() do
       Route.register_producer(_source_id, id, this, c)
     end
@@ -251,9 +248,7 @@ actor TCPSource[In: Any val] is Source
 
       _outputs(id) = c
       _routes.set(c)
-      if not _is_pending then
-        Route.register_producer(_source_id, id, this, c)
-      end
+      Route.register_producer(_source_id, id, this, c)
     end
 
   be register_downstream() =>
@@ -264,13 +259,9 @@ actor TCPSource[In: Any val] is Source
       for (id, c) in _outputs.pairs() do
         match c
         | let ob: OutgoingBoundary =>
-          if not _is_pending then
-            ob.forward_register_producer(_source_id, id, this)
-          end
+          ob.forward_register_producer(_source_id, id, this)
         else
-          if not _is_pending then
-            c.register_producer(_source_id, this)
-          end
+          c.register_producer(_source_id, this)
         end
       end
     end
@@ -433,7 +424,7 @@ actor TCPSource[In: Any val] is Source
       @printf[I32]("TCPSource received initiate_barrier %s\n".cstring(),
         token.string().cstring())
     end
-    if not _is_pending and not _disposed then
+    if not _disposed then
       _initiate_barrier(token)
     end
 

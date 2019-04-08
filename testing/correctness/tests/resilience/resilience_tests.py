@@ -74,7 +74,7 @@ RESILIENCE_TEST_NAME_FMT = 'test_resilience_{api}_{source_type}_{source_number}_
 
 SOURCE_TYPES = ['gensource', 'alo']
 SOURCE_NAME = 'Detector'
-SOURCE_NUMBERS = [1]
+SOURCE_NUMBERS = [2]
 
 RESILIENCE_SEQS = [
     # wait, grow1, wait, shrink1, wait, crash2, wait, recover

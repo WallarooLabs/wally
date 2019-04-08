@@ -83,9 +83,6 @@ actor BarrierSource is Source
     _metrics_reporter = consume metrics_reporter'
     _router_registry.register_producer(this)
 
-  be first_checkpoint_complete() =>
-    None
-
   fun ref metrics_reporter(): MetricsReporter =>
     _metrics_reporter
 

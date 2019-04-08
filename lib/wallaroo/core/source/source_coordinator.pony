@@ -17,6 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "wallaroo/core/barrier"
 use "wallaroo/core/boundary"
 use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
@@ -24,6 +25,7 @@ use "wallaroo/core/data_receiver"
 use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
 use "wallaroo/core/initialization"
+use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/network"
 use "wallaroo/core/partitioning"
@@ -56,3 +58,18 @@ interface val SourceCoordinatorBuilderBuilder
     is_joining: Bool,
     target_router: Router = EmptyRouter):
     SourceCoordinatorBuilder
+
+trait tag SourceCoordinator is (DisposableActor & BoundaryUpdatable &
+  Initializable)
+  be update_router(router: StatePartitionRouter)
+  be add_boundary_builders(
+    boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
+  be update_boundary_builders(
+    boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
+  be add_worker(worker: WorkerName)
+  be remove_worker(worker: WorkerName)
+  be receive_msg(msg: SourceCoordinatorMsg)
+  be begin_join_migration(joining_workers: Array[WorkerName] val)
+  be begin_shrink_migration(leaving_workers: Array[WorkerName] val)
+  be initiate_barrier(token: BarrierToken)
+  be checkpoint_complete(checkpoint_id: CheckpointId)

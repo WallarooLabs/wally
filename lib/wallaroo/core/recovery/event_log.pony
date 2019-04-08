@@ -109,8 +109,6 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
 
   var _log_rotation_id: LogRotationId = 0
 
-  var _pending_sources: SetIs[(RoutingId, Source)] = _pending_sources.create()
-
   new create(auth: AmbientAuth, worker: WorkerName, the_journal: SimpleJournal,
     event_log_config: EventLogConfig = EventLogConfig())
   =>
@@ -181,28 +179,7 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
     initializer.report_event_log_ready_to_work()
 
   be register_resilient(id: RoutingId, resilient: Resilient) =>
-    ifdef debug then
-      match resilient
-      | let s: Source =>
-        // TODO: Sources need to be registered via register_source because they
-        // can come into and out of existence. Make them static to avoid this.
-        Fail()
-      end
-    end
     _resilients(id) = resilient
-
-  be register_resilient_source(id: RoutingId, source: Source) =>
-    ifdef "resilience" then
-      if _initialized == true then
-        _pending_sources.set((id, source))
-      else
-        source.first_checkpoint_complete()
-        _resilients(id) = source
-      end
-    else
-      source.first_checkpoint_complete()
-      _resilients(id) = source
-    end
 
   be unregister_resilient(id: RoutingId, resilient: Resilient) =>
     try
@@ -323,11 +300,6 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
         checkpoint_id.string().cstring())
     end
     _backend.encode_checkpoint_id(checkpoint_id)
-    for (r_id, s) in _pending_sources.values() do
-      s.first_checkpoint_complete()
-      _resilients(r_id) = s
-    end
-    _pending_sources.clear()
     _phase.checkpoint_id_written(checkpoint_id, promise)
 
   fun ref checkpoint_id_written(checkpoint_id: CheckpointId) =>

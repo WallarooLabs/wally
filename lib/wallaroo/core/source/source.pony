@@ -68,23 +68,3 @@ trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
   be checkpoint_complete(checkpoint_id: CheckpointId)
   be update_worker_data_service(worker_name: String,
     host: String, service: String)
-  // Called to indicate that an in progress checkpoint when Source was created
-  // is complete.
-  // TODO: We can probably remove this with some improvements to our
-  // initialization order of events.
-  be first_checkpoint_complete()
-
-trait tag SourceCoordinator is (DisposableActor & BoundaryUpdatable &
-  Initializable)
-  be update_router(router: StatePartitionRouter)
-  be add_boundary_builders(
-    boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
-  be update_boundary_builders(
-    boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
-  be add_worker(worker: WorkerName)
-  be remove_worker(worker: WorkerName)
-  be receive_msg(msg: SourceCoordinatorMsg)
-  be begin_join_migration(joining_workers: Array[WorkerName] val)
-  be begin_shrink_migration(leaving_workers: Array[WorkerName] val)
-  be initiate_barrier(token: BarrierToken)
-  be checkpoint_complete(checkpoint_id: CheckpointId)

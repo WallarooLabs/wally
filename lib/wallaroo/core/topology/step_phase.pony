@@ -64,6 +64,9 @@ trait StepPhase
   fun ref rollback(step_id: RoutingId, step: Step ref, payload: ByteSeq val,
     event_log: EventLog, runner: Runner)
   =>
+    """
+    If we haven't been disposed, rollback overrides any state we might be in.
+    """
     ifdef "resilience" then
       StepRollbacker(payload, runner, step)
     end
@@ -110,6 +113,7 @@ class _NormalStepPhase is StepPhase
 
   new create(s: Step ref) =>
     _step = s
+    @printf[I32]("!@ TRANSITION: Step digest %s ->  _NormalStepPhase\n".cstring(), (digestof s).string().cstring())
 
   fun name(): String => __loc.type_name()
 
@@ -126,6 +130,7 @@ class _NormalStepPhase is StepPhase
   fun ref receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
+    @printf[I32]("!@ --- _NormalStepPhase receive_barrier\n".cstring())
     _step.receive_new_barrier(step_id, producer, barrier_token)
 
   fun send_state(step: Step ref, runner: Runner, id: RoutingId,
@@ -140,6 +145,7 @@ class _NormalStepPhase is StepPhase
 
 type _Queued is (QueuedMessage | QueuedBarrier)
 
+
 class _BarrierStepPhase is StepPhase
   let _step: Step ref
   let _step_id: RoutingId
@@ -152,6 +158,9 @@ class _BarrierStepPhase is StepPhase
     _step = s
     _step_id = s_id
     _barrier_token = token
+    @printf[I32]("!@ TRANSITION: Step digest %s ->  _BarrierStepPhase\n".cstring(), (digestof s).string().cstring())
+
+    @printf[I32]("!@ Step %s now handling barrier %s\n".cstring(), _step_id.string().cstring(), _barrier_token.string().cstring())
 
   fun name(): String => __loc.type_name()
 
@@ -188,6 +197,8 @@ class _BarrierStepPhase is StepPhase
   fun ref receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
+    @printf[I32]("!@ --- _BarrierStepPhase receive_barrier\n".cstring())
+
     if input_blocking(input_id) then
       _queued.push(QueuedBarrier(input_id, producer, barrier_token))
     else
@@ -202,11 +213,12 @@ class _BarrierStepPhase is StepPhase
         Invariant(not (barrier_token > _barrier_token))
       end
 
-      // If we're processing a rollback token which is higher priority than
-      // this new one, then we need to drop this new one.
-      if _barrier_token > barrier_token then
-        return
-      end
+      //!@
+      // // If we're processing a rollback token which is higher priority than
+      // // this new one, then we need to drop this new one.
+      // if _barrier_token > barrier_token then
+      //   return
+      // end
 
       ifdef debug then
         if barrier_token != _barrier_token then
@@ -256,6 +268,7 @@ class _BarrierStepPhase is StepPhase
     check_completion(_step.inputs())
 
   fun ref check_completion(inputs: Map[RoutingId, Producer] box) =>
+    @printf[I32]("!@ check_completion on Step %s: inputs are %s, inputs_blocking are %s\n".cstring(), _step_id.string().cstring(), inputs.size().string().cstring(), _inputs_blocking.size().string().cstring())
     if inputs.size() == _inputs_blocking.size()
     then
       for (o_id, o) in _step.outputs().pairs() do
@@ -276,6 +289,7 @@ class _RecoveringStepPhase is StepPhase
 
   new create(s: Step ref) =>
     _step = s
+    @printf[I32]("!@ TRANSITION: Step digest %s ->  _RecoveringStepPhase\n".cstring(), (digestof s).string().cstring())
 
   fun name(): String => __loc.type_name()
 
@@ -293,10 +307,8 @@ class _RecoveringStepPhase is StepPhase
   fun ref receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    None
-
-  fun ref prepare_for_rollback(token: BarrierToken) =>
-    _step.finish_preparing_for_rollback()
+    @printf[I32]("Ignoring non-rollback barrier in _RecoveringStepPhase\n"
+      .cstring())
 
   fun ref queued(): Array[_Queued] =>
     Array[_Queued]
@@ -329,6 +341,8 @@ class _DisposedStepPhase is StepPhase
   fun ref receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
+    @printf[I32]("!@ --- _DisposedStepPhase receive_barrier\n".cstring())
+
     None
 
   fun ref queued(): Array[_Queued] =>

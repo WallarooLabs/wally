@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use "collections"
 use "promises"
+use "serialise"
 use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
 use "wallaroo/core/invariant"
@@ -54,36 +55,78 @@ class val StreamTuple
     id = stream_id
     last_acked = point_of_ref
 
+class StreamRegistryCheckpointState[In: Any val]
+  let _worker_name: String
+  let _source_name: String
+  let _source_addr: (String, String)
+  let _active_streams: Map[StreamId, WorkerName]
+  let _inactive_streams: Map[StreamId, StreamTuple]
+  let _source_addrs: Map[WorkerName, (String, String)]
+  let _source_addrs_reallocation: Map[WorkerName, (String, String)]
+  let _workers_set: Set[WorkerName]
+  let _leader_name: WorkerName
+  let _is_leader: Bool
+
+  new create(worker_name: WorkerName, source_name: String,
+    source_addr: (String, String),
+    active_streams: Map[StreamId, WorkerName],
+    inactive_streams: Map[StreamId, StreamTuple],
+    source_addrs: Map[WorkerName, (String, String)],
+    source_addrs_reallocation: Map[WorkerName, (String, String)],
+    workers_set: Set[WorkerName], leader_name: WorkerName,
+    is_leader: Bool)
+  =>
+    _worker_name = worker_name
+    _source_name = source_name
+    _source_addr = source_addr
+    _leader_name = leader_name
+    _is_leader = is_leader
+    _active_streams = active_streams
+    _inactive_streams = inactive_streams
+    _source_addrs = source_addrs
+    _source_addrs_reallocation = source_addrs_reallocation
+    _workers_set = workers_set
+
+  fun ref global_registry(listener: ConnectorSourceCoordinator[In],
+    local_registry: LocalConnectorStreamRegistry[In],
+    auth: AmbientAuth, connections: Connections):
+    GlobalConnectorStreamRegistry[In]
+  =>
+    GlobalConnectorStreamRegistry[In].from_checkpoint(listener, auth,
+      _worker_name, _source_name, connections, _source_addr,
+      _active_streams, _inactive_streams, _source_addrs,
+      _source_addrs_reallocation, _workers_set, _leader_name,
+      _is_leader, local_registry)
+
 class GlobalConnectorStreamRegistry[In: Any val]
   let _listener: ConnectorSourceCoordinator[In] tag
+  let _connections: Connections
   var _worker_name: String
   let _source_name: String
-  let _connections: Connections
   let _source_addr: (String, String)
-  var _is_leader: Bool = false
-  var _is_relinquishing: Bool = false
-  var _is_joining: Bool
+  let _pending_notify_promises:
+    Map[ConnectorStreamNotifyId,
+      (Promise[NotifyResult[In]], ConnectorSource[In])] =
+      _pending_notify_promises.create()
+  var _local_registry: (LocalConnectorStreamRegistry[In] | None) = None
+  let _auth: AmbientAuth
+  let _pending_shrink: Set[StreamId] = _pending_shrink.create()
   var _is_shrinking: Bool = false
-  var _leader_name: String = "initializer"
+  var _is_relinquishing: Bool = false
+  var _is_leader: Bool = false
+  var _is_joining: Bool = false
+  var _leader_name: WorkerName = "initializer"
   var _active_streams: Map[StreamId, WorkerName] = _active_streams.create()
   var _inactive_streams: Map[StreamId, StreamTuple] =
     _inactive_streams.create()
   var _source_addrs: Map[WorkerName, (String, String)] =
     _source_addrs.create()
-  let _source_addrs_reallocation: Map[WorkerName, (String, String)] =
+  var _source_addrs_reallocation: Map[WorkerName, (String, String)] =
     _source_addrs_reallocation.create()
-  let _workers_set: Set[WorkerName] = _workers_set.create()
-  let _pending_notify_promises:
-    Map[ConnectorStreamNotifyId,
-      (Promise[NotifyResult[In]], ConnectorSource[In])] =
-      _pending_notify_promises.create()
-  let _pending_shrink: Set[StreamId] = _pending_shrink.create()
-  var _local_registry: (LocalConnectorStreamRegistry[In] | None ) = None
-  let _auth: AmbientAuth
+  var _workers_set: Set[WorkerName] = _workers_set.create()
 
   new create(listener: ConnectorSourceCoordinator[In],
-    auth: AmbientAuth,
-    worker_name: WorkerName, source_name: String,
+    auth: AmbientAuth, worker_name: WorkerName, source_name: String,
     connections: Connections, host: String, service: String,
     workers_list: Array[WorkerName] val, is_joining: Bool)
   =>
@@ -99,8 +142,44 @@ class GlobalConnectorStreamRegistry[In: Any val]
     end
     _elect_leader()
 
+  new from_checkpoint(listener: ConnectorSourceCoordinator[In],
+    auth: AmbientAuth, worker_name: WorkerName, source_name: String,
+    connections: Connections, source_addr: (String, String),
+    active_streams: Map[StreamId, WorkerName],
+    inactive_streams: Map[StreamId, StreamTuple],
+    source_addrs: Map[WorkerName, (String, String)],
+    source_addrs_reallocation: Map[WorkerName, (String, String)],
+    workers_set: Set[WorkerName], leader_name: WorkerName,
+    is_leader: Bool, local_registry: LocalConnectorStreamRegistry[In])
+  =>
+    _listener = listener
+    _auth = auth
+    _worker_name = worker_name
+    _source_name = source_name
+    _connections = connections
+    _source_addr = source_addr
+    _leader_name = leader_name
+    _is_leader = is_leader
+    _active_streams = active_streams
+    _inactive_streams = inactive_streams
+    _source_addrs = source_addrs
+    _source_addrs_reallocation = source_addrs_reallocation
+    _workers_set = workers_set
+    _local_registry = local_registry
+
+  fun ref checkpoint_state(): Array[ByteSeq] val ? =>
+    let state = StreamRegistryCheckpointState[In](_worker_name, _source_name,
+      _source_addr, _active_streams, _inactive_streams,
+      _source_addrs, _source_addrs_reallocation, _workers_set,
+      _leader_name, _is_leader)
+
+    let serialized: Array[U8] val =
+      Serialised(SerialiseAuth(_auth), state)?
+        .output(OutputSerialisedAuth(_auth))
+    [serialized]
+
   fun ref set_local_registry(
-    local_registry: LocalConnectorStreamRegistry[In] ref)
+    local_registry: LocalConnectorStreamRegistry[In])
   =>
     _local_registry = local_registry
 
@@ -700,7 +779,6 @@ class GlobalConnectorStreamRegistry[In: Any val]
         .complete_shrink(source_id, host, service)
     end
 
-
 class ActiveStreamTuple[In: Any val]
   let id: StreamId
   let name: String
@@ -719,8 +797,11 @@ class ActiveStreamTuple[In: Any val]
     last_seen = last_seen'
 
 class LocalConnectorStreamRegistry[In: Any val]
+  let _auth: AmbientAuth
+  let _connections: Connections
+
    // Global Stream Registry
-  let _global_registry: GlobalConnectorStreamRegistry[In] ref
+  var _global_registry: GlobalConnectorStreamRegistry[In] ref
 
   // Local stream registry
   // (stream_name, connector_source, last_acked_por, last_seen_por)
@@ -743,13 +824,32 @@ class LocalConnectorStreamRegistry[In: Any val]
     connections: Connections, host: String, service: String,
     workers_list: Array[WorkerName] val, is_joining: Bool)
   =>
+    _auth = auth
     _listener = listener
+    _connections = connections
     _worker_name = worker_name
     _source_name = source_name
     _is_joining = is_joining
     _global_registry = _global_registry.create(_listener, auth, worker_name,
       source_name, connections, host, service, workers_list, _is_joining)
     _global_registry.set_local_registry(this)
+
+  fun ref checkpoint_state(): Array[ByteSeq] val ? =>
+    _global_registry.checkpoint_state()?
+
+  fun ref rollback(payload: ByteSeq val) =>
+    try
+      match Serialised.input(InputSerialisedAuth(_auth),
+        payload as Array[U8] val)(DeserialiseAuth(_auth))?
+      | let s: StreamRegistryCheckpointState[In] =>
+        _global_registry = s.global_registry(_listener, this, _auth,
+         _connections)
+      else
+        Fail()
+      end
+    else
+      Fail()
+    end
 
   ///////////////////
   // MESSAGE HANDLING
