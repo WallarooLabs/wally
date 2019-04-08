@@ -193,5 +193,7 @@ To create data for the binary cases, follow the [framing protocol](/python-tutor
 The following pony runtime parameters may also be useful in some situations
 
 * `--ponythreads` limits the number of threads the pony runtime will use.
-* `--ponynoblock`
-* `--ponypinasio`
+* `--ponynoblock` do not send block messages to the cycle detector
+* `--ponypin` pins scheduler threads to CPU cores
+* `--ponypinasio` pins the ASIO thread to a CPU
+

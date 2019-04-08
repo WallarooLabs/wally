@@ -21,9 +21,9 @@ if [ ! -z "$START_RECEIVER_CMD" ]; then
     ssh -n $USER@$SERVER1_EXT "cd wallaroo ; $CMD > /tmp/run-dir/receiver.out 2>&1" > /dev/null 2>&1 &
 else
     echo Start receiver
-    ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -l ${SERVER1}:5555 > /tmp/run-dir/receiver.out 2>&1" > /dev/null 2>&1 &
+    ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio --ponypin -l ${SERVER1}:5555 > /tmp/run-dir/receiver.out 2>&1" > /dev/null 2>&1 &
     sleep 2
-fi    
+fi
 
 echo Start initializer
 ssh -n $USER@$SERVER1_EXT "cd wallaroo ; $WALLAROO_BIN --run-with-resilience -i ${SERVER1}:${ORDERS_PORT},${SERVER1}:${NBBO_PORT} -o ${SERVER1}:5555 -m ${SERVER1}:5001 -c ${SERVER1}:12500 -d ${SERVER1}:12501 -t -e ${SERVER1}:5050 -w 2 $W_DOS_SERVER_ARG  --ponynoblock  > /tmp/run-dir/${WALLAROO_NAME}1.out 2>&1" > /dev/null 2>&1 &

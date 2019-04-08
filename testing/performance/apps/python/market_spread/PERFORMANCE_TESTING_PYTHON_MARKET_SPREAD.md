@@ -161,7 +161,7 @@ SSH into `wallaroo-follower-2`
 Start Data Receiver with the following command:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -w -l wallaroo-follower-2:5555 > received.txt
+sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio --ponypin -w -l wallaroo-follower-2:5555 > received.txt
 ```
 
 ### Start the Python Market Spread Application
@@ -173,7 +173,7 @@ Start the Python Market Spread application with the following command:
 ```bash
 cd ~/wallaroo/testing/performance/apps/python/market_spread
 
-sudo PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo/machida/lib" cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/machida/build/machida --application-module market_spread -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 --ponythreads=1 --ponypinasio --ponynoblock
+sudo PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo/machida/lib" cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/machida/build/machida --application-module market_spread -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 --ponythreads=1 --ponypinasio --ponypin --ponynoblock
 ```
 
 ### Start Giles Senders
@@ -187,19 +187,19 @@ You can run the following commands individually or in a script, the only sender 
 ##### Initial NBBO Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 350 -s 90 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg --ponythreads=1 -y -g 46 --ponypinasio -w --ponynoblock
+sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 350 -s 90 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg --ponythreads=1 -y -g 46 --ponypinasio --ponypin -w --ponynoblock
 ```
 
 #### NBBO Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 100 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w --ponynoblock
+sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 100 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio --ponypin -w --ponynoblock
 ```
 
 #### Orders Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 100 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w --ponynoblock
+sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 100 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio --ponypin -w --ponynoblock
 ```
 
 ### Market Spread Cluster Shutdown
@@ -211,7 +211,7 @@ SSH into `wallaroo-follower-1`
 Run the following command to shutdown the cluster:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 16,17 chrt -f 80 ~/wallaroo/utils/cluster_shutdown/cluster_shutdown wallaroo-leader-1:5050 --ponythreads=1 --ponynoblock --ponypinasio
+sudo cset proc -s user -e numactl -- -C 16,17 chrt -f 80 ~/wallaroo/utils/cluster_shutdown/cluster_shutdown wallaroo-leader-1:5050 --ponythreads=1 --ponynoblock --ponypinasio --ponypin
 ```
 
 ## Record Information
@@ -286,7 +286,7 @@ SSH into `wallaroo-follower-2`
 Start Data Receiver with the following command:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -w -l wallaroo-follower-2:5555 > received.txt
+sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio --ponypin -w -l wallaroo-follower-2:5555 > received.txt
 ```
 
 #### Start the Python Market Spread Application
@@ -298,7 +298,7 @@ Start the Python Market Spread application Initializer with the following comman
 ```bash
 cd ~/wallaroo/testing/performance/apps/python/market_spread
 
-sudo PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo/machida/lib" cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/machida/build/machida --application-module market_spread -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 -w 2 --ponythreads=1 --ponypinasio --ponynoblock
+sudo PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo/machida/lib" cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/machida/build/machida --application-module market_spread -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 -w 2 --ponythreads=1 --ponypinasio --ponypin --ponynoblock
 ```
 
 Start the Python Market Spread application Worker 2 with the following command:
@@ -308,7 +308,7 @@ SSH into `wallaroo-follower-3`
 ```bash
 cd ~/wallaroo/testing/performance/apps/python/market_spread
 
-sudo PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo/machida/lib" cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/machida/build/machida --application-module market_spread -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -n worker2 --ponythreads=1 --ponypinasio --ponynoblock
+sudo PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo/machida/lib" cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/machida/build/machida --application-module market_spread -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -n worker2 --ponythreads=1 --ponypinasio --ponypin --ponynoblock
 ```
 
 #### Start Giles Senders
@@ -322,19 +322,19 @@ You can run the following commands individually or in a script, the only sender 
 ##### Initial NBBO Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 350 -s 50 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg --ponythreads=1 -y -g 46 --ponypinasio -w --ponynoblock
+sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 350 -s 50 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg --ponythreads=1 -y -g 46 --ponypinasio --ponypin -w --ponynoblock
 ```
 
 ##### NBBO Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 50 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w --ponynoblock
+sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 50 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio --ponypin -w --ponynoblock
 ```
 
 ##### Orders Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 50 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w --ponynoblock
+sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 50 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio --ponypin -w --ponynoblock
 ```
 
 #### Market Spread Cluster Shutdown
@@ -346,7 +346,7 @@ SSH into `wallaroo-follower-1`
 Run the following command to shutdown the cluster:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 16,17 chrt -f 80 ~/wallaroo/utils/cluster_shutdown/cluster_shutdown wallaroo-leader-1:5050 --ponythreads=1 --ponynoblock --ponypinasio
+sudo cset proc -s user -e numactl -- -C 16,17 chrt -f 80 ~/wallaroo/utils/cluster_shutdown/cluster_shutdown wallaroo-leader-1:5050 --ponythreads=1 --ponynoblock --ponypinasio --ponypin
 ```
 
 ## Record Information

@@ -172,7 +172,7 @@
   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
 - name: compile and install latest ponyc release
-  command: sudo make config=release install
+  command: sudo LLVM_CONFIG=/usr/lib/llvm-3.9/bin/llvm-config make config=release install
   args:
     chdir: /src/ponyc
     creates: /src/ponyc/build
