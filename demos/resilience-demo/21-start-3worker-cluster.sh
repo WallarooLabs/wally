@@ -22,7 +22,7 @@ if [ ! -z "$START_RECEIVER_CMD" ]; then
     ssh -n $USER@$SERVER1_EXT "cd wallaroo ; $CMD > /tmp/run-dir/receiver.out 2>&1" > /dev/null 2>&1 &
 else
     echo Start receiver
-    ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -l ${SERVER1}:5555 > /tmp/run-dir/receiver.out 2>&1" > /dev/null 2>&1 &
+    ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio --ponypin -l ${SERVER1}:5555 > /tmp/run-dir/receiver.out 2>&1" > /dev/null 2>&1 &
     sleep 2
 fi
 

@@ -19,9 +19,9 @@ e.g. if in the control run, we observed the sequence of outputs `[10,11,12,13], 
 
 ### Running the Test:
 
-1. start data receiver:  `../../../../utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -l 127.0.0.1:5555 > received.txt`
-1. start initializer-worker: `./sequence_window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker1 -t`
-1. start second worker: `./sequence_window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -r res-data -n worker2`
+1. start data receiver:  `../../../../utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio --ponypin -l 127.0.0.1:5555 > received.txt`
+1. start initializer-worker: `./sequence_window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponypin --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker1 -t`
+1. start second worker: `./sequence_window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponypin --ponynoblock -c 127.0.0.1:12500 -r res-data -n worker2`
 1. start giles-sender and send the first 10000 integers: `../../../../giles/sender/sender -h 127.0.0.1:7000 -s 100 -i 50_000_000 -u --ponythreads=1 -y -g 12 -w -m 10000`
 1. terminate the second worker with Ctrl-C
 1. restart the second worker with the same command

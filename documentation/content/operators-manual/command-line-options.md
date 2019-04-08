@@ -21,7 +21,7 @@ When running a Wallaroo application, we use some of the following command line p
   --external/-e [Sets address for external message channel]
   --worker-count/-w +[Sets cluster initializers total number of workers,
     including cluster initializer itself]
-  --name/-n +[Sets name for this worker. Initializer will overwrite this 
+  --name/-n +[Sets name for this worker. Initializer will overwrite this
     name with "initializer"]
 
   --metrics/-m *[Sets address for external metrics (e.g. monitoring hub)]
@@ -78,4 +78,4 @@ If you do not specify the number of `ponythreads`, the process will try to use a
 
 Since Machida (used for the Python API) is single-threaded, you must run it with `--ponythreads 1` or Machida will refuse to start.
 
-There are additional performance flags`--ponypinasio` and `--ponynoblock` that can be used as part of a high-performance configuration. Documentation on how to configure for best performance is coming soon.
+There are additional performance flags`--ponypinasio`, `--ponypin`, and `--ponynoblock` that can be used as part of a high-performance configuration. Documentation on how to configure for best performance is coming soon.

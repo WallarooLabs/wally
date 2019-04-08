@@ -221,6 +221,7 @@ BASE_COMMAND = r'''{command} \
     {{alt_block}} \
     --ponythreads=1 \
     --ponypinasio \
+    --ponypin \
     --ponynoblock'''
 IN_BLOCK = r'''--in {inputs}'''
 OUT_BLOCK = r'''--out {outputs}'''

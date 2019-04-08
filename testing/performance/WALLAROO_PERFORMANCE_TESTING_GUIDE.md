@@ -67,7 +67,7 @@ sudo cset proc -s user -e numactl -- -C 1-16,17 chrt -f 80 \
   -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 \
   -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 \
   -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 \
-  --ponynoblock --ponythreads=16 --ponypinasio --ponyminthreads=999
+  --ponynoblock --ponythreads=16 --ponypinasio --ponypin --ponyminthreads=999
 ```
 
 - `cset proc -s user -e`: this command tells cset to execute the following commands in the `user` cpuset.
@@ -98,7 +98,7 @@ sudo cset proc -s user -e numactl -- -C 1-16,17 chrt -f 80 \
   -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 \
   -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 \
   -t -e wallaroo-leader-1:5050  -w 2 --ponynoblock --ponythreads=16 --ponypinasio \
-  --ponyminthreads=999
+  --ponypin --ponyminthreads=999
 ```
 
 ` -w 2`: This command tells the Wallaroo `Initializer` that it is expecting to start a 2 worker cluster. This should be adjusted to account for the amount of workers you plan to test.
@@ -110,7 +110,7 @@ sudo cset proc -s user -e numactl -- -C 1-16,17 chrt -f 80 \
   ~/wallaroo/testing/performance/apps/market-spread/market-spread \
   -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 \
   -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -n worker2 \
-  --ponythreads=16 --ponypinasio --ponynoblock --ponyminthreads=999
+  --ponythreads=16 --ponypinasio --ponypin --ponynoblock --ponyminthreads=999
 ```
 
 - `-c wallaroo-leader-1:12500`: Control channel used to communicate to the `Initializer`. If the `Initializer` was started on any host other than `wallaroo-leader-1`, this should be adjusted to match that host.
@@ -126,7 +126,7 @@ Starting Data Receiver on `wallaroo-follower-2`:
 ```bash
 sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 \
   ~/wallaroo/utils/data_receiver/data_receiver --framed -w -l wallaroo-follower-2:5555 \
-  --ponythreads=1 --ponynoblock --ponypinasio > received.txt
+  --ponythreads=1 --ponynoblock --ponypinasio --ponypin > received.txt
 ```
 
 - `numactl -- -C 1,17`: this command tells `numactl` to execute the following command only on the CPUs provided to `-C`. `1` is used in this case because it is the first free CPU available of this instance. `,17` is used for the Pony ASIO thread because we're using `--ponypinasio`.
@@ -146,7 +146,7 @@ sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 \
   ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 350 -s 350 -i 2_500_000 \
   -y -g 46 -w \
   -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg \
-  --ponythreads=1 --ponynoblock --ponypinasio
+  --ponythreads=1 --ponynoblock --ponypinasio --ponypin
 ```
 
 - `numactl -- -C 2,17`: this command tells `numactl` to execute the following command only on the CPUs provided to `-C`. `2` is used in this case because we want to use 1 ponythread and we're assuming Data Receiver is on `1`. `,17` is used for the Pony ASIO thread because we're using `--ponypinasio`.
@@ -162,7 +162,7 @@ sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 \
   ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 \
   -s 450 -i 2_500_000 -r -y -g 46 -w \
   -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg \
-  --ponythreads=1 --ponypinasio --ponynoblock
+  --ponythreads=1 --ponypinasio --ponypin --ponynoblock
 ```
 - `numactl -- -C 2,17`: this command tells `numactl` to execute the following command only on the CPUs provided to `-C`. `2` is used in this case because we want to use 1 ponythread and we're assuming Data Receiver is on `1`. `,17` is used for the Pony ASIO thread because we're using `--ponypinasio`. The initial number provided to `numactl` should not clash with a running process started using `numactl`.
 
@@ -182,7 +182,7 @@ We currently start 7 NBBO senders for performance testing Pony Market Spread. Th
 Starting a repeating Orders sender on `wallaroo-follower-2`:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 9,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 900 -i 5_000_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 9,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 900 -i 5_000_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 -w --ponypinasio  --ponypin —ponynoblock
 ```
 
 - `numactl -- -C 9,17`: this command tells `numactl` to execute the following command only on the CPUs provided to `-C`. `9` is used in this case because we want to use 1 ponythread and we're assuming Data Receiver is on `1` and NBBO senders are on `2-8`. `,17` is used for the Pony ASIO thread because we're using `--ponypinasio`. The initial number provided to `numactl` should not clash with a running process started using `numactl`.
@@ -202,7 +202,7 @@ We currently start 7 Orders senders for performance testing Pony Market Spread. 
 ```bash
 sudo cset proc -s user -e numactl -- -C 16,17 chrt -f 80 \
   ~/wallaroo/utils/cluster_shutdown/cluster_shutdown wallaroo-leader-1:5050 \
-  --ponythreads=1 --ponynoblock --ponypinasio
+  --ponythreads=1 --ponynoblock --ponypinasio --ponypin
 ```
 
 - `wallaroo-leader-1:5050`: We're assuming the initalizer is running on `wallaroo-leader-1` and is using port `5050` for it's external data channel. Update the hostname and/or the port if a different argument is used to start the initial Wallaroo worker.
