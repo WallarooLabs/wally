@@ -86,8 +86,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   // Checkpoint
   var _next_checkpoint_id: CheckpointId = 1
 
-  var _is_pending: Bool = true
-
   let _topic: String
   let _partition_id: KafkaPartitionId
   let _kc: KafkaClient tag
@@ -118,7 +116,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     _name = name
 
     // register resilient with event log
-    _event_log.register_resilient_source(_source_id, this)
+    _event_log.register_resilient(_source_id, this)
 
     _layout_initializer = layout_initializer
     _router_registry = router_registry
@@ -143,7 +141,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
   be first_checkpoint_complete() =>
     _unmute_local()
-    _is_pending = false
     for (id, c) in _outputs.pairs() do
       Route.register_producer(_source_id, id, this, c)
     end
@@ -208,9 +205,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
       _outputs(id) = c
       _routes.set(c)
-      if not _is_pending then
-        Route.register_producer(_source_id, id, this, c)
-      end
+      Route.register_producer(_source_id, id, this, c)
     end
 
   be register_downstream() =>
@@ -221,13 +216,9 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       for (id, c) in _outputs.pairs() do
         match c
         | let ob: OutgoingBoundary =>
-          if not _is_pending then
-            ob.forward_register_producer(_source_id, id, this)
-          end
+          ob.forward_register_producer(_source_id, id, this)
         else
-          if not _is_pending then
-            c.register_producer(_source_id, this)
-          end
+          c.register_producer(_source_id, this)
         end
       end
     end
@@ -311,7 +302,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   // BARRIER
   //////////////
   be initiate_barrier(token: BarrierToken) =>
-    if not _is_pending and not _disposed then
+    if not _disposed then
       _initiate_barrier(token)
     end
 

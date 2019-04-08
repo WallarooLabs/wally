@@ -58,7 +58,7 @@ AUTOSCALE_TEST_NAME_FMT = 'test_autoscale_{api}_{source_type}_{source_number}_{o
 OPS = [Grow(1), Grow(4), Shrink(1), Shrink(4)]
 SOURCE_TYPES = ['tcp', 'gensource', 'alo']
 SOURCE_NAME = 'Detector'
-SOURCE_NUMBERS = [1, 2]
+SOURCE_NUMBERS = [1]
 
 # Programmatically create the tests, do the name mangling, and place them
 # in the global scope for pytest to find

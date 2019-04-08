@@ -314,13 +314,13 @@ class _ApplicationReadyToWorkPhase is LocalTopologyInitializerPhase
     if _is_initializer then
       _workers_ready_to_work.set(w)
       if _workers_ready_to_work.size() == _workers.size() then
+        _lti._inform_cluster_all_workers_ready_to_work()
         _lti._cluster_ready_to_work(_initializables)
       end
     end
 
   fun ref all_workers_ready_to_work() =>
     if not _is_initializer then
-      _lti._inform_cluster_all_workers_ready_to_work()
       _lti._cluster_ready_to_work(_initializables)
     end
 

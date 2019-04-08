@@ -116,9 +116,9 @@ actor Step is (Producer & Consumer & BarrierProcessor)
 
     _phase =
       if is_recovering then
-        _NormalStepPhase(this)
-      else
         _RecoveringStepPhase(this)
+      else
+        _NormalStepPhase(this)
       end
 
     match _runner
@@ -487,16 +487,25 @@ actor Step is (Producer & Consumer & BarrierProcessor)
         _id.string().cstring())
     end
     match barrier_token
-    | let sbt: CheckpointBarrierToken =>
-      checkpoint_state(sbt.id)
+    | let cbt: CheckpointBarrierToken =>
+      checkpoint_state(cbt.id)
     end
-    let queued = _phase.queued()
-    _phase = _NormalStepPhase(this)
+
+    var queued = Array[_Queued]
+    match barrier_token
+    | let crbt: CheckpointRollbackBarrierToken =>
+      _phase = _RecoveringStepPhase(this)
+    else
+      queued = _phase.queued()
+      _phase = _NormalStepPhase(this)
+    end
     for q in queued.values() do
       match q
       | let qm: QueuedMessage =>
+        @printf[I32]("!@ Dequeuing data msg at Step digest %s\n".cstring(), (digestof this).string().cstring())
         qm.process_message(this)
       | let qb: QueuedBarrier =>
+        @printf[I32]("!@ Dequeuing barrier at Step digest %s\n".cstring(), (digestof this).string().cstring())
         qb.inject_barrier(this)
       end
     end

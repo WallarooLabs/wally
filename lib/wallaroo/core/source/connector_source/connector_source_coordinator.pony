@@ -50,12 +50,14 @@ use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
 
-actor ConnectorSourceCoordinator[In: Any val] is SourceCoordinator
+actor ConnectorSourceCoordinator[In: Any val] is
+  (SourceCoordinator & Resilient)
   """
   # ConnectorSourceCoordinator
   """
   let _routing_id_gen: DeterministicSourceIdGenerator =
     DeterministicSourceIdGenerator
+  let _id: RoutingId
   let _env: Env
   let _worker_name: WorkerName
 
@@ -123,6 +125,8 @@ actor ConnectorSourceCoordinator[In: Any val] is SourceCoordinator
     _env = env
     _worker_name = worker_name
     _pipeline_name = pipeline_name
+    let s_name = _worker_name + _pipeline_name
+    _id = try _routing_id_gen(s_name + " coordinator")? else Fail(); 0 end
     _runner_builder = runner_builder
     _partitioner_builder = partitioner_builder
     _router = router
@@ -191,6 +195,8 @@ actor ConnectorSourceCoordinator[In: Any val] is SourceCoordinator
 
       _available_sources.push((source_id, source))
     end
+
+    _event_log.register_resilient(_id, this)
 
   fun ref _start_listening() =>
     _event = @pony_os_listen_tcp[AsioEventID](this,
@@ -420,7 +426,11 @@ actor ConnectorSourceCoordinator[In: Any val] is SourceCoordinator
     None
 
   be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
-    _start_sources()
+    ifdef not "resilience" then
+      // If we are building with resilience, then we can't start our sources
+      // until the first checkpoint is complete.
+      _start_sources()
+    end
 
   be report_initialized() =>
     @printf[I32]("ConnectorSourceCoordinator for: %s reporting initialized.\n"
@@ -436,6 +446,10 @@ actor ConnectorSourceCoordinator[In: Any val] is SourceCoordinator
   // BARRIER
   //////////////
   be initiate_barrier(token: BarrierToken) =>
+    match token
+    | let sbt: CheckpointBarrierToken =>
+      checkpoint_state(sbt.id)
+    end
     for (_, s) in _connected_sources.values() do
       s.initiate_barrier(token)
     end
@@ -450,6 +464,36 @@ actor ConnectorSourceCoordinator[In: Any val] is SourceCoordinator
     for (_, s) in _available_sources.values() do
       s.checkpoint_complete(checkpoint_id)
     end
+    if checkpoint_id == 1 then
+      for (_, s) in _connected_sources.values() do
+        s.first_checkpoint_complete()
+      end
+      for (_, s) in _available_sources.values() do
+        s.first_checkpoint_complete()
+      end
+      _start_sources()
+    end
+
+  //////////////
+  // CHECKPOINTS
+  //////////////
+  fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
+    try
+      let c_state = _stream_registry.checkpoint_state()?
+      _event_log.checkpoint_state(_id, checkpoint_id, c_state)
+    else
+      Fail()
+    end
+
+  be prepare_for_rollback() =>
+    //!@ Should we do something?
+    None
+
+  be rollback(payload: ByteSeq val, event_log: EventLog,
+    checkpoint_id: CheckpointId)
+  =>
+    _stream_registry.rollback(payload)
+    event_log.ack_rollback(_id)
 
   //////////////
   // AUTOSCALE

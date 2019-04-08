@@ -17,6 +17,7 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 use "collections"
+use "promises"
 
 use "wallaroo/core/common"
 use "wallaroo/core/invariant"
@@ -63,6 +64,12 @@ trait _CheckpointInitiatorPhase
     checkpoint_initiator: CheckpointInitiator ref)
   =>
     checkpoint_initiator._abort_checkpoint(checkpoint_id)
+
+  fun ref initiate_rollback(
+    recovery_promise: Promise[CheckpointRollbackBarrierToken],
+    worker: WorkerName, checkpoint_initiator: CheckpointInitiator ref)
+  =>
+    checkpoint_initiator.finish_initiating_rollback(recovery_promise, worker)
 
   fun _invalid_call() =>
     @printf[I32]("Invalid call on checkpoint initiator phase %s\n".cstring(),
@@ -236,5 +243,11 @@ class _DisposedCheckpointInitiatorPhase is _CheckpointInitiatorPhase
 
   fun ref abort_checkpoint(checkpoint_id: CheckpointId,
     checkpoint_initiator: CheckpointInitiator ref)
+  =>
+    None
+
+  fun ref initiate_rollback(
+    recovery_promise: Promise[CheckpointRollbackBarrierToken],
+    worker: WorkerName, checkpoint_initiator: CheckpointInitiator ref)
   =>
     None

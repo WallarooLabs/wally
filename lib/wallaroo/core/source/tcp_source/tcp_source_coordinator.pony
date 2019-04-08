@@ -370,7 +370,11 @@ actor TCPSourceCoordinator[In: Any val] is SourceCoordinator
     None
 
   be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
-    _start_sources()
+    ifdef not "resilience" then
+      // If we are building with resilience, then we can't start our sources
+      // until the first checkpoint is complete.
+      _start_sources()
+    end
 
   //////////////
   // BARRIER
@@ -389,6 +393,15 @@ actor TCPSourceCoordinator[In: Any val] is SourceCoordinator
     end
     for s in _available_sources.values() do
       s.checkpoint_complete(checkpoint_id)
+    end
+    if checkpoint_id == 1 then
+      for s in _connected_sources.values() do
+        s.first_checkpoint_complete()
+      end
+      for s in _available_sources.values() do
+        s.first_checkpoint_complete()
+      end
+      _start_sources()
     end
 
   //////////////

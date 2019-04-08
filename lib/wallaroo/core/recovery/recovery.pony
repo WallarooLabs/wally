@@ -224,7 +224,8 @@ actor Recovery
       _recovery_phase = _AwaitDataReceiversAck(this, token)
     end
 
-  fun ref _data_receivers_ack_complete(token: CheckpointRollbackBarrierToken) =>
+  fun ref _data_receivers_ack_complete(token: CheckpointRollbackBarrierToken)
+  =>
     ifdef "resilience" then
       @printf[I32](("|~~ - Recovery Phase: Await Recovery Initiated Acks " +
         "- ~~| \n").cstring())

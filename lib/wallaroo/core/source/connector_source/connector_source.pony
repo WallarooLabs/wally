@@ -118,8 +118,6 @@ actor ConnectorSource[In: Any val] is Source
   var _max_received_count: U8 = 50
   let _muted_by: SetIs[Any tag] = _muted_by.create()
 
-  var _is_pending: Bool = true
-
   let _router_registry: RouterRegistry
 
   let _event_log: EventLog
@@ -170,7 +168,7 @@ actor ConnectorSource[In: Any val] is Source
     _notify.update_boundaries(_outgoing_boundaries)
 
     // register resilient with event log
-    _event_log.register_resilient_source(_source_id, this)
+    _event_log.register_resilient(_source_id, this)
 
     _mute()
     ifdef "resilience" then
@@ -356,16 +354,17 @@ actor ConnectorSource[In: Any val] is Source
 
     false
 
+    //!@ Do we need sources to mute local anymore?  Can we remove this?
   be first_checkpoint_complete() =>
     """
     In case we pop into existence midway through a checkpoint, we need to
     wait until this is called to start processing.
     """
     _unmute_local()
-    _is_pending = false
-    for (id, c) in _outputs.pairs() do
-      Route.register_producer(_source_id, id, this, c)
-    end
+    //!@
+    // for (id, c) in _outputs.pairs() do
+    //   Route.register_producer(_source_id, id, this, c)
+    // end
 
   fun ref metrics_reporter(): MetricsReporter =>
     _metrics_reporter
@@ -424,9 +423,7 @@ actor ConnectorSource[In: Any val] is Source
 
       _outputs(id) = c
       _routes.set(c)
-      if not _is_pending then
-        Route.register_producer(_source_id, id, this, c)
-      end
+      Route.register_producer(_source_id, id, this, c)
     end
 
   be register_downstream() =>
@@ -437,13 +434,9 @@ actor ConnectorSource[In: Any val] is Source
       for (id, c) in _outputs.pairs() do
         match c
         | let ob: OutgoingBoundary =>
-          if not _is_pending then
-            ob.forward_register_producer(_source_id, id, this)
-          end
+          ob.forward_register_producer(_source_id, id, this)
         else
-          if not _is_pending then
-            c.register_producer(_source_id, this)
-          end
+          c.register_producer(_source_id, this)
         end
       end
     end
@@ -591,7 +584,7 @@ actor ConnectorSource[In: Any val] is Source
   // BARRIER
   //////////////
   be initiate_barrier(token: BarrierToken) =>
-    if not _is_pending and not _disposed then
+    if not _disposed then
       ifdef "checkpoint_trace" then
         @printf[I32]("ConnectorSource received initiate_barrier %s\n"
           .cstring(), token.string().cstring())
