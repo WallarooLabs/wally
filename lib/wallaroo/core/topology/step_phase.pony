@@ -295,6 +295,9 @@ class _RecoveringStepPhase is StepPhase
   =>
     None
 
+  fun ref prepare_for_rollback(token: BarrierToken) =>
+    _step.finish_preparing_for_rollback()
+
   fun ref queued(): Array[_Queued] =>
     Array[_Queued]
 
