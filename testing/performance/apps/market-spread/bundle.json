@@ -1,7 +1,11 @@
 {
   "deps": [
-    { "type": "local",
-      "local-path": "../../../../lib/"
-    }
+      { "type": "local",
+        "local-path": "../../../../lib/"
+      },
+      { "type": "github",
+        "repo": "WallarooLabs/pony-kafka",
+        "tag": "0.5.0"
+      }
   ]
 }

@@ -81,31 +81,37 @@ use "wallaroo"
 use "wallaroo_labs/mort"
 use "wallaroo/core/common"
 use "wallaroo/core/metrics"
+use "wallaroo/core/sink/kafka_sink"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
+use "wallaroo/core/source/kafka_source"
 use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/state"
 use "wallaroo/core/topology"
 
+
 actor Main
   new create(env: Env) =>
+    let ksource_clip = KafkaSourceConfigCLIParser(env.out)
+    let ksink_clip = KafkaSinkConfigCLIParser(env.out)
     try
       let pipeline = recover val
         let orders = Wallaroo.source[FixOrderMessage val]("Orders",
-            TCPSourceConfig[FixOrderMessage val].from_options(FixOrderFrameHandler,
-              TCPSourceConfigCLIParser(env.args)?(0)?))
+            KafkaSourceConfig[FixOrderMessage val](
+              ksource_clip.parse_options(env.args)?,
+              env.root as AmbientAuth, FixOrderDecoder))
           .key_by(OrderSymbolExtractor)
-
         let nbbos = Wallaroo.source[FixNbboMessage val]("Nbbo",
             TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
-              TCPSourceConfigCLIParser(env.args)?(1)?))
+              TCPSourceConfigCLIParser(env.args)?(0)?))
           .key_by(NbboSymbolExtractor)
 
-        orders.merge[FixNbboMessage val](nbbos)
+        let app = orders.merge[FixNbboMessage val](nbbos)
           .to[OrderResult val](CheckMarketData)
-          .to_sink(TCPSinkConfig[OrderResult val].from_options(
-            OrderResultEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
-
+          .to_sink(KafkaSinkConfig[OrderResult val](OrderResultKafkaEncoder,
+            ksink_clip.parse_options(env.args)?,
+            env.root as AmbientAuth))
+        app
       end
       Wallaroo.build_application(env, "Market Spread", pipeline)
     else
@@ -148,6 +154,29 @@ primitive CheckMarketData is StateComputation[
 
   fun initial_state(): SymbolData =>
     SymbolData
+
+
+primitive FixOrderDecoder is SourceHandler[FixOrderMessage val]
+  fun decode(data: Array[U8] val): FixOrderMessage val ? =>
+    match FixishMsgDecoder(data)?
+    | let m: FixOrderMessage val => m
+    | let m: FixNbboMessage val => @printf[I32]("Got FixNbbo\n".cstring()); Fail(); error
+    else
+      @printf[I32]("Could not get FixOrder from incoming data\n".cstring())
+      @printf[I32]("data size: %d\n".cstring(), data.size())
+      error
+    end
+
+primitive FixNbboDecoder is SourceHandler[FixNbboMessage val]
+  fun decode(data: Array[U8] val): FixNbboMessage val ? =>
+    match FixishMsgDecoder(data)?
+    | let m: FixNbboMessage val => m
+    | let m: FixOrderMessage val => @printf[I32]("Got FixOrder\n".cstring()); Fail(); error
+    else
+      @printf[I32]("Could not get FixNbbo from incoming data\n".cstring())
+      @printf[I32]("data size: %d\n".cstring(), data.size())
+      error
+    end
 
 primitive FixOrderFrameHandler is FramedSourceHandler[FixOrderMessage val]
   fun header_length(): USize =>
@@ -221,6 +250,11 @@ class OrderResult
       .>append(offer.string()).>append(", ")
       .>append(timestamp.string()).>append(", ")
       .>append(accept.string())).clone()
+
+
+primitive OrderResultKafkaEncoder
+  fun apply(r: OrderResult val, wb: Writer): (Array[ByteSeq] val, None, None) =>
+    (OrderResultEncoder(r, wb), None, None)
 
 primitive OrderResultEncoder
   fun apply(r: OrderResult val, wb: Writer = Writer): Array[ByteSeq] val =>

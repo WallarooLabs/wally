@@ -65,15 +65,18 @@ market-spread_pony_test:
 	tail-output \
 
 K_BIN = ./kafka/bin/
-IN_TOPIC = sensor-readings
-OUT_TOPIC = sensor-aggregates
-K_VERSION := 2.12-2.2.0
+IN_TOPIC1 := orders
+OUT_TOPIC := order-results
+_K_VERSION := 2.12-2.2.0
+K_VERSION := 2.11-1.1.1
 
-start-app: check-for-wallaroo
-	-rm /tmp/app-initializer.*
-	machida --application-module app \
-	  --kafka_source_topic $(IN_TOPIC) \
+start-app: $(shell pwd)/market-spread
+	-rm /tmp/"Market Spread"*
+	./market-spread \
+	  --in 127.0.0.1:7001 \
+	  --kafka_source_topic $(IN_TOPIC1) \
 	  --kafka_source_brokers 127.0.0.1:9092 \
+	  --kafka_source_log_level Error \
 	  --kafka_sink_topic $(OUT_TOPIC) \
 	  --kafka_sink_brokers 127.0.0.1:9092 \
 	  --kafka_sink_max_message_size 100000 \
@@ -82,7 +85,7 @@ start-app: check-for-wallaroo
 	  --control 127.0.0.1:12500 \
 	  --data 127.0.0.1:12501 \
 	  --external 127.0.0.1:5050 \
-	  --cluster-initializer --ponythreads=1 \
+	  --cluster-initializer --ponythreads=4 \
 	  --ponynoblock
 
 start-generator:
@@ -105,19 +108,23 @@ kafka: tmp/kafka_$(K_VERSION).tgz
 tmp/kafka_$(K_VERSION).tgz:
 	mkdir -p tmp
 	(cd tmp &&\
-         curl -sO 'https://www-us.apache.org/dist/kafka/2.2.0/kafka_$(K_VERSION).tgz')
+	 curl -sO 'https://archive.apache.org/dist/kafka/1.1.1/kafka_$(K_VERSION).tgz')
+#curl -sO 'https://www-us.apache.org/dist/kafka/2.2.0/kafka_$(K_VERSION).tgz')
 
 start-kafka: $(K_BIN)
+	export _JAVA_OPTIONS="-Djava.net.preferIPv4Stack=true" &&\
+	export KAFKA_OPTS="-Djava.net.preferIPv4Stack=True" &&\
 	$(K_BIN)/zookeeper-server-start.sh \
-	  ./kafka/config/zookeeper.properties > ./log/zk.log 2>&1 &
-	while !(nc -z localhost 2181); do printf . ; sleep 1 ; done
+	  ./kafka/config/zookeeper.properties > ./log/zk.log 2>&1 &\
+	while !(nc -z 127.0.0.1 2181); do printf . ; sleep 1 ; done &&\
+	echo kafka opts $$KAFKA_OPTS;\
 	$(K_BIN)/kafka-server-start.sh \
-	  ./kafka/config/server.properties > ./log/kafka.log 2>&1 &
-	while !(nc -z localhost 9092); do printf . ; sleep 1 ; done
+	  ./kafka/config/server.properties > ./log/kafka.log 2>&1 &\
+	while !(nc -z 127.0.0.1 9092); do printf . ; sleep 1 ; done
 
 stop-kafka: $(K_BIN)
-	$(K_BIN)/zookeeper-server-stop.sh
-	$(K_BIN)/kafka-server-stop.sh
+	-ps auxww | grep [z]ookeper | awk '{print $$2}' | xargs kill -9
+	-ps auxww | grep [k]afka | awk '{print $$2}' | xargs kill -9
 
 reset:
 	-ps aux | grep [k]afka | awk '{print $$2}' | xargs -L1 kill -9
@@ -128,11 +135,11 @@ reset:
 	rm -rf /tmp/zookeeper
 
 setup-topics: $(K_BIN)
-	-$(K_BIN)/kafka-topics.sh --create --zookeeper localhost:2181 \
+	-$(K_BIN)/kafka-topics.sh --create --zookeeper 127.0.0.1:2181 \
 	  --partitions 1 --replication-factor 1\
 	  --config delete.retention.ms=1 \
-	  --topic $(IN_TOPIC)
-	-$(K_BIN)/kafka-topics.sh --create --zookeeper localhost:2181 \
+	  --topic $(IN_TOPIC1)
+	-$(K_BIN)/kafka-topics.sh --create --zookeeper 127.0.0.1:2181 \
 	  --config delete.retention.ms=1 \
 	  --partitions 1 --replication-factor 1\
 	  --topic $(OUT_TOPIC)
