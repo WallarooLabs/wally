@@ -72,14 +72,16 @@ class val StepBuilder
     metrics_conn: MetricsSink, event_log: EventLog,
     recovery_replayer: RecoveryReconnecter, auth: AmbientAuth,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    router_registry: RouterRegistry, router: Router = EmptyRouter): Step tag
+    router_registry: RouterRegistry, is_recovering: Bool,
+    router: Router = EmptyRouter): Step tag
   =>
     let runner = _runner_builder(where event_log = event_log, auth = auth,
       router = router, partitioner_builder = _partitioner_builder)
     let step = Step(auth, consume runner,
       MetricsReporter(_app_name, worker_name, metrics_conn), routing_id,
       event_log, recovery_replayer,
-      outgoing_boundaries, router_registry, router)
+      outgoing_boundaries, router_registry
+      where router' = router, is_recovering = is_recovering)
     step.update_router(next)
     step
 

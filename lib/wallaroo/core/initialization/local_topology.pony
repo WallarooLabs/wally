@@ -242,7 +242,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   let _do_local_file_io: Bool
   var _recovered_worker_names: Array[WorkerName] val =
     recover val Array[WorkerName] end
-  var _recovering: Bool = false
+  var _is_recovering: Bool = false
   let _is_joining: Bool
 
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
@@ -388,7 +388,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     recovering_without_resilience: Bool = false,
     workers_ready_to_work: SetIs[WorkerName] = SetIs[WorkerName])
   =>
-    _recovering =
+    _is_recovering =
       match checkpoint_target
       | let id: CheckpointId =>
         _recovery.update_checkpoint_id(id)
@@ -448,7 +448,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         // Determine if we need to read in local keys for our state collections
         let local_keys: Map[RoutingId, StringSet val] val =
-          if _recovering then
+          if _is_recovering then
             @printf[I32]("Reading local keys from file.\n".cstring())
             try
               _local_keys_file.read_local_keys(
@@ -625,7 +625,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 // Create n steps given a parallelism of n. Then use these
                 // to create a StatePartitionRouter.
                 let step_group_steps = create_step_group(execution_ids,
-                  builder, out_router)
+                  builder, out_router, _is_recovering)
 
                 // Now that we've built all the individual local steps in this
                 // group, we need to record that we built this group and
@@ -672,7 +672,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 // Create n steps given a parallelism of n. Then use these
                 // to create a StatelessPartitionRouter.
                 let step_group_steps = create_step_group(execution_ids,
-                  builder, out_router)
+                  builder, out_router, _is_recovering)
 
                 // Now that we've built all the individual local steps in this
                 // group, we need to record that we built this group and
@@ -732,7 +732,7 @@ actor LocalTopologyInitializer is LayoutInitializer
               // infrastructure doesn't allow that. This means that currently
               // the same sink_id is attached to sink replicas across workers.
               let sink = egress_builder(_worker_name, consume sink_reporter,
-                _event_log, _recovering, _barrier_coordinator,
+                _event_log, _is_recovering, _barrier_coordinator,
                 _checkpoint_initiator, _env, _auth,
                 _outgoing_boundaries)
 
@@ -757,7 +757,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 _metrics_conn)
 
               let sinks = multi_sink_builder(_worker_name,
-                consume sink_reporter, _event_log, _recovering,
+                consume sink_reporter, _event_log, _is_recovering,
                 _barrier_coordinator, _checkpoint_initiator, _env, _auth,
                 _outgoing_boundaries)
 
@@ -856,7 +856,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   source_name, source_runner_builder, partitioner_builder,
                   out_router, _metrics_conn, consume source_reporter,
                   _router_registry, _outgoing_boundary_builders, _event_log,
-                  _auth, this, _recovering, worker_source_config, _connections,
+                  _auth, this, _is_recovering, worker_source_config, _connections,
                   t.worker_names, _is_joining)
                 _sc_builders.push(sc_builder)
               else
@@ -940,7 +940,7 @@ actor LocalTopologyInitializer is LayoutInitializer
               error
             end
 
-          if not _recovering then
+          if not _is_recovering then
             _connections.send_control("initializer", topology_ready_msg)
           end
         end
@@ -983,13 +983,15 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
 
   fun create_step_group(routing_ids: SetIs[RoutingId] box,
-    builder: StepBuilder, output_router: Router): Map[RoutingId, Step]
+    builder: StepBuilder, output_router: Router, is_recovering: Bool):
+    Map[RoutingId, Step]
   =>
     let steps = Map[RoutingId, Step]
     for r_id in routing_ids.values() do
       let next_step = builder(r_id, _worker_name, output_router,
         _metrics_conn, _event_log, _recovery_replayer, _auth,
-        _outgoing_boundaries, _router_registry)
+        _outgoing_boundaries, _router_registry
+        where is_recovering = is_recovering)
 
       steps(r_id) = next_step
       _connections.register_disposable(next_step)
@@ -1074,7 +1076,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
     match _topology
     | let t: LocalTopology =>
-      if _recovering then
+      if _is_recovering then
         _recovery.start_recovery(t.worker_names)
       else
         _phase.report_recovery_ready_to_work()
@@ -1182,7 +1184,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   be recover_and_initialize(ws: Array[WorkerName] val,
     cluster_initializer: (ClusterInitializer | None) = None)
   =>
-    _recovering = true
+    _is_recovering = true
     _recovered_worker_names = ws
 
     try

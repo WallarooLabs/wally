@@ -24,6 +24,7 @@ use "wallaroo/core/common"
 use "wallaroo/core/invariant"
 use "wallaroo/core/metrics"
 use "wallaroo/core/rebalancing"
+use "wallaroo/core/recovery"
 use "wallaroo_labs/mort"
 
 
@@ -59,6 +60,15 @@ trait StepPhase
     If we're not handling a barrier, there's nothing to do to prepare.
     """
     None
+
+  fun ref rollback(step_id: RoutingId, step: Step ref, payload: ByteSeq val,
+    event_log: EventLog, runner: Runner)
+  =>
+    ifdef "resilience" then
+      StepRollbacker(payload, runner, step)
+    end
+    event_log.ack_rollback(step_id)
+    step.finish_rolling_back()
 
   fun ref remove_input(input_id: RoutingId) =>
     """
@@ -261,6 +271,42 @@ class _BarrierStepPhase is StepPhase
       _step.barrier_complete(b_token)
     end
 
+class _RecoveringStepPhase is StepPhase
+  let _step: Step ref
+
+  new create(s: Step ref) =>
+    _step = s
+
+  fun name(): String => __loc.type_name()
+
+  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, key: Key, event_ts: U64, watermark_ts: U64,
+    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, i_seq_id: SeqId, latest_ts: U64,
+    metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    None
+
+  fun ref trigger_timeout(step: Step ref) =>
+    None
+
+  fun ref receive_barrier(step_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    None
+
+  fun ref prepare_for_rollback(token: BarrierToken) =>
+    _step.finish_preparing_for_rollback()
+
+  fun ref queued(): Array[_Queued] =>
+    Array[_Queued]
+
+  fun send_state(step: Step ref, runner: Runner, id: RoutingId,
+    boundary: OutgoingBoundary, step_group: RoutingId, key: Key,
+    checkpoint_id: CheckpointId, auth: AmbientAuth)
+  =>
+    None
+
 class _DisposedStepPhase is StepPhase
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, key: Key, event_ts: U64, watermark_ts: U64,
@@ -291,6 +337,11 @@ class _DisposedStepPhase is StepPhase
   fun send_state(step: Step ref, runner: Runner, id: RoutingId,
     boundary: OutgoingBoundary, step_group: RoutingId, key: Key,
     checkpoint_id: CheckpointId, auth: AmbientAuth)
+  =>
+    None
+
+  fun ref rollback(step_id: RoutingId, step: Step ref, payload: ByteSeq val,
+    event_log: EventLog, runner: Runner)
   =>
     None
 
