@@ -1129,6 +1129,9 @@ actor LocalTopologyInitializer is LayoutInitializer
       if _is_joining then
         @printf[I32]("Joining worker: Skipping Phase III\n".cstring())
         _cluster_ready_to_work(initializables)
+      elseif _is_recovering then
+        @printf[I32]("Recovering worker: Skipping Phase III\n".cstring())
+        _cluster_ready_to_work(initializables)
       else
         _phase = _ApplicationReadyToWorkPhase(this, initializables,
           t.worker_names, workers_ready_to_work, _is_initializer)
@@ -1138,8 +1141,9 @@ actor LocalTopologyInitializer is LayoutInitializer
       Fail()
     end
 
-  fun ref _cluster_ready_to_work(initializables: Initializables) =>
-    _phase = _ClusterReadyToWorkPhase(this, initializables)
+  fun ref _inform_cluster_all_workers_ready_to_work() =>
+    ifdef debug then Invariant(_is_initializer) end
+
     match _topology
     | let t: LocalTopology =>
       try
@@ -1156,15 +1160,16 @@ actor LocalTopologyInitializer is LayoutInitializer
       Fail()
     end
 
-    if _is_initializer then
-      match _cluster_initializer
-      | let ci: ClusterInitializer =>
-        ci.topology_ready("initializer")
-      else
-        @printf[I32](("Need ClusterInitializer to inform that topology is " +
-          "ready\n").cstring())
-      end
+    match _cluster_initializer
+    | let ci: ClusterInitializer =>
+      ci.topology_ready("initializer")
+    else
+      @printf[I32](("Need ClusterInitializer to inform that topology is " +
+        "ready\n").cstring())
     end
+
+  fun ref _cluster_ready_to_work(initializables: Initializables) =>
+    _phase = _ClusterReadyToWorkPhase(this, initializables)
 
   fun ref _register_source_coordinators() =>
     for sca in _sc_actors.values() do
