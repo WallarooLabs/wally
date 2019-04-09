@@ -705,8 +705,13 @@ actor ConnectorSource[In: Any val] is Source
           end
         else
           // We're already connected, unsubscribe the event and close.
-          @pony_asio_event_unsubscribe(event)
-          @pony_os_socket_close[None](fd)
+          if not AsioEvent.disposable(flags) then
+            @pony_asio_event_unsubscribe(event)
+          end
+          if _connected then
+            @pony_os_socket_close[None](fd)
+          end
+          _try_shutdown()
         end
       else
         // It's not our event.
