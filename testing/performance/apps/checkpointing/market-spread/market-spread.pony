@@ -151,7 +151,13 @@ class val CheckMarketData is StateComputation[
     match msg
     | let order: FixOrderMessage val =>
       // We're going to always reject and send output for each message
-      OrderResult(order, 0, 0, WallClock.nanoseconds())
+      try
+        let decode_timestamp = msg.transact_time().u64()?
+        OrderResult(order, 0, 0, decode_timestamp)
+      else
+        // Bad timestamp data
+        Fail()
+      end
     | let nbbo: FixNbboMessage val =>
       None
     end
@@ -168,7 +174,10 @@ primitive FixOrderFrameHandler is FramedSourceHandler[FixOrderMessage val]
 
   fun decode(data: Array[U8] val): FixOrderMessage val ? =>
     match FixishMsgDecoder(data)?
-    | let m: FixOrderMessage val => m
+    | let m: FixOrderMessage val =>
+      let decode_timestamp = WallClock.nanoseconds().string()
+      FixOrderMessage(m.side(), m.account(), m.order_id(), m.symbol(),
+        m.order_qty(), m.price(), decode_timestamp)
     | let m: FixNbboMessage val => @printf[I32]("Got FixNbbo\n".cstring()); Fail(); error
     else
       @printf[I32]("Could not get FixOrder from incoming data\n".cstring())
@@ -233,8 +242,9 @@ primitive OrderResultEncoder
     ifdef "market_results" then
       @printf[I32](("!!" + r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
     end
+    let encode_timestamp = WallClock.nanoseconds()
     //Header (size == 55 bytes)
-    let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
+    let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8 + 8
     wb.u32_be(msgs_size.u32())
     //Fields
     match r.order.side()
@@ -249,4 +259,5 @@ primitive OrderResultEncoder
     wb.f64_be(r.bid)
     wb.f64_be(r.offer)
     wb.u64_be(r.timestamp)
+    wb.u64_be(encode_timestamp)
     wb.done()
