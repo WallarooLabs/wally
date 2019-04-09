@@ -76,7 +76,6 @@ use "wallaroo_labs/conversions"
 use "wallaroo_labs/fix"
 use "wallaroo_labs/hub"
 use "wallaroo_labs/new_fix"
-use "wallaroo_labs/options"
 use "wallaroo_labs/time"
 use "wallaroo"
 use "wallaroo_labs/mort"
@@ -132,8 +131,8 @@ actor Main
 class FixedState is State
   let state: Array[U8] val
 
-  new val create(size: USize) =>
-    state = Array[U8].create(size)
+  new create(size: USize) =>
+    state = recover val Array[U8].create(size) end
 
 
 class val CheckMarketData is StateComputation[
