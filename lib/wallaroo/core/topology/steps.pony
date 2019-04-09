@@ -78,9 +78,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
 
   let _router_registry: RouterRegistry
 
-  // Checkpoint
-  var _next_checkpoint_id: CheckpointId = 1
-
   // Watermarks
   var _watermarks: StageWatermarks = _watermarks.create()
 
@@ -92,7 +89,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     recovery_replayer: RecoveryReconnecter,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     router_registry: RouterRegistry,
-    router': Router = EmptyRouter)
+    router': Router = EmptyRouter, is_recovering: Bool = false)
   =>
     _auth = auth
     _runner = consume runner
@@ -117,7 +114,12 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       _register_output(c_id, consumer)
     end
 
-    _phase = _NormalStepPhase(this)
+    _phase =
+      if is_recovering then
+        _NormalStepPhase(this)
+      else
+        _RecoveringStepPhase(this)
+      end
 
     match _runner
     | let tr: TimeoutTriggeringRunner =>
@@ -503,7 +505,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   // CHECKPOINTS
   //////////////
   fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
-    _next_checkpoint_id = checkpoint_id + 1
     ifdef "resilience" then
       StepStateCheckpointer(_runner, _id, checkpoint_id, _event_log,
         _watermarks, _auth)
@@ -518,11 +519,10 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
   =>
-    _next_checkpoint_id = checkpoint_id + 1
-    ifdef "resilience" then
-      StepRollbacker(payload, _runner, this)
-    end
-    event_log.ack_rollback(_id)
+    _phase.rollback(_id, this, payload, event_log, _runner)
+
+  fun ref finish_rolling_back() =>
+    _phase = _NormalStepPhase(this)
 
   fun ref rollback_watermarks(bs: ByteSeq val) =>
     try
