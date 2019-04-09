@@ -208,10 +208,11 @@ class Runner(threading.Thread):
         logging.log(1, "get_output(start_from={})".format(start_from))
         if self._output:
             return self._output[start_from:]
-        self._file.flush()
-        with open(self._file.name, 'r', errors='backslashreplace') as ro:
-            ro.seek(start_from)
-            return ro.read()
+        if self._file is not None:
+            self._file.flush()
+            with open(self._file.name, 'r', errors='backslashreplace') as ro:
+                ro.seek(start_from)
+                return ro.read()
 
     def tell(self):
         logging.log(1, "tell()")
