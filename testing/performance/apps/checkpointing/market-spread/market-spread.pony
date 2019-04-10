@@ -94,16 +94,21 @@ actor Main
       // Add options:
       // "--state-size": Int
       var state_size: USize = 10
+      var output: Bool = false
 
       let options = Options(env.args, false)
 
       options.add("state-size", "", I64Argument)
+      options.add("output", "", None)
 
       for option in options do
         match option
         | ("state-size", let arg: I64) =>
           state_size = arg.usize()
+        | ("output", None) =>
+          output = true
         end
+
       end
 
       let pipeline = recover val
@@ -118,7 +123,7 @@ actor Main
           .key_by(NbboSymbolExtractor)
 
         orders.merge[FixNbboMessage val](nbbos)
-          .to[OrderResult val](CheckMarketData(state_size))
+          .to[OrderResult val](CheckMarketData(state_size, output))
           .to_sink(TCPSinkConfig[OrderResult val].from_options(
             OrderResultEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
 
@@ -139,9 +144,11 @@ class val CheckMarketData is StateComputation[
   (FixOrderMessage val | FixNbboMessage val), OrderResult val, FixedState]
 
   let _state_size: USize
+  let _output: Bool
 
-  new val create(size: USize) =>
+  new val create(size: USize, output: Bool) =>
     _state_size = size
+    _output = output
 
   fun name(): String => "Check Market Data"
 
@@ -150,13 +157,17 @@ class val CheckMarketData is StateComputation[
   =>
     match msg
     | let order: FixOrderMessage val =>
-      // We're going to always reject and send output for each message
-      try
-        let decode_timestamp = msg.transact_time().u64()?
-        OrderResult(order, 0, 0, decode_timestamp)
+      if _output then
+        // We're going to always reject and send output for each message
+        try
+          let decode_timestamp = msg.transact_time().u64()?
+          OrderResult(order, 0, 0, decode_timestamp)
+        else
+          // Bad timestamp data
+          Fail()
+        end
       else
-        // Bad timestamp data
-        Fail()
+        None
       end
     | let nbbo: FixNbboMessage val =>
       None
