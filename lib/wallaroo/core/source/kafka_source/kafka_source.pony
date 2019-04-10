@@ -39,7 +39,8 @@ use "wallaroo_labs/mort"
 actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   let _source_id: RoutingId
   let _auth: AmbientAuth
-  let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
+  let _string_id_gen: DeterministicSourceIdGenerator =
+    DeterministicSourceIdGenerator
   var _router: Router
   let _routes: SetIs[Consumer] = _routes.create()
   // _outputs keeps track of all output targets by step id. There might be
@@ -122,11 +123,17 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     _router_registry = router_registry
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
-      let new_boundary =
-        builder.build_and_initialize(_routing_id_gen(), target_worker_name,
-          _layout_initializer)
-      router_registry.register_disposable(new_boundary)
-      _outgoing_boundaries(target_worker_name) = new_boundary
+      try
+        let boundary_id_string = target_worker_name + _source_id.string() +
+          "boundary"
+        let new_boundary =
+          builder.build_and_initialize(_string_id_gen(boundary_id_string)?,
+            target_worker_name, _layout_initializer)
+        router_registry.register_disposable(new_boundary)
+        _outgoing_boundaries(target_worker_name) = new_boundary
+      else
+        Fail()
+      end
     end
 
     _router = router'
@@ -254,11 +261,18 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     """
     for (target_worker_name, builder) in boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
-        let boundary = builder.build_and_initialize(_routing_id_gen(),
-          target_worker_name, _layout_initializer)
-        _outgoing_boundaries(target_worker_name) = boundary
-        _router_registry.register_disposable(boundary)
-        _routes.set(boundary)
+        try
+          let boundary_id_string = target_worker_name + _source_id.string() +
+            "boundary"
+          let boundary =
+            builder.build_and_initialize(_string_id_gen(boundary_id_string)?,
+              target_worker_name, _layout_initializer)
+          _outgoing_boundaries(target_worker_name) = boundary
+          _router_registry.register_disposable(boundary)
+          _routes.set(boundary)
+        else
+          Fail()
+        end
       end
     end
     _notify.update_boundaries(_outgoing_boundaries)

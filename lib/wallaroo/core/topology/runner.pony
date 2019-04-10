@@ -586,7 +586,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
         bytes_left = bytes_left - state_size
         let state_wrapper = _state_initializer.decode(reader, _auth)?
         ifdef "checkpoint_trace" then
-           @printf[I32]("OVERWRITING STATE FOR KEY %s\n".cstring(),
+          @printf[I32]("OVERWRITING STATE FOR KEY %s\n".cstring(),
             key.cstring())
         end
         _state_map(key) = state_wrapper

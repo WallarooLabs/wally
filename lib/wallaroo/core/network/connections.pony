@@ -68,6 +68,8 @@ actor Connections is Cluster
   let _init_d_service: String
   let _disposables: SetIs[DisposableActor] = _disposables.create()
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
+  let _string_id_gen: DeterministicSourceIdGenerator =
+    DeterministicSourceIdGenerator
   let _connection_addresses_file: String
   let _is_joining: Bool
   let _spike_config: (SpikeConfig | None)
@@ -634,10 +636,16 @@ actor Connections is Cluster
     let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
       MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
       _spike_config)
-    let outgoing_boundary = boundary_builder(_routing_id_gen(), target_name)
-    _data_conn_builders(target_name) = boundary_builder
-    _register_disposable(outgoing_boundary)
-    _data_conns(target_name) = outgoing_boundary
+    try
+      let boundary_id_string = target_name + "-connections-boundary"
+      let outgoing_boundary =
+        boundary_builder(_string_id_gen(boundary_id_string)?, target_name)
+      _data_conn_builders(target_name) = boundary_builder
+      _register_disposable(outgoing_boundary)
+      _data_conns(target_name) = outgoing_boundary
+    else
+      Fail()
+    end
 
   be create_data_connection_to_joining_worker(target_name: WorkerName,
     host: String, service: String, new_boundary_id: RoutingId,
@@ -825,7 +833,8 @@ actor Connections is Cluster
     _data_addrs(worker) = (host, service)
     try
       let old_bb = _data_conn_builders(worker)?
-      _data_conn_builders(worker) = old_bb.clone_with_new_service(host, service)
+      _data_conn_builders(worker) = old_bb.clone_with_new_service(host,
+        service)
     else
       Fail()
     end

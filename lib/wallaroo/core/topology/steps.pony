@@ -502,10 +502,8 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     for q in queued.values() do
       match q
       | let qm: QueuedMessage =>
-        @printf[I32]("!@ Dequeuing data msg at Step digest %s\n".cstring(), (digestof this).string().cstring())
         qm.process_message(this)
       | let qb: QueuedBarrier =>
-        @printf[I32]("!@ Dequeuing barrier at Step digest %s\n".cstring(), (digestof this).string().cstring())
         qb.inject_barrier(this)
       end
     end
