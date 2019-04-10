@@ -246,6 +246,8 @@ actor LocalTopologyInitializer is LayoutInitializer
   let _is_joining: Bool
 
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
+  let _string_id_gen: DeterministicSourceIdGenerator =
+    DeterministicSourceIdGenerator
   // Map from the source name to the WorkerSourceConfig
   let _worker_source_configs: Map[SourceName, WorkerSourceConfig] val
 
@@ -1391,13 +1393,18 @@ actor LocalTopologyInitializer is LayoutInitializer
         _save_worker_names()
         _connections.create_control_connection(w, joining_host,
           control_addr._2)
-        let new_boundary_id = _routing_id_gen()
-        _connections.create_data_connection_to_joining_worker(w,
-          joining_host, data_addr._2, new_boundary_id,
-          step_group_routing_ids, this)
-        _connections.save_connections()
-        @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
-          w.cstring())
+        let boundary_id_string = w + "-canonical-boundary"
+        try
+          let new_boundary_id = _string_id_gen(boundary_id_string)?
+          _connections.create_data_connection_to_joining_worker(w,
+            joining_host, data_addr._2, new_boundary_id,
+            step_group_routing_ids, this)
+          _connections.save_connections()
+          @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
+            w.cstring())
+        else
+          Fail()
+        end
       end
     else
       Fail()

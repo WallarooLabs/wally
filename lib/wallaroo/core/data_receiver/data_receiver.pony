@@ -87,6 +87,7 @@ actor DataReceiver is Producer
     else
       _phase = _NormalDataReceiverPhase(this)
     end
+
   fun ref metrics_reporter(): MetricsReporter =>
     _metrics_reporter
 
@@ -328,7 +329,7 @@ actor DataReceiver is Producer
       // overriden to make this change back from recovery phase. As it stands,
       // this introduces a race condition if we receive an old resume token in
       // flight before we recovered.
-      | let srt: CheckpointRollbackResumeBarrierToken =>
+      | let crrt: CheckpointRollbackResumeBarrierToken =>
         _phase = _NormalDataReceiverPhase(this)
       end
 

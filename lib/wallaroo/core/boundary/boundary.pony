@@ -94,8 +94,8 @@ class val OutgoingBoundaryBuilder
     boundary.quick_initialize(layout_initializer)
     boundary
 
-  fun val clone_with_new_service(host': String, service': String)
-    : OutgoingBoundaryBuilder val
+  fun val clone_with_new_service(host': String, service': String):
+    OutgoingBoundaryBuilder val
   =>
     let r = reporter.clone()
     OutgoingBoundaryBuilder(auth, worker_name, consume r, host', service',
