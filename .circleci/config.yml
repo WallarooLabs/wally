@@ -262,88 +262,88 @@ workflows:
             - integration-tests
             - integration-tests-correctness
             - integration-tests-resilience
-#            - integration-tests-resilience-correctness
+            - integration-tests-resilience-correctness
 
       - autoscale-tests-pony-resilience:
           requires:
             - integration-tests
             - integration-tests-correctness
             - integration-tests-resilience
-#            - integration-tests-resilience-correctness
+            - integration-tests-resilience-correctness
 
       - autoscale-tests-python2:
           requires:
             - integration-tests
             - integration-tests-correctness
             - integration-tests-resilience
-#            - integration-tests-resilience-correctness
+            - integration-tests-resilience-correctness
 
       - autoscale-tests-python2-resilience:
           requires:
             - integration-tests
             - integration-tests-correctness
             - integration-tests-resilience
-#            - integration-tests-resilience-correctness
+            - integration-tests-resilience-correctness
 
       - autoscale-tests-python3:
           requires:
             - integration-tests
             - integration-tests-correctness
             - integration-tests-resilience
-#            - integration-tests-resilience-correctness
+            - integration-tests-resilience-correctness
 
       - autoscale-tests-python3-resilience:
           requires:
             - integration-tests
             - integration-tests-correctness
             - integration-tests-resilience
-#            - integration-tests-resilience-correctness
+            - integration-tests-resilience-correctness
 
       - resilience-tests-pony:
           requires:
             - integration-tests
             - integration-tests-correctness
             - integration-tests-resilience
-#            - integration-tests-resilience-correctness
+            - integration-tests-resilience-correctness
 
       - resilience-tests-python2:
           requires:
             - integration-tests
             - integration-tests-correctness
             - integration-tests-resilience
-#            - integration-tests-resilience-correctness
+            - integration-tests-resilience-correctness
 
       - resilience-tests-python3:
           requires:
             - integration-tests
             - integration-tests-correctness
             - integration-tests-resilience
-#            - integration-tests-resilience-correctness
+            - integration-tests-resilience-correctness
 
       - topology-tests-python2:
           requires:
             - integration-tests
             - integration-tests-correctness
             - integration-tests-resilience
-#            - integration-tests-resilience-correctness
+            - integration-tests-resilience-correctness
 
       - topology-tests-python3-resilience:
           requires:
             - integration-tests
             - integration-tests-correctness
             - integration-tests-resilience
-#            - integration-tests-resilience-correctness
+            - integration-tests-resilience-correctness
 
       - topology-tests-python3:
           requires:
             - integration-tests
             - integration-tests-correctness
             - integration-tests-resilience
-#            - integration-tests-resilience-correctness
+            - integration-tests-resilience-correctness
 
       - topology-tests-python3-resilience:
           requires:
             - integration-tests
             - integration-tests-correctness
             - integration-tests-resilience
-#            - integration-tests-resilience-correctness
+            - integration-tests-resilience-correctness
