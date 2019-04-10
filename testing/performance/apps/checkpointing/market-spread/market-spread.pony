@@ -132,7 +132,7 @@ class FixedState is State
   let state: Array[U8] val
 
   new create(size: USize) =>
-    state = recover val Array[U8].create(size) end
+    state = recover val Array[U8].init(0, size) end
 
 
 class val CheckMarketData is StateComputation[
@@ -177,7 +177,7 @@ primitive FixOrderFrameHandler is FramedSourceHandler[FixOrderMessage val]
     | let m: FixOrderMessage val =>
       let decode_timestamp = WallClock.nanoseconds().string()
       FixOrderMessage(m.side(), m.account(), m.order_id(), m.symbol(),
-        m.order_qty(), m.price(), decode_timestamp)
+        m.order_qty(), m.price(), consume decode_timestamp)
     | let m: FixNbboMessage val => @printf[I32]("Got FixNbbo\n".cstring()); Fail(); error
     else
       @printf[I32]("Could not get FixOrder from incoming data\n".cstring())
