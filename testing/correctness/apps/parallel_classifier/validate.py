@@ -17,5 +17,5 @@ if (n_input_items == n_output_ids) and (n_worker_pids == n_workers):
     sys.exit(0)
 else:
     print "Expected {} pids, {} items".format(n_workers, n_input_items)
-    print "GOT {} pids, {} items".format(unique_pids, n_output_ids)
+    print "GOT {} pids, {} items".format(n_worker_pids, n_output_ids)
     sys.exit(1)

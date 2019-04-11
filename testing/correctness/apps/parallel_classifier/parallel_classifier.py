@@ -38,6 +38,7 @@ def application_setup(args):
                                              decode))
 
     pipeline = (inputs
+      .key_by(extract_key)
       .to(classify)
       .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encode)))
 
@@ -49,8 +50,13 @@ def application_setup(args):
 #     return (row_buffer.update_with(row), True)
 
 
+@wallaroo.key_extractor
+def extract_key(msg):
+    return str(msg)
+
 @wallaroo.computation(name="Classify")
 def classify(x):
+    print("classify using PID " + str(PID))
     return str(x)+":"+PID
 
 
