@@ -61,6 +61,8 @@ actor Connections is Cluster
   // control service. (TargetWorker, TargetHost, TargetService)
   let _pending_control_connections: Array[(WorkerName, String, String)] =
     _pending_control_connections.create()
+  let _pending_control_messages: Map[WorkerName, Array[Array[ByteSeq] val]] =
+    _pending_control_messages.create()
   let _metrics_conn: MetricsSink
   let _metrics_host: String
   let _metrics_service: String
@@ -212,15 +214,23 @@ actor Connections is Cluster
   be send_control(worker: String, data: Array[ByteSeq] val) =>
     _send_control(worker, data)
 
-  fun _send_control(worker: String, data: Array[ByteSeq] val) =>
+  fun ref _send_control(worker: String, data: Array[ByteSeq] val) =>
     try
-      _control_conns(worker)?.writev(data)
-      ifdef debug then
-        @printf[I32](("Sent control message to " + worker + "\n").cstring())
+      if _control_conns.contains(worker) then
+        _control_conns(worker)?.writev(data)
+        ifdef debug then
+          @printf[I32](("Sent control message to " + worker + "\n").cstring())
+        end
+      else
+        @printf[I32](("No control connection for worker " + worker + ". " +
+          "Queuing to send later.\n").cstring())
+        if not _pending_control_messages.contains(worker) then
+          _pending_control_messages(worker) = Array[Array[ByteSeq] val]
+        end
+        _pending_control_messages(worker)?.push(data)
       end
     else
-      @printf[I32](("No control connection for worker " + worker + "\n")
-        .cstring())
+      Unreachable()
     end
 
   be send_control_to_cluster(data: Array[ByteSeq] val) =>
@@ -231,7 +241,7 @@ actor Connections is Cluster
   =>
     _send_control_to_cluster(data, exclusions)
 
-  fun _send_control_to_cluster(data: Array[ByteSeq] val,
+  fun ref _send_control_to_cluster(data: Array[ByteSeq] val,
     exclusions: Array[String] val = recover Array[String] end)
   =>
     for worker in _control_conns.keys() do
@@ -243,7 +253,7 @@ actor Connections is Cluster
   be send_control_to_random(data: Array[ByteSeq] val) =>
     _send_control_to_random(data)
 
-  fun _send_control_to_random(data: Array[ByteSeq] val) =>
+  fun ref _send_control_to_random(data: Array[ByteSeq] val) =>
     let target_idx: USize = Time.nanos().usize() % _control_conns.size()
     var count: USize = 0
     for worker in _control_conns.keys() do
@@ -616,6 +626,18 @@ actor Connections is Cluster
             _my_control_addr._2, this)
         end
       _control_conns(target_name) = tcp_conn_wrapper
+      if _pending_control_messages.contains(target_name) then
+        try
+          let msgs = _pending_control_messages(target_name)?
+          for msg in msgs.values() do
+            _send_control(target_name, msg)
+          end
+          _pending_control_messages.remove(target_name)?
+        else
+          Unreachable()
+        end
+      end
+
       _register_disposable(tcp_conn_wrapper)
       let control_notifier: TCPConnectionNotify iso =
         ControlSenderConnectNotifier(_auth, target_name, host, service,
@@ -803,7 +825,7 @@ actor Connections is Cluster
     """
     _rotate_log_files(worker_name)
 
-  fun _rotate_log_files(worker_name: String) =>
+  fun ref _rotate_log_files(worker_name: String) =>
     if _log_rotation then
       if worker_name == _worker_name then
         _event_log.start_rotation()

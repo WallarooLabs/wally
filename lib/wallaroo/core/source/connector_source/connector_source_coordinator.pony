@@ -101,6 +101,10 @@ actor ConnectorSourceCoordinator[In: Any val] is
 
   var _is_joining: Bool
 
+  // TODO: These indicate an implicit state machine
+  var _application_created: Bool = false
+  var _ready_to_report_initialized: Bool = false
+
   var _initializer: (LocalTopologyInitializer | None) = None
 
   new create(env: Env, worker_name: WorkerName, pipeline_name: String,
@@ -154,8 +158,9 @@ actor ConnectorSourceCoordinator[In: Any val] is
 
     // Pass LocalConnectorStreamRegistry the parameters it needs to create
     // its own instance of the GlobalConnectorStreamRegistry
-    _stream_registry = _stream_registry.create(this, _auth, _worker_name,
-      _pipeline_name, _connections, _host, _service, workers_list, _is_joining)
+    _stream_registry = LocalConnectorStreamRegistry[In](this, _auth,
+      _worker_name, _pipeline_name, _connections, _host, _service,
+      workers_list, _is_joining)
 
     match router
     | let pr: StatePartitionRouter =>
@@ -412,10 +417,11 @@ actor ConnectorSourceCoordinator[In: Any val] is
     // Hold onto initializer so we can report initialized once the global
     // registry receives the leader name
     _initializer = initializer
+    _application_created = true
     @printf[I32]("ConnectorSourceCoordinator for: %s created.\n".cstring(),
       _pipeline_name.cstring())
-    if not _is_joining then
-      report_initialized()
+    if (not _is_joining) or _ready_to_report_initialized then
+      _report_initialized()
     end
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
@@ -433,13 +439,18 @@ actor ConnectorSourceCoordinator[In: Any val] is
     end
 
   be report_initialized() =>
+    _report_initialized()
+
+  fun ref _report_initialized() =>
     @printf[I32]("ConnectorSourceCoordinator for: %s reporting initialized.\n"
       .cstring(), _pipeline_name.cstring())
-    _is_joining = false
-    try
-      (_initializer as LocalTopologyInitializer).report_initialized(this)
-    else
-      Fail()
+    _ready_to_report_initialized = true
+    if _application_created then
+      try
+        (_initializer as LocalTopologyInitializer).report_initialized(this)
+      else
+        Fail()
+      end
     end
 
   //////////////
