@@ -3,7 +3,7 @@
 
 from struct import pack
 
-for num_keys in [100, 1000, 10000, 100000]:
+for num_keys in [100, 500, 1000, 5000, 10000, 50000, 100000]:
     filename='checkpoint_perf_test_{}_keys.msg'.format(num_keys)
     with open(filename, 'wb') as f:
         for x in range(num_keys):
