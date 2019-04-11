@@ -87,19 +87,19 @@ class StreamRegistryCheckpointState[In: Any val]
     _source_addrs_reallocation = source_addrs_reallocation
     _workers_set = workers_set
 
-  fun ref global_registry(listener: ConnectorSourceCoordinator[In],
+  fun ref global_registry(coordinator: ConnectorSourceCoordinator[In],
     local_registry: LocalConnectorStreamRegistry[In],
     auth: AmbientAuth, connections: Connections):
     GlobalConnectorStreamRegistry[In]
   =>
-    GlobalConnectorStreamRegistry[In].from_checkpoint(listener, auth,
+    GlobalConnectorStreamRegistry[In].from_checkpoint(coordinator, auth,
       _worker_name, _source_name, connections, _source_addr,
       _active_streams, _inactive_streams, _source_addrs,
       _source_addrs_reallocation, _workers_set, _leader_name,
       _is_leader, local_registry)
 
 class GlobalConnectorStreamRegistry[In: Any val]
-  let _listener: ConnectorSourceCoordinator[In] tag
+  let _coordinator: ConnectorSourceCoordinator[In] tag
   let _connections: Connections
   var _worker_name: String
   let _source_name: String
@@ -125,12 +125,12 @@ class GlobalConnectorStreamRegistry[In: Any val]
     _source_addrs_reallocation.create()
   var _workers_set: Set[WorkerName] = _workers_set.create()
 
-  new create(listener: ConnectorSourceCoordinator[In],
+  new create(coordinator: ConnectorSourceCoordinator[In],
     auth: AmbientAuth, worker_name: WorkerName, source_name: String,
     connections: Connections, host: String, service: String,
     workers_list: Array[WorkerName] val, is_joining: Bool)
   =>
-    _listener = listener
+    _coordinator = coordinator
     _auth = auth
     _worker_name = worker_name
     _source_name = source_name
@@ -142,7 +142,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     end
     _elect_leader()
 
-  new from_checkpoint(listener: ConnectorSourceCoordinator[In],
+  new from_checkpoint(coordinator: ConnectorSourceCoordinator[In],
     auth: AmbientAuth, worker_name: WorkerName, source_name: String,
     connections: Connections, source_addr: (String, String),
     active_streams: Map[StreamId, WorkerName],
@@ -152,7 +152,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     workers_set: Set[WorkerName], leader_name: WorkerName,
     is_leader: Bool, local_registry: LocalConnectorStreamRegistry[In])
   =>
-    _listener = listener
+    _coordinator = coordinator
     _auth = auth
     _worker_name = worker_name
     _source_name = source_name
@@ -223,7 +223,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
       _is_relinquishing = false
       @printf[I32](("Connector Leadership relinquish complete. New Leader: " +
         msg.leader_name + "\n").cstring())
-      _listener.complete_shrink_migration()
+      _coordinator.complete_shrink_migration()
     else
       @printf[I32](("Not a Connector leader but received a " +
         "ConnectorLeaderStateReceivedAckMsg from " + msg.leader_name +
@@ -304,7 +304,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
       Fail()
     end
     _send_source_address_to_leader()
-    _listener.report_initialized()
+    _coordinator.report_initialized()
 
   fun ref complete_leader_state_relinquish(new_leader_name: WorkerName) =>
     _relinquish_leader_state(new_leader_name)
@@ -660,7 +660,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
           relinquish_leadership(new_leader_name)
         else
           // shrink complete and leader is not shrinking/relinquishing
-          _listener.complete_shrink_migration()
+          _coordinator.complete_shrink_migration()
         end
       end
     end
@@ -744,7 +744,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     """
     local->global.shrink_complete
     All local sources have completed shrinking. Report to global and call
-    shrink_migration_complete on the listener.
+    shrink_migration_complete on the coordinator.
     """
     if _is_leader then
       try _source_addrs_reallocation.remove(worker_name)? end
@@ -752,7 +752,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     else
       ConnectorStreamRegistryMessenger.worker_shrink_complete(_source_name,
         _leader_name, worker_name, _connections, _auth)
-      _listener.complete_shrink_migration()
+      _coordinator.complete_shrink_migration()
     end
 
   fun ref process_worker_shrink_complete_msg(
@@ -816,21 +816,21 @@ class LocalConnectorStreamRegistry[In: Any val]
     _shrinking_sources.create()
 
   // ConnectorSourceCoordinator
-  let _listener: ConnectorSourceCoordinator[In] tag
+  let _coordinator: ConnectorSourceCoordinator[In] tag
 
-  new ref create(listener: ConnectorSourceCoordinator[In] tag,
+  new ref create(coordinator: ConnectorSourceCoordinator[In] tag,
     auth: AmbientAuth,
     worker_name: WorkerName, source_name: String,
     connections: Connections, host: String, service: String,
     workers_list: Array[WorkerName] val, is_joining: Bool)
   =>
     _auth = auth
-    _listener = listener
+    _coordinator = coordinator
     _connections = connections
     _worker_name = worker_name
     _source_name = source_name
     _is_joining = is_joining
-    _global_registry = _global_registry.create(_listener, auth, worker_name,
+    _global_registry = _global_registry.create(_coordinator, auth, worker_name,
       source_name, connections, host, service, workers_list, _is_joining)
     _global_registry.set_local_registry(this)
 
@@ -842,7 +842,7 @@ class LocalConnectorStreamRegistry[In: Any val]
       match Serialised.input(InputSerialisedAuth(_auth),
         payload as Array[U8] val)(DeserialiseAuth(_auth))?
       | let s: StreamRegistryCheckpointState[In] =>
-        _global_registry = s.global_registry(_listener, this, _auth,
+        _global_registry = s.global_registry(_coordinator, this, _auth,
          _connections)
       else
         Fail()
@@ -855,7 +855,7 @@ class LocalConnectorStreamRegistry[In: Any val]
   // MESSAGE HANDLING
   ///////////////////
 
-  fun ref listener_msg_received(msg: SourceCoordinatorMsg) =>
+  fun ref coordinator_msg_received(msg: SourceCoordinatorMsg) =>
     // we only care for messages that belong to this source name
     if (msg.source_name() == _source_name) then
       match msg

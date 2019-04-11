@@ -304,7 +304,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
     _stream_registry.remove_worker(worker)
 
   be receive_msg(msg: SourceCoordinatorMsg) =>
-    _stream_registry.listener_msg_received(msg)
+    _stream_registry.coordinator_msg_received(msg)
 
   ////////////////////////////////////////
   // Asynchronous stream registry actions
