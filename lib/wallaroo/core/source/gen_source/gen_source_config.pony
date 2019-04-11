@@ -31,7 +31,7 @@ class val GenSourceConfig[In: Any val] is SourceConfig
     GenSourceCoordinatorBuilderBuilder[In]
 
   fun default_partitioner_builder(): PartitionerBuilder =>
-    RandomPartitionerBuilder
+    PassthroughPartitionerBuilder
 
   fun worker_source_config(): WorkerSourceConfig =>
     _worker_source_config

@@ -31,53 +31,68 @@ actor Main
   new create(env: Env) =>
     try
       let pipeline = recover val
-        let inputs1 = Wallaroo.source[F32]("Celsius Conversion0",
-            TCPSourceConfig[F32].from_options(CelsiusDecoder,
-              TCPSourceConfigCLIParser("Celsius Conversion0", env.args)?))
-            .collect()
-            .to[F32](Multiply)
-            .to[F32](Add)
+        let inputs1 = Wallaroo.source[(U32, U32)]("Pipeline1",
+            TCPSourceConfig[(U32, U32)].from_options(Decoder,
+              TCPSourceConfigCLIParser("Pipeline1", env.args)?))
+            .to[(U32, U32)](Comp1("inputs1"))
+            .to[(U32, U32)](Comp2("inputs1"))
 
-        let inputs2 = Wallaroo.source[F32]("Celsius Conversion1",
-            TCPSourceConfig[F32].from_options(CelsiusDecoder,
-              TCPSourceConfigCLIParser("Celsius Conversion1", env.args)?))
-            .collect()
-            .to[F32](Multiply)
-            .to[F32](Add)
+        let inputs2 = Wallaroo.source[(U32, U32)]("Pipeline2",
+            TCPSourceConfig[(U32, U32)].from_options(Decoder,
+              TCPSourceConfigCLIParser("Pipeline2", env.args)?))
+            .to[(U32, U32)](Comp1("inputs2"))
+            .to[(U32, U32)](Comp2("inputs2"))
 
-        inputs1.merge[F32](inputs2)
-          .to_sink(TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
+        inputs1.merge[(U32, U32)](inputs2)
+          .to_sink(TCPSinkConfig[(U32, U32)].from_options(Encoder,
             TCPSinkConfigCLIParser(env.args)?(0)?))
       end
-      Wallaroo.build_application(env, "celsius-multi-pipeline", pipeline)
+      Wallaroo.build_application(env, "multi-pipeline", pipeline)
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end
 
-primitive Multiply is StatelessComputation[F32, F32]
-  fun apply(input: F32): F32 =>
-    input * 1.8
+class val Comp1 is StatelessComputation[(U32, U32), (U32, U32)]
+  let _pipeline: String
+  new val create(p: String) => _pipeline = p
 
-  fun name(): String => "Multiply by 1.8"
+  fun apply(input: (U32, U32)): (U32, U32) =>
+    @printf[I32]("Comp1 (%s): (%s, %s)\n".cstring(), _pipeline.cstring(),
+      input._1.string().cstring(), input._2.string().cstring())
+    (input._1, input._2)
 
-primitive Add is StatelessComputation[F32, F32]
-  fun apply(input: F32): F32 =>
-    input + 32
+  fun name(): String => "Computation 1"
 
-  fun name(): String => "Add 32"
+class val Comp2 is StatelessComputation[(U32, U32), (U32, U32)]
+  let _pipeline: String
+  new val create(p: String) => _pipeline = p
 
-primitive CelsiusDecoder is FramedSourceHandler[F32]
+  fun apply(input: (U32, U32)): (U32, U32) =>
+    @printf[I32]("-- Comp2 (%s): (%s, %s)\n".cstring(), _pipeline.cstring(),
+      input._1.string().cstring(), input._2.string().cstring())
+    (input._1, input._2)
+
+  fun name(): String => "Computation 2"
+
+primitive Decoder is FramedSourceHandler[(U32, U32)]
   fun header_length(): USize =>
     4
 
   fun payload_length(data: Array[U8] iso): USize =>
-    4
+    8
 
-  fun decode(data: Array[U8] val): F32 ? =>
-    Bytes.to_f32(data(0)?, data(1)?, data(2)?, data(3)?)
+  fun decode(data: Array[U8] val): (U32, U32) ? =>
+    let input = (Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?),
+      Bytes.to_u32(data(4)?, data(5)?, data(6)?, data(7)?))
+    @printf[I32]("Decoder: (%s, %s)\n".cstring(),
+      input._1.string().cstring(), input._2.string().cstring())
+    input
 
-primitive FahrenheitEncoder
-  fun apply(f: F32, wb: Writer): Array[ByteSeq] val =>
-    wb.u32_be(4)
-    wb.f32_be(f)
+primitive Encoder
+  fun apply(v: (U32, U32), wb: Writer): Array[ByteSeq] val =>
+    @printf[I32]("Encoder: (%s, %s)\n".cstring(),
+      v._1.string().cstring(), v._2.string().cstring())
+    wb.u32_be(8)
+    wb.u32_be(v._1)
+    wb.u32_be(v._2)
     wb.done()

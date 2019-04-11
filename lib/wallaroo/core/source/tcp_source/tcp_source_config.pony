@@ -107,7 +107,7 @@ class val TCPSourceConfig[In: Any val] is SourceConfig
     TCPSourceCoordinatorBuilderBuilder[In](this)
 
   fun default_partitioner_builder(): PartitionerBuilder =>
-    RandomPartitionerBuilder
+    PassthroughPartitionerBuilder
 
   fun worker_source_config(): WorkerSourceConfig =>
     _worker_source_config
