@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+
+# Copyright 2019 The Wallaroo Authors.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+#  implied. See the License for the specific language governing
+#  permissions and limitations under the License.
+
+
+import argparse
+import json
+import os
+import struct
+import sys
+import time
+
+
+parser = argparse.ArgumentParser("Checkpoint probe")
+parser.add_argument("--output", default="checkpoint_stats.log",
+                    help="Where to save the checkpoint stats data")
+parser.add_argument("--res-dir", default='./res-dir',
+                    help="The path to the application's resilience dir.")
+parser.add_argument("--workers", default=1, type=int,
+                    help="How many workers to expect before starting the probing")
+args = parser.parse_args()
+
+checkpoint_files = set()
+log_files = set()
+
+def get_files(path):
+    global checkpoint_file
+    global log_file
+    fs = os.listdir(path)
+    for fn in fs:
+        if fn.endswith('.checkpoint_ids'):
+            checkpoint_files.add(os.path.join(path, fn))
+            continue
+        if fn.endswith('evlog'):
+            log_files.add(os.path.join(path, fn))
+            continue
+
+
+def get_file_sizes(files):
+    return {path: os.stat(path).st_size
+            for path in files}
+
+
+def get_last_checkpoint(path):
+    with open(path, 'rb') as f:
+        f.seek(-16, 2)
+        return struct.unpack('>Q', f.read(8))[0]
+
+
+def get_last_checkpoints(files):
+    return {path: get_last_checkpoint(path)
+            for path in files}
+
+
+# Wait for files to exist
+print("Waiting for evlog and checkpoint_id files for {} workers"
+      .format(args.workers))
+while (len(checkpoint_files) < args.workers or
+       len(log_files) < args.workers):
+    get_files(args.res_dir)
+    time.sleep(0.25)
+
+print("checkpoint_files: {}".format(checkpoint_files))
+print("log_files: {}".format(log_files))
+
+# Start probing checkpoint_ids
+# and file size
+print("Saving probe data to {!r}".format(args.output))
+with open(args.output, 'w', encoding="utf8") as out:
+    try:
+        while True:
+            # timestamp
+            ts = time.time()
+            log_bytes = get_file_sizes(log_files)
+            last_checkpoints = get_last_checkpoints(checkpoint_files)
+            data = {'ts': ts, 'log_bytes': log_bytes,
+                    'checkpoint_ids': last_checkpoints}
+            json.dump(data, out)
+            out.write('\n')
+            out.flush()
+            print("{}: wrote {}".format(ts, data))
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("KeyboardInterrupt received. Terminating probe.")
+        exit_code = 1
+    except FileNotFoundError as err:
+        print("Could not open file {}. Terminating probe."
+              .format(err.filename))
+        exit_code = 1
+
+exit(exit_code)
