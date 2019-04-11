@@ -46,13 +46,13 @@ integration-tests-testing-correctness-apps-multi_pipeline: multi_pipeline_test
 multi_pipeline_test:
 	cd $(MULTI_PIPELINE_PATH) && \
 	integration_test \
-		--framed-file-sender _test.msg '"Celsius Conversion0"' \
-		--framed-file-sender _test.msg '"Celsius Conversion1"' \
-		--validation-cmp \
-	  --expected-file _expected.msg \
+		--framed-file-sender _test1.msg 'Pipeline1' \
+		--framed-file-sender _test2.msg 'Pipeline2' \
 		--log-level error \
 		--command './multi_pipeline $(RUN_WITH_RESILIENCE)' \
-		--sink-expect 200 \
+		--validation-cmd 'python _validate.py --expect _expected.json --output' \
+		--output 'received.txt' \
+		--sink-expect 2000 \
 		--sinks 1
 
 # end of prevent rules from being evaluated/included multiple times
