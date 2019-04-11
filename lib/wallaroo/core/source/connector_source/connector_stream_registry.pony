@@ -830,8 +830,9 @@ class LocalConnectorStreamRegistry[In: Any val]
     _worker_name = worker_name
     _source_name = source_name
     _is_joining = is_joining
-    _global_registry = _global_registry.create(_coordinator, auth, worker_name,
-      source_name, connections, host, service, workers_list, _is_joining)
+    _global_registry = GlobalConnectorStreamRegistry[In](_coordinator, auth,
+      worker_name, source_name, connections, host, service, workers_list,
+      _is_joining)
     _global_registry.set_local_registry(this)
 
   fun ref checkpoint_state(): Array[ByteSeq] val ? =>

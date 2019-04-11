@@ -206,6 +206,11 @@ class _BarrierStepPhase is StepPhase
         Invariant(not (barrier_token > _barrier_token))
       end
 
+      //!@ Document
+      if _barrier_token > barrier_token then
+        return
+      end
+
       ifdef debug then
         if barrier_token != _barrier_token then
           @printf[I32]("Received %s when still processing %s at step %s\n"
