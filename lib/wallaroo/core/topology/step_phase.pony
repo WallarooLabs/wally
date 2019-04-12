@@ -192,6 +192,13 @@ class _BarrierStepPhase is StepPhase
   fun ref receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
+    //If we are processing a "high priority" barrier (such as a Rollback
+    //barrier), we should throw away any lower priority barriers we see as
+    //it is expected they might still be in circulation.
+    if _barrier_token > barrier_token then
+      return
+    end
+
     if input_blocking(input_id) then
       _queued.push(QueuedBarrier(input_id, producer, barrier_token))
     else
@@ -204,11 +211,6 @@ class _BarrierStepPhase is StepPhase
         end
 
         Invariant(not (barrier_token > _barrier_token))
-      end
-
-      //!@ Document
-      if _barrier_token > barrier_token then
-        return
       end
 
       ifdef debug then
