@@ -253,6 +253,7 @@ class TCPReceiver(StoppableThread):
                     f.write(struct.pack('>Q', c))
                     c += 1
                 f.write(item[self.header_length:])
+            f.flush()
 
     def bytes_received(self):
         return sum(map(len, self.data))
