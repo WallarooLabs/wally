@@ -537,21 +537,22 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _checkpoint_initiator.commit_checkpoint_id(m.checkpoint_id,
           m.rollback_id, m.sender)
       | let m: RecoveryInitiatedMsg =>
-        _recovery.recovery_initiated_at_worker(m.sender, m.token)
+        _recovery.recovery_initiated_at_worker(m.sender, m.rollback_id)
       | let m: AckRecoveryInitiatedMsg =>
-        _recovery.ack_recovery_initiated(m.sender, m.token)
+        _recovery.ack_recovery_initiated(m.sender)
       | let m: InitiateRollbackBarrierMsg =>
         let promise = Promise[CheckpointRollbackBarrierToken]
         promise.next[None]({(t: CheckpointRollbackBarrierToken) =>
           try
             let msg = ChannelMsgEncoder.rollback_barrier_fully_acked(t,
               _worker_name, _auth)?
-            _connections.send_control(m.sender, msg)
+            _connections.send_control(m.recovering_worker, msg)
           else
             Fail()
           end
         })
-        _checkpoint_initiator.initiate_rollback(promise, m.sender)
+        _checkpoint_initiator.initiate_rollback(promise, m.recovering_worker,
+          m.rollback_id)
       | let m: PrepareForRollbackMsg =>
         // TODO: This promise can be used for acking. Right now it's a
         // placeholder.
@@ -572,6 +573,21 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         })
         _layout_initializer.rollback_local_keys(m.checkpoint_id,
           promise)
+      | let m: RequestRollbackIdMsg =>
+        let promise = Promise[RollbackId]
+        promise.next[None]({(rollback_id: RollbackId) =>
+          @printf[I32]("!@ Telling %s that rollback_id is %s\n".cstring(), m.sender.cstring(), rollback_id.string().cstring())
+          try
+            let msg = ChannelMsgEncoder.announce_rollback_id(rollback_id,
+              _auth)?
+            _connections.send_control(m.sender, msg)
+          else
+            Fail()
+          end
+        })
+        _checkpoint_initiator.request_rollback_id(promise)
+      | let m: AnnounceRollbackIdMsg =>
+        _recovery.receive_rollback_id(m.rollback_id)
       | let m: AckRollbackLocalKeysMsg =>
         _recovery.worker_ack_local_keys_rollback(m.sender, m.checkpoint_id)
       | let m: RegisterProducersMsg =>

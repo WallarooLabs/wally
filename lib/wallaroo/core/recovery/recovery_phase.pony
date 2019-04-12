@@ -46,11 +46,15 @@ trait _RecoveryPhase
   fun ref rollback_prep_complete() =>
     _invalid_call(); Fail()
 
-  fun ref worker_ack_local_keys_rollback(w: WorkerName, checkpoint_id: CheckpointId)
+  fun ref worker_ack_local_keys_rollback(w: WorkerName,
+    checkpoint_id: CheckpointId)
   =>
     _invalid_call(); Fail()
 
   fun ref worker_ack_register_producers(w: WorkerName) =>
+    _invalid_call(); Fail()
+
+  fun ref receive_rollback_id(rollback_id: RollbackId) =>
     _invalid_call(); Fail()
 
   fun ref rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
@@ -59,9 +63,7 @@ trait _RecoveryPhase
   fun ref data_receivers_ack() =>
     _invalid_call(); Fail()
 
-  fun ref ack_recovery_initiated(w: WorkerName,
-    token: CheckpointRollbackBarrierToken)
-  =>
+  fun ref ack_recovery_initiated(w: WorkerName) =>
     _invalid_call(); Fail()
 
   fun ref rollback_complete(worker: WorkerName,
@@ -70,10 +72,11 @@ trait _RecoveryPhase
     _invalid_call(); Fail()
 
   fun ref try_override_recovery(worker: WorkerName,
-    token: CheckpointRollbackBarrierToken, recovery: Recovery ref): Bool
+    rollback_id: RollbackId, recovery: Recovery ref,
+    abort_promise: Promise[None])
   =>
     recovery._abort_early(worker)
-    true
+    abort_promise(None)
 
   fun _invalid_call() =>
     @printf[I32]("Invalid call on recovery phase %s\n".cstring(),
@@ -91,8 +94,9 @@ class _BoundariesReconnect is _RecoveryPhase
   let _recovery_reconnecter: RecoveryReconnecter
   let _workers: Array[WorkerName] val
   let _recovery: Recovery ref
-  var _override_received: Bool = false
   var _override_worker: WorkerName = ""
+  var _highest_rival_rollback_id: RollbackId = 0
+  var _abort_promise: (Promise[None] | None) = None
 
   new create(recovery_reconnecter: RecoveryReconnecter,
     workers: Array[WorkerName] val, recovery: Recovery ref)
@@ -107,21 +111,26 @@ class _BoundariesReconnect is _RecoveryPhase
     _recovery_reconnecter.start_recovery_reconnect(_workers, _recovery)
 
   fun ref recovery_reconnect_finished() =>
-    if not _override_received then
-      _recovery._prepare_rollback()
-    else
+    match _abort_promise
+    | let p: Promise[None] =>
+      p(None)
       _recovery._abort_early(_override_worker)
+      return
     end
+    _recovery._prepare_rollback()
 
   fun ref try_override_recovery(worker: WorkerName,
-    token: CheckpointRollbackBarrierToken, recovery: Recovery ref): Bool
+    rollback_id: RollbackId, recovery: Recovery ref,
+    abort_promise: Promise[None])
   =>
     @printf[I32](("RECOVERY: Received override recovery message during " +
       "Reconnect Phase. Waiting to cede control until " +
       "boundaries are reconnected.\n").cstring())
-    _override_received = true
-    _override_worker = worker
-    true
+    if rollback_id > _highest_rival_rollback_id then
+      _highest_rival_rollback_id = rollback_id
+      _override_worker = worker
+      _abort_promise = abort_promise
+    end
 
 class _PrepareRollback is _RecoveryPhase
   let _recovery: Recovery ref
@@ -178,11 +187,78 @@ class _RollbackLocalKeys is _RecoveryPhase
       end
     end
 
+class _AwaitRollbackId is _RecoveryPhase
+  let _recovery: Recovery ref
+  var _abort_promise: (Promise[None] | None) = None
+  var _highest_rival_rollback_id: RollbackId = 0
+  var _override_worker: WorkerName = ""
+
+  new create(recovery: Recovery ref) =>
+    _recovery = recovery
+
+  fun name(): String => "_AwaitRollbackId"
+
+  fun ref receive_rollback_id(rollback_id: RollbackId) =>
+    match _abort_promise
+    | let p: Promise[None] =>
+      if _highest_rival_rollback_id > rollback_id then
+        p(None)
+        _recovery._abort_early(_override_worker)
+        return
+      end
+    end
+    _recovery.request_recovery_initiated_acks(rollback_id)
+
+  fun ref try_override_recovery(worker: WorkerName,
+    rollback_id: RollbackId, recovery: Recovery ref,
+    abort_promise: Promise[None])
+  =>
+    @printf[I32](("RECOVERY: Received override recovery message during " +
+      "_AwaitRollbackId. Waiting to cede control until " +
+      "we determine if we have priority.\n").cstring())
+    if rollback_id > _highest_rival_rollback_id then
+      _highest_rival_rollback_id = rollback_id
+      _abort_promise = abort_promise
+      _override_worker = worker
+    end
+
+class _AwaitRecoveryInitiatedAcks is _RecoveryPhase
+  let _workers: Array[WorkerName] val
+  let _recovery: Recovery ref
+  let _rollback_id: RollbackId
+  let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
+
+  new create(workers: Array[WorkerName] val, recovery: Recovery ref,
+    rollback_id: RollbackId)
+  =>
+    _workers = workers
+    _recovery = recovery
+    _rollback_id = rollback_id
+
+  fun name(): String => "_AwaitRecoveryInitiatedAcks"
+
+  fun ref ack_recovery_initiated(w: WorkerName) =>
+    @printf[I32]("!@ _AwaitRecoveryInitiatedAcks: ack_recovery_initiated from %s\n".cstring(), w.cstring())
+    _acked_workers.set(w)
+    check_completion()
+
+  fun ref check_completion() =>
+    @printf[I32]("!@ _AwaitRecoveryInitiatedAcks: check_completion: acks->%s, workers->%s\n".cstring(), _acked_workers.size().string().cstring(), _workers.size().string().cstring())
+    if _acked_workers.size() == _workers.size() then
+      _recovery._recovery_initiated_acks_complete(_rollback_id)
+    end
+
+  fun ref try_override_recovery(worker: WorkerName,
+    rollback_id: RollbackId, recovery: Recovery ref,
+    abort_promise: Promise[None])
+  =>
+    if rollback_id > _rollback_id then
+      recovery._abort_early(worker)
+      abort_promise(None)
+    end
+
 class _RollbackBarrier is _RecoveryPhase
   let _recovery: Recovery ref
-  let _acked_recovery_initiated_workers:
-    Map[CheckpointRollbackBarrierToken, SetIs[WorkerName]] =
-    _acked_recovery_initiated_workers.create()
 
   new create(recovery: Recovery ref) =>
     _recovery = recovery
@@ -190,95 +266,28 @@ class _RollbackBarrier is _RecoveryPhase
   fun name(): String => "_RollbackBarrier"
 
   fun ref rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
-    _recovery._rollback_barrier_complete(token,
-      _acked_recovery_initiated_workers)
-
-  fun ref ack_recovery_initiated(w: WorkerName,
-    token: CheckpointRollbackBarrierToken)
-  =>
-    """
-    Hold any acks received for a later phase.
-    """
-    if not _acked_recovery_initiated_workers.contains(token) then
-      _acked_recovery_initiated_workers(token) = SetIs[WorkerName]
-    end
-    try
-      _acked_recovery_initiated_workers(token)?.set(w)
-    else
-      Unreachable()
-    end
+    _recovery._rollback_barrier_complete(token)
 
 class _AwaitDataReceiversAck is _RecoveryPhase
   let _recovery: Recovery ref
   let _token: CheckpointRollbackBarrierToken
-  let _acked_recovery_initiated_workers:
-    Map[CheckpointRollbackBarrierToken, SetIs[WorkerName]]
 
-  new create(recovery: Recovery ref, token: CheckpointRollbackBarrierToken,
-    acked_recovery_initiated_workers:
-    Map[CheckpointRollbackBarrierToken, SetIs[WorkerName]])
-  =>
+  new create(recovery: Recovery ref, token: CheckpointRollbackBarrierToken) =>
     _recovery = recovery
     _token = token
-    _acked_recovery_initiated_workers = acked_recovery_initiated_workers
 
   fun name(): String => "_AwaitDataReceiversAck"
 
   fun ref data_receivers_ack() =>
-    _recovery._data_receivers_ack_complete(_token,
-      _acked_recovery_initiated_workers)
+    _recovery._data_receivers_ack_complete(_token)
 
-  fun ref ack_recovery_initiated(w: WorkerName,
-    token: CheckpointRollbackBarrierToken)
+  fun ref try_override_recovery(worker: WorkerName,
+    rollback_id: RollbackId, recovery: Recovery ref,
+    abort_promise: Promise[None])
   =>
-    """
-    Hold any acks received for a later phase.
-    """
-    if not _acked_recovery_initiated_workers.contains(token) then
-      _acked_recovery_initiated_workers(token) = SetIs[WorkerName]
-    end
-    try
-      _acked_recovery_initiated_workers(token)?.set(w)
-    else
-      Unreachable()
-    end
-
-class _AwaitRecoveryInitiatedAcks is _RecoveryPhase
-  let _workers: Array[WorkerName] val
-  let _token: CheckpointRollbackBarrierToken
-  let _recovery: Recovery ref
-  let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
-
-  new create(token: CheckpointRollbackBarrierToken,
-    workers: Array[WorkerName] val, recovery: Recovery ref,
-    acked_recovery_initiated_workers:
-    Map[CheckpointRollbackBarrierToken, SetIs[WorkerName]])
-  =>
-    _token = token
-    _workers = workers
-    _recovery = recovery
-    for (t, ws) in acked_recovery_initiated_workers.pairs() do
-      if t == token then
-        for w in ws.values() do
-          _acked_workers.set(w)
-        end
-      end
-    end
-
-  fun name(): String => "_AwaitRecoveryInitiatedAcks"
-
-  fun ref ack_recovery_initiated(w: WorkerName,
-    token: CheckpointRollbackBarrierToken)
-  =>
-    if token != _token then
-      Fail()
-    end
-    _acked_workers.set(w)
-    check_completion()
-
-  fun ref check_completion() =>
-    if _acked_workers.size() == _workers.size() then
-      _recovery._recovery_initiated_acks_complete(_token)
+    if rollback_id > _token.rollback_id then
+      recovery._abort_early(worker)
+      abort_promise(None)
     end
 
 class _Rollback is _RecoveryPhase
@@ -309,13 +318,12 @@ class _Rollback is _RecoveryPhase
     end
 
   fun ref try_override_recovery(worker: WorkerName,
-    token: CheckpointRollbackBarrierToken, recovery: Recovery ref): Bool
+    rollback_id: RollbackId, recovery: Recovery ref,
+    abort_promise: Promise[None])
   =>
-    if token > _token then
+    if rollback_id > _token.rollback_id then
       _recovery._abort_early(worker)
-      true
-    else
-      false
+      abort_promise(None)
     end
 
 class _FinishedRecovering is _RecoveryPhase
@@ -331,9 +339,10 @@ class _FinishedRecovering is _RecoveryPhase
     None
 
   fun ref try_override_recovery(worker: WorkerName,
-    token: CheckpointRollbackBarrierToken, recovery: Recovery ref): Bool
+    rollback_id: RollbackId, recovery: Recovery ref,
+    abort_promise: Promise[None])
   =>
-    true
+    abort_promise(None)
 
 class _RecoveryOverrideAccepted is _RecoveryPhase
   fun name(): String => "_RecoveryOverrideAccepted"
@@ -368,12 +377,14 @@ class _RecoveryOverrideAccepted is _RecoveryPhase
   =>
     None
 
-  fun ref try_override_recovery(worker: WorkerName,
-    token: CheckpointRollbackBarrierToken, recovery: Recovery ref): Bool
-  =>
-    true
+  fun ref receive_rollback_id(rollback_id: RollbackId) =>
+    None
 
-  fun ref ack_recovery_initiated(w: WorkerName,
-    token: CheckpointRollbackBarrierToken)
+  fun ref try_override_recovery(worker: WorkerName,
+    rollback_id: RollbackId, recovery: Recovery ref,
+    abort_promise: Promise[None])
   =>
+    abort_promise(None)
+
+  fun ref ack_recovery_initiated(w: WorkerName) =>
     None

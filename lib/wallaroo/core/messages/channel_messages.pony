@@ -497,31 +497,47 @@ primitive ChannelMsgEncoder
   =>
     _encode(CommitCheckpointIdMsg(checkpoint_id, rollback_id, sender), auth)?
 
-  fun recovery_initiated(token: CheckpointRollbackBarrierToken,
+  fun request_rollback_id(sender: WorkerName, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    """
+    Recovering worker requesting a rollback id.
+    """
+    _encode(RequestRollbackIdMsg(sender), auth)?
+
+  fun announce_rollback_id(rollback_id: RollbackId, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    """
+    Tell a recovering worker its rollback id.
+    """
+    _encode(AnnounceRollbackIdMsg(rollback_id), auth)?
+
+  fun recovery_initiated(rollback_id: RollbackId,
     sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
     Sent to all workers in cluster when a recovering worker has connected so
     that currently recovering workers can cede control.
     """
-    _encode(RecoveryInitiatedMsg(token, sender), auth)?
+    _encode(RecoveryInitiatedMsg(rollback_id, sender), auth)?
 
-  fun ack_recovery_initiated(token: CheckpointRollbackBarrierToken,
-    sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
+  fun ack_recovery_initiated(sender: WorkerName, auth: AmbientAuth):
+    Array[ByteSeq] val ?
   =>
     """
     Worker acking that they received a RecoveryInitiatedMsg.
     """
-    _encode(AckRecoveryInitiatedMsg(token, sender), auth)?
+    _encode(AckRecoveryInitiatedMsg(sender), auth)?
 
-  fun initiate_rollback_barrier(sender: WorkerName, auth: AmbientAuth):
-    Array[ByteSeq] val ?
+  fun initiate_rollback_barrier(sender: WorkerName, rollback_id: RollbackId,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
     Sent to the primary checkpoint worker from a recovering worker to initiate
     rollback during rollback recovery phase.
     """
-    _encode(InitiateRollbackBarrierMsg(sender), auth)?
+    _encode(InitiateRollbackBarrierMsg(sender, rollback_id), auth)?
 
   fun prepare_for_rollback(sender: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -1649,20 +1665,30 @@ class val CommitCheckpointIdMsg is ChannelMsg
     rollback_id = rollback_id'
     sender = sender'
 
-class val RecoveryInitiatedMsg is ChannelMsg
-  let token: CheckpointRollbackBarrierToken
+class val RequestRollbackIdMsg is ChannelMsg
   let sender: WorkerName
 
-  new val create(token': CheckpointRollbackBarrierToken, sender': WorkerName) =>
-    token = token'
+  new val create(sender': WorkerName) =>
+    sender = sender'
+
+class val AnnounceRollbackIdMsg is ChannelMsg
+  let rollback_id: RollbackId
+
+  new val create(rollback_id': RollbackId) =>
+    rollback_id = rollback_id'
+
+class val RecoveryInitiatedMsg is ChannelMsg
+  let rollback_id: RollbackId
+  let sender: WorkerName
+
+  new val create(rollback_id': RollbackId, sender': WorkerName) =>
+    rollback_id = rollback_id'
     sender = sender'
 
 class val AckRecoveryInitiatedMsg is ChannelMsg
-  let token: CheckpointRollbackBarrierToken
   let sender: WorkerName
 
-  new val create(token': CheckpointRollbackBarrierToken, sender': WorkerName) =>
-    token = token'
+  new val create(sender': WorkerName) =>
     sender = sender'
 
 class val EventLogInitiateRollbackMsg is ChannelMsg
@@ -1682,10 +1708,12 @@ class val EventLogAckRollbackMsg is ChannelMsg
     sender = sender'
 
 class val InitiateRollbackBarrierMsg is ChannelMsg
-  let sender: WorkerName
+  let recovering_worker: WorkerName
+  let rollback_id: RollbackId
 
-  new val create(sender': WorkerName) =>
-    sender = sender'
+  new val create(recovering_worker': WorkerName, rollback_id': RollbackId) =>
+    recovering_worker = recovering_worker'
+    rollback_id = rollback_id'
 
 class val PrepareForRollbackMsg is ChannelMsg
   let sender: WorkerName
