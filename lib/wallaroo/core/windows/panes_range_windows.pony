@@ -67,8 +67,8 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
 
     // To avoid the thundering herd problems that can come with perfectly
     // aligned windows, we randomly offset every window with an offset up to
-    // 80% of the range.
-    let window_alignment_offset = ((rand.real() * 0.8) * _range.f64()).u64()
+    // 10% of the range.
+    let window_alignment_offset = ((rand.real() * 0.1) * _range.f64()).u64()
 
     (let pane_count, _pane_size, _panes_per_slide, _panes_per_window,
       _delay) = _InitializePaneParameters(range, slide, delay)
