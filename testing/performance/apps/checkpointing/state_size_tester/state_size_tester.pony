@@ -17,7 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 """
-Market Spread App
+State Size Tester App
 
 Setting up a market spread run (in order):
 1) reports sink (if not using Monitoring Hub):
@@ -26,44 +26,9 @@ nc -l 127.0.0.1 5555 >> /dev/null
 2) metrics sink (if not using Monitoring Hub):
 nc -l 127.0.0.1 5001 >> /dev/null
 
-350 Symbols
-
-3a) market spread app (1 worker):
-./market-spread -i Orders@127.0.0.1:7000,Nbbo@127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -t --ponythreads=4 --ponynoblock
-
-3b) market spread app (2 workers):
-./market-spread -i Orders@127.0.0.1:7000,Nbbo@127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name --ponythreads=4 --ponynoblock -t -w 2
-
-./market-spread -i Orders@127.0.0.1:7010,Nbbo@127.0.0.1:7011 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -n worker2 --ponythreads=4 --ponynoblock
-
-4) initial nbbo (must be sent in or all orders will be rejected):
-giles/sender/sender -h 127.0.0.1:7001 -m 350 -s 300 -i 2_500_000 -f testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
-
-5) orders:
-giles/sender/sender -h 127.0.0.1:7000 -m 5000000000 -s 300 -i 2_500_000 -f testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 -w --ponynoblock
-
-6) nbbo:
-giles/sender/sender -h 127.0.0.1:7001 -m 10000000000 -s 300 -i 1_250_000 -f testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w --ponynoblock
-
-R3K or other Symbol Set (700, 1400, 2100)
-
-3a) market spread app (1 worker):
-./market-spread -i Orders@127.0.0.1:7000,Nbbo@127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -t -s ../../../data/market_spread/symbols/r3k-legal-symbols.msg --ponythreads=4 --ponynoblock
-
-3b) market spread app (2 workers):
-./market-spread -i Orders@127.0.0.1:7000,Nbbo@127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -s ../../../data/market_spread/symbols/r3k-legal-symbols.msg --ponythreads=4 --ponynoblock -t -w 2
-
-./market-spread -i Orders@127.0.0.1:7010,Nbbo@127.0.0.1:7011 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -n worker2 --ponythreads=4 --ponynoblock
-
-4) initial nbbo (must be sent in or all orders will be rejected):
-giles/sender/sender -h 127.0.0.1:7001 -m 2926 -s 300 -i 2_500_000 -f testing/data/market_spread/nbbo/r3k-symbols_initial-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
-
-5) orders:
-giles/sender/sender -h 127.0.0.1:7000 -m 5000000 -s 300 -i 5_000_000 -f testing/data/market_spread/orders/r3k-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 -w
-
-6) nbbo:
-giles/sender/sender -h 127.0.0.1:7001 -m 10000000 -s 300 -i 2_500_000 -f testing/data/market_spread/nbbo/r3k-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
+TODO: Add run instructions
 """
+
 use "assert"
 use "buffered"
 use "collections"
@@ -112,23 +77,25 @@ actor Main
       end
 
       let pipeline = recover val
-        let orders = Wallaroo.source[FixOrderMessage val]("Orders",
-            TCPSourceConfig[FixOrderMessage val].from_options(FixOrderFrameHandler,
-              TCPSourceConfigCLIParser("Orders", env.args)?))
-          .key_by(OrderSymbolExtractor)
+        let key_passthrough = Wallaroo.source[KeyedMessage val](
+            "KeyMsg-Passthrough",
+            TCPSourceConfig[KeyedMessage val].from_options(
+              PartitionedU32FramedHandler,
+              TCPSourceConfigCLIParser("KeyMsg-Passthrough", env.args)?))
+          .key_by(KeyExtractor)
 
-        let nbbos = Wallaroo.source[FixNbboMessage val]("Nbbo",
-            TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
-              TCPSourceConfigCLIParser("Nbbo", env.args)?))
-          .key_by(NbboSymbolExtractor)
+        let key_set = Wallaroo.source[KeyedMessage val]("Key-Set",
+            TCPSourceConfig[KeyedMessage val].from_options(PartitionedU32FramedHandler,
+              TCPSourceConfigCLIParser("Key-Set", env.args)?))
+          .key_by(KeyExtractor)
 
-        orders.merge[FixNbboMessage val](nbbos)
-          .to[OrderResult val](CheckMarketData(state_size, output))
-          .to_sink(TCPSinkConfig[OrderResult val].from_options(
-            OrderResultEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
+        key_passthrough.merge[KeyedMessage val](key_set)
+          .to[KeyedMessage val](KeyedPassThrough(state_size, output))
+          .to_sink(TCPSinkConfig[KeyedMessage val].from_options(
+            KeyedMessageEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
 
       end
-      Wallaroo.build_application(env, "Market Spread", pipeline)
+      Wallaroo.build_application(env, "State Size Tester", pipeline)
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end
@@ -139,9 +106,8 @@ class FixedState is State
   new create(size: USize) =>
     state = recover val Array[U8].init(0, size) end
 
-
-class val CheckMarketData is StateComputation[
-  (FixOrderMessage val | FixNbboMessage val), OrderResult val, FixedState]
+class val KeyedPassThrough is StateComputation[KeyedMessage val,
+  KeyedMessage val, FixedState]
 
   let _state_size: USize
   let _output: Bool
@@ -150,125 +116,56 @@ class val CheckMarketData is StateComputation[
     _state_size = size
     _output = output
 
-  fun name(): String => "Check Market Data"
+  fun name(): String => "Keyed Pass Through"
 
-  fun apply(msg: (FixOrderMessage val | FixNbboMessage val),
-    state: FixedState): (OrderResult val | None)
+  fun apply(msg: KeyedMessage val, state: FixedState):
+    (KeyedMessage val | None)
   =>
-    match msg
-    | let order: FixOrderMessage val =>
-      if _output then
-        // We're going to always reject and send output for each message
-        try
-          let decode_timestamp = msg.transact_time().u64()?
-          OrderResult(order, 0, 0, decode_timestamp)
-        else
-          // Bad timestamp data
-          Fail()
-        end
-      else
-        None
-      end
-    | let nbbo: FixNbboMessage val =>
-      None
-    end
+    if _output then msg else None end
 
   fun initial_state(): FixedState =>
     FixedState(_state_size)
 
-primitive FixOrderFrameHandler is FramedSourceHandler[FixOrderMessage val]
-  fun header_length(): USize =>
-    4
+primitive PartitionedU32FramedHandler is FramedSourceHandler[KeyedMessage val]
+  fun header_length(): USize => 4
 
   fun payload_length(data: Array[U8] iso): USize ? =>
     Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
-  fun decode(data: Array[U8] val): FixOrderMessage val ? =>
-    match FixishMsgDecoder(data)?
-    | let m: FixOrderMessage val =>
-      let decode_timestamp = WallClock.nanoseconds().string()
-      FixOrderMessage(m.side(), m.account(), m.order_id(), m.symbol(),
-        m.order_qty(), m.price(), consume decode_timestamp)
-    | let m: FixNbboMessage val => @printf[I32]("Got FixNbbo\n".cstring()); Fail(); error
+  fun decode(data: Array[U8] val): KeyedMessage val ? =>
+    try
+      let key: U32 = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?)
+      let value: U32 = Bytes.to_u32(data(4)?, data(5)?, data(6)?, data(7)?)
+      (let secs, let ns) = Time.now()
+      let decode_timestamp = secs.string() + "." + ns.string()
+      let msg = KeyedMessage(key, value, decode_timestamp)
+      consume msg
     else
-      @printf[I32]("Could not get FixOrder from incoming data\n".cstring())
-      @printf[I32]("data size: %d\n".cstring(), data.size())
       error
     end
 
-primitive FixNbboFrameHandler is FramedSourceHandler[FixNbboMessage val]
-  fun header_length(): USize =>
-    4
+primitive KeyExtractor
+  fun apply(input: KeyedMessage val): Key =>
+    input.key.string()
 
-  fun payload_length(data: Array[U8] iso): USize ? =>
-    Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
-
-  fun decode(data: Array[U8] val): FixNbboMessage val ? =>
-    match FixishMsgDecoder(data)?
-    | let m: FixNbboMessage val => m
-    | let m: FixOrderMessage val => @printf[I32]("Got FixOrder\n".cstring()); Fail(); error
-    else
-      @printf[I32]("Could not get FixNbbo from incoming data\n".cstring())
-      @printf[I32]("data size: %d\n".cstring(), data.size())
-      error
-    end
-
-primitive OrderSymbolExtractor
-  fun apply(input: FixOrderMessage val): Key =>
-    input.symbol()
-
-primitive NbboSymbolExtractor
-  fun apply(input: FixNbboMessage val): Key =>
-    input.symbol()
-
-class OrderResult
-  let order: FixOrderMessage val
-  let bid: F64
-  let offer: F64
-  let timestamp: U64
-
-  new val create(order': FixOrderMessage val,
-    bid': F64,
-    offer': F64,
-    timestamp': U64)
-  =>
-    order = order'
-    bid = bid'
-    offer = offer'
-    timestamp = timestamp'
-
-  fun string(): String =>
-    (order.symbol().clone().>append(", ")
-      .>append(order.order_id()).>append(", ")
-      .>append(order.account().string()).>append(", ")
-      .>append(order.price().string()).>append(", ")
-      .>append(order.order_qty().string()).>append(", ")
-      .>append(order.side().string()).>append(", ")
-      .>append(bid.string()).>append(", ")
-      .>append(offer.string()).>append(", ")
-      .>append(timestamp.string())).clone()
-
-primitive OrderResultEncoder
-  fun apply(r: OrderResult val, wb: Writer = Writer): Array[ByteSeq] val =>
-    ifdef "market_results" then
-      @printf[I32](("!!" + r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
-    end
-    let encode_timestamp = WallClock.nanoseconds()
-    //Header (size == 55 bytes)
-    let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8 + 8
-    wb.u32_be(msgs_size.u32())
-    //Fields
-    match r.order.side()
-    | Buy => wb.u8(SideTypes.buy())
-    | Sell => wb.u8(SideTypes.sell())
-    end
-    wb.u32_be(r.order.account())
-    wb.write(r.order.order_id().array()) // assumption: 6 bytes
-    wb.write(r.order.symbol().array()) // assumption: 4 bytes
-    wb.f64_be(r.order.order_qty())
-    wb.f64_be(r.order.price())
-    wb.f64_be(r.bid)
-    wb.f64_be(r.offer)
-    wb.u64_be(r.timestamp)
-    wb.u64_be(encode_timestamp)
+primitive KeyedMessageEncoder
+  fun apply(msg: KeyedMessage val, wb: Writer = Writer): Array[ByteSeq] val =>
+    (let secs, let ns) = Time.now()
+    let encode_timestamp = secs.string() + "." + ns.string()
+    let msg_size: USize = 4 + 4 + 20 + 20
+    wb.u32_be(msg_size.u32())
+    wb.u32_be(msg.key)
+    wb.u32_be(msg.value)
+    wb.write(msg.decode_timestamp.array()) // assumption: 20 bytes
+    wb.write(encode_timestamp.array()) // assumption: 20 bytes
     wb.done()
+
+class KeyedMessage
+  let key: U32
+  let value: U32
+  let decode_timestamp: String
+
+  new val create(key': U32, value': U32, decode_timestamp': String) =>
+    key = key'
+    value = value'
+    decode_timestamp = decode_timestamp'
