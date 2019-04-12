@@ -72,7 +72,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
   let _event_log: EventLog
   let _auth: AmbientAuth
   let _layout_initializer: LayoutInitializer
-  let _recovering: Bool
+  let _is_recovering: Bool
   let _target_router: Router
   let _connections: Connections
   let _parallelism: USize
@@ -114,7 +114,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, target_router: Router = EmptyRouter,
+    is_recovering: Bool, target_router: Router = EmptyRouter,
     connections: Connections, workers_list: Array[WorkerName] val,
     is_joining: Bool,
     parallelism: USize,
@@ -141,7 +141,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
     _event_log = event_log
     _auth = auth
     _layout_initializer = layout_initializer
-    _recovering = recovering
+    _is_recovering = is_recovering
     _target_router = target_router
     _connections = connections
     _is_joining = is_joining
@@ -185,7 +185,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
       let source = ConnectorSource[In](source_id, _auth, this,
          notify_parameters, _event_log, _router,
         _outgoing_boundary_builders, _layout_initializer,
-        _metrics_reporter.clone(), _router_registry)
+        _metrics_reporter.clone(), _router_registry, _is_recovering)
       source.mute(this)
 
       _router_registry.register_source(source, source_id)
