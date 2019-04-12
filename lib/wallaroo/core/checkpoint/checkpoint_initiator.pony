@@ -519,6 +519,17 @@ actor CheckpointInitiator is Initializable
         _last_complete_checkpoint_id)
       _barrier_coordinator.inject_blocking_barrier(token, barrier_promise,
         resume_token)
+
+      // Inform cluster we've initiated recovery
+      match _recovery
+      | let r: Recovery => r.recovery_initiated_at_worker(worker, token)
+      end
+      try
+        let msg = ChannelMsgEncoder.recovery_initiated(token, worker, _auth)?
+        _connections.send_control_to_cluster(msg)
+      else
+        Fail()
+      end
     else
       try
         let msg = ChannelMsgEncoder.initiate_rollback_barrier(_worker_name,
