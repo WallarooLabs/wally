@@ -16,6 +16,7 @@ Copyright 2018 The Wallaroo Authors.
 
 */
 
+use "collections"
 use "promises"
 use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
@@ -119,19 +120,21 @@ actor Recovery
   be recovery_initiated_at_worker(worker: WorkerName,
     token: CheckpointRollbackBarrierToken)
   =>
-    let overriden = _recovery_phase.try_override_recovery(worker, token,
-      this)
+    if worker != _worker_name then
+      let overriden = _recovery_phase.try_override_recovery(worker, token,
+        this)
 
-    if overriden then
-      _recovery_reconnecter.abort_early(worker)
-      // !TODO!: We should probably ensure DataReceivers has acked an
-      // override if that happens before acking.
-      try
-        let msg = ChannelMsgEncoder.ack_recovery_initiated(token, _worker_name,
-          _auth)?
-        _connections.send_control(worker, msg)
-      else
-        Fail()
+      if overriden then
+        _recovery_reconnecter.abort_early(worker)
+        // !TODO!: We should probably ensure DataReceivers has acked an
+        // override if that happens before acking.
+        try
+          let msg = ChannelMsgEncoder.ack_recovery_initiated(token,
+            _worker_name, _auth)?
+          _connections.send_control(worker, msg)
+        else
+          Fail()
+        end
       end
     end
 
@@ -210,35 +213,32 @@ actor Recovery
         _self.rollback_barrier_fully_acked(token)
       })
       _checkpoint_initiator.initiate_rollback(promise, _worker_name)
-
       _recovery_phase = _RollbackBarrier(this)
     else
       _recovery_complete()
     end
 
-  fun ref _rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
+  fun ref _rollback_barrier_complete(token: CheckpointRollbackBarrierToken,
+    acked_recovery_initiated_workers:
+    Map[CheckpointRollbackBarrierToken, SetIs[WorkerName]])
+  =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: AwaitDataReceiversAck - ~~|\n"
         .cstring())
       _data_receivers.rollback_barrier_complete(this)
-      _recovery_phase = _AwaitDataReceiversAck(this, token)
+      _recovery_phase = _AwaitDataReceiversAck(this, token,
+        acked_recovery_initiated_workers)
     end
 
-  fun ref _data_receivers_ack_complete(token: CheckpointRollbackBarrierToken)
+  fun ref _data_receivers_ack_complete(token: CheckpointRollbackBarrierToken,
+    acked_recovery_initiated_workers:
+    Map[CheckpointRollbackBarrierToken, SetIs[WorkerName]])
   =>
     ifdef "resilience" then
       @printf[I32](("|~~ - Recovery Phase: Await Recovery Initiated Acks " +
         "- ~~| \n").cstring())
-      _recovery_phase = _AwaitRecoveryInitiatedAcks(token, _workers, this)
-
-      // Inform cluster we've initiated recovery
-      try
-        let msg = ChannelMsgEncoder.recovery_initiated(token, _worker_name,
-          _auth)?
-        _connections.send_control_to_cluster(msg)
-      else
-        Fail()
-      end
+      _recovery_phase = _AwaitRecoveryInitiatedAcks(token, _workers, this,
+        acked_recovery_initiated_workers)
       _recovery_phase.ack_recovery_initiated(_worker_name, token)
     end
 

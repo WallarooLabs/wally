@@ -180,6 +180,9 @@ class _RollbackLocalKeys is _RecoveryPhase
 
 class _RollbackBarrier is _RecoveryPhase
   let _recovery: Recovery ref
+  let _acked_recovery_initiated_workers:
+    Map[CheckpointRollbackBarrierToken, SetIs[WorkerName]] =
+    _acked_recovery_initiated_workers.create()
 
   new create(recovery: Recovery ref) =>
     _recovery = recovery
@@ -187,20 +190,58 @@ class _RollbackBarrier is _RecoveryPhase
   fun name(): String => "_RollbackBarrier"
 
   fun ref rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
-    _recovery._rollback_barrier_complete(token)
+    _recovery._rollback_barrier_complete(token,
+      _acked_recovery_initiated_workers)
+
+  fun ref ack_recovery_initiated(w: WorkerName,
+    token: CheckpointRollbackBarrierToken)
+  =>
+    """
+    Hold any acks received for a later phase.
+    """
+    if not _acked_recovery_initiated_workers.contains(token) then
+      _acked_recovery_initiated_workers(token) = SetIs[WorkerName]
+    end
+    try
+      _acked_recovery_initiated_workers(token)?.set(w)
+    else
+      Unreachable()
+    end
 
 class _AwaitDataReceiversAck is _RecoveryPhase
   let _recovery: Recovery ref
   let _token: CheckpointRollbackBarrierToken
+  let _acked_recovery_initiated_workers:
+    Map[CheckpointRollbackBarrierToken, SetIs[WorkerName]]
 
-  new create(recovery: Recovery ref, token: CheckpointRollbackBarrierToken) =>
+  new create(recovery: Recovery ref, token: CheckpointRollbackBarrierToken,
+    acked_recovery_initiated_workers:
+    Map[CheckpointRollbackBarrierToken, SetIs[WorkerName]])
+  =>
     _recovery = recovery
     _token = token
+    _acked_recovery_initiated_workers = acked_recovery_initiated_workers
 
   fun name(): String => "_AwaitDataReceiversAck"
 
   fun ref data_receivers_ack() =>
-    _recovery._data_receivers_ack_complete(_token)
+    _recovery._data_receivers_ack_complete(_token,
+      _acked_recovery_initiated_workers)
+
+  fun ref ack_recovery_initiated(w: WorkerName,
+    token: CheckpointRollbackBarrierToken)
+  =>
+    """
+    Hold any acks received for a later phase.
+    """
+    if not _acked_recovery_initiated_workers.contains(token) then
+      _acked_recovery_initiated_workers(token) = SetIs[WorkerName]
+    end
+    try
+      _acked_recovery_initiated_workers(token)?.set(w)
+    else
+      Unreachable()
+    end
 
 class _AwaitRecoveryInitiatedAcks is _RecoveryPhase
   let _workers: Array[WorkerName] val
@@ -209,11 +250,20 @@ class _AwaitRecoveryInitiatedAcks is _RecoveryPhase
   let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
 
   new create(token: CheckpointRollbackBarrierToken,
-    workers: Array[WorkerName] val, recovery: Recovery ref)
+    workers: Array[WorkerName] val, recovery: Recovery ref,
+    acked_recovery_initiated_workers:
+    Map[CheckpointRollbackBarrierToken, SetIs[WorkerName]])
   =>
     _token = token
     _workers = workers
     _recovery = recovery
+    for (t, ws) in acked_recovery_initiated_workers.pairs() do
+      if t == token then
+        for w in ws.values() do
+          _acked_workers.set(w)
+        end
+      end
+    end
 
   fun name(): String => "_AwaitRecoveryInitiatedAcks"
 
@@ -224,6 +274,9 @@ class _AwaitRecoveryInitiatedAcks is _RecoveryPhase
       Fail()
     end
     _acked_workers.set(w)
+    check_completion()
+
+  fun ref check_completion() =>
     if _acked_workers.size() == _workers.size() then
       _recovery._recovery_initiated_acks_complete(_token)
     end
