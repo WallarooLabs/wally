@@ -212,7 +212,7 @@ class ConnectorSourceNotify[In: Any val]
 
   new create(source_id': RoutingId,
     parameters: ConnectorSourceNotifyParameters[In],
-    listener': ConnectorSourceCoordinator[In])
+    listener': ConnectorSourceCoordinator[In], is_recovering: Bool)
   =>
     source_id = source_id'
     _pipeline_name = parameters.pipeline_name
@@ -236,6 +236,10 @@ class ConnectorSourceNotify[In: Any val]
     ifdef "trace" then
       @printf[I32]("%s: max_credits = %lu, refill_credits = %lu\n".cstring(),
       __loc.type_name().cstring(), _max_credits, _refill_credits)
+    end
+
+    if is_recovering then
+      _prep_for_rollback = true
     end
 
   fun ref received(source: ConnectorSource[In] ref, data: Array[U8] iso): Bool =>
@@ -790,7 +794,13 @@ class ConnectorSourceNotify[In: Any val]
   =>
     if not _prep_for_rollback then
       ifdef debug then
-        Invariant(checkpoint_id == _barrier_checkpoint_id)
+        if checkpoint_id != _barrier_checkpoint_id then
+          @printf[I32](("ConnectorSourceNotify: Checkpoint complete for id " +
+            " %s but expected %s\n").cstring(),
+            checkpoint_id.string().cstring(),
+            _barrier_checkpoint_id.string().cstring())
+          Fail()
+        end
       end
 
       if _session_active then

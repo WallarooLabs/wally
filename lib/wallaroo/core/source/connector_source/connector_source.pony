@@ -139,7 +139,8 @@ actor ConnectorSource[In: Any val] is Source
     event_log: EventLog, router': Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
-    metrics_reporter': MetricsReporter iso, router_registry: RouterRegistry)
+    metrics_reporter': MetricsReporter iso, router_registry: RouterRegistry,
+    is_recovering: Bool)
   =>
     """
     A new connection accepted on a server.
@@ -150,7 +151,7 @@ actor ConnectorSource[In: Any val] is Source
     _metrics_reporter = consume metrics_reporter'
     _listen = listen
     _notify = ConnectorSourceNotify[In](source_id, notify_parameters,
-      _listen)
+      _listen, is_recovering)
     _layout_initializer = layout_initializer
     _router_registry = router_registry
 
