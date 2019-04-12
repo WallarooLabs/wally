@@ -695,6 +695,7 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
         self._stop = stop
         self.start = start
         self.stopped = False
+        self.paused = False
 
     def __str__(self):
         return ("ALOSequenceGenerator(partition: {}, stopped: {}, point_of_ref: {})"
@@ -716,6 +717,8 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
         if self._stop is not None:
             if self.position >= self._stop:
                 raise StopIteration
+        if self.paused:
+            return (None, self.position)
         self.position += 1
         val, pos, key = (self.position, self.position, self.key)
         payload = struct.pack('>Q{}s'.format(len(key)), val, key)
@@ -726,6 +729,12 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
 
     def stop(self):
         self.stopped = True
+
+    def pause(self):
+        self.paused = True
+
+    def resume(self):
+        self.paused = False
 
 
 class ALOSender(StoppableThread):
@@ -773,10 +782,16 @@ class ALOSender(StoppableThread):
             self.client.shutdown(error=error)
 
     def pause(self):
-        logging.debug("ALOSender pause: noop")
+        logging.debug("ALOSender pause: pausing {} sources"
+                      .format(len(self.sources)))
+        for source in self.sources:
+            source.pause()
 
     def resume(self):
-        logging.debug("ALOSender resume: noop")
+        logging.debug("ALOSender resume: resuming {} sources"
+                      .format(len(self.sources)))
+        for source in self.sources:
+            source.resume()
 
     def last_sent(self):
         return [(source.partition, source.position) for source in self.sources]

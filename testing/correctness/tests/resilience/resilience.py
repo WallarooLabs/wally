@@ -72,7 +72,7 @@ def get_await_values(last_sent_groups):
                 for group in last_sent_groups
                 for key, val in group]
     else:
-        logging.error(repr(last_sent_groups))
+        logging.debug(repr(last_sent_groups))
         return [(key,
                  "[{}]".format(",".join(
                      ("{}".format(max(0,x)) for x in range(val-3, val+1)))))
@@ -554,6 +554,7 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
             random_str = ''.join([rng.choice(chars) for _ in range(8)])
             out_name = 'received_{}.txt'.format(random_str)
             out_file = os.path.join(base_path, out_name)
+            logging.info("Saving validation output to {}".format(out_file))
             cluster.sinks[0].save(out_file)
 
             # Validate captured output
@@ -578,7 +579,7 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
         if cluster.restarted_workers:
             # TODO: move to validations.py
             logging.info("Validating recovery")
-            pattern = "RESILIENCE\: Replayed \d+ entries from recovery log file\."
+            pattern = r"RESILIENCE\: Replayed \d+ entries from recovery log file\."
             for r in cluster.restarted_workers:
                 stdout = r.get_output()
                 try:

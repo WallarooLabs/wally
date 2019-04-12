@@ -272,6 +272,8 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                 source = self.sources[key][0]
                 # get value from source
                 value, point_of_ref = next(source)
+                if value is None:
+                    return None
                 # send it as a message
                 msg = cwm.Message(
                     stream_id = key,
