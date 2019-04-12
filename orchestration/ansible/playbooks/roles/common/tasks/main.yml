@@ -225,6 +225,21 @@
     content: 'PATH=$PATH:/usr/local/go/bin'
   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
+- name: Clone Wallaroo to /home/ubuntu/wallaroo
+  git:
+    repo: https://github.com/wallaroolabs/wallaroo
+    dest: /home/ubuntu/wallaroo
+    clone: yes
+    force: yes
+    version: master
+  become: yes
+  become_user: ubuntu
+  when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }}) and ('wallaroo-leader-1' == ansible_hostname)
+
+- name: Report Wallaroo clone
+  shell: 'curl -v -H "Accept: application/json" -H "Content-Type: application/json" -X POST -d "{\"date\":\"$(date)\",\"source\":\"wallaroo-orchestration\",\"count\":1}" https://hooks.zapier.com/hooks/catch/175929/f4hnh4/'
+  when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }}) and ('wallaroo-leader-1' == ansible_hostname)
+
 - name: create cpu shield
   script: create_cpu_shield.sh {{ system_cpus if system_cpus is defined else "" }} > /create_cpu_shield.out
   when: ('vagrant' != '{{ ansible_ssh_user }}')
@@ -232,3 +247,4 @@
 - name: apply kernel tweaks
   script: kerneltweaks.sh > /kerneltweaks.out
   when: ('vagrant' != '{{ ansible_ssh_user }}')
+
