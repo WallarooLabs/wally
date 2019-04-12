@@ -70,17 +70,7 @@ for api, cmd in APIS.items():
             else:
                 op_seq = [o1, Wait(2), o2]
             for src_type in SOURCE_TYPES:
-                if src_type != "gensource":
-                    for src_num in SOURCE_NUMBERS:
-                        TC.create(test_name_fmt = AUTOSCALE_TEST_NAME_FMT,
-                                  api = api,
-                                  cmd = cmd,
-                                  ops = op_seq,
-                                  validation_cmd = VALIDATION_CMD,
-                                  source_name = SOURCE_NAME,
-                                  source_type = src_type,
-                                  source_number = src_num)
-                else:
+                if src_type == "gensource":
                     # only create 1 source for gensource
                     TC.create(test_name_fmt = AUTOSCALE_TEST_NAME_FMT,
                               api = api,
@@ -89,4 +79,15 @@ for api, cmd in APIS.items():
                               validation_cmd = VALIDATION_CMD,
                               source_name = SOURCE_NAME,
                               source_type = src_type,
-                              source_number = 1)
+                              source_number = src_num)
+                else:
+                    for src_num in SOURCE_NUMBERS:
+                        TC.create(test_name_fmt = AUTOSCALE_TEST_NAME_FMT,
+                                  api = api,
+                                  cmd = cmd,
+                                  ops = op_seq,
+                                  validation_cmd = VALIDATION_CMD,
+                                  source_name = SOURCE_NAME,
+                                  source_type = src_type,
+                                  source_number = 1)
+
