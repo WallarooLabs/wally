@@ -19,6 +19,10 @@ from json import loads
 import struct
 
 
+class OrderError(Exception):
+    pass
+
+
 parser = argparse.ArgumentParser("Multi Partition Detector Validator")
 parser.add_argument("--output", type=argparse.FileType("rb"),
                     help="The output file of the application.")
@@ -35,13 +39,12 @@ while True:
 #    print(payload)
     assert(len(payload) > 0)
     obj = loads(payload.decode())  # Python3.5/json needs a string
-    windows.setdefault(obj['key'], {}).setdefault(float(obj['ts']), []).extend(obj['value'])
+    windows.setdefault(obj['key'], []).append((float(obj['ts']), obj['value']))
 
 # flatten windows to sequences
 sequences = {}
 for k in windows.keys():
-    for w_key in sorted(windows[k].keys()):
-        win = windows[k][w_key]
+    for ts, win in windows[k]:
         if not (win == sorted(win)):
             assert(False), ("Out of order violation for key: {}, w_key: {}, "
                             "window: {}, sorted: {}"
@@ -49,47 +52,49 @@ for k in windows.keys():
         sequences.setdefault(k, []).extend(win)
 
 
-# unlike window_detector, in multi_partition_detector all windows are
-# basically sliding windows
+# Check completeness
 for k, v in sequences.items():
     processed = sorted(list(set(v)))
     size = processed[-1] - processed[0] + 1 # Assumption: processed is a natural sequence
 
-    #!@
     if len(processed) != size:
-        print("!@ GAP IN PROCESSED FOR KEY " + k)
         old = processed[0]
         for i in range(1, len(processed)):
             if processed[i] != old + 1:
-                print("!@ -- ", old, " followed by ", processed[i])
+                err_msg = ("Found a gap in data received for key {!r}: {!r} "
+                           "is followed by {!r}\n"
+                           "This may be caused by a reordering of messages "
+                           "or by a state consistency violation."
+                           .format(k, old, processed[i]))
+                raise OrderError(err_msg)
             old = processed[i]
+    assert(len(processed) == size)
 
-    assert(len(processed) == size), "Expect: sorted unique window elements form a subsegement of the natural sequence but for key {}".format(k)
 
-for k in sorted(windows.keys(), key=lambda k: int(k.replace('key_',''))):
-    # Check that for each window, there are at most 2 duplicates per item
-    # i.e. the duplicates are plausibly caused by the sub window overlap,
-    # rather than by output duplications due to other factors
-    subwindows = sorted(windows[k].keys())
-    for i in range(len(subwindows)-1):
-        counter = Counter(windows[k][subwindows[i]] +
-                          windows[k][subwindows[i+1]])
-        most_common = counter.most_common(3)
-        assert(len(most_common) > 0)
-        for key, count in most_common:
-            if key != 0:
-                assert(count in (1,2))
-
-# Regardless of window type, check sequentialty:
+# check sequentialty:
 # 1. increments are always at +1 size
 # 2. rewinds are allowed at arbitrary size
 for key in sequences:
     assert(sequences[key])
     old = sequences[key][0]
     for v in sequences[key][1:]:
-        #!@
         if not ((v == old + 1) or (v <= old)):
             print("!@ Old for key " + key + ": " + str(old))
             print("!@ Cur for key " + key + ": " + str(v))
-        assert((v == old + 1) or (v <= old))
+        assert((v == old + 1) or (v <= old)), ("Sequentiality violation "
+            "detected! (Key: {}, Old: {}, Current: {})"
+            .format(key, old, v))
         old = v
+
+
+# Check sliding window rule: any value appears at most twice across
+# any pair of subsequent windows of the same key
+for k in sorted(windows.keys(), key=lambda k: int(k.replace('key_',''))):
+    for i in range(len(windows[k])-1):
+        counter = Counter(windows[k][i][1] +
+                          windows[k][i+1][1])
+        most_common = counter.most_common(3)
+        assert(len(most_common) > 0)
+        for key, count in most_common:
+            if key != 0:
+                assert(count in (1,2))
