@@ -18,6 +18,7 @@ import logging
 import math
 from numbers import Number
 import os
+from random import Random as _Random
 import re
 import shutil
 import time
@@ -541,7 +542,16 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
         # save sink data to a file
         if validation_cmd:
             # TODO: move to validations.py
-            out_file = os.path.join(cluster.res_dir, 'received.txt')
+            # TODO: This forces _every_ test to save its validated file to artifacts.
+            # remove it once the bug with validation failing but passing on the artifact
+            # is resolved.
+            #out_file = os.path.join(cluster.res_dir, 'received.txt')
+            base_path = '/tmp/wallaroo_test_errors'
+            chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+            rng = _Random()
+            random_str = ''.join([rng.choice(chars) for _ in range(8)])
+            out_name = 'received_{}.txt'.format(random_str)
+            out_file = os.path.join(base_path, out_name)
             cluster.sinks[0].save(out_file)
 
             # Validate captured output
@@ -551,6 +561,13 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
             try:
                 assert(res.success)
                 logging.info("Validation successful")
+                try:
+                    os.remove(out_file)
+                    logging.info("Removed validation file: {}".format(
+                        out_file))
+                except:
+                    logging.info("Failed to remove file: {}".format(out_file))
+                    pass
             except:
                 raise AssertionError('Validation failed with the following '
                                      'error:\n{}'.format(res.output))
