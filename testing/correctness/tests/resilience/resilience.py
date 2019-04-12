@@ -45,7 +45,8 @@ from integration.errors import (RunnerHasntStartedError,
                                 SinkAwaitTimeoutError,
                                 TimeoutError)
 
-from integration.external import (run_shell_cmd,
+from integration.external import (makedirs_if_not_exists,
+                                  run_shell_cmd,
                                   save_logs_to_file)
 
 
@@ -547,6 +548,7 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
             # is resolved.
             #out_file = os.path.join(cluster.res_dir, 'received.txt')
             base_path = '/tmp/wallaroo_test_errors'
+            makedirs_if_not_exists(base_path)
             chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
             rng = _Random()
             random_str = ''.join([rng.choice(chars) for _ in range(8)])
