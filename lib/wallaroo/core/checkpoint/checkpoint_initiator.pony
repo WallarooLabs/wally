@@ -471,69 +471,76 @@ actor CheckpointInitiator is Initializable
     _timers.dispose()
     _timers = Timers
 
+  be request_rollback_id(promise: Promise[RollbackId]) =>
+    if _last_complete_checkpoint_id == 0 then
+      @printf[I32]("No checkpoints were taken!\n".cstring())
+      Fail()
+    end
+
+    if (_primary_worker == _worker_name) then
+      let rollback_id = _last_rollback_id + 1
+      _last_rollback_id = rollback_id
+      _save_checkpoint_id(_last_complete_checkpoint_id, rollback_id)
+      promise(_last_rollback_id)
+    else
+      try
+        let msg = ChannelMsgEncoder.request_rollback_id(_worker_name, _auth)?
+        _connections.send_control(_primary_worker, msg)
+      else
+        Fail()
+      end
+    end
+
   be initiate_rollback(
     recovery_promise: Promise[CheckpointRollbackBarrierToken],
-    worker: WorkerName)
+    worker: WorkerName, rollback_id: RollbackId)
   =>
     ifdef "resilience" then
-      _phase.initiate_rollback(recovery_promise, worker, this)
+      _phase.initiate_rollback(recovery_promise, worker, this, rollback_id)
     end
 
   fun ref finish_initiating_rollback(
     recovery_promise: Promise[CheckpointRollbackBarrierToken],
-    worker: WorkerName)
+    worker: WorkerName, rollback_id: RollbackId)
   =>
     if (_primary_worker == _worker_name) then
-      if _last_complete_checkpoint_id == 0 then
-        @printf[I32]("No checkpoints were taken!\n".cstring())
-        Fail()
-      end
+      if rollback_id == _last_rollback_id then
+        _clear_pending_checkpoints()
 
-      _clear_pending_checkpoints()
-
-      let rollback_id = _last_rollback_id + 1
-      _last_rollback_id = rollback_id
-
-      ifdef "checkpoint_trace" then
-        @printf[I32](("CheckpointInitiator: initiate_rollback %s on " +
-          " behalf of %s\n").cstring(), rollback_id.string().cstring(),
-          worker.cstring())
-      end
-
-      let token = CheckpointRollbackBarrierToken(rollback_id,
-        _last_complete_checkpoint_id)
-      if _current_checkpoint_id < _last_complete_checkpoint_id then
-        _current_checkpoint_id = _last_complete_checkpoint_id
-      end
-      let barrier_promise = Promise[BarrierToken]
-      barrier_promise.next[None]({(t: BarrierToken) =>
-        match t
-        | let srbt: CheckpointRollbackBarrierToken =>
-          recovery_promise(srbt)
-          _self.rollback_complete(srbt.rollback_id)
-        else
-          Fail()
+        ifdef "checkpoint_trace" then
+          @printf[I32](("CheckpointInitiator: initiate_rollback %s on " +
+            " behalf of %s\n").cstring(), rollback_id.string().cstring(),
+            worker.cstring())
         end
-      })
-      let resume_token = CheckpointRollbackResumeBarrierToken(rollback_id,
-        _last_complete_checkpoint_id)
-      _barrier_coordinator.inject_blocking_barrier(token, barrier_promise,
-        resume_token)
 
-      // Inform cluster we've initiated recovery
-      match _recovery
-      | let r: Recovery => r.recovery_initiated_at_worker(worker, token)
-      end
-      try
-        let msg = ChannelMsgEncoder.recovery_initiated(token, worker, _auth)?
-        _connections.send_control_to_cluster(msg)
+        let token = CheckpointRollbackBarrierToken(rollback_id,
+          _last_complete_checkpoint_id)
+        if _current_checkpoint_id < _last_complete_checkpoint_id then
+          _current_checkpoint_id = _last_complete_checkpoint_id
+        end
+        let barrier_promise = Promise[BarrierToken]
+        barrier_promise.next[None]({(t: BarrierToken) =>
+          match t
+          | let srbt: CheckpointRollbackBarrierToken =>
+            recovery_promise(srbt)
+            _self.rollback_complete(srbt.rollback_id)
+          else
+            Fail()
+          end
+        })
+        let resume_token = CheckpointRollbackResumeBarrierToken(rollback_id,
+          _last_complete_checkpoint_id)
+        _barrier_coordinator.inject_blocking_barrier(token, barrier_promise,
+          resume_token)
       else
-        Fail()
+        @printf[I32](("Skipping rollback for %s, because %s is lower than " +
+          "current rollback id %s\n").cstring(), worker.cstring(),
+          rollback_id.string().cstring(), _last_rollback_id.string().cstring())
       end
     else
       try
-        let msg = ChannelMsgEncoder.initiate_rollback_barrier(_worker_name,
-          _auth)?
+        let msg = ChannelMsgEncoder.initiate_rollback_barrier(worker,
+          rollback_id, _auth)?
         _connections.send_control(_primary_worker, msg)
       else
         Fail()
@@ -542,7 +549,7 @@ actor CheckpointInitiator is Initializable
 
   be rollback_complete(rollback_id: RollbackId) =>
     ifdef "resilience" then
-      _last_rollback_id = rollback_id
+      // _last_rollback_id = rollback_id
       _save_checkpoint_id(_last_complete_checkpoint_id, rollback_id)
     end
 
@@ -563,7 +570,8 @@ actor CheckpointInitiator is Initializable
     ifdef "resilience" then
       _current_checkpoint_id = checkpoint_id
       _last_complete_checkpoint_id = checkpoint_id
-      _last_rollback_id = rollback_id
+      //!@
+      // _last_rollback_id = rollback_id
       _save_checkpoint_id(checkpoint_id, rollback_id)
     end
 

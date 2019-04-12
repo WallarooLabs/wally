@@ -67,9 +67,11 @@ trait _CheckpointInitiatorPhase
 
   fun ref initiate_rollback(
     recovery_promise: Promise[CheckpointRollbackBarrierToken],
-    worker: WorkerName, checkpoint_initiator: CheckpointInitiator ref)
+    worker: WorkerName, checkpoint_initiator: CheckpointInitiator ref,
+    rollback_id: RollbackId)
   =>
-    checkpoint_initiator.finish_initiating_rollback(recovery_promise, worker)
+    checkpoint_initiator.finish_initiating_rollback(recovery_promise, worker,
+      rollback_id)
 
   fun _invalid_call() =>
     @printf[I32]("Invalid call on checkpoint initiator phase %s\n".cstring(),
@@ -248,6 +250,7 @@ class _DisposedCheckpointInitiatorPhase is _CheckpointInitiatorPhase
 
   fun ref initiate_rollback(
     recovery_promise: Promise[CheckpointRollbackBarrierToken],
-    worker: WorkerName, checkpoint_initiator: CheckpointInitiator ref)
+    worker: WorkerName, checkpoint_initiator: CheckpointInitiator ref,
+    rollback_id: RollbackId)
   =>
     None

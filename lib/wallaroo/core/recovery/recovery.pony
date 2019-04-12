@@ -39,15 +39,17 @@ actor Recovery
     3) _PrepareRollback: Have EventLog tell all resilients to prepare for
     4) _RollbackLocalKeys: Roll back topology. Wait for acks from all workers.
        register downstream.
-    5) _RollbackBarrier: Use barrier to ensure that all old data is cleared
-       and all producers and consumers are ready to rollback state.
-    6) _AwaitDataReceiversAck: Put DataReceivers in non-recovery mode.
-    7) _AwaitRecoveryInitiatedAcks: Wait for all workers to acknowledge
+    5) _AwaitRollbackId: We request our rollback id from the
+       CheckpointInitiator.
+    6) _AwaitRecoveryInitiatedAcks: Wait for all workers to acknowledge
        recovery is about to start. This gives currently recovering workers a
        chance to cede control to us if we're the latest recovering.
-    8) _Rollback: Rollback all state to last safe checkpoint.
-    9) _FinishedRecovering: Finished recovery
-    10) _RecoveryOverrideAccepted: If recovery was handed off to another worker
+    7) _RollbackBarrier: Use barrier to ensure that all old data is cleared
+       and all producers and consumers are ready to rollback state.
+    8) _AwaitDataReceiversAck: Put DataReceivers in non-recovery mode.
+    9) _Rollback: Rollback all state to last safe checkpoint.
+    10) _FinishedRecovering: Finished recovery
+    11) _RecoveryOverrideAccepted: If recovery was handed off to another worker
   """
   let _self: Recovery tag = this
   let _auth: AmbientAuth
@@ -94,7 +96,7 @@ actor Recovery
     _router_registry.stop_the_world()
     _recovery_phase.start_recovery(_workers, this, with_reconnect)
 
-  be recovery_reconnect_finished() =>
+  be recovery_reconnect_finished(abort_promise: (Promise[None] | None)) =>
     _recovery_phase.recovery_reconnect_finished()
 
   be rollback_prep_complete() =>
@@ -117,31 +119,30 @@ actor Recovery
   =>
     _recovery_phase.rollback_complete(worker, token)
 
-  be recovery_initiated_at_worker(worker: WorkerName,
-    token: CheckpointRollbackBarrierToken)
+  be recovery_initiated_at_worker(worker: WorkerName, rollback_id: RollbackId)
   =>
     if worker != _worker_name then
-      let overriden = _recovery_phase.try_override_recovery(worker, token,
-        this)
-
-      if overriden then
-        _recovery_reconnecter.abort_early(worker)
+      @printf[I32]("Recovery initiation attempted by %s\n".cstring(),
+        worker.cstring())
+      let promise = Promise[None]
+      promise.next[None]({(_: None) =>
         // !TODO!: We should probably ensure DataReceivers has acked an
         // override if that happens before acking.
         try
-          let msg = ChannelMsgEncoder.ack_recovery_initiated(token,
-            _worker_name, _auth)?
+          @printf[I32]("!@ Sending ack_recovery_initiated to %s\n".cstring(), worker.cstring())
+          let msg = ChannelMsgEncoder.ack_recovery_initiated(_worker_name,
+            _auth)?
           _connections.send_control(worker, msg)
         else
           Fail()
         end
-      end
+      })
+
+      _recovery_phase.try_override_recovery(worker, rollback_id, this, promise)
     end
 
-  be ack_recovery_initiated(worker: WorkerName,
-    token: CheckpointRollbackBarrierToken)
-  =>
-    _recovery_phase.ack_recovery_initiated(worker, token)
+  be ack_recovery_initiated(worker: WorkerName) =>
+    _recovery_phase.ack_recovery_initiated(worker)
 
   fun ref _start_reconnect(workers: Array[WorkerName] val,
     with_reconnect: Bool)
@@ -207,48 +208,66 @@ actor Recovery
 
   fun ref _local_keys_rollback_complete() =>
     ifdef "resilience" then
-      @printf[I32]("|~~ - Recovery Phase: Rollback Barrier - ~~|\n".cstring())
-      let promise = Promise[CheckpointRollbackBarrierToken]
-      promise.next[None]({(token: CheckpointRollbackBarrierToken) =>
-        _self.rollback_barrier_fully_acked(token)
-      })
-      _checkpoint_initiator.initiate_rollback(promise, _worker_name)
-      _recovery_phase = _RollbackBarrier(this)
+      @printf[I32]("|~~ - Recovery Phase: Await Rollback Id - ~~|\n".cstring())
+      _recovery_phase = _AwaitRollbackId(this)
+      let promise = Promise[RollbackId]
+      promise.next[None](_self~receive_rollback_id())
+      _checkpoint_initiator.request_rollback_id(promise)
     else
       _recovery_complete()
     end
 
-  fun ref _rollback_barrier_complete(token: CheckpointRollbackBarrierToken,
-    acked_recovery_initiated_workers:
-    Map[CheckpointRollbackBarrierToken, SetIs[WorkerName]])
-  =>
+  be receive_rollback_id(rollback_id: RollbackId) =>
+    _recovery_phase.receive_rollback_id(rollback_id)
+
+  fun ref request_recovery_initiated_acks(rollback_id: RollbackId) =>
+    ifdef "resilience" then
+      @printf[I32]("|~~ - Recovery Phase: Await Recovery Initiated Acks - ~~|\n".cstring())
+      try
+        let msg = ChannelMsgEncoder.recovery_initiated(rollback_id,
+          _worker_name, _auth)?
+        _connections.send_control_to_cluster(msg)
+      else
+        Fail()
+      end
+      _recovery_phase = _AwaitRecoveryInitiatedAcks(_workers, this,
+        rollback_id)
+      _recovery_phase.ack_recovery_initiated(_worker_name)
+    else
+      _recovery_complete()
+    end
+
+  fun ref _recovery_initiated_acks_complete(rollback_id: RollbackId) =>
+    ifdef "resilience" then
+      @printf[I32]("|~~ - Recovery Phase: Rollback Barrier - ~~|\n".cstring())
+
+      _recovery_phase = _RollbackBarrier(this)
+
+      let promise = Promise[CheckpointRollbackBarrierToken]
+      promise.next[None]({(token: CheckpointRollbackBarrierToken) =>
+        _self.rollback_barrier_fully_acked(token)
+      })
+      _checkpoint_initiator.initiate_rollback(promise, _worker_name,
+        rollback_id)
+    else
+      _recovery_complete()
+    end
+
+  fun ref _rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: AwaitDataReceiversAck - ~~|\n"
         .cstring())
       _data_receivers.rollback_barrier_complete(this)
-      _recovery_phase = _AwaitDataReceiversAck(this, token,
-        acked_recovery_initiated_workers)
+      _recovery_phase = _AwaitDataReceiversAck(this, token)
     end
 
-  fun ref _data_receivers_ack_complete(token: CheckpointRollbackBarrierToken,
-    acked_recovery_initiated_workers:
-    Map[CheckpointRollbackBarrierToken, SetIs[WorkerName]])
+  fun ref _data_receivers_ack_complete(token: CheckpointRollbackBarrierToken)
   =>
     ifdef "resilience" then
-      @printf[I32](("|~~ - Recovery Phase: Await Recovery Initiated Acks " +
+      @printf[I32](("|~~ - Recovery Phase: Rollback " +
         "- ~~| \n").cstring())
-      _recovery_phase = _AwaitRecoveryInitiatedAcks(token, _workers, this,
-        acked_recovery_initiated_workers)
-      _recovery_phase.ack_recovery_initiated(_worker_name, token)
-    end
-
-  fun ref _recovery_initiated_acks_complete(
-    token: CheckpointRollbackBarrierToken)
-  =>
-    ifdef "resilience" then
-      @printf[I32]("|~~ - Recovery Phase: Rollback - ~~|\n".cstring())
-
       _recovery_phase = _Rollback(this, token, _workers)
+
       let promise = Promise[CheckpointRollbackBarrierToken]
       promise.next[None](recover this~rollback_complete(_worker_name) end)
       _event_log.initiate_rollback(token, promise)
@@ -262,8 +281,6 @@ actor Recovery
       else
         Fail()
       end
-    else
-      _recovery_complete()
     end
 
   fun ref _recovery_complete() =>

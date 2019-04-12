@@ -17,6 +17,7 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 use "collections"
+use "promises"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
@@ -59,6 +60,9 @@ actor RecoveryReconnecter
   let _cluster: Cluster
   var _recovery: (Recovery | None) = None
 
+  //!@ This is part of an implicit state machine state
+  var _abort_promise: (Promise[None] | None) = None
+
   var _reconnected_boundaries: Map[WorkerName, SetIs[RoutingId]] =
     _reconnected_boundaries.create()
 
@@ -81,12 +85,6 @@ actor RecoveryReconnecter
 
   be register_step(step: Step) =>
     _steps.set(step)
-
-  be abort_early(worker: WorkerName) =>
-    @printf[I32](
-      "|~~ -- RecoveryReconnecter ceding control to worker %s -- ~~\n"
-        .cstring(), worker.cstring())
-    _reconnect_phase = _ReadyForNormalProcessing(this)
 
   be add_expected_boundary_count(worker: WorkerName, count: USize) =>
     _reconnect_phase.add_expected_boundary_count(worker, count)
@@ -112,7 +110,7 @@ actor RecoveryReconnecter
       @printf[I32]("|~~ -- Skipping Reconnect: Only One Worker -- ~~|\n"
         .cstring())
       _reconnect_phase = _ReadyForNormalProcessing(this)
-      recovery.recovery_reconnect_finished()
+      recovery.recovery_reconnect_finished(_abort_promise)
       return
     end
     @printf[I32]("|~~ -- Reconnect Phase 1: Wait for Boundary Counts -- ~~|\n"
@@ -183,7 +181,7 @@ actor RecoveryReconnecter
     _reconnect_phase = _ReadyForNormalProcessing(this)
     match _recovery
     | let r: Recovery =>
-      r.recovery_reconnect_finished()
+      r.recovery_reconnect_finished(_abort_promise)
     else
       Fail()
     end
