@@ -47,6 +47,9 @@ trait Runner
     i_msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, U64)
+  fun ref flush_local_state(producer_id: RoutingId, producer: Producer ref,
+    router: Router, metrics_reporter: MetricsReporter ref,
+    watermarks: StageWatermarks) => None
   fun name(): String
 
 trait SerializableStateRunner
@@ -173,7 +176,8 @@ class val StatelessComputationRunnerBuilder[In: Any val, Out: Any val] is
     | let r: Runner iso =>
       StatelessComputationRunner[In, Out](_comp, consume r)
     else
-      StatelessComputationRunner[In, Out](_comp, RouterRunner(partitioner_builder))
+      StatelessComputationRunner[In, Out](_comp,
+        RouterRunner(partitioner_builder))
     end
 
   fun name(): String => _comp.name()
@@ -207,10 +211,10 @@ class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
     match (consume next_runner)
     | let r: Runner iso =>
       StateRunner[In, Out, S](_step_group, _state_init, event_log, auth,
-        consume r)
+        consume r, _local_routing)
     else
       StateRunner[In, Out, S](_step_group, _state_init, event_log, auth,
-        RouterRunner(partitioner_builder))
+        RouterRunner(partitioner_builder), _local_routing)
     end
 
   fun name(): String => _state_init.name()
@@ -316,13 +320,15 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
   // points. We should refactor so that we can control the seed for testing.
   let _rand: Rand = Rand
 
+  let _local_routing: Bool
+
   // Timeouts
   var _step_timeout_trigger: (StepTimeoutTrigger | None) = None
   let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
 
   new iso create(step_group': RoutingId,
     state_initializer: StateInitializer[In, Out, S] val, event_log: EventLog,
-    auth: AmbientAuth, next_runner: Runner iso)
+    auth: AmbientAuth, next_runner: Runner iso, local_routing: Bool)
   =>
     _step_group = step_group'
     _state_initializer = state_initializer
@@ -330,6 +336,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     _event_log = event_log
     _step_id = None
     _auth = auth
+    _local_routing = local_routing
 
   fun ref set_step_id(id: RoutingId) =>
     _step_id = id
@@ -343,64 +350,6 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     if ti > 0 then
       stt.set_timeout(ti)
       watermarks.update_last_heard_threshold(ti * 2)
-    end
-
-  fun ref on_timeout(producer_id: RoutingId, producer: Producer ref,
-    router: Router, metrics_reporter: MetricsReporter ref,
-    watermarks: StageWatermarks)
-  =>
-    let on_timeout_ts = WallClock.nanoseconds()
-    for (key, sw) in _state_map.pairs() do
-      let input_watermark_ts = watermarks.check_effective_input_watermark(
-        on_timeout_ts)
-      let initial_output_watermark_ts = watermarks.output_watermark()
-
-      (let out, let output_watermark_ts) =
-        sw.on_timeout(input_watermark_ts, initial_output_watermark_ts)
-
-      (let new_watermark_ts, let old_watermark_ts) =
-        watermarks.update_output_watermark(output_watermark_ts)
-
-      // New metrics info for the window outputs
-      let new_i_msg_uid = _msg_id_gen()
-      let metrics_name = _state_initializer.name()
-      let pipeline_time_spent: U64 = 0
-      var metrics_id: U16 = 1
-
-      let latest_ts = WallClock.nanoseconds()
-
-      match out
-      | let o: Out =>
-        OutputProcessor[Out](
-          _next_runner, metrics_name, pipeline_time_spent,
-          o, key, output_watermark_ts, new_watermark_ts, old_watermark_ts,
-          producer_id, producer, router, new_i_msg_uid, None, latest_ts,
-          metrics_id, on_timeout_ts, metrics_reporter)
-      | let os: Array[Out] val =>
-        OutputProcessor[Out](
-          _next_runner, metrics_name, pipeline_time_spent,
-          os, key, output_watermark_ts, new_watermark_ts, old_watermark_ts,
-          producer_id, producer, router, new_i_msg_uid, None, latest_ts,
-          metrics_id, on_timeout_ts, metrics_reporter)
-      | let os: Array[(Out,U64)] val =>
-        OutputProcessor[Out](
-          _next_runner, metrics_name, pipeline_time_spent,
-          os, key, output_watermark_ts, new_watermark_ts, old_watermark_ts,
-          producer_id, producer, router, new_i_msg_uid, None, latest_ts,
-          metrics_id, on_timeout_ts, metrics_reporter)
-      end
-    end
-    match _step_timeout_trigger
-    | let stt: StepTimeoutTrigger =>
-      let ti = _state_initializer.timeout_interval()
-      if ti > 0 then
-        stt.set_timeout(ti)
-      end
-    else
-      ifdef debug then
-        @printf[I32](("StateRunner: on_timeout was called but we have no " +
-          "StepTimeoutTrigger\n").cstring())
-      end
     end
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
@@ -502,6 +451,94 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     //we need to be able to conflate all the current logs to a checkpoint and
     //rotate
     None
+
+  fun ref on_timeout(producer_id: RoutingId, producer: Producer ref,
+    router: Router, metrics_reporter: MetricsReporter ref,
+    watermarks: StageWatermarks)
+  =>
+    let on_timeout_ts = WallClock.nanoseconds()
+    for (key, sw) in _state_map.pairs() do
+      let input_watermark_ts = watermarks.check_effective_input_watermark(
+        on_timeout_ts)
+      let initial_output_watermark_ts = watermarks.output_watermark()
+
+      (let out, let output_watermark_ts) =
+        sw.on_timeout(input_watermark_ts, initial_output_watermark_ts)
+
+      _send_flushed_outputs(key, out, output_watermark_ts,
+        producer_id, producer, router, metrics_reporter,
+        watermarks, on_timeout_ts)
+    end
+    match _step_timeout_trigger
+    | let stt: StepTimeoutTrigger =>
+      let ti = _state_initializer.timeout_interval()
+      if ti > 0 then
+        stt.set_timeout(ti)
+      end
+    else
+      ifdef debug then
+        @printf[I32](("StateRunner: on_timeout was called but we have no " +
+          "StepTimeoutTrigger\n").cstring())
+      end
+    end
+
+  fun ref flush_local_state(producer_id: RoutingId, producer: Producer ref,
+    router: Router, metrics_reporter: MetricsReporter ref,
+    watermarks: StageWatermarks)
+  =>
+    // We only flush local state if we're involved in worker local routing.
+    if _local_routing then
+      let current_ts = WallClock.nanoseconds()
+      let input_watermark_ts = watermarks.check_effective_input_watermark(
+        current_ts)
+      for (key, sw) in _state_map.pairs() do
+        let initial_output_watermark_ts = watermarks.output_watermark()
+
+        (let out, let output_watermark_ts) =
+          sw.flush_windows(input_watermark_ts, initial_output_watermark_ts)
+
+        _send_flushed_outputs(key, out, output_watermark_ts,
+          producer_id, producer, router, metrics_reporter,
+          watermarks, current_ts)
+      end
+    end
+
+  fun ref _send_flushed_outputs(key: Key, out: ComputationResult[Out],
+    output_watermark_ts: U64, producer_id: RoutingId, producer: Producer ref,
+    router: Router, metrics_reporter: MetricsReporter ref,
+    watermarks: StageWatermarks, artificial_ingress_ts: U64)
+  =>
+    (let new_watermark_ts, let old_watermark_ts) =
+      watermarks.update_output_watermark(output_watermark_ts)
+
+    // New metrics info for the window outputs
+    let new_i_msg_uid = _msg_id_gen()
+    let metrics_name = _state_initializer.name()
+    let pipeline_time_spent: U64 = 0
+    var metrics_id: U16 = 1
+
+    let latest_ts = WallClock.nanoseconds()
+
+    match out
+    | let o: Out =>
+      OutputProcessor[Out](
+        _next_runner, metrics_name, pipeline_time_spent,
+        o, key, output_watermark_ts, new_watermark_ts, old_watermark_ts,
+        producer_id, producer, router, new_i_msg_uid, None, latest_ts,
+        metrics_id, artificial_ingress_ts, metrics_reporter)
+    | let os: Array[Out] val =>
+      OutputProcessor[Out](
+        _next_runner, metrics_name, pipeline_time_spent,
+        os, key, output_watermark_ts, new_watermark_ts, old_watermark_ts,
+        producer_id, producer, router, new_i_msg_uid, None, latest_ts,
+        metrics_id, artificial_ingress_ts, metrics_reporter)
+    | let os: Array[(Out,U64)] val =>
+      OutputProcessor[Out](
+        _next_runner, metrics_name, pipeline_time_spent,
+        os, key, output_watermark_ts, new_watermark_ts, old_watermark_ts,
+        producer_id, producer, router, new_i_msg_uid, None, latest_ts,
+        metrics_id, artificial_ingress_ts, metrics_reporter)
+    end
 
   fun name(): String => _state_initializer.name()
 

@@ -27,6 +27,11 @@ use "wallaroo_labs/guid"
 use "wallaroo_labs/time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/initialization"
+use "wallaroo/core/invariant"
+use "wallaroo/core/metrics"
+use "wallaroo/core/routing"
+use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/state"
 use "wallaroo/core/windows"
 use "wallaroo/core/barrier"
@@ -36,15 +41,12 @@ use "wallaroo/core/rebalancing"
 use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
 use "wallaroo/core/checkpoint"
+use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
-use "wallaroo/core/initialization"
-use "wallaroo/core/invariant"
-use "wallaroo/core/metrics"
-use "wallaroo/core/routing"
-use "wallaroo/core/sink/tcp_sink"
 
 actor Step is (Producer & Consumer & BarrierProcessor)
   let _auth: AmbientAuth
+  let _worker_name: WorkerName
   var _id: U128
   let _runner: Runner
   var _router: Router = EmptyRouter
@@ -83,7 +85,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
 
   let _timers: Timers = Timers
 
-  new create(auth: AmbientAuth, runner: Runner iso,
+  new create(auth: AmbientAuth, worker_name: WorkerName, runner: Runner iso,
     metrics_reporter': MetricsReporter iso,
     id: U128, event_log: EventLog,
     recovery_replayer: RecoveryReconnecter,
@@ -92,6 +94,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     router': Router = EmptyRouter, is_recovering: Bool = false)
   =>
     _auth = auth
+    _worker_name = worker_name
     _runner = consume runner
     match _runner
     | let r: RollbackableRunner => r.set_step_id(id)
@@ -465,6 +468,15 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       match barrier_token
       | let srt: CheckpointRollbackBarrierToken =>
         _phase.prepare_for_rollback(srt)
+      | let abt: AutoscaleBarrierToken =>
+        if ArrayHelpers[WorkerName].contains[WorkerName](abt.leaving_workers(),
+          _worker_name)
+        then
+          // We're leaving, so we need to flush any remaining worker local
+          // state (which won't be migrated).
+          _runner.flush_local_state(_id, this, _router, _metrics_reporter,
+            _watermarks)
+        end
       end
 
       _phase.receive_barrier(step_id, producer,
