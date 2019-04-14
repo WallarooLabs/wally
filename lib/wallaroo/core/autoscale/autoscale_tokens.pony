@@ -19,6 +19,7 @@ Copyright 2018 The Wallaroo Authors.
 use "wallaroo/core/barrier"
 use "wallaroo/core/common"
 
+
 class val AutoscaleTokens
   let worker: String
   let id: AutoscaleId

@@ -159,7 +159,8 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       end
     end
 
-  fun ref attempt_to_trigger(input_watermark_ts: U64): (Array[(Out, U64)] val, U64)
+  fun ref attempt_to_trigger(input_watermark_ts: U64):
+    (Array[(Out, U64)] val, U64)
   =>
     let outs = recover iso Array[(Out, U64)] end
     var output_watermark_ts: U64 = 0
