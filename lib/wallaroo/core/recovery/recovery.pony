@@ -129,7 +129,6 @@ actor Recovery
         // !TODO!: We should probably ensure DataReceivers has acked an
         // override if that happens before acking.
         try
-          @printf[I32]("!@ Sending ack_recovery_initiated to %s\n".cstring(), worker.cstring())
           let msg = ChannelMsgEncoder.ack_recovery_initiated(_worker_name,
             _auth)?
           _connections.send_control(worker, msg)

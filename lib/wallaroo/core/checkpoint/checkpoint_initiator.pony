@@ -549,7 +549,6 @@ actor CheckpointInitiator is Initializable
 
   be rollback_complete(rollback_id: RollbackId) =>
     ifdef "resilience" then
-      // _last_rollback_id = rollback_id
       _save_checkpoint_id(_last_complete_checkpoint_id, rollback_id)
     end
 
@@ -570,8 +569,6 @@ actor CheckpointInitiator is Initializable
     ifdef "resilience" then
       _current_checkpoint_id = checkpoint_id
       _last_complete_checkpoint_id = checkpoint_id
-      //!@
-      // _last_rollback_id = rollback_id
       _save_checkpoint_id(checkpoint_id, rollback_id)
     end
 

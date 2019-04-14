@@ -261,7 +261,6 @@ class _BarrierStepPhase is StepPhase
     check_completion(_step.inputs())
 
   fun ref check_completion(inputs: Map[RoutingId, Producer] box) =>
-    @printf[I32]("!@ Step %s check_completion: inputs->%s, inputs_blocking->%s\n".cstring(), _step_id.string().cstring(), inputs.size().string().cstring(), _inputs_blocking.size().string().cstring())
     if inputs.size() == _inputs_blocking.size()
     then
       for (o_id, o) in _step.outputs().pairs() do

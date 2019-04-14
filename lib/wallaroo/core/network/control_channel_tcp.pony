@@ -576,7 +576,6 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
       | let m: RequestRollbackIdMsg =>
         let promise = Promise[RollbackId]
         promise.next[None]({(rollback_id: RollbackId) =>
-          @printf[I32]("!@ Telling %s that rollback_id is %s\n".cstring(), m.sender.cstring(), rollback_id.string().cstring())
           try
             let msg = ChannelMsgEncoder.announce_rollback_id(rollback_id,
               _auth)?

@@ -238,12 +238,10 @@ class _AwaitRecoveryInitiatedAcks is _RecoveryPhase
   fun name(): String => "_AwaitRecoveryInitiatedAcks"
 
   fun ref ack_recovery_initiated(w: WorkerName) =>
-    @printf[I32]("!@ _AwaitRecoveryInitiatedAcks: ack_recovery_initiated from %s\n".cstring(), w.cstring())
     _acked_workers.set(w)
     check_completion()
 
   fun ref check_completion() =>
-    @printf[I32]("!@ _AwaitRecoveryInitiatedAcks: check_completion: acks->%s, workers->%s\n".cstring(), _acked_workers.size().string().cstring(), _workers.size().string().cstring())
     if _acked_workers.size() == _workers.size() then
       _recovery._recovery_initiated_acks_complete(_rollback_id)
     end
