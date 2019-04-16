@@ -134,25 +134,17 @@ primitive KeyExtractor
 primitive KeyedMessageEncoder
   fun apply(msg: KeyedMessage val, wb: Writer = Writer): Array[ByteSeq] val =>
     let encode_nanos: U64 = Time.nanos()
-    let ba: Array[U8] val = recover
-      let w = Writer
-      w.write(msg.key.string())
-      w.write(",")
-      w.write(msg.value.string())
-      w.write(",")
-      w.write(msg.decode_nanos.string())
-      w.write(",")
-      w.write(encode_nanos.string())
-      let bs: Array[ByteSeq] val = w.done()
-      recover val
-        let a = Array[U8]
-        for b in bs.values() do
-          a.append(b)
-        end
-        a
-      end
-    end
-    Bytes.length_encode(ba)
+    let w = Writer
+    w.write(msg.key.string())
+    w.write(",")
+    w.write(msg.value.string())
+    w.write(",")
+    w.write(msg.decode_nanos.string())
+    w.write(",")
+    w.write(encode_nanos.string())
+    wb.u32_be(w.size().u32())
+    wb.writev(w.done())
+    wb.done()
 
 class KeyedMessage
   let key: U32
