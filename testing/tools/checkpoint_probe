@@ -82,7 +82,7 @@ with open(args.output, 'w', encoding="utf8") as out:
     try:
         while True:
             # timestamp
-            ts = time.time()
+            ts = int(time.monotonic() * 1000000000)
             log_bytes = get_file_sizes(log_files)
             last_checkpoints = get_last_checkpoints(checkpoint_files)
             data = {'ts': ts, 'log_bytes': log_bytes,
