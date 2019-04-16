@@ -19,7 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 """
 State Size Tester App
 
-Setting up a market spread run (in order):
+Setting up a run (in order):
 1) reports sink (if not using Monitoring Hub):
 nc -l 127.0.0.1 5555 >> /dev/null
 
@@ -29,21 +29,13 @@ nc -l 127.0.0.1 5001 >> /dev/null
 TODO: Add run instructions
 """
 
-use "assert"
 use "buffered"
-use "collections"
-use "net"
 use "options"
-use "serialise"
 use "time"
 use "wallaroo_labs/bytes"
-use "wallaroo_labs/conversions"
-use "wallaroo_labs/fix"
-use "wallaroo_labs/hub"
-use "wallaroo_labs/new_fix"
-use "wallaroo_labs/time"
 use "wallaroo"
 use "wallaroo_labs/mort"
+use "wallaroo_labs/time"
 use "wallaroo/core/common"
 use "wallaroo/core/metrics"
 use "wallaroo/core/sink/tcp_sink"
@@ -77,23 +69,15 @@ actor Main
       end
 
       let pipeline = recover val
-        let key_passthrough = Wallaroo.source[KeyedMessage val](
-            "KeyMsg-Passthrough",
+        Wallaroo.source[KeyedMessage val](
+            "keyval",
             TCPSourceConfig[KeyedMessage val].from_options(
               PartitionedU32FramedHandler,
-              TCPSourceConfigCLIParser("KeyMsg-Passthrough", env.args)?))
+              TCPSourceConfigCLIParser("keyval", env.args)?))
           .key_by(KeyExtractor)
-
-        let key_set = Wallaroo.source[KeyedMessage val]("Key-Set",
-            TCPSourceConfig[KeyedMessage val].from_options(PartitionedU32FramedHandler,
-              TCPSourceConfigCLIParser("Key-Set", env.args)?))
-          .key_by(KeyExtractor)
-
-        key_passthrough.merge[KeyedMessage val](key_set)
           .to[KeyedMessage val](KeyedPassThrough(state_size, output))
           .to_sink(TCPSinkConfig[KeyedMessage val].from_options(
             KeyedMessageEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
-
       end
       Wallaroo.build_application(env, "State Size Tester", pipeline)
     else
@@ -136,9 +120,8 @@ primitive PartitionedU32FramedHandler is FramedSourceHandler[KeyedMessage val]
     try
       let key: U32 = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?)
       let value: U32 = Bytes.to_u32(data(4)?, data(5)?, data(6)?, data(7)?)
-      (let secs, let ns) = Time.now()
-      let decode_timestamp = secs.string() + "." + ns.string()
-      let msg = KeyedMessage(key, value, decode_timestamp)
+      let decode_nanos: U64 = Time.nanos()
+      let msg = KeyedMessage(key, value, decode_nanos)
       consume msg
     else
       error
@@ -150,22 +133,33 @@ primitive KeyExtractor
 
 primitive KeyedMessageEncoder
   fun apply(msg: KeyedMessage val, wb: Writer = Writer): Array[ByteSeq] val =>
-    (let secs, let ns) = Time.now()
-    let encode_timestamp = secs.string() + "." + ns.string()
-    let msg_size: USize = 4 + 4 + 20 + 20
-    wb.u32_be(msg_size.u32())
-    wb.u32_be(msg.key)
-    wb.u32_be(msg.value)
-    wb.write(msg.decode_timestamp.array()) // assumption: 20 bytes
-    wb.write(encode_timestamp.array()) // assumption: 20 bytes
-    wb.done()
+    let encode_nanos: U64 = Time.nanos()
+    let ba: Array[U8] val = recover
+      let w = Writer
+      w.write(msg.key.string())
+      w.write(",")
+      w.write(msg.value.string())
+      w.write(",")
+      w.write(msg.decode_nanos.string())
+      w.write(",")
+      w.write(encode_nanos.string())
+      let bs: Array[ByteSeq] val = w.done()
+      recover val
+        let a = Array[U8]
+        for b in bs.values() do
+          a.append(b)
+        end
+        a
+      end
+    end
+    Bytes.length_encode(ba)
 
 class KeyedMessage
   let key: U32
   let value: U32
-  let decode_timestamp: String
+  let decode_nanos: U64
 
-  new val create(key': U32, value': U32, decode_timestamp': String) =>
+  new val create(key': U32, value': U32, decode_nanos': U64) =>
     key = key'
     value = value'
-    decode_timestamp = decode_timestamp'
+    decode_nanos = decode_nanos'
