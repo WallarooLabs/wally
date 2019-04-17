@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+import matplotlib.pyplot as plt
+import numpy as np
+
+import file_parser
+
+
+parser = argparse.ArgumentParser("State Size Test Analysis")
+parser.add_argument("--checkpoints", type=str,
+                    help="The path to the checkpoints stats file.")
+parser.add_argument("--application-data", type=str,
+                    help="The path to the application output file.")
+parser.add_argument("--output", type=str,
+                    help="The path to save the post-processed data.")
+args = parser.parse_args()
+
+perf = file_parser.load_output_file(args.application_data)
+checkpoints = file_parser.load_checkpoints_file(args.checkpoints)
+
+# Save output to single file
+with open(args.output, 'wt') as f:
+    f.write(json.dumps({'perf': perf, 'checkpoints': checkpoints}))
+
+print("Post-processed data written to {!r}".format(args.output))
+exit(0)
+
+
+# 1. Find the smallest timestamp from both data sets
+# 2. plots plots plots!
+#   2.1. performance over time (latency percentiles, throughput at sink)
+#   2.2. checkpoint throughput and latency over time
+#   2.3. ??
+# 3. Save a single value that can be compared across runs
+#       - throughput mean + stddev per run
+#       - latency mean + stddev per percentile per run
+#       - checkpoint latency mean + stddev per run
+
+
+# get percentiles per second
+#k0 = 20
+#freq, edges = np.histogram(output[k0],
+#        bins=100,
+#        range=(1e-4, 5e-3))
+#print(k0)
+#print(len(output[k0]))
+#print(freq, edges)
+#
+#fig, ax = plt.subplots()
+#ax.bar(edges[:-1], freq, width=np.diff(edges), ec="k", align="edge")
+#
+#plt.show()
+
+exit(0)
+
+
+
+#####################
+# log sizes over time
+#####################
+
+#print(parsed[t1_100][0][0], parsed[t1_100][0][-1])
+#print(parsed[t1_500][0][0], parsed[t1_500][0][-1])
+#print(parsed[t1_1000][0][0], parsed[t1_1000][0][-1])
+#plt.plot(parsed[t1_100][0], parsed[t1_100][2])
+#plt.plot(parsed[t1_500][0], parsed[t1_500][2])
+#plt.plot(parsed[t1_1000][0], parsed[t1_1000][2])
+#plt.show()
+
+#################################
+# Histogram of checkpoint latency
+#################################
+
+#n, bins, patches = plt.hist(x=d, bins=10, color='#0504aa',
+#                            alpha=0.7, rwidth=0.85)
+#plt.grid(axis='y', alpha=0.75)
+#plt.xlabel('Time since last checkpoint')
+#plt.ylabel('Frequency')
+#plt.title('Checkpoint Delay Frequency: 10kb, 500 states')
+#maxfreq = n.max()
+## Set a clean upper y-axis limit.
+#plt.ylim(ymax=np.ceil(maxfreq / 10) * 10 if maxfreq % 10 else maxfreq + 10)
+#plt.show()
+
+exit(0)
+# Generate data on commute times.
+size, scale = 1000, 10
+commutes = pd.Series(np.random.gamma(scale, size=size) ** 1.5)
+
+commutes.plot.hist(grid=True, bins=20, rwidth=0.9,
+                   color='#607c8e')
+plt.title('Commute Times for 1,000 Commuters')
+plt.xlabel('Counts')
+plt.ylabel('Commute Time')
+plt.grid(axis='y', alpha=0.75)

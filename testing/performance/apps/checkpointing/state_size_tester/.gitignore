@@ -3,3 +3,5 @@ state_size_tester.o
 received.txt
 sent.txt
 output.dat
+processed.txt
+checkpoint_stats.log
