@@ -2,7 +2,11 @@
 
 import argparse
 import json
-import matplotlib.pyplot as plt
+from matplotlib import (
+            pyplot as plt,
+            ticker,
+            gridspec,
+            rc)
 import numpy as np
 import pandas as pd
 
@@ -78,23 +82,71 @@ with open(paths['stats'], 'wt') as f:
     stats.to_json(f)
 print("Stats data written to {!r}".format(paths['stats']))
 
-fig, ax1 = plt.subplots()
-# First axis: latency vs. time
-ax1.set_xlabel('Time (s)')
-ax1.set_ylabel('Latency (ms)')
-df.plot(y='p50', ax=ax1)
-df.plot(y='p95', ax=ax1)
-df.plot(y='p99', ax=ax1)
-df.plot(y='p99.9', ax=ax1)
-df.plot(y='p99.99', ax=ax1)
-df.plot(y='p100', ax=ax1)
 
-# Second axis: throughput vs. time (using same x axis for time)
-ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
-ax2.set_ylabel('Throughput')  # we already handled the x-label with ax1
-df.plot(y='count', ax=ax2, linewidth=3.5)
+rc('font', size=12)
 
-fig.tight_layout()  # otherwise the right y-label is slightly clipped
+fig = plt.figure(figsize=(12, 18), dpi=120, facecolor='w', edgecolor='k')
+fig.suptitle(args.prefix)
+grid = plt.GridSpec(4, 3) # 4 rows, 3 cols
 
+# First pane: Throughput vs. Time, full width
+pane1 = plt.subplot(grid[0,:])
+pane1.set_title('Throughput')
+pane1.set_xlabel('Time (s)')
+# rescale Y axis
+ticks_y = ticker.FuncFormatter(lambda y, pos: '{0:g}'.format(y/1000))
+pane1.yaxis.set_major_formatter(ticks_y)
+pane1.set_ylabel('K req/sec')
+pane1.xaxis.set_minor_locator(ticker.MultipleLocator(10))
+pane1.xaxis.set_major_locator(ticker.MultipleLocator(50))
+df.plot(y='count', ax=pane1, legend=False)
+
+## Panes 2,3: Latency vs. Time, 3 per row
+row_2, row_3= ['p50', 'p95', 'p99'], ['p99.9', 'p99.99', 'p100']
+ylim = df[row_2+row_3].max().max()
+for i, r in enumerate([row_2, row_3]):
+    for j, p in enumerate(r):
+        subpane = plt.subplot(grid[i+1,j])
+        subpane.set_title(p)
+        subpane.set_xlabel('Time (s)')
+        subpane.set_ylabel('Latency (ms)')
+        subpane.set_ylim(0, ylim)
+        ticks_y = ticker.FuncFormatter(lambda y, pos: '{0:g}'.format(y*1000))
+        subpane.yaxis.set_major_formatter(ticks_y)
+        df.plot(y=p, ax=subpane, legend=False)
+
+# Stats as a table plot in bottom pane
+bottom = plt.subplot(grid[3,:])
+# Set pandas display precision to 2 decimals
+# get stats
+tf = df[['count', 'p50', 'p95', 'p99', 'p99.9', 'p99.99', 'p100']].describe()
+# convert the percentile columns to ms
+for col in tf.columns:
+    if col.startswith('p'):
+        tf[col] *= 1000
+# convert the counts column to 1k/
+tf['count'] /=1000.0
+# Convert everything to 2 decimal precision
+tf = tf.applymap("{0:.2f}".format)
+# Replace count row with units
+row = pd.Series({c: 'ms' if c.startswith('p') else 'KReq/s'
+                     for c in tf.columns}, name='unit')
+tf.iloc[0] = row
+tf.iloc[0].name = 'unit'
+
+# add data rows
+cell_text = []
+for row in range(len(tf)):
+    cell_text.append(tf.iloc[row])
+
+table = bottom.table(cellText=cell_text, colLabels=tf.columns, loc='center')
+#table.auto_set_font_size(False)
+#table.set_fontsize(10)
+bottom.axis('off')
+
+
+plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # otherwise the right y-label is slightly clipped
+
+#plt.show()
 plt.savefig(paths['png'], format='png')
 print("Figure saved to {!r}".format(paths['png']))
