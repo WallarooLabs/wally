@@ -18,8 +18,11 @@ def load_output_file(path):
         f.readline()
         for line in f.readlines():
             if line:
-                key, val, bucket, latency = parse_output_line(line)
-                aggs.setdefault(bucket, []).append(latency)
+                try:
+                    key, val, bucket, latency = parse_output_line(line)
+                    aggs.setdefault(bucket, []).append(latency)
+                except:
+                    print("Ignoring {}".format(line))
             else:
                 continue
     # convert time to offset from start
