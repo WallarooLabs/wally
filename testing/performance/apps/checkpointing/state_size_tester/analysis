@@ -99,6 +99,7 @@ pane1.yaxis.set_major_formatter(ticks_y)
 pane1.set_ylabel('K req/sec')
 pane1.xaxis.set_minor_locator(ticker.MultipleLocator(10))
 pane1.xaxis.set_major_locator(ticker.MultipleLocator(50))
+pane1.set_ylim(0,df['count'].max())
 df.plot(y='count', ax=pane1, legend=False)
 
 ## Panes 2,3: Latency vs. Time, 3 per row
@@ -132,16 +133,14 @@ tf = tf.applymap("{0:.2f}".format)
 row = pd.Series({c: 'ms' if c.startswith('p') else 'KReq/s'
                      for c in tf.columns}, name='unit')
 tf.iloc[0] = row
-tf.iloc[0].name = 'unit'
-
+tf.rename(index={'count':'unit'}, inplace=True)
 # add data rows
 cell_text = []
 for row in range(len(tf)):
     cell_text.append(tf.iloc[row])
+table = bottom.table(cellText=cell_text, colLabels=tf.columns, loc='center',
+                     rowLabels=tf.index)
 
-table = bottom.table(cellText=cell_text, colLabels=tf.columns, loc='center')
-#table.auto_set_font_size(False)
-#table.set_fontsize(10)
 bottom.axis('off')
 
 
