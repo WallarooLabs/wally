@@ -4,94 +4,97 @@ import argparse
 import json
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 import file_parser
 
 
 parser = argparse.ArgumentParser("State Size Test Analysis")
-parser.add_argument("--checkpoints", type=str,
-                    help="The path to the checkpoints stats file.")
-parser.add_argument("--application-data", type=str,
+parser.add_argument("-o", "--output-prefix", type=str, dest='prefix',
+                    help="The path prefix for saving the post-processed data.")
+
+# Use groups for mutually exclusive features
+mex = parser.add_mutually_exclusive_group(required=True)
+
+mex.add_argument("-d", "--application-data", type=str,
                     help="The path to the application output file.")
-parser.add_argument("--output", type=str,
-                    help="The path to save the post-processed data.")
+mex.add_argument("-p", "--processed-data", type=str,
+                    help="The path to the processed data file.")
+parser.add_argument("-c", "--checkpoints", type=str, default=None,
+                    help="The path to the checkpoints stats file.")
+
+
 args = parser.parse_args()
 
-perf = file_parser.load_output_file(args.application_data)
-checkpoints = file_parser.load_checkpoints_file(args.checkpoints)
+paths = {'post-processed': args.prefix + '_processed.txt',
+         'png': args.prefix + '_performance.png',
+         'svg': args.prefix + '_performance.svg',
+         'stats': args.prefix + '_stats.txt'}
 
-# Save output to single file
-with open(args.output, 'wt') as f:
-    f.write(json.dumps({'perf': perf, 'checkpoints': checkpoints}))
-
-print("Post-processed data written to {!r}".format(args.output))
-exit(0)
-
-
-# 1. Find the smallest timestamp from both data sets
-# 2. plots plots plots!
-#   2.1. performance over time (latency percentiles, throughput at sink)
-#   2.2. checkpoint throughput and latency over time
-#   2.3. ??
-# 3. Save a single value that can be compared across runs
-#       - throughput mean + stddev per run
-#       - latency mean + stddev per percentile per run
-#       - checkpoint latency mean + stddev per run
+if args.application_data:
+    perf = file_parser.load_output_file(args.application_data)
+    if args.checkpoints:
+        checkpoints = file_parser.load_checkpoints_file(args.checkpoints)
+        # assume only one worker for now
+        checkpoints = checkpoints.popitem()[1]
+    else:
+        checkpoints = {}
 
 
-# get percentiles per second
-#k0 = 20
-#freq, edges = np.histogram(output[k0],
-#        bins=100,
-#        range=(1e-4, 5e-3))
-#print(k0)
-#print(len(output[k0]))
-#print(freq, edges)
-#
-#fig, ax = plt.subplots()
-#ax.bar(edges[:-1], freq, width=np.diff(edges), ec="k", align="edge")
-#
-#plt.show()
+    # Use perf data for the time boundaries
+    min_ts = min(perf.keys())
+    # create a panads dataframe
+    data = {}
+    for k in list(perf.keys()):
+        key = k - min_ts
+        data[key] = perf.pop(k)
+        data[key].update(checkpoints.get(k, {}))
+        pct = data[key].pop('percentiles')
+        for p, v in sorted(pct, key=lambda x: x[0]):
+            data[key]['p{}'.format(p)] = v
 
-exit(0)
+    df = pd.DataFrame.from_dict(data, orient='index')
 
+    with open(paths['post-processed'], 'wt') as f:
+        df.to_json(f)
+        print("Post-processed data written to {!r}".format(paths['post-processed']))
 
+elif args.processed_data:
+    print("Loading processed data from {!r}".format(args.processed_data))
+    with open(args.processed_data, 'rt') as f:
+        d = json.loads(f.read())
+        for col in d:
+            for k in list(d[col].keys()):
+                d[col][int(k)] = d[col].pop(k)
+        df = pd.DataFrame.from_dict(d)
 
-#####################
-# log sizes over time
-#####################
+print(df[['count', 'size', 'id', 'p50', 'p95', 'p99', 'p99.9', 'p99.99', 'p100']])
+# Get stats
+stats = df[['count', 'p50', 'p95', 'p99', 'p99.9', 'p99.99', 'p100']].describe()
+# print stats
+print(stats)
+# save stats
+with open(paths['stats'], 'wt') as f:
+    stats.to_json(f)
+print("Stats data written to {!r}".format(paths['stats']))
 
-#print(parsed[t1_100][0][0], parsed[t1_100][0][-1])
-#print(parsed[t1_500][0][0], parsed[t1_500][0][-1])
-#print(parsed[t1_1000][0][0], parsed[t1_1000][0][-1])
-#plt.plot(parsed[t1_100][0], parsed[t1_100][2])
-#plt.plot(parsed[t1_500][0], parsed[t1_500][2])
-#plt.plot(parsed[t1_1000][0], parsed[t1_1000][2])
-#plt.show()
+fig, ax1 = plt.subplots()
+# First axis: latency vs. time
+ax1.set_xlabel('Time (s)')
+ax1.set_ylabel('Latency (ms)')
+df.plot(y='p50', ax=ax1)
+df.plot(y='p95', ax=ax1)
+df.plot(y='p99', ax=ax1)
+df.plot(y='p99.9', ax=ax1)
+df.plot(y='p99.99', ax=ax1)
+df.plot(y='p100', ax=ax1)
 
-#################################
-# Histogram of checkpoint latency
-#################################
+# Second axis: throughput vs. time (using same x axis for time)
+ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+ax2.set_ylabel('Throughput')  # we already handled the x-label with ax1
+df.plot(y='count', ax=ax2, linewidth=3.5)
 
-#n, bins, patches = plt.hist(x=d, bins=10, color='#0504aa',
-#                            alpha=0.7, rwidth=0.85)
-#plt.grid(axis='y', alpha=0.75)
-#plt.xlabel('Time since last checkpoint')
-#plt.ylabel('Frequency')
-#plt.title('Checkpoint Delay Frequency: 10kb, 500 states')
-#maxfreq = n.max()
-## Set a clean upper y-axis limit.
-#plt.ylim(ymax=np.ceil(maxfreq / 10) * 10 if maxfreq % 10 else maxfreq + 10)
-#plt.show()
+fig.tight_layout()  # otherwise the right y-label is slightly clipped
 
-exit(0)
-# Generate data on commute times.
-size, scale = 1000, 10
-commutes = pd.Series(np.random.gamma(scale, size=size) ** 1.5)
-
-commutes.plot.hist(grid=True, bins=20, rwidth=0.9,
-                   color='#607c8e')
-plt.title('Commute Times for 1,000 Commuters')
-plt.xlabel('Counts')
-plt.ylabel('Commute Time')
-plt.grid(axis='y', alpha=0.75)
+plt.savefig(paths['png'], format='png')
+print("Figure saved to {!r}".format(paths['png']))

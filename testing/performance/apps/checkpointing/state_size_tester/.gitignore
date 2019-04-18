@@ -5,3 +5,5 @@ sent.txt
 output.dat
 processed.txt
 checkpoint_stats.log
+test_*
+tests/*
