@@ -142,24 +142,31 @@ class ResilienceOperation(object):
 
 
 class Grow(ResilienceOperation):
-    def __init__(self, size, timeout=30, with_test=True):
+    def __init__(self, size, timeout=30, with_test=True, pause=True):
         super(Grow, self).__init__(size)
         self.timeout = timeout
         self.with_test = with_test
+        self.pause = pause
 
     def sign(self):
         return 1
 
     def apply(self, cluster, data=None):
-        return cluster.grow(by=self.size, timeout=self.timeout,
+        if self.pause:
+            pause_senders_and_sink_await(cluster)
+        res = cluster.grow(by=self.size, timeout=self.timeout,
                             with_test=self.with_test)
+        if self.pause:
+            cluster.resume_senders()
+        return res
 
 
 class Shrink(ResilienceOperation):
-    def __init__(self, workers, timeout=30, with_test=True):
+    def __init__(self, workers, timeout=30, with_test=True, pause=True):
         self.workers = workers
         self.timeout = timeout
         self.with_test = with_test
+        self.pause = pause
         if isinstance(workers, basestring):
             super(Shrink, self).__init__(len(workers.split(',')))
         else:
@@ -169,8 +176,13 @@ class Shrink(ResilienceOperation):
         return -1
 
     def apply(self, cluster, data=None):
-        return cluster.shrink(self.workers, timeout=self.timeout,
+        if self.pause:
+            pause_senders_and_sink_await(cluster)
+        res = cluster.shrink(self.workers, timeout=self.timeout,
                               with_test=self.with_test)
+        if self.pause:
+            cluster.resume_senders()
+        return res
 
 
 class Crash(ResilienceOperation):
