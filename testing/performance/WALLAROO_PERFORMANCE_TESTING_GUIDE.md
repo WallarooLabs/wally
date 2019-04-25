@@ -2,7 +2,7 @@
 
 This guide is written to help you get started performance testing Wallaroo. There is an assumption that you have some basic knowledge of Wallaroo and related tooling.
 
-This guide covers general performance testing information. Once you have finished this document you should read the documents for performance tests of either the [Pony](apps/market-spread/PERFORMANCE_TESTING_MARKET_SPREAD.md), [Python](apps/python/market_spread/PERFORMANCE_TESTING_PYTHON_MARKET_SPREAD.md), or [Go](apps/go/market_spread/PERFORMANCE_TESTING_GO_MARKET_SPREAD.md) APIs.
+This guide covers general performance testing information. Once you have finished this document you should read the documents for performance tests of either the [Pony](apps/market-spread/PERFORMANCE_TESTING_MARKET_SPREAD.md) or [Python](apps/python/market_spread/PERFORMANCE_TESTING_PYTHON_MARKET_SPREAD.md) APIs.
 
 ## Setting up Terraform for AWS Cluster Orchestration
 
