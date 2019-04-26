@@ -23,7 +23,7 @@ make cluster cluster_name=<YOUR-CLUSTER-NAME> num_followers=2 \
   terraform_args="-var placement_tenancy=dedicated"
 ```
 
-- `cluster_name`: the name you'd want to use for your cluster, this should be a unique identifier that you can remember.
+- `cluster_name`: the name you'd want to use for your cluster, this should be a unique identifier that you can remember. There is a bug in cluster setup that will allow you to use `.` in the cluster name, but the cluster won't be set up correctly. Do not use `.` in your cluster name.
 
 - `num_followers`: The number of additional instance types to bring up besides the default single instance `wallaroo-leader-1` brought up via the `make cluster` command. If running multi-worker tests, this should be adjusted to include an additional instance per worker. The Metrics UI, Data Receiver(s) and Sender(s) should also be running on a separate instance type where no other Wallaroo worker is running.
 
