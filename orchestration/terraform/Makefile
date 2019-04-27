@@ -541,7 +541,7 @@ acquire-vpc-lock: check-cluster-name ## Acquire vpc lock in order to safely run 
 
 check-cluster-name: # check for valid cluster name
 	$(if $(cluster_name),,$(error 'cluster_name' cannot be empty!))
-	$(if $(filter $(cluster_name),$(shell echo '$(cluster_name)' | sed 's/[^a-zA-Z0-9\-\.]//g')),,$(error 'cluster_name' can only have [a-zA-Z0-9-.] in it!))
+	$(if $(filter $(cluster_name),$(shell echo '$(cluster_name)' | sed 's/[^-a-zA-Z0-9]//g')),,$(error 'cluster_name' can only have [-a-zA-Z0-9] in it!))
 
 init-vpc-terraform: check-cluster-name ## Initialize/reset local terraform state based on what is in S3 for vpc
 	@echo "\033[36m==> Initializing terraform state for VPC in region \
