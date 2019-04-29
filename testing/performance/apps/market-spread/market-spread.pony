@@ -102,7 +102,7 @@ actor Main
           .key_by(NbboSymbolExtractor)
 
         orders.merge[FixNbboMessage val](nbbos)
-          .to[OrderResult val](CheckMarketData)
+          .to[OrderResult val](CheckMarketData, 350)
           .to_sink(TCPSinkConfig[OrderResult val].from_options(
             OrderResultEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
 
