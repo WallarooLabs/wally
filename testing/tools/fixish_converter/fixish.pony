@@ -84,7 +84,7 @@ actor Main
         let wb = Writer
         var p = true
         for line in input_file.lines() do
-          match FixParser(consume line)
+          match FixParser(line)
           | let m: FixOrderMessage val =>
             try
               if m.order_id().size() != 6 then error end

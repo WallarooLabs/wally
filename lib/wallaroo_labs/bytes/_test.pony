@@ -26,7 +26,6 @@ actor Main is TestList
 
   fun tag tests(test: PonyTest) =>
     test(_TestBytes)
-    test(_TestLengthEncode)
 
 class iso _TestBytes is UnitTest
   fun name(): String => "bytes/_TestBytes"
@@ -50,34 +49,4 @@ class iso _TestBytes is UnitTest
       n3_enc(4)?, n3_enc(5)?, n3_enc(6)?, n3_enc(7)?)
     h.assert_eq[U64](n3_dec, n3)
 
-    true
-
-
-class iso _TestLengthEncode is UnitTest
-  fun name(): String => "bytes/_TestLengthEncode"
-
-  fun apply(h: TestHelper) ? =>
-    let s0: String = ""
-    let s1: String = "a"
-    let s3: String = "aaa"
-    let s0_enc: Array[ByteSeq] val = Bytes.length_encode(s0)
-    let s1_enc: Array[ByteSeq] val = Bytes.length_encode(s1)
-    let s3_enc: Array[ByteSeq] val = Bytes.length_encode(s3)
-
-    // Check outer size
-    h.assert_eq[USize](0, s0_enc.size())
-    h.assert_eq[USize](1, s1_enc.size())
-    h.assert_eq[USize](1, s3_enc.size())
-
-    // Check contents
-    h.assert_eq[U8](0, s1_enc(0)?(0)?)
-    h.assert_eq[U8](0, s1_enc(0)?(1)?)
-    h.assert_eq[U8](0, s1_enc(0)?(2)?)
-    h.assert_eq[U8](1, s1_enc(0)?(3)?)
-    h.assert_eq[U8]('a', s1_enc(0)?(4)?)
-
-    h.assert_eq[U8](3, s3_enc(0)?(3)?)
-    h.assert_eq[U8]('a', s3_enc(0)?(4)?)
-    h.assert_eq[U8]('a', s3_enc(0)?(5)?)
-    h.assert_eq[U8]('a', s3_enc(0)?(6)?)
     true

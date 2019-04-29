@@ -76,7 +76,7 @@ actor Main
         is_header = false
         continue
       end
-      match InstrumentParser(consume line)
+      match InstrumentParser(line)
       | let instrument: InstrumentData val =>
         instruments.push(instrument)
       end

@@ -862,9 +862,13 @@ actor Startup
     let ws = recover trn Array[String] end
 
     let file = File(worker_names_filepath)
-    for worker_name in file.lines() do ws.push(consume worker_name) end
-    @printf[I32]("recover_worker_names: %s\n".cstring(),
-      ",".join(ws.values()).cstring())
+
+    for worker_name in file.lines() do
+      ws.push(worker_name)
+      @printf[I32]("recover_worker_names: %s\n".cstring(),
+        worker_name.cstring())
+    end
+
     ws
 
   fun ref _setup_shutdown_handler(c: Connections, r: RecoveryFileCleaner,
