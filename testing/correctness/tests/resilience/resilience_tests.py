@@ -17,6 +17,7 @@
 from resilience import (Crash,
                         Grow,
                         Recover,
+                        Rotate,
                         Shrink,
                         Wait,
                         _test_resilience)
@@ -87,7 +88,13 @@ RESILIENCE_SEQS = [
     [Wait(2), Crash(1), Wait(2), Recover(1), Wait(5)],
 
     # crash2, recover2
-    [Wait(2), Crash(2), Wait(2), Recover(2), Wait(5)]
+    [Wait(2), Crash(2), Wait(2), Recover(2), Wait(5)],
+
+    # Log rotate
+    [Wait(2), Rotate(), Wait(2)],
+
+    # Log rotate and crash
+    [Wait(2), Rotate(), Wait(2), Crash(1), Wait(2), Recover(1), Wait(2)],
     ]
 
 # Generate resilience test functions for each api, for each of the op seqs

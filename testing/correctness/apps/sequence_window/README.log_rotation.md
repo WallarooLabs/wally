@@ -66,3 +66,9 @@ Sender:
 ../../../../giles/sender/sender -h 127.0.0.1:20000 -s 100 -i 50_000_000 \
 --ponythreads=1 -y -g 12 -w -u -m 10000
 ```
+
+
+external log rotation trigger
+```bash
+../../../tools/external_sender/external_sender --external 127.0.0.1:20004 -t rotate-log -m initializer
+```

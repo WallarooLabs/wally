@@ -104,8 +104,22 @@ def get_port_values(num=1, host='127.0.0.1', base_port=20000):
     return ports
 
 
+def send_rotate_command(addr, worker):
+    """
+    Trigger log rotation with external message
+    """
+    cmd_external_rotate = ('external_sender --external {} --type rotate-log '
+                           '--message {}'.format(addr, worker))
+    res = run_shell_cmd(cmd_external_rotate)
+    try:
+        assert(res.success)
+    except AssertionError:
+        raise AssertionError('External log rotation trigger failed with '
+                             'the error:\n{}'.format(res))
+    return res.output
+
+
 def send_shrink_command(addr, workers):
-    # Trigger log rotation with external message
     cmd_external_trigger = ('cluster_shrinker --external {} --workers {}'
                             .format(addr, workers))
 

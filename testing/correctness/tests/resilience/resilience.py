@@ -235,6 +235,24 @@ class Recover(ResilienceOperation):
         return restarted
 
 
+class Rotate(ResilienceOperation):
+    def __init__(self):
+        """
+        Trigger a log rotation on all workers using via their external control
+        channel.
+        """
+        super(Rotate, self).__init__(0, check_size=False)
+
+    def sign(self):
+        return 0
+
+    def apply(self, cluster, data=None):
+        # TODO: Get current last log chunk
+        rotated = cluster.rotate_logs()
+        # TODO: watch for new log chunks to confirm rotation
+        return rotated
+
+
 class Wait(ResilienceOperation):
     def __init__(self, seconds):
         if not isinstance(seconds, Number):
