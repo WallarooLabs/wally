@@ -22,7 +22,8 @@ from .errors import (ClusterError,
 from .stoppable_thread import StoppableThread
 from .observability import (cluster_status_query,
                            get_func_name,
-                           ObservabilityNotifier)
+                           ObservabilityNotifier,
+                           EvLogFileNotifier)
 
 from .validations import is_processing
 
@@ -242,3 +243,41 @@ class CrashChecker(StoppableThread):
                 self.stop()
                 break
             time.sleep(0.01)
+
+
+class WaitForLogRotation(StoppableThread):
+    """
+    Wait for a log rotation to occuer on a set of filepath prefixes
+    """
+    __base_name__ = 'WaitForLogRottion'
+
+    def __init__(self, base_path, prefixes=[], log_suffix='.evlog', timeout=30):
+        super(WaitForLogRotation, self).__init__()
+        self.base_path = base_path
+        self.prefixes = prefixes
+        self.timeout = timeout
+        self.notifier = EvLogFileNotifier(handler=self, base_path)
+
+    def run(self):
+        while not self.stopped():
+            self.notifier.run()
+            self.notifier.join(self.timeout)
+            if self.notifier.is_alive():
+                self.notifier.stop()
+                self.stop()
+                err = TimeoutError("WaitForrLogRotation timed out after "
+                " {} seconds while waiting for {!r} to rotate"
+                .format(self.timeout, self.prefixes))
+                self.cluster.raise_from_error(err)
+                break
+            else:
+                self.stop()
+                return
+            time.sleep(0.05)
+
+    def file_created(self, base_name, new_chunk, old_chunk):
+        # TODO
+
+    def file_deleted(self, base_name, chunk):
+        # TODO
+

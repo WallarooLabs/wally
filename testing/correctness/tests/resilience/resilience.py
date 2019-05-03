@@ -248,6 +248,7 @@ class Rotate(ResilienceOperation):
 
     def apply(self, cluster, data=None):
         # TODO: Get current last log chunk
+        # Use WaitForLogRotation controller in control.py for this.
         rotated = cluster.rotate_logs()
         # TODO: watch for new log chunks to confirm rotation
         return rotated
