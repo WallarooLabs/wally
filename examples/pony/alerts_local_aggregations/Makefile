@@ -35,18 +35,18 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 
-ALERTS_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+PONY_ALERTS_LOCAL_AGGREGATIONS_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # standard rules generation makefile
 include $(rules_mk_path)
 
 
 # integration-tests-examples-pony-alerts_stateless: build-examples-pony-alerts_stateless
-# integration-tests-examples-pony-alerts_stateless: alerts_stateless_test
+# integration-tests-examples-pony-alerts_stateless: pony_alerts_local_aggregations_test
 
-alerts_stateless_test:
+pony_alerts_local_aggregations_test:
 	# TODO: Update to use gensource
-	# cd $(ALERTS_PATH) && \
+	# cd $(PONY_ALERTS_LOCAL_AGGREGATIONS_PATH) && \
 	# integration_test --framed-file-sender \
 	#   _test.txt --validation-cmp \
 	#   --expected-file _expected.txt \
