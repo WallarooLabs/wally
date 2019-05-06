@@ -2,7 +2,9 @@
 
 export PYTHONPATH="../../machida/lib:."
 
-../../machida/build/machida --application-module word_count --in 'Split and Count'@127.0.0.1:7010 \
+../../machida/build/machida --application-module word_count \
+  --in 'Split and Count'@127.0.0.1:7012 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
-  --control 127.0.0.1:6000 --name worker3 --ponythreads=1 -j 127.0.0.1:6000 \
-  --my-control 127.0.0.1:13303 --my-data 127.0.0.1:13403
+  --join 127.0.0.1:6000 --name worker3 \
+  --my-control 127.0.0.1:13303 --my-data 127.0.0.1:13403 \
+  --ponythreads=1 --ponypinasio --ponynoblock

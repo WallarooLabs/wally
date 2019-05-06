@@ -83,7 +83,7 @@ To add additional workers, you can use the following commands to demonstrate aut
 Worker 2:
 
 ```bash
-machida --application-module word_count --in 'Split and Count'127.0.0.1:7010 \
+machida --application-module word_count --in 'Split and Count'127.0.0.1:7011 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6000 --name worker2 --ponythreads=1 -j 127.0.0.1:6000
 ```
@@ -91,7 +91,26 @@ machida --application-module word_count --in 'Split and Count'127.0.0.1:7010 \
 Worker 3:
 
 ```bash
-machida --application-module word_count --in 'Split and Count'@127.0.0.1:7010 \
+machida --application-module word_count --in 'Split and Count'@127.0.0.1:7012 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6000 --name worker3 --ponythreads=1 -j 127.0.0.1:6000
+```
+
+## Emphasizing the state migration
+Run the demo receiver with grep:
+```bash
+./demo_receiver | grep amendmend
+```
+
+Apply the following patch to `word-count.py`:
+```diff
+--- a/examples/python/word_count/word_count.py
++++ b/examples/python/word_count/word_count.py
+@@ -82,4 +82,6 @@ def decode_lines(bs):
+ @wallaroo.encoder
+ def encode_word_count(word_count):
+     output = word_count.word + " => " + str(word_count.count) + "\n"
++    if output.startswith("amendment"):
++        print(output.strip())
+     return output.encode("utf-8")
 ```
