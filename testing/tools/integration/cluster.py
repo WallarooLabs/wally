@@ -27,7 +27,8 @@ from .control import (CrashChecker,
                      SinkExpect,
                      SinkAwaitValue,
                      TryUntilTimeout,
-                     WaitForClusterToResumeProcessing)
+                     WaitForClusterToResumeProcessing,
+                     WaitForLogRotation)
 
 from .end_points import (ALOSender,
                          Metrics,
@@ -577,8 +578,10 @@ class Cluster(object):
         """
         Rotate the named workers, or all workers if no workers are named
         """
-        logging.log(1, "rotate(workers={})".format(workers))
+        logging.debug("rotate_logs(workers={})".format(workers))
         if workers is None:
+            logging.debug("Workers is None, getting all live ones: {}".format(
+                self.workers))
             to_rotate = self.workers
         else:
             # check all named workers exist
@@ -587,10 +590,27 @@ class Cluster(object):
             for w in workers:
                 to_rotate.append(valid[w])  # fail if w not in valid
 
-        # for each worker, send a log rotate command directly to its external
-        # channel
+        prefixes = [r.name for r in to_rotate]
+        logging.debug("prefixes = {}".format(prefixes))
+
+        # start log rotation watcher
+        logging.debug("Running WaitForLogRotation")
+        wflr = WaitForLogRotation(cluster=self, base_path=self.res_dir,
+                prefixes=prefixes)
+        self._stoppables.add(wflr)
+        wflr.start()
+
+        # send a log rotate command directly to each worker's external channel
         for w in to_rotate:
             send_rotate_command(w.external, w.name)
+
+        # Wait for log rotation watcher to return
+        wflr.join()
+        self._stoppables.discard(wflr)
+        if wflr.error:
+            logging.error("WaitForLogRotation failed with:\n{!r}"
+                .format(wflr.error))
+            raise wflr.error
         return to_rotate
 
     #############

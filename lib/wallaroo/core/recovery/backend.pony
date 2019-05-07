@@ -163,7 +163,7 @@ class FileBackend is Backend
     end
 
     @printf[I32](("RESILIENCE: Rolling back to checkpoint %s from recovery " +
-      "log file: \n").cstring(), checkpoint_id.string().cstring(),
+      "log file: %s\n").cstring(), checkpoint_id.string().cstring(),
       _filepath.path.cstring())
 
     // First task: append a _LogRestartEntry record to the log.
@@ -226,7 +226,7 @@ class FileBackend is Backend
     end
     if not target_checkpoint_found then
       @printf[I32](("RESILIENCE: Rolling back to checkpoint %s from recovery "+
-        "log file failed: not found \n").cstring(),
+        "log file failed: %s not found \n").cstring(),
         checkpoint_id.string().cstring(), _filepath.path.cstring())
       Fail()
     end
@@ -490,6 +490,7 @@ class RotatingFileBackend is Backend
       // TODO This is a placeholder for recording that we're rotating
       // an EventLog backend file, which is a prototype quick hack for
       // keeping such state within an SimpleJournal collection thingie.
+      // TODO: https://github.com/WallarooLabs/wallaroo/issues/2884
       let rotation_history = AsyncJournalledFile(FilePath(_auth, "TODO-EventLog-rotation-history.txt")?, _the_journal, _auth,
         _do_local_file_io)
       rotation_history.print("START of rotation: finished writing to " + _backend.get_path())

@@ -24,7 +24,9 @@ import traceback
 import sys
 import time
 
-import inotify
+from inotify.adapters import Inotify
+inotify_logger = logging.getLogger("inotify.adapters")
+inotify_logger.setLevel(logging.ERROR)
 
 from .errors import (DuplicateKeyError,
                     TimeoutError)
@@ -425,6 +427,8 @@ class EvLogFileNotifier(StoppableThread):
     __base_name__ = 'EvLogFileNotifier'
 
     def __init__(self, handler, path, log_suffix='.evlog'):
+        logging.log(1, "{}({}, {}, {})".format(self.__base_name__,
+            handler, path, log_suffix))
         super(EvLogFileNotifier, self).__init__()
         self.handler = handler
         self.path = path
@@ -449,10 +453,13 @@ class EvLogFileNotifier(StoppableThread):
                         self.handler.evlognotifier_stopped(self)
                     else:
                         continue
-            except:
-                continue
+            except Exception as err:
+                logging.exception(err)
+                raise err
 
     def handle_log_file_event(self, filename, type_names):
+        logging.log(1, "{}.handle_log_file_event({}, {})".format(
+            self.__base_name__, filename, type_names))
         # type_names we might care about:
         #   IN_CREATE           - create file/dir
         #   IN_DELETE           - delete file/dir
@@ -471,13 +478,13 @@ class EvLogFileNotifier(StoppableThread):
 
         # CREATE
         if 'IN_CREATE' in type_names:
-            fn_logs.setdefault('chunks', []).add(chunk)
+            fn_logs.setdefault('chunks', []).append(chunk)
             fn_logs.setdefault('active', chunk)
             new_chunk = chunk
-            old_chunk = (fn_logs['chunks'][-1]
-                         if len(fn_logs['chunks'])>0
+            old_chunk = (fn_logs['chunks'][-2]
+                         if len(fn_logs['chunks'])>1
                          else None)
-            self.handler.file_created(basename, new_chunk, old_chunk)
+            self.handler.file_created(base_name, new_chunk, old_chunk)
         # DELETE
         elif 'IN_DELETE' in type_names:
             if fn_logs['current'] == chunk:

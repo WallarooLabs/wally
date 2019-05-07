@@ -46,3 +46,5 @@ tags
 #Stable files
 .deps
 .deps/*
+
+TODO-EventLog-rotation-history.txt

@@ -452,6 +452,10 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
     if not isinstance(ops, (list, tuple)):
         raise TypeError("ops must be a list or tuple of operations")
 
+    # determine whether there is log rotation in the ops
+    log_rotation = any(isinstance(op, Rotate) for op in ops)
+    logging.info("log_rotation={}".format(log_rotation))
+
     # If no initial workers value is given, determine the minimum number
     # required at the start so that the cluster never goes below 1 worker.
     # If a number is given, then verify it is sufficient.
@@ -502,6 +506,7 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
     with Cluster(command=command, host=host,
                  sources=[source_name] if source_type != 'gensource' else [],
                  workers=workers, sinks=sinks, sink_mode=sink_mode,
+                 log_rotation=log_rotation,
                  persistent_data=persistent_data) as cluster:
 
         # start senders
