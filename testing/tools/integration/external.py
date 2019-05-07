@@ -206,6 +206,7 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
                 time=strftime(sk.start_time, STRFTIME_FMT))
             with open(os.path.join(base_dir, sink_log_name), 'wb') as f:
                 for d in sk.data:
+                    print('SLF: TODO: fix up file copy stuff here, open = {}'.format(os.path.join(base_dir, sink_log_name)))
                     f.write(d)
         logging.warning("Error logs saved to {}".format(base_dir))
 

@@ -16,6 +16,7 @@
 import argparse
 from collections import Counter
 from json import loads
+import os
 import struct
 
 
@@ -24,24 +25,36 @@ class OrderError(Exception):
 
 
 parser = argparse.ArgumentParser("Multi Partition Detector Validator")
-parser.add_argument("--output", type=argparse.FileType("rb"),
-                    help="The output file of the application.")
+parser.add_argument("--output", type=str,
+                    help="The output file/dir of the application.")
 args = parser.parse_args()
 
-f = args.output
-windows = {}
-while True:
-    header_bytes = f.read(4)
-    if not header_bytes:
-        break
-    header = struct.unpack('>I', header_bytes)[0]
-    payload = f.read(header)
-#    print(payload)
-    assert(len(payload) > 0)
-    obj = loads(payload.decode())  # Python3.5/json needs a string
-    windows.setdefault(obj['key'], []).append((float(obj['ts']), obj['value']))
+path = args.output
+files = []
+try:
+    for entry in os.listdir(path):
+       files.append('{}/{}'.format(path, entry))
+except Exception as e:
+    print('SLF: bummer, e = {}'.format(e))
+    files = [path]
+print('SLF: files = {}'.format(files))
 
-# flatten windows to sequences
+window_list = []
+for file in files:
+    with open(file, 'rb') as f:
+        windows = {}
+        while True:
+            header_bytes = f.read(4)
+            if not header_bytes:
+                break
+            header = struct.unpack('>I', header_bytes)[0]
+            payload = f.read(header)
+            assert(len(payload) > 0)
+            obj = loads(payload.decode())  # Python3.5/json needs a string
+            windows.setdefault(obj['key'], []).append((float(obj['ts']), obj['value']))
+        window_list.append(windows)
+
+# flatten windows to sequences, e.g. [0, 0, 0, 1, 0, 0, 1, 2, 0, 1, 2, 3, ...]
 sequences = {}
 for k in windows.keys():
     for ts, win in windows[k]:
@@ -50,7 +63,8 @@ for k in windows.keys():
                             "window: {}, sorted: {}"
                             .format(k, w_key, win, sorted(win)))
         sequences.setdefault(k, []).extend(win)
-
+#print('sequences for key_20: {}'.format(sequences[u'key_20']))
+#raise Exception("YO")
 
 # Check completeness
 for k, v in sequences.items():
