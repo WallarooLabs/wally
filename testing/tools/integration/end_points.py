@@ -16,6 +16,7 @@ import datetime
 import errno
 import io
 import logging
+import os
 import threading
 import time
 import socket
@@ -52,6 +53,8 @@ class SingleSocketReceiver(StoppableThread):
         super(SingleSocketReceiver, self).__init__()
         self.sock = sock
         self.accumulator = accumulator
+        if isinstance(self.accumulator, basestring):
+            self.accumulator_f = open(self.accumulator, 'wb')
         self.mode = mode
         self.header_fmt = header_fmt
         self.header_length = struct.calcsize(self.header_fmt)
@@ -70,10 +73,18 @@ class SingleSocketReceiver(StoppableThread):
             return None
 
     def append(self, bs):
-        if self.mode == 'framed':
-            self.accumulator.append(bs)
+        if isinstance(self.accumulator, list):
+            if self.mode == 'framed':
+                self.accumulator.append(bs)
+            else:
+                self.accumulator.append(bs + b'\n')
+        elif isinstance(self.accumulator, basestring):
+            if self.mode == 'framed':
+                self.accumulator_f.write(bs)
+            else:
+                self.accumulator_f.write(bs + b'\n')
         else:
-            self.accumulator.append(bs + b'\n')
+            raise Exception('Unexpected accumulator type: {}'.format(self.accumulator))
 
     def run(self):
         if self.mode == 'framed':
@@ -126,12 +137,18 @@ class SingleSocketReceiver(StoppableThread):
                 self.stop()
             else:
                 self.append(b''.join((header, data)))
+                ## print('SLF: append %s, from %s at %.6f' % (data, self.sock, time.time()))
                 time.sleep(0.000001)
 
     def stop(self, *args, **kwargs):
         super(self.__class__, self).stop(*args, **kwargs)
         self.sock.close()
-
+        if isinstance(self.accumulator, basestring):
+            try:
+                self.accumulator_f.flush()
+            except:
+                None
+            self.accumulator_f.close()
 
 class TCPReceiver(StoppableThread):
     """
@@ -155,7 +172,7 @@ class TCPReceiver(StoppableThread):
     __base_name__ = 'TCPReceiver'
 
     def __init__(self, host, port=0, max_connections=1000, mode='framed',
-                 header_fmt='>I'):
+                 header_fmt='>I', acc_mode='list'):
         """
         Listen on a (host, port) pair for up to max_connections connections.
         Each connection is handled by a separate client thread.
@@ -168,8 +185,16 @@ class TCPReceiver(StoppableThread):
         self.mode = mode
         self.header_fmt = header_fmt
         self.header_length = struct.calcsize(self.header_fmt)
-        # use an in-memory byte buffer
-        self.data = []
+        if acc_mode == 'list':
+            # use an in-memory byte buffer
+            self.data = []
+        elif acc_mode[0] == '/':
+            self.data = acc_mode
+            print('SLF: yodel: gonna file like files never filed before: {}'.format(acc_mode))
+            os.system('rm -rf {}'.format(self.data))
+            os.mkdir(self.data)
+        else:
+            raise Exception('Unknown acc_mode {}'.format(acc_mode))
         # Create a socket and start listening
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -195,6 +220,7 @@ class TCPReceiver(StoppableThread):
             while not self.stopped():
                 try:
                     (clientsocket, address) = self.sock.accept()
+                    print('SLF: client socket address?? {}'.format(address))
                 except Exception as err:
                     try:
                         if self.stopped():
@@ -213,7 +239,12 @@ class TCPReceiver(StoppableThread):
                                 .format(err.errno))
                             self.err = err
                             raise
-                cl = SingleSocketReceiver(clientsocket, self.data, self.mode,
+                if isinstance(self.data, list):
+                    acc_arg = []
+                elif isinstance(self.data, basestring):
+                    # Name each TCP connection's file by the local & remote port
+                    acc_arg = '{}/{}.{}'.format(self.data, self.port, address[1])
+                cl = SingleSocketReceiver(clientsocket, acc_arg, self.mode,
                                           self.header_fmt,
                                           name='{}-{}'.format(
                                               self.__base_name__,
@@ -245,15 +276,21 @@ class TCPReceiver(StoppableThread):
                 cl.stop()
 
     def save(self, path, mode=None):
-        c = 0
-        with open(path, 'wb') as f:
-            for item in self.data:
-                f.write(item[:self.header_length])
-                if mode == 'giles':
-                    f.write(struct.pack('>Q', c))
-                    c += 1
-                f.write(item[self.header_length:])
-            f.flush()
+        print('SLF: save now: {}'.format(path))
+        if isinstance(self.data, list):
+            c = 0
+            with open(path, 'wb') as f:
+                for item in self.data:
+                    f.write(item[:self.header_length])
+                    if mode == 'giles':
+                        f.write(struct.pack('>Q', c))
+                        c += 1
+                    f.write(item[self.header_length:])
+                f.flush()
+        elif isinstance(self.data, basestring):
+            ## Our stop() method calls stop() on all clients which will close & flush
+            logging.info('SLF: Our stop() method calls stop() on all clients which will close & flush')
+            None
 
     def bytes_received(self):
         return sum(map(len, self.data))

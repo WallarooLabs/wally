@@ -464,7 +464,8 @@ SinkData = namedtuple('SinkData',
 class Cluster(object):
     def __init__(self, command, host='127.0.0.1', sources=[], workers=1,
             sinks=1, sink_mode='framed', worker_join_timeout=30,
-            is_ready_timeout=30, res_dir=None, persistent_data={}):
+            is_ready_timeout=30, res_dir=None, persistent_data={},
+            validation_dir=None):
         # Create attributes
         self._finalized = False
         self._exited = False
@@ -505,8 +506,12 @@ class Cluster(object):
             self.metrics_addr = ":".join(
                 map(str, self.metrics.get_connection_info()))
 
+            if validation_dir == None:
+                acc_mode = 'list'
+            else:
+                acc_mode = validation_dir
             for s in range(sinks):
-                self.sinks.append(Sink(host, mode=sink_mode))
+                self.sinks.append(Sink(host, mode=sink_mode, acc_mode=acc_mode))
                 self.sinks[-1].start()
                 self._stoppables.add(self.sinks[-1])
                 if self.sinks[-1].err is not None:

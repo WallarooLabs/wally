@@ -478,12 +478,26 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
     else:
         raise ValueError("source_type must be one of ['gensource', 'tcp', 'alo']")
 
+    # TODO: move to validations.py
+    # TODO: This forces _every_ test to save its validated file to artifacts.
+    # remove it once the bug with validation failing but passing on the artifact
+    # is resolved.
+    #out_file = os.path.join(cluster.res_dir, 'received.txt')
+    base_path = '/tmp/wallaroo_test_errors'
+    makedirs_if_not_exists(base_path)
+    chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+    rng = _Random()
+    random_str = ''.join([rng.choice(chars) for _ in range(8)])
+    out_name = 'received_{}.dir'.format(random_str)
+    v_out_dir = '/tmp/yodel-fixme' ## real: os.path.join(base_path, out_name)
+
     # Start cluster
     logging.debug("Creating cluster")
     with Cluster(command=command, host=host,
                  sources=[source_name] if source_type != 'gensource' else [],
                  workers=workers, sinks=sinks, sink_mode=sink_mode,
-                 persistent_data=persistent_data) as cluster:
+                 persistent_data=persistent_data,
+                 validation_dir=v_out_dir) as cluster:
 
         # start senders
         if source_type == 'tcp':
@@ -542,34 +556,22 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
         # Use validator to validate the data in at-least-once mode
         # save sink data to a file
         if validation_cmd:
-            # TODO: move to validations.py
-            # TODO: This forces _every_ test to save its validated file to artifacts.
-            # remove it once the bug with validation failing but passing on the artifact
-            # is resolved.
-            #out_file = os.path.join(cluster.res_dir, 'received.txt')
-            base_path = '/tmp/wallaroo_test_errors'
-            makedirs_if_not_exists(base_path)
-            chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-            rng = _Random()
-            random_str = ''.join([rng.choice(chars) for _ in range(8)])
-            out_name = 'received_{}.txt'.format(random_str)
-            out_file = os.path.join(base_path, out_name)
-            logging.info("Saving validation output to {}".format(out_file))
-            cluster.sinks[0].save(out_file)
+            logging.info("Saving validation output to {}".format(v_out_dir))
+            cluster.sinks[0].save(v_out_dir)
 
             # Validate captured output
             logging.info("Validating output")
-            cmd_validate = validation_cmd.format(out_file = out_file)
+            cmd_validate = validation_cmd.format(out_file = v_out_dir)
             res = run_shell_cmd(cmd_validate)
             try:
                 assert(res.success)
                 logging.info("Validation successful")
                 try:
-                    os.remove(out_file)
-                    logging.info("Removed validation file: {}".format(
-                        out_file))
+                    os.system('rm -rf {}'.format(v_out_dir))
+                    logging.info("Removed validation dir: {}".format(
+                        v_out_dir))
                 except:
-                    logging.info("Failed to remove file: {}".format(out_file))
+                    logging.info("Failed to remove dir: {}".format(v_out_dir))
                     pass
             except:
                 raise AssertionError('Validation failed with the following '
