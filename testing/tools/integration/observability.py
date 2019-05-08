@@ -24,6 +24,10 @@ import traceback
 import sys
 import time
 
+from inotify.adapters import Inotify
+inotify_logger = logging.getLogger("inotify.adapters")
+inotify_logger.setLevel(logging.ERROR)
+
 from .errors import (DuplicateKeyError,
                     TimeoutError)
 from .external import run_shell_cmd
@@ -409,3 +413,83 @@ def coalesce_partition_query_responses(responses):
                                             .format(step, part, dup0, dup1))
                 steps[step][part] = worker
     return steps
+
+
+####################################
+# Log File Observability Functions #
+####################################
+class EvLogFileNotifier(StoppableThread):
+    """
+    Watch the resilience directory and keep track of log files.
+    Call a handler when a log file rotates.
+    """
+
+    __base_name__ = 'EvLogFileNotifier'
+
+    def __init__(self, handler, path, log_suffix='.evlog'):
+        logging.log(1, "{}({}, {}, {})".format(self.__base_name__,
+            handler, path, log_suffix))
+        super(EvLogFileNotifier, self).__init__()
+        self.handler = handler
+        self.path = path
+        self.log_suffix = log_suffix
+        self.inotify = Inotify()
+        self.inotify.add_watch(self.path)
+
+        # State management
+        self.log_files = {}
+
+    def run(self):
+        while not self.stopped():
+            try:
+                event_gen = self.inotify.event_gen(timeout_s=5,
+                        yield_nones=False)
+                while not self.stopped():
+                    _, type_names, path, filename = next(event_gen)
+                    if filename.endswith(self.log_suffix):
+                        self.handle_log_file_event(filename, type_names)
+                    elif 'IN_DELETE_SELF' in type_names:
+                        self.stop()
+                        self.handler.evlognotifier_stopped(self)
+                    else:
+                        continue
+            except Exception as err:
+                logging.exception(err)
+                raise err
+
+    def handle_log_file_event(self, filename, type_names):
+        logging.log(1, "{}.handle_log_file_event({}, {})".format(
+            self.__base_name__, filename, type_names))
+        # type_names we might care about:
+        #   IN_CREATE           - create file/dir
+        #   IN_DELETE           - delete file/dir
+        #   IN_OPEN             - open file (for read/write)
+        #   IN_MODIFY           - save without closing (e.g. flush())
+        #   IN_CLOSE_WRITE      - save + close
+        #   IN_CLOSE_NOWRITE    - close nowrite
+        #   IN_DELETE_SELF      - Watched path deleted, stops the watcher
+
+        base_name, chunk = filename.split('.evlog')[0].rsplit('-', 1)
+        fn_logs = self.log_files.setdefault(base_name, {})
+
+        # Assumption: wallaroo has strict ordering between create-open-close
+        # across files for the same backend (e.g. old is closed before new is
+        # created)
+
+        # CREATE
+        if 'IN_CREATE' in type_names:
+            fn_logs.setdefault('chunks', []).append(chunk)
+            fn_logs.setdefault('active', chunk)
+            new_chunk = chunk
+            old_chunk = (fn_logs['chunks'][-2]
+                         if len(fn_logs['chunks'])>1
+                         else None)
+            self.handler.file_created(base_name, new_chunk, old_chunk)
+        # DELETE
+        elif 'IN_DELETE' in type_names:
+            if fn_logs['current'] == chunk:
+                fn_logs['current'] = None
+            self.handler.file_deleted(basename, chunk)
+        else:
+            # dont care
+            pass

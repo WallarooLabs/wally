@@ -22,7 +22,8 @@ from .errors import (ClusterError,
 from .stoppable_thread import StoppableThread
 from .observability import (cluster_status_query,
                            get_func_name,
-                           ObservabilityNotifier)
+                           ObservabilityNotifier,
+                           EvLogFileNotifier)
 
 from .validations import is_processing
 
@@ -242,3 +243,77 @@ class CrashChecker(StoppableThread):
                 self.stop()
                 break
             time.sleep(0.01)
+
+
+class WaitForLogRotation(StoppableThread):
+    """
+    Wait for a log rotation to occuer on a set of filepath prefixes
+    """
+    __base_name__ = 'WaitForLogRottion'
+
+    def __init__(self, cluster, base_path, prefixes=[], log_suffix='.evlog',
+                 timeout=30):
+        super(WaitForLogRotation, self).__init__()
+        logging.debug("{}({}, {}, {}, {})".format(self.__base_name__,
+            base_path, prefixes, log_suffix, timeout))
+        self.cluster = cluster
+        self.base_path = base_path
+        self.prefixes = prefixes
+        self.timeout = timeout
+        self.notifier = EvLogFileNotifier(handler=self, path=base_path,
+                log_suffix=log_suffix)
+        self.wait_for = set(self.prefixes)
+        self.error = None
+
+
+    def run(self):
+        while not self.stopped():
+            self.notifier.start()
+            self.notifier.join(self.timeout)
+            if self.notifier.is_alive():
+                self.notifier.stop()
+                self.stop()
+                self.error = TimeoutError("WaitForrLogRotation timed out after "
+                " {} seconds while waiting for {!r} to rotate"
+                .format(self.timeout, self.prefixes))
+                self.cluster.raise_from_error(self.error)
+                return self.error
+            else:
+                self.stop()
+                return self.error
+            time.sleep(0.05)
+
+    def file_created(self, base_name, new_chunk, old_chunk):
+        logging.log(1, "{}.file_created({}, {}, {})".format(self.__base_name__,
+            base_name, new_chunk, old_chunk))
+        logging.debug("Log {} rotated from {} to {}".format(
+            base_name, old_chunk, new_chunk))
+        # Extract the prefix from the base_name, which includes the application
+        # name
+        worker = next((p for p in self.prefixes if base_name.endswith(p)),
+                      False)
+        if worker is False:
+            logging.debug("Couldn't find a worker for the base_name: {} {} {}"
+                    .format(base_name, old_chunk, new_chunk))
+            return
+        if worker in self.wait_for:
+            logging.debug("Worker {} rotated from {} to {}".format(
+                worker, "{}-{}.evlog".format(base_name, old_chunk),
+                "{}-{}.evlog".format(base_name, new_chunk)))
+            self.wait_for.remove(worker)
+        if len(self.wait_for) == 0:
+            logging.debug("All workers in the wait_for group have rotated their"
+                    " logs")
+            self.notifier.stop()
+            self.stop()
+
+    def file_deleted(self, base_name, chunk):
+        logging.debug("Log file deleted: {}-{}".format(base_name, chunk))
+        # TODO: change this when we add log chunk deletion
+        self.error = ExpectationError("Log file was deleted: {}-{}".format(
+            base_name, chunk))
+        self.stop()
+
+    def evlognotifier_stopped(self, notifier):
+        logging.debug("Notifier {} has stopped.".format(notifier))
+        self.stop()

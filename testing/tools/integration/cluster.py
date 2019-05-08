@@ -27,7 +27,8 @@ from .control import (CrashChecker,
                      SinkExpect,
                      SinkAwaitValue,
                      TryUntilTimeout,
-                     WaitForClusterToResumeProcessing)
+                     WaitForClusterToResumeProcessing,
+                     WaitForLogRotation)
 
 from .end_points import (ALOSender,
                          Metrics,
@@ -44,6 +45,7 @@ from .errors import (ClusterError,
 
 from .external import (clean_resilience_path,
                       get_port_values,
+                      send_rotate_command,
                       send_shrink_command,
                       setup_resilience_path)
 
@@ -238,6 +240,7 @@ BASE_COMMAND = r'''{command} \
     {{join_block}} \
     {{spike_block}} \
     {{alt_block}} \
+    {log_rotation} \
     --ponythreads=1 \
     --ponypinasio \
     --ponynoblock'''
@@ -262,18 +265,21 @@ SPIKE_CMD = r'''--spike-drop \
 SPIKE_SEED = r'''--spike-seed {seed}'''
 SPIKE_PROB = r'''--spike-prob {prob}'''
 SPIKE_MARGIN = r'''--spike-margin {margin}'''
+LOG_ROTATION = r'''--log-rotation'''
 
 
 def start_runners(runners, command, source_addrs, sink_addrs, metrics_addr,
-                  res_dir, workers, worker_addrs=[], alt_block=None,
-                  alt_func=lambda x: False, spikes={}):
+                  res_dir, workers, worker_addrs=[], log_rotation=False,
+                  alt_block=None, alt_func=lambda x: False, spikes={}):
     cmd_stub = BASE_COMMAND.format(command=command,
                                    out_block=(
                                        OUT_BLOCK.format(outputs=','.join(
                                            sink_addrs))
                                        if sink_addrs else ''),
                                    metrics_addr=metrics_addr,
-                                   res_dir=res_dir)
+                                   res_dir=res_dir,
+                                   log_rotation = (LOG_ROTATION if log_rotation
+                                                   else ''))
 
     # for each worker, assign `name` and `cluster-initializer` values
     if workers < 1:
@@ -373,6 +379,7 @@ def start_runners(runners, command, source_addrs, sink_addrs, metrics_addr,
 def add_runner(worker_id, runners, command, source_addrs, sink_addrs, metrics_addr,
                control_addr, res_dir, workers,
                my_control_addr, my_data_addr, my_external_addr,
+               log_rotation=False,
                alt_block=None, alt_func=lambda x: False, spikes={}):
     cmd_stub = BASE_COMMAND.format(command=command,
                                    out_block=(
@@ -380,7 +387,9 @@ def add_runner(worker_id, runners, command, source_addrs, sink_addrs, metrics_ad
                                            sink_addrs))
                                        if sink_addrs else ''),
                                    metrics_addr=metrics_addr,
-                                   res_dir=res_dir)
+                                   res_dir=res_dir,
+                                   log_rotation = (LOG_ROTATION if log_rotation
+                                                   else ''))
 
     # Test that the new worker *can* join
     if len(runners) < 1:
@@ -464,11 +473,13 @@ SinkData = namedtuple('SinkData',
 class Cluster(object):
     def __init__(self, command, host='127.0.0.1', sources=[], workers=1,
             sinks=1, sink_mode='framed', worker_join_timeout=30,
-            is_ready_timeout=30, res_dir=None, persistent_data={}):
+            is_ready_timeout=30, res_dir=None, log_rotation=False,
+            persistent_data={}):
         # Create attributes
         self._finalized = False
         self._exited = False
         self._raised = False
+        self.log_rotation = log_rotation
         self.command = command
         self.host = host
         self.workers = TypedList(types=(Runner,))
@@ -535,7 +546,7 @@ class Cluster(object):
             start_runners(self.workers, self.command, self.source_addrs,
                           self.sink_addrs,
                           self.metrics_addr, self.res_dir, workers,
-                          worker_addrs)
+                          worker_addrs, self.log_rotation)
             self.runners.extend(self.workers)
             self._worker_id_counter = len(self.workers)
 
@@ -559,6 +570,48 @@ class Cluster(object):
             self.errors.append(err)
             self.__finally__()
             raise err
+
+    ################
+    # Log Rotation #
+    ################
+    def rotate_logs(self, workers=None):
+        """
+        Rotate the named workers, or all workers if no workers are named
+        """
+        logging.debug("rotate_logs(workers={})".format(workers))
+        if workers is None:
+            logging.debug("Workers is None, getting all live ones: {}".format(
+                self.workers))
+            to_rotate = self.workers
+        else:
+            # check all named workers exist
+            valid = {r.name: r for r in self.workers}
+            to_rotate = []
+            for w in workers:
+                to_rotate.append(valid[w])  # fail if w not in valid
+
+        prefixes = [r.name for r in to_rotate]
+        logging.debug("prefixes = {}".format(prefixes))
+
+        # start log rotation watcher
+        logging.debug("Running WaitForLogRotation")
+        wflr = WaitForLogRotation(cluster=self, base_path=self.res_dir,
+                prefixes=prefixes)
+        self._stoppables.add(wflr)
+        wflr.start()
+
+        # send a log rotate command directly to each worker's external channel
+        for w in to_rotate:
+            send_rotate_command(w.external, w.name)
+
+        # Wait for log rotation watcher to return
+        wflr.join()
+        self._stoppables.discard(wflr)
+        if wflr.error:
+            logging.error("WaitForLogRotation failed with:\n{!r}"
+                .format(wflr.error))
+            raise wflr.error
+        return to_rotate
 
     #############
     # Autoscale #
@@ -595,7 +648,8 @@ class Cluster(object):
                 workers=by,
                 my_control_addr=worker_addrs[x][0],
                 my_data_addr=worker_addrs[x][1],
-                my_external_addr=worker_addrs[x][2])
+                my_external_addr=worker_addrs[x][2],
+                log_rotation=self.log_rotation)
             self._worker_id_counter += 1
             runners.append(runner)
             self.runners.append(runner)
