@@ -214,13 +214,16 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
             # skip empty data
             if not sk.data:
                 continue
-            sink_log_name = 'sink_{host}!{port}_{time}.error.dat'.format(
-                host=sk.host,
-                port=sk.port,
-                time=strftime(sk.start_time, STRFTIME_FMT))
-            with open(os.path.join(base_dir, sink_log_name), 'wb') as f:
-                for d in sk.data:
-                    f.write(d)
+            for stream, data in sk.data:
+                sink_log_name = 'sink_{host}!{port}!{stream}_{time}.error.dat'
+                    .format(
+                        host=sk.host,
+                        port=sk.port,
+                        stream=stream,
+                        time=strftime(sk.start_time, STRFTIME_FMT))
+                with open(os.path.join(base_dir, sink_log_name), 'wb') as f:
+                    for d in data:
+                        f.write(d)
         logging.warning("Error logs saved to {}".format(base_dir))
 
         # save core files if they exist

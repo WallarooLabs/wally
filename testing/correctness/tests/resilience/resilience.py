@@ -439,6 +439,7 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
     host = '127.0.0.1'
     sinks = 1
     sink_mode = 'framed'
+    sink_split_streams = True
     batch_size = int(sender_mps * sender_interval)
     logging.debug("batch_size is {batch_size}".format(batch_size = batch_size))
 
@@ -506,6 +507,7 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
     with Cluster(command=command, host=host,
                  sources=[source_name] if source_type != 'gensource' else [],
                  workers=workers, sinks=sinks, sink_mode=sink_mode,
+                 sink_split_streams=sink_split_streams,
                  log_rotation=log_rotation,
                  persistent_data=persistent_data) as cluster:
 
@@ -579,22 +581,23 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
             out_name = 'received_{}.txt'.format(random_str)
             out_file = os.path.join(base_path, out_name)
             logging.info("Saving validation output to {}".format(out_file))
-            cluster.sinks[0].save(out_file)
+            out_files = cluster.sinks[0].save(out_file)
 
             # Validate captured output
             logging.info("Validating output")
-            cmd_validate = validation_cmd.format(out_file = out_file)
+            cmd_validate = validation_cmd.format(out_file = ",".join(out_files))
             res = run_shell_cmd(cmd_validate)
             try:
                 assert(res.success)
                 logging.info("Validation successful")
-                try:
-                    os.remove(out_file)
-                    logging.info("Removed validation file: {}".format(
-                        out_file))
-                except:
-                    logging.info("Failed to remove file: {}".format(out_file))
-                    pass
+                for out_file in out_files:
+                    try:
+                        os.remove(out_file)
+                        logging.info("Removed validation file: {}".format(
+                            out_file))
+                    except:
+                        logging.info("Failed to remove file: {}".format(out_file))
+                        pass
             except:
                 raise AssertionError('Validation failed with the following '
                                      'error:\n{}'.format(res.output))

@@ -155,7 +155,7 @@ class TCPReceiver(StoppableThread):
     __base_name__ = 'TCPReceiver'
 
     def __init__(self, host, port=0, max_connections=1000, mode='framed',
-                 header_fmt='>I'):
+                 split_mode=False, header_fmt='>I'):
         """
         Listen on a (host, port) pair for up to max_connections connections.
         Each connection is handled by a separate client thread.
@@ -166,10 +166,11 @@ class TCPReceiver(StoppableThread):
         self.address = '{}.{}'.format(host, port)
         self.max_connections = max_connections
         self.mode = mode
+        self.split_mode = split_mode
         self.header_fmt = header_fmt
         self.header_length = struct.calcsize(self.header_fmt)
         # use an in-memory byte buffer
-        self.data = []
+        self.data = {}
         # Create a socket and start listening
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -213,7 +214,16 @@ class TCPReceiver(StoppableThread):
                                 .format(err.errno))
                             self.err = err
                             raise
-                cl = SingleSocketReceiver(clientsocket, self.data, self.mode,
+                if self.split_mode:
+                    # Use a counter to identify unique streams
+                    client_accumulator = self.data.setdefault(len(self.data),
+                                                              [])
+                else:
+                    # use * to identify the "everything" stream
+                    client_accumulator = self.data.setdefault('*', [])
+                cl = SingleSocketReceiver(clientsocket,
+                                          client_accumulator,
+                                          self.mode,
                                           self.header_fmt,
                                           name='{}-{}'.format(
                                               self.__base_name__,
@@ -244,16 +254,29 @@ class TCPReceiver(StoppableThread):
             for cl in self.clients:
                 cl.stop()
 
-    def save(self, path, mode=None):
-        c = 0
-        with open(path, 'wb') as f:
-            for item in self.data:
-                f.write(item[:self.header_length])
-                if mode == 'giles':
-                    f.write(struct.pack('>Q', c))
-                    c += 1
-                f.write(item[self.header_length:])
-            f.flush()
+    def save(self, path):
+        files = []
+        if self.split_mode:
+            # Save streams separately
+            for stream, data in self.data.items():
+                base, suffix = path.resplit('.', 1)
+                new_path = '{}.{}.{}'.format(base, stream, suffix)
+                logging.debug("Saving stream {} to path {}".format(
+                    stream, new_path))
+                with open(new_path, 'wb') as f:
+                    files.append(new_path)
+                    for item in data:
+                        f.write(item)
+                    f.flush()
+        else:
+            # only have stream '*' to save
+            logging.debug("Saving stream * to path {}".format(path))
+            with open(path, 'wb') as f:
+                files.append(path)
+                for item in self.data['*']:
+                    f.write(item)
+                f.flush()
+        return files
 
     def bytes_received(self):
         return sum(map(len, self.data))
