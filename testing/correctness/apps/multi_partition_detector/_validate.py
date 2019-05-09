@@ -23,34 +23,52 @@ class OrderError(Exception):
     pass
 
 
+def validate_window(window):
+    assert(win == sorted(win)), ("Out of order violation for key: {}, "
+                                 "w_key: {}, window: {}, sorted: {}"
+                                 .format(k, w_key, window, sorted(window)))
+
+
+
 parser = argparse.ArgumentParser("Multi Partition Detector Validator")
-parser.add_argument("--output", type=argparse.FileType("rb"),
+parser.add_argument("--output", type=argparse.FileType("rb"), nargs='+',
                     help="The output file of the application.")
 args = parser.parse_args()
 
-f = args.output
-windows = {}
-while True:
-    header_bytes = f.read(4)
-    if not header_bytes:
-        break
-    header = struct.unpack('>I', header_bytes)[0]
-    payload = f.read(header)
-#    print(payload)
-    assert(len(payload) > 0)
-    obj = loads(payload.decode())  # Python3.5/json needs a string
-    windows.setdefault(obj['key'], []).append((float(obj['ts']), obj['value']))
+files = args.output
 
-# flatten windows to sequences
+sink_data = {}
+for f in files:
+    windows = sink_data.setdefault(f.name, {})
+    while True:
+        header_bytes = f.read(4)
+        if not header_bytes:
+            break
+        header = struct.unpack('>I', header_bytes)[0]
+        payload = f.read(header)
+        #print(payload)
+        assert(len(payload) > 0)
+        obj = loads(payload.decode())  # Python3.5/json needs a string
+        windows.setdefault(obj['key'], []).append((float(obj['ts']),
+                                                   obj['value']))
+
+# flatten windows to sequences, using only the tail of the window
+# eg. [1, 1, 2, 3, ...]
 sequences = {}
-for k in windows.keys():
-    for ts, win in windows[k]:
-        if not (win == sorted(win)):
-            assert(False), ("Out of order violation for key: {}, w_key: {}, "
-                            "window: {}, sorted: {}"
-                            .format(k, w_key, win, sorted(win)))
-        sequences.setdefault(k, []).extend(win)
+for fname, data in sink_data.items():
+    for k in data.keys():
+        for ts, win in data[k]:
+            validate_window(win)
+            sequences.setdefault(k, {}).setdefault(fname, []).append(win[-1])
 
+# TODO:
+# 1. per stream: identify contiguous segments, and verify each segment
+#       within a stream, large skips indicate segment (due to autoscale)
+#       and rollbacks are rollbacks
+# 2. per key (across multiple streams, possibly)
+#    - [ ] segment count per key <= ops count
+#    - [ ] sorted + unique == range(1, max(key data)+1) -- natural sequence
+assert(0)
 
 # Check completeness
 for k, v in sequences.items():
