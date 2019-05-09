@@ -94,7 +94,7 @@ class SinkExpect(StoppableThread):
     def run(self):
         started = time.time()
         while not self.stopped():
-            msgs = len(self.sink.data)
+            msgs = len(sink)
             if msgs > self.expected:
                 if not self.allow_more:
                     self.error = ExpectationError('{}: has received too many '
@@ -135,26 +135,25 @@ class SinkAwaitValue(StoppableThread):
         self.timeout = timeout
         self.name = self.__base_name__
         self.error = None
-        self.position = 0
         self.func = func
 
     def run(self):
         started = time.time()
+        logging.debug("SinkAwait started for values: {}".format(self.values))
+        view = self.sink.view()
         while not self.stopped():
-            msgs = len(self.sink.data)
-            if msgs and msgs > self.position:
-                while self.position < msgs:
-                    sink_data = self.func(self.sink.data[self.position])
-                    for val in list(self.values):
-                        if sink_data == val:
-                            self.values.discard(val)
-                            logging.log(1, "{} matched on value {!r}."
-                                           .format(self.name,
-                                                   val))
-                    if not self.values:
-                        self.stop()
-                        break
-                    self.position += 1
+            msg = next(view)
+            processed = self.func(msg)
+            if processed in self.values:
+                self.values.discard(processed)
+                logging.debug("{} matched on value {!r}."
+                               .format(self.name,
+                                       processed))
+            if not self.values:
+                self.stop()
+                logging.debug("SinkAwait complete with remaining values: {}"
+                        .format(self.values))
+                break
             if time.time() - started > self.timeout:
                 self.error = TimeoutError('{}: has timed out after {} seconds'
                                           ', with {} messages. before '
@@ -165,7 +164,6 @@ class SinkAwaitValue(StoppableThread):
                                                          self.values))
                 self.stop()
                 break
-            time.sleep(0.1)
 
 
 class TryUntilTimeout(StoppableThread):
