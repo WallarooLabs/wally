@@ -439,7 +439,7 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
     host = '127.0.0.1'
     sinks = 1
     sink_mode = 'framed'
-    sink_split_streams = True
+    split_streams = True
     batch_size = int(sender_mps * sender_interval)
     logging.debug("batch_size is {batch_size}".format(batch_size = batch_size))
 
@@ -507,7 +507,7 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
     with Cluster(command=command, host=host,
                  sources=[source_name] if source_type != 'gensource' else [],
                  workers=workers, sinks=sinks, sink_mode=sink_mode,
-                 sink_split_streams=sink_split_streams,
+                 split_streams=split_streams,
                  log_rotation=log_rotation,
                  persistent_data=persistent_data) as cluster:
 
@@ -585,7 +585,7 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
 
             # Validate captured output
             logging.info("Validating output")
-            cmd_validate = validation_cmd.format(out_file = ",".join(out_files))
+            cmd_validate = validation_cmd.format(out_file = " ".join(out_files))
             res = run_shell_cmd(cmd_validate)
             try:
                 assert(res.success)
@@ -599,8 +599,10 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
                         logging.info("Failed to remove file: {}".format(out_file))
                         pass
             except:
-                raise AssertionError('Validation failed with the following '
+                err = AssertionError('Validation failed with the following '
                                      'error:\n{}'.format(res.output))
+                logging.exception(err)
+                raise AssertionError("Validation failed")
 
         # Validate worker actually underwent recovery
         if cluster.restarted_workers:

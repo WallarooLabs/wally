@@ -56,9 +56,10 @@ class SingleSocketReceiver(StoppableThread):
         self.header_fmt = header_fmt
         self.header_length = struct.calcsize(self.header_fmt)
         if name:
-            self.name = '{}:{}'.format(self.__base_name__, name)
+            self.name = '{}:{}:{}'.format(self.__base_name__, name,
+                                          sock.fileno())
         else:
-            self.name = self.__base_name__
+            self.name = '{}:{}'.format(self.__base_name__, sock.fileno())
 
     def try_recv(self, bs, flags=0):
         """
@@ -133,6 +134,49 @@ class SingleSocketReceiver(StoppableThread):
         self.sock.close()
 
 
+class MultiClientStreamView(object):
+    def __init__(self, initial_streams):
+        self.streams = {s.name: s.accumulator for s in initial_streams}
+        self.positions = {s.name: 0 for s in initial_streams}
+        self.keys = list(self.positions.keys())
+        self.key_position = 0
+
+    def add_stream(self, stream):
+        if stream.name in self.streams:
+            raise KeyError("Stream {} already in view!".format(stream.name))
+        self.streams[stream.name] = stream.accumulator
+        self.positions[stream.name] = 0
+        self.keys.append(stream.name)
+
+    def throw(self, type=None, value=None, traceback=None):
+        raise StopIteration
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        return self.__next__()
+
+    def __next__(self):
+        # sleep condition
+        origin = self.key_position
+        while True:
+            # get current key
+            cur = self.keys[self.key_position]
+            # set key for next iteration
+            self.key_position = (self.key_position + 1) % len(self.keys)
+            # Can we read from current key?
+            if self.positions[cur] < len(self.streams[cur]):
+                # read next value
+                val = self.streams[cur][self.positions[cur]]
+                # Increment position
+                self.positions[cur] += 1
+                return val
+            elif self.key_position == origin:
+                # sleep after a full round on all keys produces no value
+                time.sleep(0.001)
+            # implicit:  continue
+
 class TCPReceiver(StoppableThread):
     """
     Listen on a (host,port) pair and write any incoming data to an accumulator.
@@ -155,7 +199,7 @@ class TCPReceiver(StoppableThread):
     __base_name__ = 'TCPReceiver'
 
     def __init__(self, host, port=0, max_connections=1000, mode='framed',
-                 split_mode=False, header_fmt='>I'):
+                 split_streams=False, header_fmt='>I'):
         """
         Listen on a (host, port) pair for up to max_connections connections.
         Each connection is handled by a separate client thread.
@@ -166,7 +210,7 @@ class TCPReceiver(StoppableThread):
         self.address = '{}.{}'.format(host, port)
         self.max_connections = max_connections
         self.mode = mode
-        self.split_mode = split_mode
+        self.split_streams = split_streams
         self.header_fmt = header_fmt
         self.header_length = struct.calcsize(self.header_fmt)
         # use an in-memory byte buffer
@@ -178,6 +222,13 @@ class TCPReceiver(StoppableThread):
         self.err = None
         self.event = threading.Event()
         self.start_time = None
+        self.views = []
+
+    def __len__(self):
+        return sum(map(len, self.data.values()))
+
+    def bytes_received(self):
+        return sum( sum(map(len, acc)) for acc in d.values() )
 
     def get_connection_info(self, timeout=10):
         is_connected = self.event.wait(timeout)
@@ -214,7 +265,7 @@ class TCPReceiver(StoppableThread):
                                 .format(err.errno))
                             self.err = err
                             raise
-                if self.split_mode:
+                if self.split_streams:
                     # Use a counter to identify unique streams
                     client_accumulator = self.data.setdefault(len(self.data),
                                                               [])
@@ -233,6 +284,9 @@ class TCPReceiver(StoppableThread):
                              .format(self.__base_name__, self.name, self.host,
                                      self.port, address[1]))
                 self.clients.append(cl)
+                if self.views:
+                    for v in self.views:
+                        v.add_stream(cl)
                 cl.start()
         except Exception as err:
             self.err = err
@@ -254,12 +308,17 @@ class TCPReceiver(StoppableThread):
             for cl in self.clients:
                 cl.stop()
 
+    def view(self):
+        view = MultiClientStreamView(self.clients)
+        self.views.append(view)
+        return view
+
     def save(self, path):
         files = []
-        if self.split_mode:
+        if self.split_streams:
             # Save streams separately
             for stream, data in self.data.items():
-                base, suffix = path.resplit('.', 1)
+                base, suffix = path.rsplit('.', 1)
                 new_path = '{}.{}.{}'.format(base, stream, suffix)
                 logging.debug("Saving stream {} to path {}".format(
                     stream, new_path))
@@ -277,9 +336,6 @@ class TCPReceiver(StoppableThread):
                     f.write(item)
                 f.flush()
         return files
-
-    def bytes_received(self):
-        return sum(map(len, self.data))
 
 
 class Metrics(TCPReceiver):
