@@ -16,6 +16,7 @@
 import argparse
 from collections import Counter
 from json import loads
+import os
 import struct
 
 
@@ -29,16 +30,70 @@ def validate_window(window):
                                  .format(k, w_key, window, sorted(window)))
 
 
+def validate_stream(stream):
+    # rules
+    # 1. increments are either +1 or +n, n>1
+    # 1.1. if +1, still same contiguous segment
+    # 1.2. if +n,n>1, new segment
+    # 2. decrements unbounded, by should only go down to floor.
+    # 2.1. Floor is initially 0, and is set to the new value after each
+    # decrement
+    # 2.2. Decrements are part of a contiugous segment, but also imply a
+    # rollback
+    # output is: count of segments, count of rollbacks
+
+    if len(stream) == 0:
+        return (0, 0)
+    elif len(stream) == 1:
+        return (1, 0)
+
+    a = stream[0]
+    floor = a
+    segments = 1
+    rollbacks = 0
+
+    for v in stream[1:]:
+        diff = v-a
+        if diff == 1:
+            a = v
+            continue
+        if diff > 1:
+            segments += 1
+            a = v
+            continue
+        if diff < 1:
+            rollbacks += 1
+            a = v
+            floor = v
+            continue
+    return (segments, rollbacks)
+
 
 parser = argparse.ArgumentParser("Multi Partition Detector Validator")
-parser.add_argument("--output", type=argparse.FileType("rb"), nargs='+',
-                    help="The output file of the application.")
+parser.add_argument("--output", type=str,
+                    help="The output directory of the application data.")
 args = parser.parse_args()
 
-files = args.output
+# If output is file, strip it to base dir
+output = args.output.split(',')[0]
+if os.path.isfile(output):
+    output_dir = os.path.dirname(output)
+elif os.path.isdir(output):
+    output_dir = output
+else:
+    raise ValueError("Output must be a path to the output dir, or a file "
+            "within it from which the output dir can be derived.")
+
+
+output_files = os.listdir(output_dir)
+# Read sink data
+sink_files = [open(os.path.join(output_dir, f), 'rb')
+              for f in output_files if f.startswith('sink')]
+ops_file = open(os.path.join(output_dir,
+                [f for f in output_files if f.startswith('ops.log')][0]), 'rt')
 
 sink_data = {}
-for f in files:
+for f in sink_files:
     windows = sink_data.setdefault(f.name, {})
     while True:
         header_bytes = f.read(4)
@@ -51,6 +106,13 @@ for f in files:
         obj = loads(payload.decode())  # Python3.5/json needs a string
         windows.setdefault(obj['key'], []).append((float(obj['ts']),
                                                    obj['value']))
+
+# Read ops data
+ops = []
+for line in ops_file.readlines():
+    o = line.strip()
+    if o:
+        ops.append(o)
 
 # flatten windows to sequences, using only the tail of the window
 # eg. [1, 1, 2, 3, ...]
@@ -65,54 +127,25 @@ for fname, data in sink_data.items():
 # 1. per stream: identify contiguous segments, and verify each segment
 #       within a stream, large skips indicate segment (due to autoscale)
 #       and rollbacks are rollbacks
-# 2. per key (across multiple streams, possibly)
-#    - [ ] segment count per key <= ops count
-#    - [ ] sorted + unique == range(1, max(key data)+1) -- natural sequence
-assert(0)
+key_stats = {}
+for key, streams in sequences.items():
+    stats = key_stats[key] = {'segments': 0, 'rollbacks': 0}
+    for fname, stream in streams.items():
+        segments, rollbacks = validate_stream(stream)
+        stats['segments'] += segments
+        stats['rollbacks'] += rollbacks
+        segs = stats['segments'] + stats['rollbacks']
+        # segment count per key <= ops count + 1
+        assert( segs <= len(ops) + 1), (
+                "Too many segments for key {!r}! {} segments with "
+                "ops {!r}. Expect at most {}".format(key, segs, ops,
+                                                     len(ops) + 1))
 
-# Check completeness
-for k, v in sequences.items():
-    processed = sorted(list(set(v)))
-    size = processed[-1] - processed[0] + 1 # Assumption: processed is a natural sequence
-
-    if len(processed) != size:
-        old = processed[0]
-        for i in range(1, len(processed)):
-            if processed[i] != old + 1:
-                err_msg = ("Found a gap in data received for key {!r}: {!r} "
-                           "is followed by {!r}\n"
-                           "This may be caused by a reordering of messages "
-                           "or by a state consistency violation."
-                           .format(k, old, processed[i]))
-                raise OrderError(err_msg)
-            old = processed[i]
-    assert(len(processed) == size)
-
-
-# check sequentialty:
-# 1. increments are always at +1 size
-# 2. rewinds are allowed at arbitrary size
-for key in sequences:
-    assert(sequences[key])
-    old = sequences[key][0]
-    for v in sequences[key][1:]:
-        if not ((v == old + 1) or (v <= old)):
-            print("!@ Old for key " + key + ": " + str(old))
-            print("!@ Cur for key " + key + ": " + str(v))
-        assert((v == old + 1) or (v <= old)), ("Sequentiality violation "
-            "detected! (Key: {}, Old: {}, Current: {})"
-            .format(key, old, v))
-        old = v
-
-
-# Check sliding window rule: any value appears at most twice across
-# any pair of subsequent windows of the same key
-for k in sorted(windows.keys(), key=lambda k: int(k.replace('key_',''))):
-    for i in range(len(windows[k])-1):
-        counter = Counter(windows[k][i][1] +
-                          windows[k][i+1][1])
-        most_common = counter.most_common(3)
-        assert(len(most_common) > 0)
-        for key, count in most_common:
-            if key != 0:
-                assert(count in (1,2))
+# Check completeness per key
+for key, sequences in sequences.items():
+    s = sorted(set([y for x in sequences.values() for y in x]))
+    high =  max(s)
+    assert(s == range(1, high+1)), ("Found an error in data for key: {!r}.\n"
+            "Output is missing the values: {!r}"
+            .format(key,
+                    sorted(set(range(1, high+1)) - set(s))))
