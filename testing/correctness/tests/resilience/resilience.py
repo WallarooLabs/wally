@@ -541,6 +541,7 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
         assert(not cluster.get_crashed_workers())
         for op in ops:
             res_ops.append(op)
+            cluster.log_op(op)
             logging.info("Executing: {}".format(op))
             res = op.apply(cluster, res)
             assert(not cluster.get_crashed_workers())
@@ -573,7 +574,7 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
             # remove it once the bug with validation failing but passing on the artifact
             # is resolved.
             #out_file = os.path.join(cluster.res_dir, 'received.txt')
-            base_path = '/tmp/wallaroo_test_errors'
+            base_path = cluster.res_dir
             makedirs_if_not_exists(base_path)
             chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
             rng = _Random()
@@ -583,9 +584,13 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None,
             logging.info("Saving validation output to {}".format(out_file))
             out_files = cluster.sinks[0].save(out_file)
 
+            with open(os.path.join(cluster.res_dir, "ops.log"), "wt") as f:
+                for op in cluster.ops:
+                    f.write("{}\n".format(op))
+
             # Validate captured output
             logging.info("Validating output")
-            cmd_validate = validation_cmd.format(out_file = " ".join(out_files))
+            cmd_validate = validation_cmd.format(out_file = cluster.res_dir)
             res = run_shell_cmd(cmd_validate)
             try:
                 assert(res.success)

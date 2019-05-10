@@ -29,6 +29,7 @@ from .control import (SinkAwaitValue,
 from .end_points import (ALOSender,
                          Sender,
                          Reader)
+from .external import run_shell_cmd
 from .errors import (PipelineTestError,
                      TimeoutError)
 from .logger import INFO2
@@ -72,7 +73,7 @@ def pipeline_test(sources, expected, command, workers=1,
                   sink_expect=None, sink_expect_allow_more=False,
                   sink_stop_timeout=DEFAULT_SINK_STOP_TIMEOUT,
                   sink_await=None, sink_await_keys=None, delay=30,
-                  validate_file=None, giles_mode=False,
+                  output_file=None, validation_cmd=None,
                   host='127.0.0.1', listen_attempts=1,
                   ready_timeout=30,
                   runner_join_timeout=DEFAULT_RUNNER_JOIN_TIMEOUT,
@@ -125,12 +126,6 @@ def pipeline_test(sources, expected, command, workers=1,
     - `delay`: Wait for `delay` seconds before stopping the cluster.
       Default 30 seconds. Only used if `sink_expect` and `sink_await`
       are both `None`.
-    - `validate_file`: save sink data to a file to be validated by an external
-        process.
-    - `giles_mode`: if True, include a 64-bit timestamp between the length
-        header and the payload when saving sink data to file. This is a
-        backward compatibility mode for validators that expected
-        giles-receiver format.
     - `host`: the network host address to use in workers, senders, and
         receivers. Default '127.0.0.1'
     - `listen_attempts`: attempt to start an applicatin listening on ports
@@ -266,14 +261,43 @@ def pipeline_test(sources, expected, command, workers=1,
             # join stoppers and check for errors
             cluster.stop_cluster()
 
+            ###############
+            # Output file #
+            ###############
+            if output_file:
+                output_files = output_file.split(',')
+                for sink, fp in zip(cluster.sinks, output_files):
+                    sink.save(fp)
             ############
             # Validation
             ############
-            if validate_file:
-                validation_files = validate_file.split(',')
-                for sink, fp in zip(cluster.sinks, validation_files):
-                    sink.save(fp, giles_mode)
-                # let the code after 'finally' return our data
+            if validation_cmd:
+                sink_files = []
+                for i, s in enumerate(cluster.sinks):
+                    sink_files.extend(s.save(
+                        os.path.join(cluster.res_dir, "sink.{}.dat".format(i))))
+                with open(os.path.join(cluster.res_dir, "ops.log"), "wt") as f:
+                    for op in cluster.ops:
+                        f.write("{}\n".format(op))
+                command = "{} {}".format(validation_cmd, ",".join(sink_files))
+                res = run_shell_cmd(command)
+                if res.success:
+                    if res.output:
+                        logging.info("Validation command '%s' completed successfully "
+                                     "with the output:\n--\n%s", ' '.join(res.command),
+                                                                          res.output)
+                    else:
+                        logging.info("Validation command '%s' completed successfully",
+                                     ' '.join(res.command))
+                else:
+                    outputs = runner_data_format(persistent_data.get('runner_data', []))
+                    logging.error("Application outputs:\n{}".format(outputs))
+                    logging.error("Validation command '%s' failed with the output:\n"
+                                  "--\n%s",
+                                  res.command, res.output)
+                    # Save logs to file in case of error
+                    save_logs_to_file(base_dir, log_stream, persistent_data)
+                    raise PipelineTestError
 
             else:  # compare expected to processed
                 logging.debug('Begin validation phase...')

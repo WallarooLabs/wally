@@ -94,7 +94,7 @@ class SinkExpect(StoppableThread):
     def run(self):
         started = time.time()
         while not self.stopped():
-            msgs = len(sink)
+            msgs = len(self.sink)
             if msgs > self.expected:
                 if not self.allow_more:
                     self.error = ExpectationError('{}: has received too many '

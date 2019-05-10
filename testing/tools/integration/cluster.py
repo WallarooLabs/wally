@@ -501,6 +501,7 @@ class Cluster(object):
             self.res_dir = tempfile.mkdtemp(dir='/tmp/', prefix='res-data.')
         else:
             self.res_dir = res_dir
+        self.ops = []
         self.persistent_data = persistent_data
         # Run a continuous crash in a background thread
         self._stoppables = set()
@@ -572,6 +573,12 @@ class Cluster(object):
             self.errors.append(err)
             self.__finally__()
             raise err
+
+    #######
+    # Ops #
+    #######
+    def log_op(self, op):
+        self.ops.append(op)
 
     ################
     # Log Rotation #
@@ -1068,6 +1075,7 @@ class Cluster(object):
         self.persistent_data['sink_data'] = [
             SinkData(s.name, s.host, s.port, s.start_time, s.data)
             for s in self.sinks]
+        self.persistent_data['ops'] = self.ops
         clean_resilience_path(self.res_dir)
         self._finalized = True
 

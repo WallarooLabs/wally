@@ -178,9 +178,14 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
         if log_stream:
             with open(os.path.join(base_dir, 'test.error.log'), 'w') as f:
                 f.write(log_stream.getvalue())
-        runner_data = persistent_data.get('runner_data', [])
+
+        # Save ops log data to file
+        with open(os.path.join(base_dir, "ops.log"), "w") as ops_log:
+            for op in persistent_data['ops']:
+                ops_log.write("{}\n".format(op))
 
         # save worker data to files
+        runner_data = persistent_data.get('runner_data', [])
         for rd in runner_data:
             worker_log_name = '{name}.{pid}.{code}.{time}.error.log'.format(
                 name=rd.name,

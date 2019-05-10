@@ -16,8 +16,7 @@ from integration.end_points import (ALOSequenceGenerator,
                                     iter_generator,
                                     sequence_generator)
 from integration.errors import RunnerHasntStartedError
-from integration.external import (run_shell_cmd,
-                                  save_logs_to_file)
+from integration.external import save_logs_to_file
 from integration.integration import pipeline_test
 from integration.logger import (add_in_memory_log_stream,
                                 get_log_level,
@@ -438,10 +437,6 @@ def CLI():
                         "output to for external validation. If used with "
                         "'--validation-cmd', this filepath will be appended "
                         "to the end of the command string."))
-    parser.add_argument('--giles-mode', action='store_true',
-                        help=("Save sink output with giles-receiver compatible"
-                            " encoding, adding a U64 timestamp between header "
-                            "length and payload."))
     # Detail for the specific run
     parser.add_argument('--workers', type=int, default=1,
                         help="Number of workers to use in the test.")
@@ -523,7 +518,6 @@ def CLI():
     if args.validation_cmd:
         if not args.output:
             parser.error("'--output' is required with '--validation-cmd'")
-        validation_cmd = '%s %s' % (args.validation_cmd, args.output)
     else:
         validation_cmd = None
 
@@ -570,9 +564,8 @@ def CLI():
                     sink_await = args.sink_await,
                     sink_await_keys = args.sink_await_keys,
                     delay = args.delay,
-                    validate_file = (args.output if args.validation_cmd else
-                                     False),
-                    giles_mode = 'giles' if args.giles_mode else None,
+                    output_file = args.output,
+                    validation_cmd = args.validation_cmd,
                     host=args.host,
                     runner_join_timeout=args.runner_join_timeout,
                     resilience_dir=args.resilience_dir,
@@ -603,32 +596,6 @@ def CLI():
             logging.warning("failed to save logs to file")
             logging.exception(err)
         parser.exit(1)
-
-    if validation_cmd:
-        res = run_shell_cmd(validation_cmd)
-        if res.success:
-            if res.output:
-                logging.info("Validation command '%s' completed successfully "
-                             "with the output:\n--\n%s", ' '.join(res.command),
-                                                                  res.output)
-            else:
-                logging.info("Validation command '%s' completed successfully",
-                             ' '.join(res.command))
-        else:
-            outputs = runner_data_format(persistent_data.get('runner_data', []))
-            logging.error("Application outputs:\n{}".format(outputs))
-            logging.error("Validation command '%s' failed with the output:\n"
-                          "--\n%s",
-                          res.command, res.output)
-            # Save logs to file in case of error
-            save_logs_to_file(base_dir, log_stream, persistent_data)
-
-            if logging.root.level > logging.ERROR:
-                # If failed, and logging level means we didn't log error, include it
-                # in exit message
-                parser.exit(res.return_code, res.output)
-            else:
-                parser.exit(res.return_code)
 
     # Reached the end and nothing broke. Success!
     logging.info("Integration test completed successfully for command %r" %
