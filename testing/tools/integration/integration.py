@@ -324,9 +324,14 @@ def pipeline_test(sources, expected, command, workers=1,
                 if hasattr(expected, 'read') and hasattr(expected, 'tell'):
                     if isinstance(processed, list):
                         bytesio = io.BytesIO()
-                        for part in processed:
-                            for p in part:
-                                bytesio.write(p)
+                        ## example:
+                        ## processed = [{'*': [b'\x00\x00\x00\x18t=6049,data=10,key=HELO\n']}]
+                        for a_dictionary in processed:
+                            for (key, parts) in a_dictionary.items():
+                                if key != '*':
+                                    raise Exception('unknown key {} in dict {}'.format(key, a_dictionary))
+                                for part in parts:
+                                    bytesio.write(part)
                         bytesio.seek(0)
                         processed = io.BufferedReader(bytesio)
                     elif isinstance(processed, basestring):
