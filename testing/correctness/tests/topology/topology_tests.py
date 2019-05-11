@@ -120,7 +120,7 @@ def run_test(api, cmd, validation_cmd, topology, workers=1):
 
                 pipeline_test(
                     sources = sources,
-                    expected = None,
+                    expected = None, ## This causes a big problem for integration-tests-testing-correctness-tests-topology-all
                     command = cmd_val,
                     workers = workers,
                     sinks = 1,
