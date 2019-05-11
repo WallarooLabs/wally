@@ -128,7 +128,7 @@ def run_test(api, cmd, validation_cmd, topology, workers=1):
                     batch_size = 1,
                     sink_expect = expect * len(sources),
                     sink_stop_timeout = 5,
-                    validate_file = output,
+                    output_file = output,
                     persistent_data = persistent_data,
                     log_error = False)
                 # Test run was successful, break out of loop and proceed to
