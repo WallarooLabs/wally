@@ -35,6 +35,7 @@ actor _LateDataPolicyTests is TestList
     test(_LateDataIgnoredUnderDrop)
     test(_LateDataTriggersOwnWindowUnderFirePerMessage)
     test(_LateDataTriggersNewWindowUnderFirePerMessage)
+    test(_FirePerMessageUsesEventTimeAsOutputTsForLateData)
     test(_PlaceInOldestWindowOneWindow)
     test(_PlaceInOldestWindowTwoWindows)
     test(_PlaceInOldestWindowDoesntAutomaticallyTrigger)
@@ -55,7 +56,7 @@ class iso _LateDataIgnoredUnderDrop is UnitTest
     let range: U64 = Seconds(10)
     let slide = range
     let delay: U64 = 0
-    let tw = RangeWindows[USize, Array[USize] val, Collected]("key",
+    let tw = RangeWindows[USize, Array[USize] val, _Collected]("key",
       _Collect, range, slide, delay, _Zeros, LateDataPolicy.drop())
         .>apply(1, Seconds(100), Seconds(100))
         .>apply(2, Seconds(50), Seconds(100))
@@ -87,7 +88,7 @@ class iso _LateDataTriggersOwnWindowUnderFirePerMessage is UnitTest
     let range: U64 = Seconds(10)
     let slide = range
     let delay: U64 = 0
-    let tw = RangeWindows[USize, Array[USize] val, Collected]("key",
+    let tw = RangeWindows[USize, Array[USize] val, _Collected]("key",
       _Collect, range, slide, delay, _Zeros, LateDataPolicy.fire_per_message())
         .>apply(1, Seconds(100), Seconds(100))
 
@@ -120,7 +121,7 @@ class iso _LateDataTriggersNewWindowUnderFirePerMessage is UnitTest
     let range: U64 = Seconds(10)
     let slide = range
     let delay: U64 = 0
-    let tw = RangeWindows[USize, Array[USize] val, Collected]("key",
+    let tw = RangeWindows[USize, Array[USize] val, _Collected]("key",
       _Collect, range, slide, delay, _Zeros, LateDataPolicy.fire_per_message())
         .>apply(1, Seconds(100), Seconds(100))
 
@@ -135,6 +136,33 @@ class iso _LateDataTriggersNewWindowUnderFirePerMessage is UnitTest
     let res_array2 = _ForceArrayArray(res2._1)?
     h.assert_eq[USize](res_array2.size(), 1)
     h.assert_array_eq[USize](res_array2(0)?, [3])
+
+class iso _FirePerMessageUsesEventTimeAsOutputTsForLateData is UnitTest
+  fun name(): String =>
+    "windows/_FirePerMessageUsesEventTimeAsOutputTsForLateData"
+
+  fun apply(h: TestHelper) ? =>
+    // given
+    let range: U64 = Seconds(10)
+    let slide = range
+    let delay: U64 = 0
+    let tw = RangeWindows[USize, USize, _Total]("key",
+      _Sum, range, slide, delay, _Zeros, LateDataPolicy.fire_per_message())
+        .>apply(1, Seconds(100), Seconds(100))
+
+    // when
+    let res1 = tw(2, Seconds(101), Seconds(111))
+    let res2 = tw(3, Seconds(50), Seconds(112))
+
+    // then
+    let res_array1 = _ForceArray(res1._1)?
+    h.assert_eq[USize](res_array1.size(), 1)
+    h.assert_eq[USize](res_array1(0)?, 3)
+    h.assert_eq[U64](res1._2, Seconds(110) - 1)
+    let res_array2 = _ForceArrayWithEventTimes(res2._1)?
+    h.assert_eq[USize](res_array2.size(), 1)
+    h.assert_eq[U64](res_array2(0)?._2, Seconds(50))
+    h.assert_eq[U64](res2._2, Seconds(50))
 
 class iso _PlaceInOldestWindowOneWindow is UnitTest
   fun name(): String => "windows/late_data/_PlaceInOldestWindowOneWindow"
@@ -153,7 +181,7 @@ class iso _PlaceInOldestWindowOneWindow is UnitTest
     let range: U64 = Seconds(10)
     let slide = range
     let delay: U64 = 0
-    let tw = RangeWindows[USize, Array[USize] val, Collected]("key",
+    let tw = RangeWindows[USize, Array[USize] val, _Collected]("key",
       _Collect, range, slide, delay, _Zeros,
       LateDataPolicy.place_in_oldest_window())
         .>apply(1, Seconds(100), Seconds(100))
@@ -186,7 +214,7 @@ class iso _PlaceInOldestWindowTwoWindows is UnitTest
     let range: U64 = Seconds(10)
     let slide = range
     let delay: U64 = 0
-    let tw = RangeWindows[USize, Array[USize] val, Collected]("key",
+    let tw = RangeWindows[USize, Array[USize] val, _Collected]("key",
       _Collect, range, slide, delay, _Zeros,
       LateDataPolicy.place_in_oldest_window())
         .>apply(1, Seconds(100), Seconds(100))
@@ -218,7 +246,7 @@ class iso _PlaceInOldestWindowDoesntAutomaticallyTrigger is UnitTest
     let range: U64 = Seconds(10)
     let slide = range
     let delay: U64 = 0
-    let tw = RangeWindows[USize, Array[USize] val, Collected]("key",
+    let tw = RangeWindows[USize, Array[USize] val, _Collected]("key",
       _Collect, range, slide, delay, _Zeros,
       LateDataPolicy.place_in_oldest_window())
         .>apply(1, Seconds(100), Seconds(100))
