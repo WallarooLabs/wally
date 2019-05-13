@@ -134,6 +134,47 @@ class FramedFileReader(BaseIter, BaseSource):
         except:
             pass
 
+class LineFileReader(BaseIter, BaseSource):
+    """
+    An ASCII line-based file reader iterator with a resettable position.
+
+    Usage: `LineFileReader(filename)`.
+    """
+    def __init__(self, filename):
+        self.file = open(filename, mode='r')
+        self.name = filename.encode()
+        self.key = filename.encode()
+
+    def __str__(self):
+        return ("FramedFileReader(filename: {}, closed: {}, point_of_ref: {})"
+                .format(self.name, self.file.closed, self.point_of_ref()))
+
+    def point_of_ref(self):
+        try:
+            return self.file.tell()
+        except:
+            return -1
+
+    def reset(self, pos=0):
+        logging.debug("resetting {} from {} to position {}"
+            .format(self.__str__(), self.point_of_ref(), pos))
+        self.file.seek(pos)
+
+    def __next__(self):
+        # read header
+        b = self.file.readline()
+        if not b:
+            raise StopIteration
+        return (b, self.file.tell())
+
+    def close(self):
+        self.file.close()
+
+    def __del__(self):
+        try:
+            self.close()
+        except:
+            pass
 
 class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
     """
