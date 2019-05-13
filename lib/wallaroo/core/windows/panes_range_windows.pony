@@ -112,7 +112,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       end
 
       // Check if we need to trigger and clear windows
-      (var outs, let output_watermark_ts) = attempt_to_trigger(watermark_ts)
+      (var outs, var output_watermark_ts) = attempt_to_trigger(watermark_ts)
 
       // If we haven't already applied the input, do it now.
       if not applied then
@@ -143,6 +143,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
             // as the window end timestamp.
             outs.push((o, event_ts))
           end
+          output_watermark_ts = output_watermark_ts.max(event_ts)
         | LateDataPolicy.place_in_oldest_window() =>
           let new_earliest_ts = _earliest_ts()?
           _apply_input(input, new_earliest_ts, new_earliest_ts)

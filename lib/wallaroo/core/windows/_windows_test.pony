@@ -630,7 +630,7 @@ class iso _TestSlidingWindowsStragglersSequence is UnitTest
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(1_000)
-    let sw = RangeWindows[USize, Array[USize] val, Collected]("key",
+    let sw = RangeWindows[USize, Array[USize] val, _Collected]("key",
       _Collect, range, slide, delay, _Zeros)
 
     // Last heard threshold of 100 seconds
@@ -717,7 +717,7 @@ class iso _TestSlidingWindowsSequence is UnitTest
     let range: U64 = Seconds(50)
     let slide: U64 = Seconds(25)
     let delay: U64 = Seconds(3000)
-    let sw = RangeWindows[USize, Array[USize] val, Collected]("key",
+    let sw = RangeWindows[USize, Array[USize] val, _Collected]("key",
       _Collect, range, slide, delay, _Zeros)
 
     // var wm: USize = 4_888
@@ -948,12 +948,12 @@ class _NonZeroSum is Aggregation[USize, USize, _Total]
     if acc.v > 0 then acc.v end
   fun name(): String => "_NonZeroSum"
 
-primitive _Collect is Aggregation[USize, Array[USize] val, Collected]
-  fun initial_accumulator(): Collected => Collected
-  fun update(input: USize, acc: Collected) =>
+primitive _Collect is Aggregation[USize, Array[USize] val, _Collected]
+  fun initial_accumulator(): _Collected => _Collected
+  fun update(input: USize, acc: _Collected) =>
     acc.push(input)
-  fun combine(acc1: Collected, acc2: Collected): Collected =>
-    let new_arr = Collected
+  fun combine(acc1: _Collected, acc2: _Collected): _Collected =>
+    let new_arr = _Collected
     for m1 in acc1.values() do
       new_arr.push(m1)
     end
@@ -961,7 +961,7 @@ primitive _Collect is Aggregation[USize, Array[USize] val, Collected]
       new_arr.push(m2)
     end
     new_arr
-  fun output(key: Key, window_end_ts: U64, acc: Collected): Array[USize] val =>
+  fun output(key: Key, window_end_ts: U64, acc: _Collected): Array[USize] val =>
     let arr: Array[USize] iso = recover Array[USize] end
     for m in acc.values() do
       arr.push(m)
@@ -969,7 +969,7 @@ primitive _Collect is Aggregation[USize, Array[USize] val, Collected]
     consume arr
   fun name(): String => "_Collect"
 
-class Collected is State
+class _Collected is State
   let arr: Array[USize] = arr.create()
 
   fun ref push(u: USize) =>
@@ -1045,11 +1045,11 @@ primitive _TotalTumblingWindow
 
 primitive _CollectTumblingWindow
   fun apply(range: U64, calculation: Aggregation[USize, Array[USize] val,
-    Collected]): RangeWindows[USize, Array[USize] val, Collected]
+    _Collected]): RangeWindows[USize, Array[USize] val, _Collected]
   =>
     let slide = range
     let delay: U64 = 0
-    RangeWindows[USize, Array[USize] val, Collected]("key",
+    RangeWindows[USize, Array[USize] val, _Collected]("key",
       _Collect, range, slide, delay, _Zeros)
 
 
