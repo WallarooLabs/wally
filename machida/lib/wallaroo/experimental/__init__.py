@@ -129,6 +129,7 @@ class BaseConnector(object):
 class SourceConnector(BaseConnector):
     def __init__(self, args=None, required_params=['host', 'port'],
                  optional_params=[]):
+        raise Exception("SourceConnector uses unsupported connector protocol, please use AtLeastOnceSourceConnector")
         super(SourceConnector, self).__init__(args, required_params,
                                               optional_params)
         self._conn = None
@@ -213,6 +214,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
 
         # allow the user to do a join(timeout=0)
         self.stopped = threading.Event()
+        print("version {} cookie {} program_name {} instance_name {} host {} port {} delay {}".format(version, cookie, program_name, instance_name, host, port, delay))
 
     def join(self, timeout=None):
         """

@@ -312,12 +312,12 @@ class ConnectorSourceNotify[In: Any val]
         if m.version != "0.0.1" then
           @ll(_conn_err, "%s.received_connector_msg: unknown protocol version %s\n".cstring(),
             __loc.type_name().cstring(), m.version.cstring())
-          return _to_error_state(source, "Unknown protocol version")
+          return _to_error_state(source, "Unknown protocol version: " + m.version)
         end
         if m.cookie != _cookie then
           @ll(_conn_err, "%s.received_connector_msg: bad cookie %s\n"
             .cstring(), __loc.type_name().cstring(), m.cookie.cstring())
-          return _to_error_state(source, "Bad cookie")
+          return _to_error_state(source, "Bad cookie: " + m.cookie + ", wanted: " + _cookie)
         end
 
         // SLF TODO: add routing logic to handle

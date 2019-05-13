@@ -1,0 +1,73 @@
+#!/usr/bin/env python
+
+"""
+An example at-least-once feed with resettable sources that exercises the new
+AtLeastOnceSourceConnector and at-least-once protocol.
+
+To run it:
+
+1. start the mock server (TODO: replace with wallaroo app once pony connector is ready)
+    ```sh
+    python3 server.py
+    ```
+
+    The mock server will choose a random offset betwee 0 and 800 for each stream to in its notify_ack. (Since each stream has 1000 total messagrs, each of size 8 bytes, it does so by choosing `random.randint(0,800)*8` as the point_of_ref.)
+
+2. Start the feed:
+
+    ```sh
+    export PYTHONPATH="$PYTHONPATH:/home/nisan/wallaroo-tutorial/wallaroo/machida/lib/:/home/nisan/wallaroo-tutorial/wallaroo/testing/tools"
+    ./at_least_once_feed
+    ```
+"""
+
+import logging
+import sys
+import threading
+import time
+
+from wallaroo.experimental.connectors import (
+                                   LineFileReader,
+                                   MultiSourceConnector)
+
+logging.root.setLevel(logging.DEBUG)
+
+class Sender(threading.Thread):
+    def __init__(self, client):
+        super(Sender, self).__init__()
+        self.daemon = True
+        self.client = client
+        self.error = None
+
+    def run(self):
+        self.error = self.client.join()
+
+    def start(self):
+        self.client.connect()
+        super(Sender, self).start()
+        time.sleep(0.05)
+
+
+version = "0.0.1"
+cookie = "Dragons Love Tacos!"
+program_name = "celsius at least once"
+instance_name = "instance"
+required_params = ['host', 'port', 'filenames']
+optional_params = []
+
+client = MultiSourceConnector(version, cookie, program_name, instance_name,
+                              '127.0.0.1', '7100', delay=0.1)
+
+
+sender1 = Sender(client)
+
+sender1.start()
+
+client.add_source(LineFileReader(filename = sys.argv[1]))
+
+
+sender1.join()
+
+# Rely on the iterator method of our connector subclass
+print("Reached the end of all files. Shutting down.")
+print(client._sent)
