@@ -81,15 +81,14 @@ def run_test(api, cmd, validation_cmd, topology, workers=1):
     persistent_data = {}
 
     steps_val = ' '.join('--{}'.format(s) for s in topology)
-    output = 'received.txt'
     cmd_val = ("{cmd} {steps}".format(
                    cmd=cmd,
                    steps=steps_val))
+    output_file = "received.txt"
     validation_cmd_val = ("{validation_cmd} {steps} "
-                      "--output {output}".format(
+                      "--output".format(
                           validation_cmd=validation_cmd,
-                          steps=steps_val,
-                          output=output))
+                          steps=steps_val))
 
     expect_mod = get_expect_modifier(topology)
     logging.info("Expect mod is {} for topology {!r}".format(expect_mod, topology))
@@ -128,7 +127,8 @@ def run_test(api, cmd, validation_cmd, topology, workers=1):
                     batch_size = 1,
                     sink_expect = expect * len(sources),
                     sink_stop_timeout = 5,
-                    output_file = output,
+                    output_file = output_file,
+                    validation_cmd = validation_cmd_val,
                     persistent_data = persistent_data,
                     log_error = False)
                 # Test run was successful, break out of loop and proceed to
@@ -169,34 +169,11 @@ def run_test(api, cmd, validation_cmd, topology, workers=1):
             logging.exception(err)
         raise
 
-    res = run_shell_cmd(validation_cmd_val)
-    if res.success:
-        if res.output:
-            logging.info("Validation command '%s' completed successfully "
-                         "with the output:\n--\n%s", ' '.join(res.command),
-                                                              res.output)
-        else:
-            logging.info("Validation command '%s' completed successfully",
-                         ' '.join(res.command))
-    else:
-        outputs = runner_data_format(persistent_data.get('runner_data', []))
-        if outputs:
-            logging.error("Application outputs:\n{}".format(outputs))
-        logging.error("Validation command\n    '{}'\nfailed with the output:\n"
-                      "--\n{}".format(' '.join(res.command), res.output))
-        # Save logs to file in case of error
-        save_logs_to_file(base_dir, log_stream, persistent_data)
-
-        if logging.root.level > logging.ERROR:
-            # If failed, and logging level means we didn't log error, include it
-            # in exit message
-            print(res.output)
-            exit(res.return_code)
-        raise ValidationError()
 
     # Reached the end and nothing broke. Success!
     logging.info("Topology test completed successfully for topology {!r}"
                  .format(topology))
+
     del persistent_data
     log_stream.close()
     logging.root.handlers.clear()
