@@ -174,6 +174,11 @@ actor TCPSink is Sink
     _phase = NormalSinkPhase(this)
     _mute_upstreams()
 
+    ifdef "identify_routing_ids" then
+      @printf[I32]("===TCPSink %s created===\n".cstring(),
+        _sink_id.string().cstring())
+    end
+
   //
   // Application Lifecycle events
   //

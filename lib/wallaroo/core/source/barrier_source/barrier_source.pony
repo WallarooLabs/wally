@@ -83,6 +83,11 @@ actor BarrierSource is Source
     _metrics_reporter = consume metrics_reporter'
     _router_registry.register_producer(this)
 
+    ifdef "identify_routing_ids" then
+      @printf[I32]("===BarrierSource %s created===\n".cstring(),
+        _source_id.string().cstring())
+    end
+
   fun ref metrics_reporter(): MetricsReporter =>
     _metrics_reporter
 

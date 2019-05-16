@@ -163,6 +163,11 @@ actor TCPSource[In: Any val] is Source
       _mute_local()
     end
 
+    ifdef "identify_routing_ids" then
+      @printf[I32]("===TCPSource %s created===\n".cstring(),
+        _source_id.string().cstring())
+    end
+
   be accept(fd: U32, init_size: USize = 64, max_size: USize = 16384) =>
     """
     A new connection accepted on a server.
