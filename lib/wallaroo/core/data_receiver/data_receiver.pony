@@ -88,6 +88,11 @@ actor DataReceiver is Producer
       _phase = _NormalDataReceiverPhase(this)
     end
 
+    ifdef "identify_routing_ids" then
+      @printf[I32]("===DataReceiver %s created===\n".cstring(),
+        _id.string().cstring())
+    end
+
   fun ref metrics_reporter(): MetricsReporter =>
     _metrics_reporter
 
@@ -320,9 +325,9 @@ actor DataReceiver is Producer
     barrier_token: BarrierToken, seq_id: SeqId)
   =>
     ifdef "checkpoint_trace" then
-      @printf[I32]("DataReceiver: forward_barrier to %s -> seq id %s, last_seen: %s\n".cstring(),
-        target_step_id.string().cstring(), seq_id.string().cstring(),
-        _last_id_seen.string().cstring())
+      @printf[I32]("DataReceiver: forward_barrier to step (or step group) %s from %s -> seq id %s, last_seen: %s\n".cstring(),
+        target_step_id.string().cstring(), origin_step_id.string().cstring(),
+        seq_id.string().cstring(), _last_id_seen.string().cstring())
     end
     if seq_id > _last_id_seen then
       match barrier_token

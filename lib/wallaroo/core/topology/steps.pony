@@ -129,6 +129,11 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       tr.set_triggers(StepTimeoutTrigger(this), _watermarks)
     end
 
+    ifdef "identify_routing_ids" then
+      @printf[I32]("===Step %s created===\n".cstring(),
+        _id.string().cstring())
+    end
+
   //
   // Application startup lifecycle event
   //

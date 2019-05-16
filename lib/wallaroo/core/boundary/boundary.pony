@@ -287,6 +287,11 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _routing_id = routing_id
     _notify.register_routing_id(routing_id)
 
+    ifdef "identify_routing_ids" then
+      @printf[I32]("===OutgoingBoundary %s routing_id registered===\n"
+        .cstring(), _routing_id.string().cstring())
+    end
+
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     key: Key, event_ts: U64, watermark_ts: U64, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,

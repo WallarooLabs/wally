@@ -105,6 +105,9 @@ actor Startup
     ifdef "trace" then
       @printf[I32]("****TRACE is active****\n".cstring())
     end
+    ifdef "identify_routing_ids" then
+      @printf[I32]("****IDENTIFY ROUTING IDS is active****\n".cstring())
+    end
     ifdef "spike" then
       @printf[I32]("****SPIKE is active****\n".cstring())
     end

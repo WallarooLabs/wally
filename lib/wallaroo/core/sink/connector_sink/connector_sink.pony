@@ -71,13 +71,14 @@ actor ConnectorSink is Sink
   """
   # ConnectorSink
 
-  `ConnectorSink` replaces the Pony standard library class `ConnectorConnection`
+  `ConnectorSink` replaces the Pony standard library class ConnectorConnection`
   within Wallaroo for outgoing connections to external systems. While
   `ConnectorConnection` offers a number of excellent features it doesn't
   account for our needs around resilience.
 
-  `ConnectorSink` incorporates basic send/recv functionality from `ConnectorConnection` as
-  well working with our upstream backup/message acknowledgement system.
+  `ConnectorSink` incorporates basic send/recv functionality from
+  `ConnectorConnection` as well working with our upstream backup/message
+  acknowledgement system.
 
   ## Resilience and message tracking
 
@@ -85,8 +86,8 @@ actor ConnectorSink is Sink
 
   ## Possible future work
 
-  - At the moment we treat sending over Connector as done. In the future we can and
-    should support ack of the data being handled from the other side.
+  - At the moment we treat sending over Connector as done. In the future we
+    can and should support ack of the data being handled from the other side.
   - Optional in sink deduplication (this woud involve storing what we sent and
     was acknowleged.)
   """
@@ -157,7 +158,8 @@ actor ConnectorSink is Sink
   new create(sink_id: RoutingId, sink_name: String, event_log: EventLog,
     recovering: Bool, env: Env, encoder_wrapper: ConnectorEncoderWrapper,
     metrics_reporter: MetricsReporter iso,
-    barrier_coordinator: BarrierCoordinator, checkpoint_initiator: CheckpointInitiator,
+    barrier_coordinator: BarrierCoordinator,
+    checkpoint_initiator: CheckpointInitiator,
     host: String, service: String, worker_name: WorkerName,
     protocol_version: String, cookie: String,
     auth: ApplyReleaseBackpressureAuth,
@@ -195,6 +197,11 @@ actor ConnectorSink is Sink
     _connect_count = 0
     _twopc = ConnectorSink2PC(_notify.stream_name)
     _phase = NormalSinkPhase(this)
+
+    ifdef "identify_routing_ids" then
+      @printf[I32]("===ConnectorSink %s created===\n".cstring(),
+        _sink_id.string().cstring())
+    end
 
   //
   // Application Lifecycle events
