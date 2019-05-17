@@ -236,6 +236,7 @@ actor DataReceiver is Producer
     // improved.
     if highest_seq_id < _last_id_seen then
       _last_id_seen = highest_seq_id
+      _last_id_acked = _last_id_seen
     end
 
     _phase.data_connect(highest_seq_id)
