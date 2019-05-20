@@ -20,47 +20,46 @@ use "collections"
 use "random"
 use "wallaroo/core/network"
 
-class DropConnection is WallarooOutgoingNetworkActorNotify
-  let _letter: WallarooOutgoingNetworkActorNotify
+class DropConnection[T: TCPActor ref] is GeneralTCPNotify[T]
+  let _wrapped_notify: GeneralTCPNotify[T]
   let _rand: Random
   let _prob: F64
   let _margin: USize
   var _count_since_last_dropped: USize = 0
   let _c: Map[String, USize] = Map[String, USize](4)
 
-  new iso create(config: SpikeConfig,
-    letter: WallarooOutgoingNetworkActorNotify iso)
+  new create(config: SpikeConfig, wrapped_notify: GeneralTCPNotify[T])
   =>
     _rand = MT(config.seed)
     _prob = config.prob
     _margin = config.margin
-    _letter = consume letter
+    _wrapped_notify = wrapped_notify
 
-  fun ref connecting(conn: WallarooOutgoingNetworkActor ref, count: U32) =>
+  fun ref connecting(conn: T, count: U32) =>
     ifdef "spiketrace" then
       try
         _c.upsert("connecting", 1, {(x: USize=0, y: USize): USize => x+y})?
       end
     end
     spike(conn)
-    _letter.connecting(conn, count)
+    _wrapped_notify.connecting(conn, count)
 
-  fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
+  fun ref connected(conn: T) =>
     ifdef "spiketrace" then
       try
         _c.upsert("connected", 1, {(x: USize=0, y: USize): USize => x+y})?
       end
     end
     spike(conn)
-    _letter.connected(conn)
+    _wrapped_notify.connected(conn)
 
-  fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
-    _letter.connect_failed(conn)
+  fun ref connect_failed(conn: T) =>
+    _wrapped_notify.connect_failed(conn)
 
-  fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
-    _letter.closed(conn)
+  fun ref closed(conn: T, locally_initiated_close: Bool) =>
+    _wrapped_notify.closed(conn, locally_initiated_close)
 
-  fun ref sentv(conn: WallarooOutgoingNetworkActor ref,
+  fun ref sentv(conn: T,
     data: ByteSeqIter): ByteSeqIter
   =>
     ifdef "spiketrace" then
@@ -69,9 +68,9 @@ class DropConnection is WallarooOutgoingNetworkActorNotify
       end
     end
     spike(conn)
-    _letter.sentv(conn, data)
+    _wrapped_notify.sentv(conn, data)
 
-  fun ref received(conn: WallarooOutgoingNetworkActor ref, data: Array[U8] iso,
+  fun ref received(conn: T, data: Array[U8] iso,
     n: USize): Bool
   =>
     ifdef "spiketrace" then
@@ -82,20 +81,20 @@ class DropConnection is WallarooOutgoingNetworkActorNotify
     spike(conn)
     // We need to always send the data we've read from the buffer along.
     // Even when we drop the connection, we've already read that data
-    // and _letter is still expecting it.
-    _letter.received(conn, consume data, n)
+    // and _wrapped_notify is still expecting it.
+    _wrapped_notify.received(conn, consume data, n)
     true
 
-  fun ref expect(conn: WallarooOutgoingNetworkActor ref, qty: USize): USize =>
-    _letter.expect(conn, qty)
+  fun ref expect(conn: T, qty: USize): USize =>
+    _wrapped_notify.expect(conn, qty)
 
-   fun ref throttled(conn: WallarooOutgoingNetworkActor ref) =>
-    _letter.throttled(conn)
+   fun ref throttled(conn: T) =>
+    _wrapped_notify.throttled(conn)
 
-  fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
-    _letter.unthrottled(conn)
+  fun ref unthrottled(conn: T) =>
+    _wrapped_notify.unthrottled(conn)
 
-  fun ref spike(conn: WallarooOutgoingNetworkActor ref) =>
+  fun ref spike(conn: T) =>
     _count_since_last_dropped = _count_since_last_dropped + 1
     if _rand.real() <= _prob then
       if _margin == 0 then
@@ -105,7 +104,7 @@ class DropConnection is WallarooOutgoingNetworkActorNotify
       end
     end
 
-  fun ref drop(conn: WallarooOutgoingNetworkActor ref) =>
+  fun ref drop(conn: T) =>
     ifdef debug then
       @printf[I32]("\n((((((SPIKE: DROPPING CONNECTION!))))))\n\n".cstring())
     end
