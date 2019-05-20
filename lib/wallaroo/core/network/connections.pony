@@ -673,7 +673,7 @@ actor Connections is Cluster
   be update_boundary_ids(boundary_ids: Map[WorkerName, RoutingId] val) =>
     for (worker, boundary) in _data_conns.pairs() do
       try
-        boundary.register_step_id(boundary_ids(worker)?)
+        boundary.register_routing_id(boundary_ids(worker)?)
       else
         @printf[I32](("Could not register step id for boundary to " + worker +
           "\n").cstring())
