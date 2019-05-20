@@ -103,7 +103,7 @@ actor TCPSink is Sink
   var _mute_outstanding: Bool = false
 
   // TCP
-  var _notify: WallarooOutgoingNetworkActorNotify
+  var _notify: TCPSinkNotify
   var _read_buf: Array[U8] iso
   var _next_size: USize
   let _max_size: USize
