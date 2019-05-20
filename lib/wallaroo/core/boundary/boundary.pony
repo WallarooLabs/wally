@@ -397,9 +397,6 @@ actor OutgoingBoundary is Consumer
 
     _maybe_mute_or_unmute_upstreams()
 
-  be writev(data: Array[ByteSeq] val) =>
-    _writev(data)
-
   fun ref receive_ack(seq_id: SeqId) =>
     ifdef debug then
       Invariant(seq_id > _lowest_queue_id)

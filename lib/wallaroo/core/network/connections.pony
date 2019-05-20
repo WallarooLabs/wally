@@ -264,22 +264,6 @@ actor Connections is Cluster
       count = count + 1
     end
 
-  be send_data(worker: String, data: Array[ByteSeq] val) =>
-    _send_data(worker, data)
-
-  fun _send_data(worker: String, data: Array[ByteSeq] val) =>
-    try
-      _data_conns(worker)?.writev(data)
-    else
-      @printf[I32](("No outgoing boundary to worker " + worker + "\n")
-        .cstring())
-    end
-
-  be send_data_to_cluster(data: Array[ByteSeq] val) =>
-    for worker in _data_conns.keys() do
-      _send_data(worker, data)
-    end
-
   be disconnect_from(worker: WorkerName) =>
     try
       (_, let d) = _data_conns.remove(worker)?
