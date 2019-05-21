@@ -72,12 +72,14 @@ args = parser.parse_args()
 output = args.output.split(',')[0]
 if os.path.isfile(output):
     output_dir = os.path.dirname(output)
+    # If the file is in '.', make output_dir = '.'
+    if output_dir == '':
+        output_dir = '.'
 elif os.path.isdir(output):
     output_dir = output
 else:
     raise ValueError("Output must be a path to the output dir, or a file "
             "within it from which the output dir can be derived.")
-
 
 output_files = os.listdir(output_dir)
 # Read sink data
@@ -114,9 +116,26 @@ sequences = {}
 for fname, data in sink_data.items():
     for k in data.keys():
         for ts, win in data[k]:
-            assert(win == sorted(win)), ("Out of order violation for key: {}, "
-                                         "ts: {}, window: {}, sorted: {}"
-                                         .format(k, ts, win, sorted(win)))
+            win_sorted = sorted(win)
+            win_expected = list(range(min(win), min(win)+len(win)))
+            try:
+                # Deal with windows starting with 0's:
+                if win[0] == 0:
+                    if win[1] == 0:
+                        if win[2] == 0:
+                            assert(win[3] == 1)
+                        else:
+                            assert(win[2:] == [1,2])
+                    else:
+                        assert(win[1:] == [1,2,3])
+                # windows not starting with 0's:
+                else:
+                    assert(win == win_sorted and
+                           win == win_expected)
+            except AssertionError as err:
+                raise AssertionError("Out of order violation for key: {}, "
+                    "ts: {}, window: {}, sorted: {}, expected: {}"
+                    .format(k, ts, win, win_sorted, win_expected)) from err
             sequences.setdefault(k, {}).setdefault(fname, []).append(win[-1])
 
 # TODO:
@@ -141,7 +160,9 @@ for key, streams in sequences.items():
 for key, sequences in sequences.items():
     s = sorted(set([y for x in sequences.values() for y in x]))
     high =  max(s)
-    assert(s == range(1, high+1)), ("Found an error in data for key: {!r}.\n"
+    exp = list(range(1, high+1))
+    assert(s == exp), (
+            "Found an error in data for key: {!r}.\n"
             "Output is missing the values: {!r}"
             .format(key,
                     sorted(set(range(1, high+1)) - set(s))))

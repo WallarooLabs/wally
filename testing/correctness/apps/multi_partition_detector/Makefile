@@ -91,7 +91,7 @@ multi_partition_detector_test_python_alo:
 		--alo-sequence-sender key_1 '(100,200]' Detector \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module multi_partition_detector --source alo $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 2 \
@@ -123,7 +123,7 @@ multi_partition_detector_test_python_alo_10_worker:
 		--alo-sequence-sender key_9 '(100,200]' Detector \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module multi_partition_detector --source alo $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 2 \
@@ -145,7 +145,7 @@ multi_partition_detector_test_python:
 		--sequence-sender '(0,200]' Detector '>I' key_1 \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module multi_partition_detector $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 2 \
@@ -157,7 +157,7 @@ multi_partition_detector_test_python_gen_source:
 	integration_test \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module multi_partition_detector --source gensource $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 2 \
@@ -179,7 +179,7 @@ multi_partition_detector_test_python_10_worker:
 		--sequence-sender '(0,1000]' Detector '>I' key_9 \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module multi_partition_detector $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 10 \
@@ -190,7 +190,7 @@ multi_partition_detector_test_python_gen_source_10_worker:
 	integration_test \
 		--log-level $(LOGLEVEL) \
 		--command 'machida --application-module multi_partition_detector --source gensource $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 10 \
@@ -207,7 +207,7 @@ multi_partition_detector_test_python3_alo:
 		--alo-sequence-sender key_1 '(100,200]' Detector \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module multi_partition_detector --source alo $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 2 \
@@ -239,7 +239,7 @@ multi_partition_detector_test_python3_alo_10_worker:
 		--alo-sequence-sender key_9 '(100,200]' Detector \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module multi_partition_detector --source alo $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 2 \
@@ -261,7 +261,7 @@ multi_partition_detector_test_python3:
 		--sequence-sender '(0,100]' Detector '>I' key_1 \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module multi_partition_detector $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 2 \
@@ -272,7 +272,7 @@ multi_partition_detector_test_python3_gen_source:
 	integration_test \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module multi_partition_detector --source gensource $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 2 \
@@ -294,7 +294,7 @@ multi_partition_detector_test_python3_10_worker:
 		--sequence-sender '(0,1000]' Detector '>I' key_9 \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module multi_partition_detector $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 10 \
@@ -305,7 +305,7 @@ multi_partition_detector_test_python3_gen_source_10_worker:
 	integration_test \
 		--log-level $(LOGLEVEL) \
 		--command 'machida3 --application-module multi_partition_detector --source gensource $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 10 \
@@ -322,7 +322,7 @@ multi_partition_alo_source_test_pony:
 		--alo-sequence-sender key_1 '(100,200]' Detector \
 		--log-level $(LOGLEVEL) \
 		--command './multi_partition_detector --source alo $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 2 \
@@ -336,7 +336,7 @@ multi_partition_detector_test_pony:
 		--sequence-sender '(0,100]' Detector '>I' key_1 \
 		--log-level $(LOGLEVEL) \
 		--command './multi_partition_detector $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 2 \
@@ -348,7 +348,7 @@ multi_partition_detector_test_pony_gen_source:
 	integration_test \
 		--log-level $(LOGLEVEL) \
 		--command './multi_partition_detector --source gensource $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 2 \
@@ -380,7 +380,7 @@ multi_partition_alo_source_test_pony_10_worker:
 		--alo-sequence-sender key_9 '(100,200]' Detector \
 		--log-level $(LOGLEVEL) \
 		--command './multi_partition_detector --source alo $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 10 \
@@ -410,7 +410,7 @@ multi_partition_detector_test_pony_10_worker:
 		--sequence-sender '(0,1000]' Detector '>I' key_9 \
 		--log-level $(LOGLEVEL) \
 		--command './multi_partition_detector $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 10 \
@@ -421,7 +421,7 @@ multi_partition_detector_test_pony_gen_source_10_worker:
 	integration_test \
 		--log-level $(LOGLEVEL) \
 		--command './multi_partition_detector --source gensource $(RUN_WITH_RESILIENCE)' \
-		--validation-cmd 'python _validate.py --output' \
+		--validation-cmd 'python3 _validate.py --output' \
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 10 \
