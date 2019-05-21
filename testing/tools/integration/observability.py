@@ -24,9 +24,13 @@ import traceback
 import sys
 import time
 
-from inotify.adapters import Inotify
-inotify_logger = logging.getLogger("inotify.adapters")
-inotify_logger.setLevel(logging.ERROR)
+from watchdog.observers import Observer
+from watchdog.events import (DirDeletedEvent,
+                             FileCreatedEvent,
+                             FileSystemEventHandler)
+
+watchdog_logger = logging.getLogger("watchdog")
+watchdog_logger.setLevel(logging.WARNING)
 
 from .errors import (DuplicateKeyError,
                     TimeoutError)
@@ -418,6 +422,39 @@ def coalesce_partition_query_responses(responses):
 ####################################
 # Log File Observability Functions #
 ####################################
+class LogRotationEventHandler(FileSystemEventHandler):
+    def __init__(self, notifier, path, log_suffix):
+        logging.debug("Created LogRotationEventHandler: {}".format(
+            notifier, path, log_suffix))
+        super(LogRotationEventHandler, self).__init__()
+        self.notifier = notifier
+        self.path = path
+        self.log_suffix = log_suffix
+
+    def dispatch(self, event):
+        if isinstance(event, DirDeletedEvent):
+            if event.src_path == self.path:
+                logging.info("Watch directory deleted.")
+                self.notifier.stop()
+        else:
+            # only process events we care about
+            if event.src_path.endswith(self.log_suffix):
+                super(LogRotationEventHandler, self).dispatch(event)
+            else:
+                logging.log(1, "Event path doesn't end with log_suffix: {}. "
+                    "Discarding event: {}".format(self.log_suffix, event))
+
+    def on_created(self, event):
+        if isinstance(event, FileCreatedEvent):
+            self.notifier.file_created(event.src_path)
+
+    def on_deleted(self, event):
+        if isinstance(event, DirDeletedEvent):
+            self.notifier.dir_deleted(event.src_path)
+        else:
+            self.notifier.file_deleted(event.src_path)
+
+
 class EvLogFileNotifier(StoppableThread):
     """
     Watch the resilience directory and keep track of log files.
@@ -433,63 +470,43 @@ class EvLogFileNotifier(StoppableThread):
         self.handler = handler
         self.path = path
         self.log_suffix = log_suffix
-        self.inotify = Inotify()
-        self.inotify.add_watch(self.path)
-
+        self.observer = Observer()
+        self._event_handler = LogRotationEventHandler(self, self.path,
+                self.log_suffix)
         # State management
         self.log_files = {}
 
+    def stop(self, error=None):
+        self.observer.stop()
+        super(EvLogFileNotifier, self).stop(error)
+        self.handler.evlognotifier_stopped(self)
+
     def run(self):
+        logging.debug("Scheduling watchdog observer")
+        self.observer.schedule(self._event_handler, self.path)
+        self.observer.start()
         while not self.stopped():
-            try:
-                event_gen = self.inotify.event_gen(timeout_s=5,
-                        yield_nones=False)
-                while not self.stopped():
-                    _, type_names, path, filename = next(event_gen)
-                    if filename.endswith(self.log_suffix):
-                        self.handle_log_file_event(filename, type_names)
-                    elif 'IN_DELETE_SELF' in type_names:
-                        self.stop()
-                        self.handler.evlognotifier_stopped(self)
-                    else:
-                        continue
-            except Exception as err:
-                logging.exception(err)
-                raise err
+            time.sleep(0.1)
+        self.observer.join()
 
-    def handle_log_file_event(self, filename, type_names):
-        logging.log(1, "{}.handle_log_file_event({}, {})".format(
-            self.__base_name__, filename, type_names))
-        # type_names we might care about:
-        #   IN_CREATE           - create file/dir
-        #   IN_DELETE           - delete file/dir
-        #   IN_OPEN             - open file (for read/write)
-        #   IN_MODIFY           - save without closing (e.g. flush())
-        #   IN_CLOSE_WRITE      - save + close
-        #   IN_CLOSE_NOWRITE    - close nowrite
-        #   IN_DELETE_SELF      - Watched path deleted, stops the watcher
-
+    def parse_log_file_name(self, filename):
         base_name, chunk = filename.split('.evlog')[0].rsplit('-', 1)
+        return (base_name, chunk)
+
+    def file_created(self, filename):
+        base_name, chunk = self.parse_log_file_name(filename)
         fn_logs = self.log_files.setdefault(base_name, {})
+        fn_logs.setdefault('chunks', []).append(chunk)
+        fn_logs.setdefault('active', chunk)
+        new_chunk = chunk
+        old_chunk = (fn_logs['chunks'][-2]
+                     if len(fn_logs['chunks'])>1
+                     else '0000000000000000')
+        self.handler.file_created(base_name, new_chunk, old_chunk)
 
-        # Assumption: wallaroo has strict ordering between create-open-close
-        # across files for the same backend (e.g. old is closed before new is
-        # created)
-
-        # CREATE
-        if 'IN_CREATE' in type_names:
-            fn_logs.setdefault('chunks', []).append(chunk)
-            fn_logs.setdefault('active', chunk)
-            new_chunk = chunk
-            old_chunk = (fn_logs['chunks'][-2]
-                         if len(fn_logs['chunks'])>1
-                         else None)
-            self.handler.file_created(base_name, new_chunk, old_chunk)
-        # DELETE
-        elif 'IN_DELETE' in type_names:
-            if fn_logs['current'] == chunk:
-                fn_logs['current'] = None
-            self.handler.file_deleted(basename, chunk)
-        else:
-            # dont care
-            pass
+    def file_deleted(self, filename):
+        base_name, chunk = self.parse_log_file_name(filename)
+        fn_logs = self.log_files.setdefault(base_name, {})
+        if fn_logs['current'] == chunk:
+            fn_logs['current'] = None
+        self.handler.file_deleted(basename, chunk)

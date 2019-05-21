@@ -265,9 +265,11 @@ class WaitForLogRotation(StoppableThread):
 
 
     def run(self):
+        logging.debug("Started WaitForLogRotation")
         while not self.stopped():
             self.notifier.start()
             self.notifier.join(self.timeout)
+            logging.debug("EvLogFileNotifier joined")
             if self.notifier.is_alive():
                 self.notifier.stop()
                 self.stop()
