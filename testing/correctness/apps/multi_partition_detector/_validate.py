@@ -24,12 +24,6 @@ class OrderError(Exception):
     pass
 
 
-def validate_window(window):
-    assert(win == sorted(win)), ("Out of order violation for key: {}, "
-                                 "w_key: {}, window: {}, sorted: {}"
-                                 .format(k, w_key, window, sorted(window)))
-
-
 def validate_stream(stream):
     # rules
     # 1. increments are either +1 or +n, n>1
@@ -120,7 +114,9 @@ sequences = {}
 for fname, data in sink_data.items():
     for k in data.keys():
         for ts, win in data[k]:
-            validate_window(win)
+            assert(win == sorted(win)), ("Out of order violation for key: {}, "
+                                         "ts: {}, window: {}, sorted: {}"
+                                         .format(k, ts, win, sorted(win)))
             sequences.setdefault(k, {}).setdefault(fname, []).append(win[-1])
 
 # TODO:
