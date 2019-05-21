@@ -1,24 +1,28 @@
-version: 2
-jobs:
-  verify-changelog:
+version: 2.1
+executors:
+  wallaroo-ci:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:2019.05.21.1
+  pony-changelog:
     docker:
       - image: ponylang/changelog-tool:release
+jobs:
+  verify-changelog:
+    executor: pony-changelog
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
       - run: changelog-tool verify CHANGELOG.md
 
   unit-tests:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
+    executor: wallaroo-ci
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
       - run: make unit-tests debug=true
 
   integration-tests:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
+    executor: wallaroo-ci
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -33,19 +37,8 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  integration-tests-correctness:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
-    steps:
-      - checkout
-      - run: .circleci/clone_tracker.sh
-      - run: make integration-tests-testing-correctness-apps-all debug=true
-      - store_artifacts:
-          path: /tmp/wallaroo_test_errors
-
-  integration-tests-resilience:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
+  integration-tests-with-resilience:
+    executor: wallaroo-ci
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -54,9 +47,17 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  integration-tests-resilience-correctness:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
+  integration-tests-testing-correctness-apps:
+    executor: wallaroo-ci
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: make integration-tests-testing-correctness-apps-all debug=true
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  integration-tests-testing-correctness-apps-with-resilience:
+    executor: wallaroo-ci
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -65,8 +66,7 @@ jobs:
           path: /tmp/wallaroo_test_errors
 
   autoscale-tests-pony:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
+    executor: wallaroo-ci
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -77,9 +77,8 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  autoscale-tests-pony-resilience:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
+  autoscale-tests-pony-with-resilience:
+    executor: wallaroo-ci
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -91,8 +90,7 @@ jobs:
           path: /tmp/wallaroo_test_errors
 
   autoscale-tests-python2:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
+    executor: wallaroo-ci
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -103,9 +101,8 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  autoscale-tests-python2-resilience:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
+  autoscale-tests-python2-with-resilience:
+    executor: wallaroo-ci
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -117,8 +114,7 @@ jobs:
           path: /tmp/wallaroo_test_errors
 
   autoscale-tests-python3:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
+    executor: wallaroo-ci
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -129,9 +125,8 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  autoscale-tests-python3-resilience:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
+  autoscale-tests-python3-with-resilience:
+    executor: wallaroo-ci
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -143,8 +138,7 @@ jobs:
           path: /tmp/wallaroo_test_errors
 
   resilience-tests-pony:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
+    executor: wallaroo-ci
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -156,8 +150,7 @@ jobs:
           path: /tmp/wallaroo_test_errors
 
   resilience-tests-python2:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
+    executor: wallaroo-ci
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -169,8 +162,7 @@ jobs:
           path: /tmp/wallaroo_test_errors
 
   resilience-tests-python3:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
+    executor: wallaroo-ci
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -182,8 +174,7 @@ jobs:
           path: /tmp/wallaroo_test_errors
 
   topology-tests-python2:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
+    executor: wallaroo-ci
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -194,9 +185,8 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  topology-tests-python3-resilience:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
+  topology-tests-python2-with-resilience:
+    executor: wallaroo-ci
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -208,8 +198,7 @@ jobs:
           path: /tmp/wallaroo_test_errors
 
   topology-tests-python3:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
+    executor: wallaroo-ci
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -220,9 +209,8 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
-  topology-tests-python3-resilience:
-    docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.08.1
+  topology-tests-python3-with-resilience:
+    executor: wallaroo-ci
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
@@ -245,105 +233,105 @@ workflows:
           requires:
             - unit-tests
 
-      - integration-tests-correctness:
+      - integration-tests-with-resilience:
           requires:
             - unit-tests
 
-      - integration-tests-resilience:
+      - integration-tests-testing-correctness-apps:
           requires:
             - unit-tests
 
-      - integration-tests-resilience-correctness:
+      - integration-tests-testing-correctness-apps-with-resilience:
           requires:
             - unit-tests
 
       - autoscale-tests-pony:
           requires:
             - integration-tests
-            - integration-tests-correctness
-            - integration-tests-resilience
-            - integration-tests-resilience-correctness
+            - integration-tests-testing-correctness-apps
+            - integration-tests-with-resilience
+            - integration-tests-testing-correctness-apps-with-resilience
 
-      - autoscale-tests-pony-resilience:
+      - autoscale-tests-pony-with-resilience:
           requires:
             - integration-tests
-            - integration-tests-correctness
-            - integration-tests-resilience
-            - integration-tests-resilience-correctness
+            - integration-tests-testing-correctness-apps
+            - integration-tests-with-resilience
+            - integration-tests-testing-correctness-apps-with-resilience
 
       - autoscale-tests-python2:
           requires:
             - integration-tests
-            - integration-tests-correctness
-            - integration-tests-resilience
-            - integration-tests-resilience-correctness
+            - integration-tests-testing-correctness-apps
+            - integration-tests-with-resilience
+            - integration-tests-testing-correctness-apps-with-resilience
 
-      - autoscale-tests-python2-resilience:
+      - autoscale-tests-python2-with-resilience:
           requires:
             - integration-tests
-            - integration-tests-correctness
-            - integration-tests-resilience
-            - integration-tests-resilience-correctness
+            - integration-tests-testing-correctness-apps
+            - integration-tests-with-resilience
+            - integration-tests-testing-correctness-apps-with-resilience
 
       - autoscale-tests-python3:
           requires:
             - integration-tests
-            - integration-tests-correctness
-            - integration-tests-resilience
-            - integration-tests-resilience-correctness
+            - integration-tests-testing-correctness-apps
+            - integration-tests-with-resilience
+            - integration-tests-testing-correctness-apps-with-resilience
 
-      - autoscale-tests-python3-resilience:
+      - autoscale-tests-python3-with-resilience:
           requires:
             - integration-tests
-            - integration-tests-correctness
-            - integration-tests-resilience
-            - integration-tests-resilience-correctness
+            - integration-tests-testing-correctness-apps
+            - integration-tests-with-resilience
+            - integration-tests-testing-correctness-apps-with-resilience
 
       - resilience-tests-pony:
           requires:
             - integration-tests
-            - integration-tests-correctness
-            - integration-tests-resilience
-            - integration-tests-resilience-correctness
+            - integration-tests-testing-correctness-apps
+            - integration-tests-with-resilience
+            - integration-tests-testing-correctness-apps-with-resilience
 
       - resilience-tests-python2:
           requires:
             - integration-tests
-            - integration-tests-correctness
-            - integration-tests-resilience
-            - integration-tests-resilience-correctness
+            - integration-tests-testing-correctness-apps
+            - integration-tests-with-resilience
+            - integration-tests-testing-correctness-apps-with-resilience
 
       - resilience-tests-python3:
           requires:
             - integration-tests
-            - integration-tests-correctness
-            - integration-tests-resilience
-            - integration-tests-resilience-correctness
+            - integration-tests-testing-correctness-apps
+            - integration-tests-with-resilience
+            - integration-tests-testing-correctness-apps-with-resilience
 
       - topology-tests-python2:
           requires:
             - integration-tests
-            - integration-tests-correctness
-            - integration-tests-resilience
-            - integration-tests-resilience-correctness
+            - integration-tests-testing-correctness-apps
+            - integration-tests-with-resilience
+            - integration-tests-testing-correctness-apps-with-resilience
 
-      - topology-tests-python3-resilience:
+      - topology-tests-python2-with-resilience:
           requires:
             - integration-tests
-            - integration-tests-correctness
-            - integration-tests-resilience
-            - integration-tests-resilience-correctness
+            - integration-tests-testing-correctness-apps
+            - integration-tests-with-resilience
+            - integration-tests-testing-correctness-apps-with-resilience
 
       - topology-tests-python3:
           requires:
             - integration-tests
-            - integration-tests-correctness
-            - integration-tests-resilience
-            - integration-tests-resilience-correctness
+            - integration-tests-testing-correctness-apps
+            - integration-tests-with-resilience
+            - integration-tests-testing-correctness-apps-with-resilience
 
-      - topology-tests-python3-resilience:
+      - topology-tests-python3-with-resilience:
           requires:
             - integration-tests
-            - integration-tests-correctness
-            - integration-tests-resilience
-            - integration-tests-resilience-correctness
+            - integration-tests-testing-correctness-apps
+            - integration-tests-with-resilience
+            - integration-tests-testing-correctness-apps-with-resilience
