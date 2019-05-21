@@ -570,7 +570,8 @@ def CLI():
                     runner_join_timeout=args.runner_join_timeout,
                     resilience_dir=args.resilience_dir,
                     spikes=args.spike,
-                    persistent_data = persistent_data)
+                    persistent_data = persistent_data,
+                    log_error = False)
                 # Test run was successful, break out of loop and proceed to
                 # validation
                 logging.info("Run phase complete. Proceeding to validation.")

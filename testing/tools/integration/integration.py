@@ -29,7 +29,8 @@ from .control import (SinkAwaitValue,
 from .end_points import (ALOSender,
                          Sender,
                          Reader)
-from .external import run_shell_cmd
+from .external import (run_shell_cmd,
+                       save_logs_to_file)
 from .errors import (PipelineTestError,
                      TimeoutError)
 from .logger import INFO2
@@ -291,13 +292,12 @@ def pipeline_test(sources, expected, command, workers=1,
                                      ' '.join(res.command))
                 else:
                     outputs = runner_data_format(persistent_data.get('runner_data', []))
-                    logging.error("Application outputs:\n{}".format(outputs))
-                    logging.error("Validation command '%s' failed with the output:\n"
-                                  "--\n%s",
-                                  res.command, res.output)
+                    if outputs:
+                        logging.error("Application outputs:\n{}".format(outputs))
+                    error = ("Validation command '%s' failed with the output:\n"
+                             "--\n%s" % (res.command, res.output))
                     # Save logs to file in case of error
-                    save_logs_to_file(base_dir, log_stream, persistent_data)
-                    raise PipelineTestError
+                    raise PipelineTestError(error)
 
             else:  # compare expected to processed
                 logging.debug('Begin validation phase...')
