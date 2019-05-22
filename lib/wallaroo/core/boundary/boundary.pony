@@ -704,6 +704,7 @@ class BoundaryNotify is TestableBoundaryNotify[OutgoingBoundary ref]
   var _header: Bool = true
   let _reconnect_closed_delay: U64
   let _reconnect_failed_delay: U64
+  var _initial_connection_was_established: Bool = false
 
   new create(auth: AmbientAuth, routing_id: RoutingId, worker_name: WorkerName,
     target_worker: WorkerName, host: String, service: String,
@@ -791,13 +792,18 @@ class BoundaryNotify is TestableBoundaryNotify[OutgoingBoundary ref]
     // This is a symptom of OutgoingBoundary overreaching
     conn.resend_producer_registrations()
     conn.reset_reconnect_pause()
-    try
-      let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
-        _routing_id, conn.seq_id, _auth)?
-      conn._writev(connect_msg)
+    if _initial_connection_was_established then
+      // This is not the initial time we connected, so we're reconnecting.
+      try
+        let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
+          _routing_id, conn.seq_id, _auth)?
+        conn._writev(connect_msg)
+      else
+        @printf[I32]("error creating data connect message on reconnect\n"
+          .cstring())
+      end
     else
-      @printf[I32]("error creating data connect message on reconnect\n"
-        .cstring())
+      _initial_connection_was_established = true
     end
     conn.set_nodelay(true)
     conn.expect(4)
