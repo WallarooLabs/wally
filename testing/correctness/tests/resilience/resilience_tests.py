@@ -34,25 +34,25 @@ APIS = {
     'pony': [
         {'app': 'multi_partition_detector',
          'cmd': 'multi_partition_detector --depth 1 --run-with-resilience',
-         'validation_cmd': 'python ../../apps/multi_partition_detector/_validate.py --output {out_file}'}],
+         'validation_cmd': 'python3 ../../apps/multi_partition_detector/_validate.py --output {out_file}'}],
     'python2': [
         {'app': 'multi_partition_detector',
          'cmd': 'machida --application-module multi_partition_detector --depth 1 --run-with-resilience',
-         'validation_cmd': 'python ../../apps/multi_partition_detector/_validate.py --output {out_file}'},
+         'validation_cmd': 'python3 ../../apps/multi_partition_detector/_validate.py --output {out_file}'},
         # {'app': 'window_detector_tumbling',
         #  'cmd': 'machida --application-module window_detector --window-type tumbling --window-delay 100 --run-with-resilience',
-        #  'validation_cmd': 'python ../../apps/window_detector/_validate.py --window-type tumbling --output {out_file}'},
+        #  'validation_cmd': 'python3 ../../apps/window_detector/_validate.py --window-type tumbling --output {out_file}'},
         # {'app': 'window_detector_counting',
         #  'cmd': 'machida --application-module window_detector --window-type counting --run-with-resilience',
-        #  'validation_cmd': 'python ../../apps/window_detector/_validate.py --window-type counting --output {out_file}'},
+        #  'validation_cmd': 'python3 ../../apps/window_detector/_validate.py --window-type counting --output {out_file}'},
         # {'app': 'window_detector_sliding',
         #  'cmd': 'machida --application-module window_detector --window-type sliding --window-delay 100 --run-with-resilience',
-        #  'validation_cmd': 'python ../../apps/window_detector/_validate.py --window-type sliding --output {out_file}'}
+        #  'validation_cmd': 'python3 ../../apps/window_detector/_validate.py --window-type sliding --output {out_file}'}
     ],
     'python3': [
         {'app': 'multi_partition_detector',
          'cmd': 'machida3 --application-module multi_partition_detector --depth 1 --run-with-resilience',
-         'validation_cmd': 'python ../../apps/multi_partition_detector/_validate.py --output {out_file}'},
+         'validation_cmd': 'python3 ../../apps/multi_partition_detector/_validate.py --output {out_file}'},
         # {'app': 'window_detector_tumbling',
         #  'cmd': 'machida3 --application-module window_detector --window-type tumbling --window-delay 100 --run-with-resilience',
         #  'validation_cmd': 'python3 ../../apps/window_detector/_validate.py --window-type tumbling --output {out_file}'},

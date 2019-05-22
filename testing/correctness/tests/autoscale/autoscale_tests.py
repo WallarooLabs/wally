@@ -35,7 +35,7 @@ CMD_PONY = 'multi_partition_detector --depth 1'
 CMD_PYTHON = 'machida --application-module multi_partition_detector --depth 1'
 CMD_PYTHON3 = 'machida3 --application-module multi_partition_detector --depth 1'
 
-VALIDATION_CMD = 'python ../../apps/multi_partition_detector/_validate.py --output {out_file}'
+VALIDATION_CMD = 'python3 ../../apps/multi_partition_detector/_validate.py --output {out_file}'
 
 APIS = {'pony': CMD_PONY, 'python2': CMD_PYTHON, 'python3': CMD_PYTHON3}
 
