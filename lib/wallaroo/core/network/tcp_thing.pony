@@ -12,15 +12,12 @@ use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 
-trait TCPActor is Something
+trait TCPActor
   // This behavior must be implemented so that the Pony runtime can
   // call it.
   be _event_notify(event: AsioEventID, flags: U32, arg: U32)
   be write_again()
   be read_again()
-
-
-trait Something
   fun ref expect(qty: USize = 0)
   fun ref set_nodelay(state: Bool)
   fun ref close()
