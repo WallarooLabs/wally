@@ -20,15 +20,15 @@ use "collections"
 use "random"
 use "wallaroo/core/network"
 
-class DropConnection[T: TCPActor ref] is GeneralTCPNotify[T]
-  let _wrapped_notify: GeneralTCPNotify[T]
+class DropConnection[T: TCPActor ref] is TCPHandlerNotify[T]
+  let _wrapped_notify: TCPHandlerNotify[T]
   let _rand: Random
   let _prob: F64
   let _margin: USize
   var _count_since_last_dropped: USize = 0
   let _c: Map[String, USize] = Map[String, USize](4)
 
-  new create(config: SpikeConfig, wrapped_notify: GeneralTCPNotify[T])
+  new create(config: SpikeConfig, wrapped_notify: TCPHandlerNotify[T])
   =>
     _rand = MT(config.seed)
     _prob = config.prob

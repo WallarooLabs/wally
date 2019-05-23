@@ -1,6 +1,6 @@
 
 
-trait GeneralTCPNotify[T: TCPActor ref]
+trait TCPHandlerNotify[T: TCPActor ref]
   fun ref connecting(conn: T, count: U32)
     """
     Called if name resolution succeeded for a T
