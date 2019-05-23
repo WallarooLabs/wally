@@ -71,13 +71,13 @@ actor ConnectorSink is Sink
   """
   # ConnectorSink
 
-  `ConnectorSink` replaces the Pony standard library class ConnectorConnection`
-  within Wallaroo for outgoing connections to external systems. While
-  `ConnectorConnection` offers a number of excellent features it doesn't
-  account for our needs around resilience.
+  `ConnectorSink` replaces the Pony standard library class
+  `TCPConnection` within Wallaroo for outgoing connections to external
+  systems. While `TCPConnection` offers a number of excellent features
+  it doesn't account for our needs around resilience.
 
   `ConnectorSink` incorporates basic send/recv functionality from
-  `ConnectorConnection` as well working with our upstream backup/message
+  `TCPConnection` as well working with our upstream backup/message
   acknowledgement system.
 
   ## Resilience and message tracking
