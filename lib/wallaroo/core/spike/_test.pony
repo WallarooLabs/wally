@@ -218,8 +218,8 @@ class iso _TestDoesntDropConnectionWhenExpectWhenSpiked is UnitTest
     "spike/DoesntDropConnectionWhenExpectWhenSpiked"
 
   fun ref apply(h: TestHelper) ? =>
-    //!@ What is this test testing? Why doesn't Spike close it when expect?
-
+    // expect() should not trigger spiking a connection, even when the odds
+    // of spiking are 100%
     let spike_probability = F64(1)
     let expected_actions = recover val ["expect"] end
     let connection_count = U32(1)
@@ -228,7 +228,6 @@ class iso _TestDoesntDropConnectionWhenExpectWhenSpiked is UnitTest
         .simulate_expect(qty)
 
     h.long_test(10_000_000_000)
-
 
 class iso _TestDoesntDropConnectionWhenExpectWhenNotSpiked is UnitTest
   fun name(): String =>
@@ -249,8 +248,8 @@ class iso _TestDoesntDropConnectionWhenThrottledWhenSpiked is UnitTest
     "spike/DoesntDropConnectionWhenThrottledWhenSpiked"
 
   fun ref apply(h: TestHelper) ? =>
-    //!@ What is this test testing? Why doesn't Spike close it when throttled?
-
+    // throttled() should not trigger spiking a connection, even when the odds
+    // of spiking are 100%
     let spike_probability = F64(1)
     let expected_actions = recover val ["throttled"] end
     let connection_count = U32(1)
@@ -277,6 +276,8 @@ class iso _TestDoesntDropConnectionWhenUnthrottledWhenSpiked is UnitTest
     "spike/DoesntDropConnectionWhenUnthrottledWhenSpiked"
 
   fun ref apply(h: TestHelper) ? =>
+    // unthrottled() should not trigger spiking a connection, even when the
+    // odds of spiking are 100%
     let spike_probability = F64(1)
     let expected_actions = recover val ["unthrottled"] end
     let connection_count = U32(1)
@@ -305,7 +306,8 @@ class iso _TestDropsConnectionWhenSpikedWithMargin is UnitTest
   fun ref apply(h: TestHelper) ? =>
     let spike_probability = F64(1)
     let margin = USize(3)
-    // if margin == 3, the 4th action should drop
+    // if margin == 3, the 4th connected event should cause Spike to drop
+    // the connection.
     let expected_actions =
       recover val ["connected"; "connected"; "connected"; "closed"] end
     let connection_count = U32(1)
@@ -334,12 +336,12 @@ primitive _TestConnection
 
     let spike_config = SpikeConfig(where seed'=1, prob'=spike_probability,
       margin'=margin)?
-    let notify = _TestGeneralTCPNotify[NullTCPActor ref](h, connection_count,
+    let notify = _TestTCPHandlerNotify[NullTCPActor ref](h, connection_count,
       expected_actions, expected_data)
     let should_close = expected_actions.contains("closed")
     NullTCPActor(h, consume notify, spike_config, should_close)
 
-class _TestGeneralTCPNotify[T: TCPActor ref] is GeneralTCPNotify[T]
+class _TestTCPHandlerNotify[T: TCPActor ref] is TCPHandlerNotify[T]
   let _h: TestHelper
   let _count: U32
   let _expected_actions: Array[String] val
@@ -418,10 +420,10 @@ class _TestGeneralTCPNotify[T: TCPActor ref] is GeneralTCPNotify[T]
 
 actor NullTCPActor is TCPActor
   let _h: TestHelper
-  let _notify: GeneralTCPNotify[NullTCPActor ref]
+  let _notify: TCPHandlerNotify[NullTCPActor ref]
   let _should_close: Bool
 
-  new create(h: TestHelper, notify: GeneralTCPNotify[NullTCPActor ref] iso,
+  new create(h: TestHelper, notify: TCPHandlerNotify[NullTCPActor ref] iso,
     spike_config: SpikeConfig, should_close: Bool)
   =>
     _h = h
@@ -431,13 +433,12 @@ actor NullTCPActor is TCPActor
         DropConnection[NullTCPActor ref](spike_config, consume notify)
       // end
 
-
-  //////////////////////
+  //////////////////////////////////////////////////////////////////
   // TESTING INTERFACE
   //
   // These behaviors are used to simulate ASIO and other events that
   // trigger notify calls internally.
-  //////////////////////
+  //////////////////////////////////////////////////////////////////
   be simulate_connecting(connection_count: U32) =>
     _notify.connecting(this, connection_count)
 

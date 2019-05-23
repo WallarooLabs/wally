@@ -27,28 +27,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-//!@
-/*
-Required for internal magic:
-  _event_notify()
-Required for yielding (behaviors on Boundary used by TCP class):
-  behaviors:
-    _write_again()
-    _read_again()
-  methods:
-    _maybe_mute_or_unmute_upstreams()
-
-
-Interface used by our boundary code:
-  _writev()
-  close() <-- from dispose()
-
-Called by Notify:
-  reset_reconnect_pause()
-  expect()
-  set_nodelay()
-*/
-
 use "buffered"
 use "collections"
 use "net"
@@ -151,6 +129,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   // over seq_id generation whether there is resilience or not.
   var seq_id: SeqId = 0
 
+  // Reconnect
   var _initial_reconnect_pause: U64 = 500_000_000
   var _reconnect_pause: U64 = _initial_reconnect_pause
   let _timers: Timers = Timers
@@ -158,8 +137,9 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   var _pending_immediate_ack_promise:
     (Promise[OutgoingBoundary] | None) = None
 
-  var _tcp_thing: TestableTCPThing[OutgoingBoundary ref] =
-    EmptyTCPThing[OutgoingBoundary ref]
+  // TCP
+  var _tcp_handler: TestableTCPHandler[OutgoingBoundary ref] =
+    EmptyTCPHandler[OutgoingBoundary ref]
   let _notify: TestableBoundaryNotify[OutgoingBoundary ref]
 
   new create(auth: AmbientAuth, worker_name: String, target_worker: String,
@@ -193,7 +173,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _service = service
     _from = from
     _metrics_reporter = consume metrics_reporter
-    _tcp_thing = GeneralTCPThing[OutgoingBoundary ref](this, _notify,
+    _tcp_handler = TCPHandler[OutgoingBoundary ref](this, _notify,
       init_size, max_size)
 
   //
@@ -205,7 +185,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer) =>
-    _tcp_thing.connect(_host, _service, _from, this)
+    _tcp_handler.connect(_host, _service, _from, this)
     @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" + _service +
       "\n").cstring())
 
@@ -217,7 +197,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
 
       let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _routing_id,
         seq_id, _auth)?
-      _tcp_thing.writev(connect_msg)
+      _tcp_handler.writev(connect_msg)
     else
       Fail()
     end
@@ -237,7 +217,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
         _initializer = initializer
         _reported_initialized = true
         _reported_ready_to_work = true
-        _tcp_thing.connect(_host, _service, _from, this)
+        _tcp_handler.connect(_host, _service, _from, this)
 
         @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" +
           _service + "\n").cstring())
@@ -248,7 +228,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
 
         let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
           _routing_id, seq_id, _auth)?
-        _tcp_thing.writev(connect_msg)
+        _tcp_handler.writev(connect_msg)
       else
         Fail()
       end
@@ -258,7 +238,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _pending_immediate_ack_promise = p
     try
       let msg = ChannelMsgEncoder.data_receiver_ack_immediately(_auth)?
-      _tcp_thing.writev(msg)
+      _tcp_handler.writev(msg)
     else
       Fail()
     end
@@ -281,7 +261,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     // set replaying to true since we might need to replay to
     // downstream before resuming
     _replaying = true
-    _tcp_thing.connect(_host, _service, _from, this)
+    _tcp_handler.connect(_host, _service, _from, this)
 
   be migrate_key(routing_id: RoutingId, step_group: RoutingId, key: Key,
     checkpoint_id: CheckpointId, state: ByteSeq val)
@@ -289,7 +269,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     try
       let outgoing_msg = ChannelMsgEncoder.migrate_key(step_group, key,
         checkpoint_id, state, _worker_name, _auth)?
-      _tcp_thing.writev(outgoing_msg)
+      _tcp_handler.writev(outgoing_msg)
     else
       Fail()
     end
@@ -298,7 +278,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     try
       let migration_batch_complete_msg =
         ChannelMsgEncoder.migration_batch_complete(_worker_name, _auth)?
-      _tcp_thing.writev(migration_batch_complete_msg)
+      _tcp_handler.writev(migration_batch_complete_msg)
     else
       Fail()
     end
@@ -362,7 +342,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
       _add_to_upstream_backup(outgoing_msg)
 
       if _connection_initialized then
-        _tcp_thing.writev(outgoing_msg)
+        _tcp_handler.writev(outgoing_msg)
       else
         _unsent.push(outgoing_msg)
       end
@@ -413,7 +393,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _connection_initialized = true
     _replaying = false
     for msg in _unsent.values() do
-      _tcp_thing.writev(msg)
+      _tcp_handler.writev(msg)
     end
     _unsent.clear()
     _maybe_mute_or_unmute_upstreams()
@@ -426,7 +406,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     var cur_id = _lowest_queue_id
     for msg in _queue.values() do
       if cur_id >= idx then
-        _tcp_thing.writev(msg)
+        _tcp_handler.writev(msg)
       end
       cur_id = cur_id + 1
     end
@@ -446,10 +426,8 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     """
     @printf[I32]("Shutting down OutgoingBoundary\n".cstring())
     _unmute_upstreams()
-    //!@
-    // _no_more_reconnect = true
     _timers.dispose()
-    _tcp_thing.close()
+    _tcp_handler.close()
     _notify.dispose()
 
   be request_ack() =>
@@ -483,7 +461,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     try
       let msg = ChannelMsgEncoder.register_producer(_worker_name,
         source_id, target_id, _auth)?
-      _tcp_thing.writev(msg)
+      _tcp_handler.writev(msg)
     else
       Fail()
     end
@@ -496,7 +474,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     try
       let msg = ChannelMsgEncoder.unregister_producer(_worker_name,
         source_id, target_id, _auth)?
-      _tcp_thing.writev(msg)
+      _tcp_handler.writev(msg)
     else
       Fail()
     end
@@ -511,7 +489,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
 
   be report_status(code: ReportStatusCode) =>
     try
-      _tcp_thing.writev(ChannelMsgEncoder.report_status(code, _auth)?)
+      _tcp_handler.writev(ChannelMsgEncoder.report_status(code, _auth)?)
     else
       Fail()
     end
@@ -536,7 +514,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
       let msg = ChannelMsgEncoder.forward_barrier(target_routing_id,
         origin_routing_id, barrier_token, seq_id, _auth)?
       if _connection_initialized then
-        _tcp_thing.writev(msg)
+        _tcp_handler.writev(msg)
       else
         _unsent.push(msg)
       end
@@ -629,7 +607,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _mute_outstanding = false
 
   fun _can_send(): Bool =>
-    _tcp_thing.can_send() and
+    _tcp_handler.can_send() and
       not _replaying and
       not _backup_queue_is_overflowing()
 
@@ -637,25 +615,25 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   // TCP
   ///////////
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
-    _tcp_thing.event_notify(event, flags, arg, this)
+    _tcp_handler.event_notify(event, flags, arg, this)
 
   be write_again() =>
-    _tcp_thing.write_again()
+    _tcp_handler.write_again()
 
   be read_again() =>
-    _tcp_thing.read_again()
+    _tcp_handler.read_again()
 
   fun ref expect(qty: USize = 0) =>
-    _tcp_thing.expect(qty)
+    _tcp_handler.expect(qty)
 
   fun ref set_nodelay(state: Bool) =>
-    _tcp_thing.set_nodelay(state)
+    _tcp_handler.set_nodelay(state)
 
   fun ref close() =>
-    _tcp_thing.close()
+    _tcp_handler.close()
 
   fun ref _writev(data: ByteSeqIter) =>
-    _tcp_thing.writev(data)
+    _tcp_handler.writev(data)
 
   //!@ Come back and reevaluate where the methods below should go
   fun ref set_connection_not_initialized() =>
@@ -679,7 +657,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
       _reconnect_pause = _reconnect_pause * 2
     end
 
-    if (_host != "") and (_service != "") then //!@ and not _no_more_reconnect then
+    if (_host != "") and (_service != "") then
       @printf[I32]("OutgoingBoundary: Scheduling reconnect to %s at %s:%s\n"
         .cstring(), _target_worker.cstring(), _host.cstring(),
         _service.cstring())
@@ -690,7 +668,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   fun ref reset_reconnect_pause() =>
     _reconnect_pause = _initial_reconnect_pause
 
-trait TestableBoundaryNotify[T: TCPActor ref] is GeneralTCPNotify[T]
+trait TestableBoundaryNotify[T: TCPActor ref] is TCPHandlerNotify[T]
   fun ref update_address(host: String, service: String)
   fun ref register_routing_id(r_id: RoutingId)
 
@@ -788,8 +766,6 @@ class BoundaryNotify is TestableBoundaryNotify[OutgoingBoundary ref]
     @printf[I32]("BoundaryNotify: connected to %s at %s:%s...\n\n"
       .cstring(), _target_worker.cstring(), _host.cstring(),
       _service.cstring())
-    //!@
-    // This is a symptom of OutgoingBoundary overreaching
     conn.resend_producer_registrations()
     conn.reset_reconnect_pause()
     if _initial_connection_was_established then

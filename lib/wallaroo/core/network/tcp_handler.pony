@@ -22,9 +22,7 @@ trait TCPActor
   fun ref set_nodelay(state: Bool)
   fun ref close()
 
-
-///SHARED
-trait TestableTCPThing[T: TCPActor ref]
+trait TestableTCPHandler[T: TCPActor ref]
   fun ref connect(host: String, service: String, from: String,
     conn: TCPActor ref)
 
@@ -45,7 +43,7 @@ trait TestableTCPThing[T: TCPActor ref]
 
   fun ref set_nodelay(state: Bool)
 
-class EmptyTCPThing[T: TCPActor ref] is TestableTCPThing[T]
+class EmptyTCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
   fun ref connect(host: String, service: String, from: String,
     conn: TCPActor ref)
   =>
@@ -77,9 +75,9 @@ class EmptyTCPThing[T: TCPActor ref] is TestableTCPThing[T]
   fun ref set_nodelay(state: Bool) =>
     None
 
-class GeneralTCPThing[T: TCPActor ref] is TestableTCPThing[T]
+class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
   let _tcp_actor: T
-  let _notify: GeneralTCPNotify[T]
+  let _notify: TCPHandlerNotify[T]
   var _read_buf: Array[U8] iso
   var _next_size: USize
   let _max_size: USize
@@ -102,7 +100,7 @@ class GeneralTCPThing[T: TCPActor ref] is TestableTCPThing[T]
   var _muted: Bool = false
   var _expect_read_buf: Reader = Reader
 
-  new create(tcp_actor: T, notify: GeneralTCPNotify[T],
+  new create(tcp_actor: T, notify: TCPHandlerNotify[T],
     init_size: USize, max_size: USize)
   =>
     _tcp_actor = tcp_actor
@@ -552,7 +550,7 @@ class GeneralTCPThing[T: TCPActor ref] is TestableTCPThing[T]
 /*
 
 ///BOUNDARY
-class BoundaryNotify is GeneralTCPNotify[OutgoingBoundary]
+class BoundaryNotify is TCPHandlerNotify[OutgoingBoundary]
   fun ref connected(conn: OutgoingBoundary ref)
     """
     Called when we have successfully connected to the server.
@@ -563,16 +561,16 @@ class BoundaryNotify is GeneralTCPNotify[OutgoingBoundary]
 
 actor OutgoingBoundary is TCPActor
   let _notify: BoundaryNotify
-  let _tcp_thing: GeneralTCPThing[OutgoingBoundary]
+  let _tcp_thing: TCPHandler[OutgoingBoundary]
 
-  _tcp_thing = GeneralTCPThing[OutgoingBoundary](_notify)
+  _tcp_thing = TCPHandler[OutgoingBoundary](_notify)
 
 
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     _tcp_thing._event_notify(event, flags, arg, this)
 
 ///TCPSINK
-class TCPSinkNotify is GeneralTCPNotify[TCPSink]
+class TCPSinkNotify is TCPHandlerNotify[TCPSink]
   fun ref connected(conn: TCPSink ref)
     """
     Called when we have successfully connected to the server.
@@ -582,8 +580,8 @@ class TCPSinkNotify is GeneralTCPNotify[TCPSink]
 
 actor TCPSink is TCPActor
   let _notify: TCPSinkNotify
-  let _tcp_thing: GeneralTCPThing[TCPSink]
+  let _tcp_thing: TCPHandler[TCPSink]
 
-  _tcp_thing = GeneralTCPThing[TCPSink](_notify)
+  _tcp_thing = TCPHandler[TCPSink](_notify)
 
 */
