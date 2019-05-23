@@ -195,8 +195,8 @@ actor OutgoingBoundary is (Consumer & TCPActor)
         Fail()
       end
 
-      let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _routing_id,
-        seq_id, _auth)?
+      let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
+        _routing_id, seq_id, _auth)?
       _tcp_handler.writev(connect_msg)
     else
       Fail()
@@ -255,13 +255,15 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _reconnect()
 
   fun ref _reconnect() =>
-    @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" +
-      _service + "\n").cstring())
+    if not _tcp_handler.is_connected() then
+      @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" +
+        _service + "\n").cstring())
 
-    // set replaying to true since we might need to replay to
-    // downstream before resuming
-    _replaying = true
-    _tcp_handler.connect(_host, _service, _from, this)
+      // set replaying to true since we might need to replay to
+      // downstream before resuming
+      _replaying = true
+      _tcp_handler.connect(_host, _service, _from, this)
+    end
 
   be migrate_key(routing_id: RoutingId, step_group: RoutingId, key: Key,
     checkpoint_id: CheckpointId, state: ByteSeq val)
@@ -295,7 +297,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     key: Key, event_ts: U64, watermark_ts: U64, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    iseq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     // run() should never be called on an OutgoingBoundary
     Fail()
@@ -303,7 +305,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   fun ref process_message[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
     watermark_ts: U64, i_producer_id: RoutingId, i_producer: Producer,
-    msg_uid: MsgId, frac_ids: FractionalMessageId, iseq_id: SeqId,
+    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     // process_message() should never be called on an OutgoingBoundary
@@ -311,7 +313,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
 
   // TODO: open question: how do we reconnect if our external system goes away?
   be forward(delivery_msg: DeliveryMsg, pipeline_time_spent: U64,
-    i_producer_id: RoutingId, i_producer: Producer, iseq_id: SeqId,
+    i_producer_id: RoutingId, i_producer: Producer, i_seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     let metric_name = delivery_msg.metric_name()
@@ -502,8 +504,8 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   //////////////
   // BARRIER
   //////////////
-  be forward_barrier(target_routing_id: RoutingId, origin_routing_id: RoutingId,
-    barrier_token: BarrierToken)
+  be forward_barrier(target_routing_id: RoutingId,
+    origin_routing_id: RoutingId, barrier_token: BarrierToken)
   =>
     match barrier_token
     | let srt: CheckpointRollbackBarrierToken =>
@@ -566,7 +568,8 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   be update_worker_data_service(worker: WorkerName,
     host: String, service: String)
   =>
-    @printf[I32]("SLF: OutgoingBoundary.update_worker_data_service: %s -> %s %s\n".cstring(), worker.cstring(), host.cstring(), service.cstring())
+    @printf[I32]("OutgoingBoundary: update worker data service: %s -> %s %s\n"
+      .cstring(), worker.cstring(), host.cstring(), service.cstring())
     if worker != _target_worker then
       Fail()
     end
@@ -640,7 +643,6 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   fun ref _writev(data: ByteSeqIter) =>
     _tcp_handler.writev(data)
 
-  //!@ Come back and reevaluate where the methods below should go
   fun ref set_connection_not_initialized() =>
     _connection_initialized = false
 

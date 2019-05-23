@@ -23,6 +23,8 @@ trait TCPActor
   fun ref close()
 
 trait TestableTCPHandler[T: TCPActor ref]
+  fun is_connected(): Bool
+
   fun ref connect(host: String, service: String, from: String,
     conn: TCPActor ref)
 
@@ -44,6 +46,8 @@ trait TestableTCPHandler[T: TCPActor ref]
   fun ref set_nodelay(state: Bool)
 
 class EmptyTCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
+  fun is_connected(): Bool => false
+
   fun ref connect(host: String, service: String, from: String,
     conn: TCPActor ref)
   =>
@@ -108,6 +112,9 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
     _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
+
+  fun is_connected(): Bool =>
+    _connected
 
   fun ref connect(host: String, service: String, from: String,
     conn: TCPActor ref)
@@ -546,42 +553,3 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
       _throttled = false
       _notify.unthrottled(_tcp_actor)
     end
-
-/*
-
-///BOUNDARY
-class BoundaryNotify is TCPHandlerNotify[OutgoingBoundary]
-  fun ref connected(conn: OutgoingBoundary ref)
-    """
-    Called when we have successfully connected to the server.
-    """
-    conn.boundary_specific_method1()
-    conn.close()
-
-
-actor OutgoingBoundary is TCPActor
-  let _notify: BoundaryNotify
-  let _tcp_thing: TCPHandler[OutgoingBoundary]
-
-  _tcp_thing = TCPHandler[OutgoingBoundary](_notify)
-
-
-  be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
-    _tcp_thing._event_notify(event, flags, arg, this)
-
-///TCPSINK
-class TCPSinkNotify is TCPHandlerNotify[TCPSink]
-  fun ref connected(conn: TCPSink ref)
-    """
-    Called when we have successfully connected to the server.
-    """
-    conn.tcp_sink_specific_method1()
-
-
-actor TCPSink is TCPActor
-  let _notify: TCPSinkNotify
-  let _tcp_thing: TCPHandler[TCPSink]
-
-  _tcp_thing = TCPHandler[TCPSink](_notify)
-
-*/
