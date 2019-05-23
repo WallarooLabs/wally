@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../../../Makefile
+include ../../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times
@@ -34,14 +34,15 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
 # (and by recursion every makefile in the tree that is referenced)
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
 
-
 PASSTHROUGH_PONY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
 
 # standard rules generation makefile
 include $(rules_mk_path)
 
-integration-tests-examples-pony-passthrough: passthrough_pony_test
+integration-tests-testing-performance-apps-passthrough: passthrough_pony_test
 
 
 # end of prevent rules from being evaluated/included multiple times
 endif
+
