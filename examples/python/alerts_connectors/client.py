@@ -15,11 +15,11 @@ from wallaroo.experimental import (AtLeastOnceSourceConnector,
 
 
 hello = cwm.Hello("version", "cookie", "program", "instance")
-args = ['--application-module', 'celsius',
-        '--connector', 'celsius_feed',
-        '--celsius_feed-host', '127.0.0.1',
-        '--celsius_feed-port', '7100',
-        '--celsius_feed-timeout', '0.05']
+args = ['--application-module', 'alerts',
+        '--connector', 'alerts_feed',
+        '--alerts_feed-host', '127.0.0.1',
+        '--alerts_feed-port', '7100',
+        '--alerts_feed-timeout', '0.05']
 client = AtLeastOnceSourceConnector(
         args=args,
         required_params=['host', 'port'],

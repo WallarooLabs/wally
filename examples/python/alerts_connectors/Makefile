@@ -35,7 +35,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 
-CELSIUS_CONNECTOR_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+ALERTS_STATEFUL_CONNECTOR_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # standard rules generation makefile
 include $(rules_mk_path)

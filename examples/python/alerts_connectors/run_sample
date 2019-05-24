@@ -13,7 +13,7 @@ if sys.version_info.major == 2:
 else:
     import socketserver as SocketServer
 
-parser = argparse.ArgumentParser("Celsius Connectors Example")
+parser = argparse.ArgumentParser("Alerts Connectors Example")
 parser.add_argument('--command', default='machida')
 pargs, _ = parser.parse_known_args()
 machida = pargs.command
@@ -86,10 +86,10 @@ def terminate(_signal=None, _frame=None):
 
 sink = subprocess.Popen([
     "../../../connectors/udp_sink",
-    "--application-module", "celsius",
-    "--connector", "fahrenheit_conversion",
-    "--fahrenheit_conversion-host", "127.0.0.1",
-    "--fahrenheit_conversion-port", "8901"])
+    "--application-module", "alerts",
+    "--connector", "check_transaction",
+    "--check_transaction-host", "127.0.0.1",
+    "--check_transaction-port", "7200"])
 
 print("Ensuring connectors are initialized")
 time.sleep(1)
@@ -102,13 +102,14 @@ thread.start()
 try:
     wallaroo = subprocess.Popen([
         machida,
-        "--application-module", "celsius",
+        "--application-module", "alerts",
         "--metrics", "127.0.0.1:5001",
         "--control", "127.0.0.1:6000",
         "--data", "127.0.0.1:6001",
         "--name", "worker-name",
+        "--in", "127.0.0.1:7100",
         "--external", "127.0.0.1:5050",
-        "--cluster-initializer", "--run-with-resilience",
+        "--cluster-initializer",
         "--ponythreads=1", "--ponynoblock"])
 except:
     print("Unable to run %s. Has the wallaroo environment "
@@ -118,12 +119,12 @@ except:
 
 source = subprocess.Popen([
         "./at_least_once_feed",
-        "--application-module", "celsius",
-        "--connector", "celsius_feed",
-        "--celsius_feed-host", "127.0.0.1",
-        "--celsius_feed-port", "7100",
-        "--celsius_feed-timeout" "0.05",
-        "--celsius_feed-filenames", "celsius.msg,celsius.msg.2,celsius.msg.3"])
+        "--application-module", "alerts",
+        "--connector", "alerts_feed",
+        "--alerts_feed-host", "127.0.0.1",
+        "--alerts_feed-port", "7100",
+        "--alerts_feed-timeout" "0.05",
+        "--alerts_feed-filenames", "alerts.msg"])
 source.poll()
 if source.returncode or sink.returncode:
     terminate()
@@ -134,3 +135,4 @@ signal.signal(signal.SIGTERM, terminate)
 
 send_feed() ## hack
 terminate()
+
