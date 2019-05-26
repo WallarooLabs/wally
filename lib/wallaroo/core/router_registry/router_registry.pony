@@ -52,7 +52,11 @@ trait tag KeyRegistry
   be unregister_key(step_group: RoutingId, key: Key,
     checkpoint_id: (CheckpointId | None) = None)
 
-actor RouterRegistry is KeyRegistry
+trait tag ChannelListenerRegistry
+  be register_data_channel_listener(dchl: DataChannelListener)
+  be register_control_channel_listener(cchl: TCPListener)
+
+actor RouterRegistry is (KeyRegistry & ChannelListenerRegistry)
   let _self: RouterRegistry tag = this
 
   let _id: RoutingId
@@ -70,8 +74,6 @@ actor RouterRegistry is KeyRegistry
     _partition_routers.create()
   let _stateless_partition_routers: Map[RoutingId, StatelessPartitionRouter] =
     _stateless_partition_routers.create()
-  let _data_receiver_map: Map[WorkerName, DataReceiver] =
-    _data_receiver_map.create()
 
   // TODO: Remove this. This is here to be threaded to joining workers as
   // the primary checkpoint initiator worker. We need to enable this role to
@@ -115,7 +117,6 @@ actor RouterRegistry is KeyRegistry
     _data_channel_listeners.create()
   let _control_channel_listeners: SetIs[TCPListener] =
     _control_channel_listeners.create()
-  let _data_channels: SetIs[DataChannel] = _data_channels.create()
   // Boundary builders are used by new TCPSources to create their own
   // individual boundaries to other workers (to allow for increased
   // throughput).
@@ -193,7 +194,6 @@ actor RouterRegistry is KeyRegistry
     _stop_the_world_pause = stop_the_world_pause
     _connections.register_disposable(this)
     _id = (digestof this).u128()
-    _data_receivers.set_router_registry(this)
     _contacted_worker = contacted_worker
     _data_router =
       DataRouter(_worker_name, recover Map[RoutingId, Consumer] end,
@@ -337,10 +337,6 @@ actor RouterRegistry is KeyRegistry
       end
     end
 
-  be register_data_channel(dc: DataChannel) =>
-    // TODO: These need to be unregistered if they close
-    _data_channels.set(dc)
-
   be register_partition_router_subscriber(step_group: RoutingId,
     sub: _RouterSub)
   =>
@@ -462,9 +458,6 @@ actor RouterRegistry is KeyRegistry
       source.add_boundary_builders(new_boundary_builders_sendable)
     end
 
-  be register_data_receiver(worker: WorkerName, dr: DataReceiver) =>
-    _data_receiver_map(worker) = dr
-
   be register_key(step_group: RoutingId, key: Key,
     checkpoint_id: (CheckpointId | None) = None)
   =>
@@ -548,11 +541,6 @@ actor RouterRegistry is KeyRegistry
     end
 
   fun ref _remove_worker(worker: WorkerName) =>
-    try
-      _data_receiver_map.remove(worker)?
-    else
-      Fail()
-    end
     _distribute_boundary_removal(worker)
 
   fun ref _distribute_boundary_removal(worker: WorkerName) =>

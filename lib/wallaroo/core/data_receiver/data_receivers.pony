@@ -22,7 +22,6 @@ use "wallaroo/core/data_channel"
 use "wallaroo/core/metrics"
 use "wallaroo/core/network"
 use "wallaroo/core/recovery"
-use "wallaroo/core/router_registry"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
@@ -45,10 +44,6 @@ actor DataReceivers
   var _data_router: DataRouter
   let _subscribers: SetIs[DataReceiversSubscriber tag] = _subscribers.create()
 
-  var _router_registry: (RouterRegistry | None) = None
-
-  var _updated_data_router: Bool = false
-
   new create(auth: AmbientAuth, connections: Connections, worker_name: String,
     metrics_reporter: MetricsReporter iso, is_recovering: Bool = false)
   =>
@@ -64,9 +59,6 @@ actor DataReceivers
     if not _is_recovering then
       _initialized = true
     end
-
-  be set_router_registry(rr: RouterRegistry) =>
-    _router_registry = rr
 
   be subscribe(sub: DataReceiversSubscriber tag) =>
     _subscribers.set(sub)
@@ -96,12 +88,6 @@ actor DataReceivers
         let new_dr = DataReceiver(_auth, id, _worker_name, sender_name,
           _data_router, _metrics_reporter.clone(), _initialized,
           _is_recovering)
-        match _router_registry
-        | let rr: RouterRegistry =>
-          rr.register_data_receiver(sender_name, new_dr)
-        else
-          Fail()
-        end
         _data_receivers(boundary_id) = new_dr
         _connections.register_disposable(new_dr)
         new_dr
@@ -119,15 +105,6 @@ actor DataReceivers
     _data_router = dr
     for data_receiver in _data_receivers.values() do
       data_receiver.update_router(_data_router)
-    end
-    if not _updated_data_router then
-      match _router_registry
-      | let rr: RouterRegistry =>
-        rr.data_receivers_initialized()
-        _updated_data_router = true
-      else
-        Fail()
-      end
     end
 
   be rollback_barrier_complete(recovery: Recovery) =>

@@ -48,7 +48,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
   let _layout_initializer: LayoutInitializer tag
   let _data_receivers: DataReceivers
   let _recovery_replayer: RecoveryReconnecter
-  let _router_registry: RouterRegistry
+  let _channel_listener_registry: ChannelListenerRegistry
   let _the_journal: SimpleJournal
   let _do_local_file_io: Bool
   let _joining_existing_cluster: Bool
@@ -59,8 +59,8 @@ class DataChannelListenNotifier is DataChannelListenNotify
     recovery_file: FilePath,
     layout_initializer: LayoutInitializer tag,
     data_receivers: DataReceivers, recovery_replayer: RecoveryReconnecter,
-    router_registry: RouterRegistry, the_journal: SimpleJournal,
-    do_local_file_io: Bool, joining: Bool = false)
+    channel_listener_registry: ChannelListenerRegistry,
+    the_journal: SimpleJournal, do_local_file_io: Bool, joining: Bool = false)
   =>
     _name = name
     _auth = auth
@@ -71,7 +71,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
     _layout_initializer = layout_initializer
     _data_receivers = data_receivers
     _recovery_replayer = recovery_replayer
-    _router_registry = router_registry
+    _channel_listener_registry = channel_listener_registry
     _the_journal = the_journal
     _do_local_file_io = do_local_file_io
     _joining_existing_cluster = joining
@@ -84,7 +84,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
       if not _is_initializer then
         _connections.register_my_data_addr(_host, _service)
       end
-      _router_registry.register_data_channel_listener(listen)
+      _channel_listener_registry.register_data_channel_listener(listen)
 
       @printf[I32]((_name + " data channel: listening on " + _host + ":" +
         _service + "\n").cstring())
@@ -125,13 +125,11 @@ class DataChannelListenNotifier is DataChannelListenNotify
       h.cstring(), s.cstring())
     Fail()
 
-  fun ref connected(
-    listen: DataChannelListener ref,
-    router_registry: RouterRegistry): DataChannelNotify iso^
+  fun ref connected(listen: DataChannelListener ref): DataChannelNotify iso^
   =>
     DataChannelConnectNotifier(_connections, _auth,
     _metrics_reporter.clone(), _layout_initializer, _data_receivers,
-    _recovery_replayer, router_registry)
+    _recovery_replayer, _channel_listener_registry)
 
 class DataChannelConnectNotifier is DataChannelNotify
   let _connections: Connections
@@ -141,7 +139,7 @@ class DataChannelConnectNotifier is DataChannelNotify
   let _layout_initializer: LayoutInitializer tag
   let _data_receivers: DataReceivers
   let _recovery_replayer: RecoveryReconnecter
-  let _router_registry: RouterRegistry
+  let _channel_listener_registry: ChannelListenerRegistry
 
   let _queue: Array[Array[U8] val] = _queue.create()
 
@@ -153,7 +151,7 @@ class DataChannelConnectNotifier is DataChannelNotify
     metrics_reporter: MetricsReporter iso,
     layout_initializer: LayoutInitializer tag,
     data_receivers: DataReceivers, recovery_replayer: RecoveryReconnecter,
-    router_registry: RouterRegistry)
+    channel_listener_registry: ChannelListenerRegistry)
   =>
     _connections = connections
     _auth = auth
@@ -161,7 +159,7 @@ class DataChannelConnectNotifier is DataChannelNotify
     _layout_initializer = layout_initializer
     _data_receivers = data_receivers
     _recovery_replayer = recovery_replayer
-    _router_registry = router_registry
+    _channel_listener_registry = channel_listener_registry
     _receiver = _WaitingDataReceiver(_auth, this, _data_receivers)
 
   fun ref queue_msg(msg: Array[U8] val) =>
@@ -180,7 +178,7 @@ class DataChannelConnectNotifier is DataChannelNotify
     // State change to our real DataReceiver.
     _receiver = _DataReceiver(_auth, _connections, _metrics_reporter.clone(),
       _layout_initializer, _data_receivers, _recovery_replayer,
-      _router_registry, this, dr)
+      _channel_listener_registry, this, dr)
     dr.data_connect(sender_boundary_id, highest_seq_id, conn)
     for msg in _queue.values() do
       _receiver.decode_and_process(conn, msg)
@@ -273,7 +271,7 @@ class _DataReceiver is _DataReceiverWrapper
   let _layout_initializer: LayoutInitializer tag
   let _data_receivers: DataReceivers
   let _recovery_replayer: RecoveryReconnecter
-  let _router_registry: RouterRegistry
+  let _channel_listener_registry: ChannelListenerRegistry
   let _dccn: DataChannelConnectNotifier ref
   let _data_receiver: DataReceiver
 
@@ -281,7 +279,7 @@ class _DataReceiver is _DataReceiverWrapper
     metrics_reporter: MetricsReporter iso,
     layout_initializer: LayoutInitializer tag,
     data_receivers: DataReceivers, recovery_replayer: RecoveryReconnecter,
-    router_registry: RouterRegistry,
+    channel_listener_registry: ChannelListenerRegistry,
     dccn: DataChannelConnectNotifier ref, dr: DataReceiver)
   =>
     _auth = auth
@@ -290,7 +288,7 @@ class _DataReceiver is _DataReceiverWrapper
     _layout_initializer = layout_initializer
     _data_receivers = data_receivers
     _recovery_replayer = recovery_replayer
-    _router_registry = router_registry
+    _channel_listener_registry = channel_listener_registry
     _dccn = dccn
     _data_receiver = dr
 

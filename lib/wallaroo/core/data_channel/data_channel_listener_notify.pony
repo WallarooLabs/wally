@@ -58,8 +58,7 @@ interface DataChannelListenNotify
     """
     None
 
-  fun ref connected(listen: DataChannelListener ref,
-    router_registry: RouterRegistry): DataChannelNotify iso^ ?
+  fun ref connected(listen: DataChannelListener ref): DataChannelNotify iso^ ?
     """
     Create a new DataChannelNotify to attach to a new DataChannel for a
     newly established connection to the server.
