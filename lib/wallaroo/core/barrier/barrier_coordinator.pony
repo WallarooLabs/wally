@@ -171,6 +171,11 @@ actor BarrierCoordinator is Initializable
     _phase = _SourcePendingBarrierCoordinatorPhase(this)
     let promise = Promise[Source]
     promise.next[None](recover this~source_registration_complete() end)
+    // TODO: It's not clear if this is required and needs to be tested
+    // further. If it's doing anything at all, it's checking that sources
+    // have completed registering indirectly since every source currently
+    // simply completes the promise immediately upon receiving this behavior
+    // call.
     s.register_downstreams(promise)
 
   be source_registration_complete(s: Source) =>

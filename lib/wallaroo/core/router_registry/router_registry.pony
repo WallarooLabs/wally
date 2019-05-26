@@ -169,8 +169,6 @@ actor RouterRegistry is (KeyRegistry & ChannelListenerRegistry &
   var _joining_step_group_routing_ids:
     (Map[RoutingId, RoutingId] val | None) = None
 
-  var _event_log: (EventLog | None) = None
-
   var _initiated_stop_the_world: Bool = false
 
   // If this is a worker that joined during an autoscale event, then there
@@ -269,9 +267,6 @@ actor RouterRegistry is (KeyRegistry & ChannelListenerRegistry &
     pr: StatelessPartitionRouter)
   =>
     _stateless_partition_routers(partition_id) = pr
-
-  be set_event_log(e: EventLog) =>
-    _event_log = e
 
   be register_local_topology_initializer(lt: LocalTopologyInitializer) =>
     _local_topology_initializer = lt
@@ -594,12 +589,6 @@ actor RouterRegistry is (KeyRegistry & ChannelListenerRegistry &
     for source_coordinator in _source_coordinators.values() do
       source_coordinator.update_boundary_builders(boundary_builders_to_send)
     end
-
-  be producers_register_downstream(promise: Promise[None]) =>
-    for p in _producers.values() do
-      p.register_downstream()
-    end
-    promise(None)
 
   be report_status(code: ReportStatusCode) =>
     match code
