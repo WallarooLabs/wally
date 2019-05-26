@@ -61,7 +61,7 @@ actor Recovery
   let _recovery_reconnecter: RecoveryReconnecter
   let _checkpoint_initiator: CheckpointInitiator
   let _connections: Connections
-  let _router_registry: RouterRegistry
+  let _world_stopper_resumer: WorldStopperAndResumer
   var _initializer: (LocalTopologyInitializer | None) = None
   let _data_receivers: DataReceivers
   // The checkpoint id we are recovering to if we're recovering
@@ -70,7 +70,7 @@ actor Recovery
   new create(auth: AmbientAuth, worker_name: WorkerName, event_log: EventLog,
     recovery_reconnecter: RecoveryReconnecter,
     checkpoint_initiator: CheckpointInitiator, connections: Connections,
-    router_registry: RouterRegistry, data_receivers: DataReceivers,
+    world_stopper_resumer: WorldStopperAndResumer, data_receivers: DataReceivers,
     is_recovering: Bool)
   =>
     _auth = auth
@@ -79,7 +79,7 @@ actor Recovery
     _recovery_reconnecter = recovery_reconnecter
     _checkpoint_initiator = checkpoint_initiator
     _connections = connections
-    _router_registry = router_registry
+    _world_stopper_resumer = world_stopper_resumer
     _data_receivers = data_receivers
     _checkpoint_initiator.set_recovery(this)
 
@@ -93,7 +93,7 @@ actor Recovery
     with_reconnect: Bool = true)
   =>
     _workers = workers
-    _router_registry.stop_the_world()
+    _world_stopper_resumer.stop_the_world()
     _recovery_phase.start_recovery(_workers, this, with_reconnect)
 
   be recovery_reconnect_finished(abort_promise: (Promise[None] | None)) =>
@@ -286,7 +286,7 @@ actor Recovery
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery COMPLETE - ~~|\n".cstring())
     end
-    _router_registry.resume_the_world(_worker_name)
+    _world_stopper_resumer.resume_the_world(_worker_name)
     _data_receivers.recovery_complete()
     _recovery_phase = _FinishedRecovering
     match _initializer

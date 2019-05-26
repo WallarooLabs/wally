@@ -56,7 +56,14 @@ trait tag ChannelListenerRegistry
   be register_data_channel_listener(dchl: DataChannelListener)
   be register_control_channel_listener(cchl: TCPListener)
 
-actor RouterRegistry is (KeyRegistry & ChannelListenerRegistry)
+trait tag WorldStopperAndResumer
+  be stop_the_world(exclusions: Array[WorkerName] val =
+    recover Array[WorkerName] end)
+  be resume_the_world(initiator: WorkerName)
+
+
+actor RouterRegistry is (KeyRegistry & ChannelListenerRegistry &
+  WorldStopperAndResumer)
   let _self: RouterRegistry tag = this
 
   let _id: RoutingId
