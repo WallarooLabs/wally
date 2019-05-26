@@ -126,8 +126,7 @@ class _TestDataChannel is DataChannelListenNotify
       _h.fail_action("client create")
     end
 
-  fun ref connected(listen: DataChannelListener ref,
-    router_registry: RouterRegistry): DataChannelNotify iso^ ?
+  fun ref connected(listen: DataChannelListener ref): DataChannelNotify iso^ ?
   =>
     try
       let notify = (_server_conn_notify = None) as DataChannelNotify iso^
