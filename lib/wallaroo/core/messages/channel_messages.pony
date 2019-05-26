@@ -563,22 +563,6 @@ primitive ChannelMsgEncoder
     """
     _encode(AckRollbackLocalKeysMsg(sender, checkpoint_id), auth)?
 
-  fun register_producers(sender: WorkerName, auth: AmbientAuth):
-    Array[ByteSeq] val ?
-  =>
-    """
-    Sent to all workers in cluster by recovering worker.
-    """
-    _encode(RegisterProducersMsg(sender), auth)?
-
-  fun ack_register_producers(sender: WorkerName, auth: AmbientAuth):
-    Array[ByteSeq] val ?
-  =>
-    """
-    Sent to ack register producers.
-    """
-    _encode(AckRegisterProducersMsg(sender), auth)?
-
   fun rollback_barrier_fully_acked(token: CheckpointRollbackBarrierToken,
     sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -1736,18 +1720,6 @@ class val AckRollbackLocalKeysMsg is ChannelMsg
   new val create(sender': WorkerName, s_id: CheckpointId) =>
     sender = sender'
     checkpoint_id = s_id
-
-class val RegisterProducersMsg is ChannelMsg
-  let sender: WorkerName
-
-  new val create(sender': WorkerName) =>
-    sender = sender'
-
-class val AckRegisterProducersMsg is ChannelMsg
-  let sender: WorkerName
-
-  new val create(sender': WorkerName) =>
-    sender = sender'
 
 class val RollbackBarrierFullyAckedMsg is ChannelMsg
   let token: CheckpointRollbackBarrierToken

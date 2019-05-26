@@ -589,20 +589,6 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _recovery.receive_rollback_id(m.rollback_id)
       | let m: AckRollbackLocalKeysMsg =>
         _recovery.worker_ack_local_keys_rollback(m.sender, m.checkpoint_id)
-      | let m: RegisterProducersMsg =>
-        let promise = Promise[None]
-        promise.next[None]({(n: None) =>
-          try
-            let msg = ChannelMsgEncoder.ack_register_producers( _worker_name,
-              _auth)?
-            _connections.send_control(m.sender, msg)
-          else
-            Fail()
-          end
-        })
-        _router_registry.producers_register_downstream(promise)
-      | let m: AckRegisterProducersMsg =>
-        _recovery.worker_ack_register_producers(m.sender)
       | let m: RollbackBarrierFullyAckedMsg =>
         _recovery.rollback_barrier_fully_acked(m.token)
       | let m: EventLogInitiateRollbackMsg =>
