@@ -356,7 +356,7 @@ actor Startup
 
       let recovery_reconnecter = RecoveryReconnecter(auth,
         _startup_options.worker_name, d_service, data_receivers,
-        router_registry, connections, _is_recovering)
+        connections, _is_recovering)
 
       let recovery = Recovery(auth, _startup_options.worker_name,
         event_log, recovery_reconnecter, checkpoint_initiator, connections,
@@ -574,7 +574,7 @@ actor Startup
 
       let recovery_reconnecter = RecoveryReconnecter(auth,
         _startup_options.worker_name, _startup_options.my_d_service,
-        data_receivers, router_registry, connections)
+        data_receivers, connections)
 
       let recovery = Recovery(auth, _startup_options.worker_name,
         event_log, recovery_reconnecter, checkpoint_initiator, connections,

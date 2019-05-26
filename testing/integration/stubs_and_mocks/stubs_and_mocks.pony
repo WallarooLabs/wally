@@ -44,15 +44,24 @@ primitive TestOutputStepGenerator[V: (Hashable & Equatable[V] &
     Step(auth, "", RouterRunner(PassthroughPartitionerBuilder),
       _MetricsReporterGenerator(),
       1, _EventLogGenerator(auth), _RecoveryReconnecterGenerator(env, auth),
-      recover Map[String, OutgoingBoundary] end,
-      _RouterRegistryGenerator(env, auth), DirectRouter(0, oc))
+      recover Map[String, OutgoingBoundary] end, EmptyKeyRegistry,
+      DirectRouter(0, oc))
 
 primitive _StepGenerator
   fun apply(env: Env, auth: AmbientAuth): Step =>
     Step(auth, "", _RouterRunnerGenerator(), _MetricsReporterGenerator(),
       1, _EventLogGenerator(auth), _RecoveryReconnecterGenerator(env, auth),
-      recover Map[String, OutgoingBoundary] end,
-      _RouterRegistryGenerator(env, auth))
+      recover Map[String, OutgoingBoundary] end, EmptyKeyRegistry)
+
+actor EmptyKeyRegistry is KeyRegistry
+  be register_key(step_group: RoutingId, key: Key,
+    checkpoint_id: (CheckpointId | None) = None)
+  =>
+    None
+  be unregister_key(step_group: RoutingId, key: Key,
+    checkpoint_id: (CheckpointId | None) = None)
+  =>
+    None
 
 primitive _MetricsReporterGenerator
   fun apply(): MetricsReporter iso^ =>
@@ -65,7 +74,7 @@ primitive _EventLogGenerator
 primitive _RecoveryReconnecterGenerator
   fun apply(env: Env, auth: AmbientAuth): RecoveryReconnecter =>
     RecoveryReconnecter(auth, "", "", _DataReceiversGenerator(env, auth),
-      _RouterRegistryGenerator(env, auth), _Cluster)
+      _Cluster)
 
 primitive _DataReceiversGenerator
   fun apply(env: Env, auth: AmbientAuth): DataReceivers =>
@@ -79,14 +88,15 @@ primitive _ConnectionsGenerator
       where event_log = _EventLogGenerator(auth, "w1"),
       the_journal = SimpleJournalNoop)
 
-primitive _RouterRegistryGenerator
-  fun apply(env: Env, auth: AmbientAuth): RouterRegistry =>
-    RouterRegistry(auth, "", _DataReceiversGenerator(env, auth),
-      _ConnectionsGenerator(env, auth),
-      _DummyRecoveryFileCleaner, 0,
-      false, "", _BarrierCoordinatorGenerator(env, auth),
-      _CheckpointInitiatorGenerator(env, auth),
-      _AutoscaleInitiatorGenerator(env, auth))
+//!@
+// primitive _RouterRegistryGenerator
+//   fun apply(env: Env, auth: AmbientAuth): RouterRegistry =>
+//     RouterRegistry(auth, "", _DataReceiversGenerator(env, auth),
+//       _ConnectionsGenerator(env, auth),
+//       _DummyRecoveryFileCleaner, 0,
+//       false, "", _BarrierCoordinatorGenerator(env, auth),
+//       _CheckpointInitiatorGenerator(env, auth),
+//       _AutoscaleInitiatorGenerator(env, auth))
 
 primitive _BarrierCoordinatorGenerator
   fun apply(env: Env, auth: AmbientAuth): BarrierCoordinator =>

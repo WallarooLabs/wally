@@ -46,7 +46,13 @@ use "wallaroo_labs/string_set"
 
 type _RouterSub is (BoundaryUpdatable & RouterUpdatable)
 
-actor RouterRegistry
+trait tag KeyRegistry
+  be register_key(step_group: RoutingId, key: Key,
+    checkpoint_id: (CheckpointId | None) = None)
+  be unregister_key(step_group: RoutingId, key: Key,
+    checkpoint_id: (CheckpointId | None) = None)
+
+actor RouterRegistry is KeyRegistry
   let _self: RouterRegistry tag = this
 
   let _id: RoutingId

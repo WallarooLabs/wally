@@ -56,7 +56,6 @@ actor RecoveryReconnecter
   let _steps: SetIs[Step] = _steps.create()
 
   let _data_receivers: DataReceivers
-  let _router_registry: RouterRegistry
   let _cluster: Cluster
   var _recovery: (Recovery | None) = None
 
@@ -67,14 +66,13 @@ actor RecoveryReconnecter
     _reconnected_boundaries.create()
 
   new create(auth: AmbientAuth, worker_name: WorkerName, data_service: String,
-    data_receivers: DataReceivers, router_registry: RouterRegistry,
-    cluster: Cluster, is_recovering: Bool = false)
+    data_receivers: DataReceivers, cluster: Cluster,
+    is_recovering: Bool = false)
   =>
     _worker_name = worker_name
     _data_service = data_service
     _auth = auth
     _data_receivers = data_receivers
-    _router_registry = router_registry
     _cluster = cluster
     if is_recovering then
       _reconnect_phase = _AwaitingRecoveryReconnectStart(this)
