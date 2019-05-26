@@ -78,7 +78,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
 
-  let _router_registry: RouterRegistry
+  let _key_registry: KeyRegistry
 
   // Watermarks
   var _watermarks: StageWatermarks = _watermarks.create()
@@ -90,7 +90,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     id: U128, event_log: EventLog,
     recovery_replayer: RecoveryReconnecter,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    router_registry: RouterRegistry,
+    key_registry: KeyRegistry,
     router': Router = EmptyRouter, is_recovering: Bool = false)
   =>
     _auth = auth
@@ -103,7 +103,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     _event_log = event_log
     _recovery_replayer = recovery_replayer
     _recovery_replayer.register_step(this)
-    _router_registry = router_registry
+    _key_registry = key_registry
     _id = id
 
     for (worker, boundary) in outgoing_boundaries.pairs() do
@@ -441,10 +441,10 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
 
   fun ref register_key(step_group: RoutingId, key: Key) =>
-    _router_registry.register_key(step_group, key)
+    _key_registry.register_key(step_group, key)
 
   fun ref unregister_key(step_group: RoutingId, key: Key) =>
-    _router_registry.unregister_key(step_group, key)
+    _key_registry.unregister_key(step_group, key)
 
   //////////////
   // BARRIER
