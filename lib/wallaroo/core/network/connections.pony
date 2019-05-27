@@ -163,7 +163,7 @@ actor Connections is Cluster
 
   be make_and_register_recoverable_data_channel_listener(auth: TCPListenerAuth,
     notifier: DataChannelListenNotify iso,
-    channel_listener_registry: ChannelListenerRegistry,
+    router_registry: RouterRegistry,
     recovery_addr_file: FilePath val,
     host: String val = "", port: String val = "0")
   =>
@@ -177,7 +177,7 @@ actor Connections is Cluster
         @printf[I32]("Restarting a data channel listener on %s:%s...\n\n"
           .cstring(), host'.cstring(), port'.cstring())
         let dch_listener = DataChannelListener(auth, consume notifier,
-          channel_listener_registry, consume host', consume port')
+          router_registry, consume host', consume port')
         _register_disposable(dch_listener)
       else
         @printf[I32](("could not recover host and port from file (replace " +
@@ -185,14 +185,14 @@ actor Connections is Cluster
       end
     else
       let dch_listener = DataChannelListener(auth, consume notifier,
-        channel_listener_registry, host, port)
+        router_registry, host, port)
       _register_disposable(dch_listener)
     end
 
   be create_initializer_data_channel_listener(
     data_receivers: DataReceivers,
     recovery_replayer: RecoveryReconnecter,
-    channel_listener_registry: ChannelListenerRegistry,
+    router_registry: RouterRegistry,
     cluster_initializer: ClusterInitializer, data_channel_file: FilePath,
     layout_initializer: LayoutInitializer tag)
   =>
@@ -201,13 +201,11 @@ actor Connections is Cluster
         _is_initializer,
         MetricsReporter(_app_name, _worker_name, _metrics_conn),
         data_channel_file, layout_initializer, data_receivers,
-        recovery_replayer, channel_listener_registry, _the_journal,
-        _do_local_file_io)
+        recovery_replayer, router_registry, _the_journal, _do_local_file_io)
     // TODO: we need to get the init and max sizes from OS max
     // buffer size
     let dch_listener = DataChannelListener(_auth, consume data_notifier,
-      channel_listener_registry, _init_d_host, _init_d_service, 0, 1_048_576,
-      1_048_576)
+      router_registry, _init_d_host, _init_d_service, 0, 1_048_576, 1_048_576)
     _register_disposable(dch_listener)
 
     cluster_initializer.identify_data_address("initializer", _init_d_host,
