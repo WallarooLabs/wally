@@ -22,6 +22,7 @@ use "wallaroo/core/data_channel"
 use "wallaroo/core/metrics"
 use "wallaroo/core/network"
 use "wallaroo/core/recovery"
+use "wallaroo/core/step"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 

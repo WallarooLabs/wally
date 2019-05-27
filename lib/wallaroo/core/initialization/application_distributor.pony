@@ -101,7 +101,7 @@ actor ApplicationDistributor is Distributor
 
       // Traverse graph from sinks to sources, moving any key_by stages back
       // to immediate upstream nodes.
-      let interm_graph = Dag[StepInitializer]
+      let interm_graph = Dag[ExecutionStageBuilder]
 
       let frontier = Array[U128]
       let processed = SetIs[U128]
@@ -184,7 +184,7 @@ actor ApplicationDistributor is Distributor
               // For each node we try to coalesce onto, we need to check that
               // it has only one input. For now, we can only coalesce a
               // linear pipeline of stateless computations.
-              var inputs = Array[DagNode[Stage] val]
+              var inputs = Array[DagNode[LogicalStage] val]
               for n in node.ins() do
                 inputs.push(n)
               end

@@ -1,6 +1,6 @@
 /*
 
-Copyright 2019 The Wallaroo Authors.
+Copyright 2018 The Wallaroo Authors.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -16,22 +16,18 @@ Copyright 2019 The Wallaroo Authors.
 
 */
 
-"""
-# Wallaroo Standard Library
-
-This package represents the integration test suite for Wallaroo.
-
-All tests can be run by compiling and running this package.
-"""
 use "ponytest"
-use barrier_protocol = "barrier_protocol"
+use "promises"
+use "wallaroo/core/aggregations"
+use "wallaroo/core/common"
+use "wallaroo/core/state"
+use "wallaroo/core/topology"
+use "wallaroo_labs/time"
+
 
 actor Main is TestList
-  new create(env: Env) =>
-    PonyTest(env, this)
-
-  new make() =>
-    None
-
+  new create(env: Env) => PonyTest(env, this)
+  new make() => None
   fun tag tests(test: PonyTest) =>
-    barrier_protocol.Main.make().tests(test)
+    _TestStepBarrierProtocol.make().tests(test)
+    _TestStepSeqIdGenerator.make().tests(test)

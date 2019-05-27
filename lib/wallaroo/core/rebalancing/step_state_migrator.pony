@@ -19,9 +19,10 @@ Copyright 2018 The Wallaroo Authors.
 use "collections"
 use "serialise"
 use "wallaroo/core/boundary"
-use "wallaroo/core/common"
-use "wallaroo/core/topology"
 use "wallaroo/core/checkpoint"
+use "wallaroo/core/common"
+use "wallaroo/core/step"
+use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
 primitive StepStateMigrator

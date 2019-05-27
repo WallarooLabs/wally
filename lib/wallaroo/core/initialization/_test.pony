@@ -64,7 +64,7 @@ actor Main is TestList
 //     h.assert_eq[Bool](true, base_topology == target_topology)
 
 // primitive _BaseLocalTopologyGenerator
-//   fun apply(dag: Dag[StepInitializer] val,
+//   fun apply(dag: Dag[ExecutionStageBuilder] val,
 //     psd: Array[PreStateData] val,
 //     pf: PartitionFunction[String] val,
 //     rb: RunnerBuilder): LocalTopology
@@ -78,7 +78,7 @@ actor Main is TestList
 //       0)
 
 // primitive _TargetLocalTopologyGenerator
-//   fun apply(dag: Dag[StepInitializer] val,
+//   fun apply(dag: Dag[ExecutionStageBuilder] val,
 //     psd: Array[PreStateData] val,
 //     pf: PartitionFunction[String] val,
 //     rb: RunnerBuilder): LocalTopology
@@ -92,8 +92,8 @@ actor Main is TestList
 //       0)
 
 // primitive _DagGenerator
-//   fun apply(): Dag[StepInitializer] val =>
-//     Dag[StepInitializer]
+//   fun apply(): Dag[ExecutionStageBuilder] val =>
+//     Dag[ExecutionStageBuilder]
 
 // primitive _StepMapGenerator
 //   fun apply(): Map[U128, (ProxyAddress | U128)] val =>

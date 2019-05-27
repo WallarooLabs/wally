@@ -36,4 +36,3 @@ actor Main is TestList
 
   fun tag tests(test: PonyTest) =>
     _TestRouterEquality.make().tests(test)
-    _TestStepSeqIdGenerator.make().tests(test)
