@@ -180,12 +180,13 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
                 f.write(log_stream.getvalue())
 
         # Save ops log data to file
-        with open(os.path.join(base_dir, "ops.log"), "w") as ops_log:
-            try:
-                for op in persistent_data['ops']:
-                    ops_log.write("{}\n".format(op))
-            except KeyError:
-                None
+        if persistent_data.get('ops', None):
+            with open(os.path.join(base_dir, "ops.log"), "w") as ops_log:
+                try:
+                    for op in persistent_data['ops']:
+                        ops_log.write("{}\n".format(op))
+                except KeyError:
+                    None
 
         # save worker data to files
         runner_data = persistent_data.get('runner_data', [])

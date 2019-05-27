@@ -49,11 +49,16 @@ integration-tests-testing-correctness-apps-window_detector: window_detector_test
 
 
 # single name space for testing
+window_detector_tests: window_detector_tests_pony
 window_detector_tests: window_detector_tests_python
 window_detector_tests: window_detector_tests_python3
 
 # group the tests by target API (Pony, Python, Python3)
+
 # Pony
+window_detector_tests_pony: window_detector_tumbling_test_pony
+window_detector_tests_pony: window_detector_counting_test_pony
+window_detector_tests_pony: window_detector_sliding_test_pony
 
 # Python
 window_detector_tests_python: window_detector_tumbling_test_python
@@ -80,6 +85,49 @@ window_detector_tests_python3: window_detector_sliding_alo_source_test_python3
 
 # Individual test definitions below
 #
+# Pony tests
+window_detector_tumbling_test_pony:
+	cd $(WINDOW_DETECTOR_PATH) && \
+	integration_test \
+		--sequence-sender '(0,100]' Detector '>I' key_0 \
+		--sequence-sender '(0,100]' Detector '>I' key_1 \
+		--log-level $(LOGLEVEL) \
+		--command './window_detector --window-type tumbling $(RUN_WITH_RESILIENCE)' \
+		--validation-cmd 'python _validate.py --window-type tumbling --output' \
+		--output 'received.txt' \
+		--batch-size 50 \
+		--workers 5 \
+		--sink-await-key key_0 100 \
+		--sink-await-key key_1 100
+
+window_detector_counting_test_pony:
+	cd $(WINDOW_DETECTOR_PATH) && \
+	integration_test \
+		--sequence-sender '(0,100]' Detector '>I' key_0 \
+		--sequence-sender '(0,100]' Detector '>I' key_1 \
+		--log-level $(LOGLEVEL) \
+		--command './window_detector --window-type counting $(RUN_WITH_RESILIENCE)' \
+		--validation-cmd 'python _validate.py --window-type counting --output' \
+		--output 'received.txt' \
+		--batch-size 50 \
+		--workers 5 \
+		--sink-await-key key_0 100 \
+		--sink-await-key key_1 100
+
+window_detector_sliding_test_pony:
+	cd $(WINDOW_DETECTOR_PATH) && \
+	integration_test \
+		--sequence-sender '(0,100]' Detector '>I' key_0 \
+		--sequence-sender '(0,100]' Detector '>I' key_1 \
+		--log-level $(LOGLEVEL) \
+		--command './window_detector --window-type sliding $(RUN_WITH_RESILIENCE)' \
+		--validation-cmd 'python _validate.py --window-type sliding --output' \
+		--output 'received.txt' \
+		--batch-size 50 \
+		--workers 5 \
+		--sink-await-key key_0 100 \
+		--sink-await-key key_1 100
+
 # Python tests
 window_detector_tumbling_alo_source_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
