@@ -38,6 +38,8 @@ def application_setup(args):
     parser.add_argument("--window-slide", type=int, default=25,
                         help=("Window slide size, in milliseconds. "
                               "(Default: 25)"))
+    parser.add_argument("--window-policy", default="drop",
+                        choices=["drop", "fire-per-message"])
     parser.add_argument("--source", choices=['tcp', 'gensource', 'alo'],
                          default='tcp',
                          help=("Choose source type for resilience tests. "

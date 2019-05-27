@@ -135,11 +135,12 @@ class SingleSocketReceiver(StoppableThread):
 
 
 class MultiClientStreamView(object):
-    def __init__(self, initial_streams):
+    def __init__(self, initial_streams, blocking=True):
         self.streams = {s.name: s.accumulator for s in initial_streams}
         self.positions = {s.name: 0 for s in initial_streams}
         self.keys = list(self.positions.keys())
         self.key_position = 0
+        self.blocking = blocking
 
     def add_stream(self, stream):
         if stream.name in self.streams:
@@ -173,8 +174,11 @@ class MultiClientStreamView(object):
                 self.positions[cur] += 1
                 return val
             elif self.key_position == origin:
-                # sleep after a full round on all keys produces no value
-                time.sleep(0.001)
+                if self.blocking:
+                    # sleep after a full round on all keys produces no value
+                    time.sleep(0.001)
+                else:
+                    return None
             # implicit:  continue
 
 class TCPReceiver(StoppableThread):
@@ -308,8 +312,8 @@ class TCPReceiver(StoppableThread):
             for cl in self.clients:
                 cl.stop()
 
-    def view(self):
-        view = MultiClientStreamView(self.clients)
+    def view(self, blocking=True):
+        view = MultiClientStreamView(self.clients, blocking=blocking)
         self.views.append(view)
         return view
 
@@ -467,6 +471,7 @@ class Sender(StoppableThread):
             if not self.stopped():
                 logging.info("Waiting 1 second before retrying...")
                 time.sleep(1)
+        self.sock.close()
 
     def maybe_stop(self):
         if not self.batch:
@@ -661,9 +666,9 @@ def iter_generator(items,
     for val in items:
         if on_next:
             on_next(val)
-        byt = to_bytes(val)  # bite->bit, so byte->byt ;)
-        yield struct.pack(header_fmt, len(byt))
-        yield byt
+        bs = to_bytes(val)
+        yield struct.pack(header_fmt, len(bs))
+        yield bs
 
 
 def files_generator(files, mode='framed', header_fmt='>I', on_next=None):
