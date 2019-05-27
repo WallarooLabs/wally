@@ -58,16 +58,16 @@ primitive Wallaroo
     CountWindowsBuilder(where count = count)
 
 trait BasicPipeline
-  fun graph(): this->Dag[Stage]
+  fun graph(): this->Dag[LogicalStage]
   fun is_finished(): Bool
   fun size(): USize
   fun worker_source_configs(): this->Map[SourceName, WorkerSourceConfig]
 
-type Stage is (RunnerBuilder | SinkBuilder | Array[SinkBuilder] val |
+type LogicalStage is (RunnerBuilder | SinkBuilder | Array[SinkBuilder] val |
   SourceConfigWrapper | RandomPartitionerBuilder | KeyPartitionerBuilder)
 
 class Pipeline[Out: Any val] is BasicPipeline
-  let _stages: Dag[Stage]
+  let _stages: Dag[LogicalStage]
   let _dag_sink_ids: Array[RoutingId]
   var _worker_source_configs: Map[SourceName, WorkerSourceConfig] =
     _worker_source_configs.create()
@@ -80,7 +80,7 @@ class Pipeline[Out: Any val] is BasicPipeline
   var _local_routing: Bool
 
   new from_source(n: String, source_config: TypedSourceConfig[Out]) =>
-    _stages = Dag[Stage]
+    _stages = Dag[LogicalStage]
     _dag_sink_ids = Array[RoutingId]
     _finished = false
     _last_is_shuffle = false
@@ -92,7 +92,7 @@ class Pipeline[Out: Any val] is BasicPipeline
     _worker_source_configs.update(sc_wrapper.name(),
       source_config.worker_source_config())
 
-  new create(stages: Dag[Stage] = Dag[Stage],
+  new create(stages: Dag[LogicalStage] = Dag[LogicalStage],
     dag_sink_ids: Array[RoutingId] = Array[RoutingId],
     worker_source_configs': Map[SourceName, WorkerSourceConfig],
     local_routing: Bool,
@@ -246,7 +246,7 @@ class Pipeline[Out: Any val] is BasicPipeline
   fun ref local_collect(): Pipeline[Out] =>
     collect(where local_routing = true)
 
-  fun graph(): this->Dag[Stage] => _stages
+  fun graph(): this->Dag[LogicalStage] => _stages
 
   fun worker_source_configs(): this->Map[SourceName, WorkerSourceConfig] =>
     _worker_source_configs

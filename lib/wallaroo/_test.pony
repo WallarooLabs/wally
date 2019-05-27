@@ -29,6 +29,7 @@ use data_channel = "core/data_channel"
 use initialization = "core/initialization"
 use recovery = "core/recovery"
 use spike = "core/spike"
+use step = "core/step"
 use topology = "core/topology"
 use windows = "core/windows"
 
@@ -45,5 +46,6 @@ actor Main is TestList
     initialization.Main.make().tests(test)
     recovery.Main.make().tests(test)
     spike.Main.make().tests(test)
+    step.Main.make().tests(test)
     topology.Main.make().tests(test)
     windows.Main.make().tests(test)

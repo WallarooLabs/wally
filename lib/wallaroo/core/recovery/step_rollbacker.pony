@@ -18,6 +18,7 @@ Copyright 2018 The Wallaroo Authors.
 
 use "buffered"
 use "wallaroo/core/common"
+use "wallaroo/core/step"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 

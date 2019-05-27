@@ -42,6 +42,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
 use "wallaroo/core/source/barrier_source"
+use "wallaroo/core/step"
 use "wallaroo/core/topology"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/dag"
@@ -55,7 +56,7 @@ use "wallaroo/core/source/connector_source"
 class val LocalTopology
   let _app_name: String
   let _worker_name: WorkerName
-  let _graph: Dag[StepInitializer] val
+  let _graph: Dag[ExecutionStageBuilder] val
   // A map from node ids in the graph to one or more routing ids per node,
   // depending on the parallelism.
   let _routing_ids: Map[U128, SetIs[RoutingId] val] val
@@ -68,7 +69,7 @@ class val LocalTopology
   let barrier_source_id: RoutingId
 
   new val create(name': String, worker_name': WorkerName,
-    graph': Dag[StepInitializer] val,
+    graph': Dag[ExecutionStageBuilder] val,
     routing_ids': Map[U128, SetIs[RoutingId] val] val,
     worker_names': Array[WorkerName] val,
     non_shrinkable': SetIs[WorkerName] val,
@@ -92,7 +93,7 @@ class val LocalTopology
   fun routing_ids(): Map[U128, SetIs[RoutingId] val] val =>
     _routing_ids
 
-  fun graph(): Dag[StepInitializer] val =>
+  fun graph(): Dag[ExecutionStageBuilder] val =>
     _graph
 
   fun name(): String =>
@@ -506,7 +507,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         //
         // ASSUMPTION: Acyclic graph
         /////////
-        let nodes_to_initialize = Array[DagNode[StepInitializer] val]
+        let nodes_to_initialize = Array[DagNode[ExecutionStageBuilder] val]
 
         //////////////////////////////////////////////////////////////////////
         // 1. Find graph sinks and add to nodes to initialize queue.
@@ -515,7 +516,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         //    initialization queue in waves, starting with all sinks, followed
         //    by all inputs to those sinks, followed by all inputs to those
         //    inputs, etc. until we get to the sources.
-        let frontier = Array[DagNode[StepInitializer] val]
+        let frontier = Array[DagNode[ExecutionStageBuilder] val]
 
         @printf[I32]("Adding sink nodes to nodes to initialize\n".cstring())
         for sink_node in graph.sinks() do
@@ -567,7 +568,7 @@ actor LocalTopologyInitializer is LayoutInitializer
             @printf[I32](("Initializing " + next_node.value.name() + " node\n")
               .cstring())
 
-            let next_initializer: StepInitializer = next_node.value
+            let next_initializer: ExecutionStageBuilder = next_node.value
 
             ///////////////////////////////////////////////////////////////////
             // Determine if the next initializer is for a step, sink, or source
@@ -1034,7 +1035,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
     steps
 
-  fun _is_ready_for_building(node: DagNode[StepInitializer] val,
+  fun _is_ready_for_building(node: DagNode[ExecutionStageBuilder] val,
     built_routers: Map[U128, Router]): Bool
   =>
     var is_ready = true
@@ -1043,7 +1044,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
     is_ready
 
-  fun _get_output_node_ids(node: DagNode[StepInitializer] val):
+  fun _get_output_node_ids(node: DagNode[ExecutionStageBuilder] val):
     Array[RoutingId] val ?
   =>
     // Make sure this is not a sink or proxy node.

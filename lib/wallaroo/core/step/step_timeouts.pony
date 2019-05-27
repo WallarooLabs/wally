@@ -19,6 +19,7 @@ Copyright 2018 The Wallaroo Authors.
 use "time"
 use "wallaroo/core/common"
 use "wallaroo/core/metrics"
+use "wallaroo/core/topology"
 use "wallaroo/core/windows"
 
 

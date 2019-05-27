@@ -36,7 +36,7 @@ class iso _TestNewIncrementsByOne is UnitTest
   Verify that calling new_id() results in an increase of 1
   """
   fun name(): String =>
-    "step_seq_id_generator/new_increments_by_one"
+    "step/seq_id_generator/new_increments_by_one"
 
   fun ref apply(h: TestHelper) =>
     let gen = StepSeqIdGenerator
@@ -51,7 +51,7 @@ class iso _TestCurrentAfterNew is UnitTest
   Verify calling `current_seq_id` after `new_id` results in the same id.
   """
   fun name(): String =>
-    "step_seq_id_generator/current_after_new"
+    "step/seq_id_generator/current_after_new"
 
   fun ref apply(h: TestHelper) =>
     let gen = StepSeqIdGenerator
@@ -68,7 +68,7 @@ class iso _TestCurrentDoesNotIncrement is UnitTest
   if the generator has never had `new_id()` called on it before.
   """
   fun name(): String =>
-    "step_seq_id_generator/current_doesnt_increment"
+    "step/seq_id_generator/current_doesnt_increment"
 
   fun ref apply(h: TestHelper) =>
     let gen = StepSeqIdGenerator
@@ -84,7 +84,7 @@ class iso _TestCurrentWithoutNew is UnitTest
   "run" and verify that the ids are the same.
   """
   fun name(): String =>
-    "step_seq_id_generator/current_without_new"
+    "step/seq_id_generator/current_without_new"
 
   fun ref apply(h: TestHelper) =>
     let gen = StepSeqIdGenerator
@@ -101,7 +101,7 @@ class iso _TestCurrentWithNew is UnitTest
   `new_id`.
   """
   fun name(): String =>
-    "step_seq_id_generator/current_with_new"
+    "step/seq_id_generator/current_with_new"
 
   fun ref apply(h: TestHelper) =>
     let gen = StepSeqIdGenerator

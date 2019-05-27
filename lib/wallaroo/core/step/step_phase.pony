@@ -25,6 +25,7 @@ use "wallaroo/core/invariant"
 use "wallaroo/core/metrics"
 use "wallaroo/core/rebalancing"
 use "wallaroo/core/recovery"
+use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
 

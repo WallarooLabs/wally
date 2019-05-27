@@ -22,12 +22,13 @@ use "wallaroo_labs/collection_helpers"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/data_receiver"
-use "wallaroo/core/network"
-use "wallaroo/core/router_registry"
-use "wallaroo_labs/mort"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
+use "wallaroo/core/network"
+use "wallaroo/core/router_registry"
+use "wallaroo/core/step"
 use "wallaroo/core/topology"
+use "wallaroo_labs/mort"
 
 
 actor RecoveryReconnecter
