@@ -50,11 +50,11 @@ actor DataChannelListener
   let _requested_host: String
   let _requested_service: String
 
-  let _channel_listener_registry: ChannelListenerRegistry
+  let _router_registry: RouterRegistry
 
   new create(auth: DataChannelListenerAuth,
     notify: DataChannelListenNotify iso,
-    channel_listener_registry: ChannelListenerRegistry,
+    router_registry: RouterRegistry,
     host: String = "", service: String = "0", limit: USize = 0,
     init_size: USize = 64, max_size: USize = 16384)
   =>
@@ -63,7 +63,7 @@ actor DataChannelListener
     """
     _requested_host = host
     _requested_service = service
-    _channel_listener_registry = channel_listener_registry
+    _router_registry = router_registry
     _limit = limit
     _notify = consume notify
     _event = @pony_os_listen_tcp[AsioEventID](this,
@@ -184,8 +184,9 @@ actor DataChannelListener
     Spawn a new connection.
     """
     try
-      let data_channel = DataChannel._accept(this, _notify.connected(this)?,
-        ns, _init_size, _max_size)
+      let data_channel = DataChannel._accept(this, _notify.connected(this,
+        _router_registry)?, ns, _init_size, _max_size)
+      _router_registry.register_data_channel(data_channel)
       _count = _count + 1
     else
       @pony_os_socket_close[None](ns)
