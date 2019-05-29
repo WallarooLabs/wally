@@ -39,16 +39,12 @@ trait tag LayoutInitializer
 
   be all_workers_ready_to_work()
 
-  be receive_immigrant_key(msg: KeyMigrationMsg)
-
   be update_boundaries(bs: Map[String, OutgoingBoundary] val,
     bbs: Map[String, OutgoingBoundaryBuilder] val)
 
   be create_data_channel_listener(ws: Array[String] val,
     host: String, service: String,
     cluster_initializer: (ClusterInitializer | None) = None)
-
-  be ack_migration_batch_complete(sender: String)
 
   be rollback_local_keys(checkpoint_id: CheckpointId,
     promise: Promise[None])

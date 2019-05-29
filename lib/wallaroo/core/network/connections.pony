@@ -22,23 +22,24 @@ use "files"
 use "net"
 use "serialise"
 use "time"
-use "wallaroo_labs/messages"
 use "wallaroo"
+use "wallaroo/core/autoscale"
 use "wallaroo/core/boundary"
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
+use "wallaroo/core/data_receiver"
 use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/source"
 use "wallaroo/core/source/connector_source"
-use "wallaroo/core/topology"
-use "wallaroo/core/data_receiver"
 use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
-use "wallaroo/core/checkpoint"
 use "wallaroo/core/spike"
+use "wallaroo/core/topology"
 use "wallaroo_labs/collection_helpers"
+use "wallaroo_labs/messages"
 use "wallaroo_labs/mort"
 
 
@@ -192,6 +193,7 @@ actor Connections is Cluster
   be create_initializer_data_channel_listener(
     data_receivers: DataReceivers,
     recovery_replayer: RecoveryReconnecter,
+    autoscale: Autoscale,
     router_registry: RouterRegistry,
     cluster_initializer: ClusterInitializer, data_channel_file: FilePath,
     layout_initializer: LayoutInitializer tag)
@@ -201,7 +203,8 @@ actor Connections is Cluster
         _is_initializer,
         MetricsReporter(_app_name, _worker_name, _metrics_conn),
         data_channel_file, layout_initializer, data_receivers,
-        recovery_replayer, router_registry, _the_journal, _do_local_file_io)
+        recovery_replayer, autoscale, router_registry, _the_journal,
+        _do_local_file_io)
     // TODO: we need to get the init and max sizes from OS max
     // buffer size
     let dch_listener = DataChannelListener(_auth, consume data_notifier,
@@ -761,15 +764,15 @@ actor Connections is Cluster
       true
     end
 
-  be ack_migration_batch_complete(ack_target: String) =>
+  be worker_completed_migration_batch(ack_target: String) =>
     """
     Called when this worker has just joined and it needs to ack to sender_name
     that immigration of a batch is complete
     """
     try
-      let ack_migration_batch_complete_msg =
-        ChannelMsgEncoder.ack_migration_batch_complete(_worker_name, _auth)?
-      _control_conns(ack_target)?.writev(ack_migration_batch_complete_msg)
+      let worker_completed_migration_batch_msg =
+        ChannelMsgEncoder.worker_completed_migration_batch(_worker_name, _auth)?
+      _control_conns(ack_target)?.writev(worker_completed_migration_batch_msg)
     else
       Fail()
     end

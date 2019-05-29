@@ -509,7 +509,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
   //////////////
   // AUTOSCALE
   /////////////
-  be begin_join_migration(joining_workers: Array[WorkerName] val) =>
+  be begin_grow_migration(joining_workers: Array[WorkerName] val) =>
     @printf[I32]("ConnectorSourceCoordinator completed join migration.\n"
       .cstring())
     _router_registry.source_coordinator_migration_complete(this)

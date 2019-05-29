@@ -222,16 +222,16 @@ actor _TestRouterEquality is TestList
 //       _DummyRecoveryFileCleaner, 0,
 //       false, "", _BarrierCoordinatorGenerator(env, auth),
 //       _CheckpointInitiatorGenerator(env, auth),
-//       _AutoscaleInitiatorGenerator(env, auth))
+//       _AutoscaleBarrierInitiatorGenerator(env, auth))
 
 // primitive _BarrierCoordinatorGenerator
 //   fun apply(env: Env, auth: AmbientAuth): BarrierCoordinator =>
 //     BarrierCoordinator(auth, "w", _ConnectionsGenerator(env, auth),
 //       "init")
 
-// primitive _AutoscaleInitiatorGenerator
-//   fun apply(env: Env, auth: AmbientAuth): AutoscaleInitiator =>
-//     AutoscaleInitiator("w", _BarrierCoordinatorGenerator(env, auth))
+// primitive _AutoscaleBarrierInitiatorGenerator
+//   fun apply(env: Env, auth: AmbientAuth): AutoscaleBarrierInitiator =>
+//     AutoscaleBarrierInitiator("w", _BarrierCoordinatorGenerator(env, auth))
 
 // primitive _CheckpointInitiatorGenerator
 //   fun apply(env: Env, auth: AmbientAuth): CheckpointInitiator =>

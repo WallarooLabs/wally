@@ -23,25 +23,27 @@ use "net"
 use "promises"
 use "serialise"
 use "wallaroo"
-use "wallaroo/core/boundary"
-use "wallaroo/core/common"
-use "wallaroo/core/keys"
+use "wallaroo/core/autoscale"
 use "wallaroo/core/barrier"
-use "wallaroo/core/data_receiver"
-use "wallaroo/core/cluster_manager"
-use "wallaroo/core/network"
-use "wallaroo/core/recovery"
-use "wallaroo/core/router_registry"
+use "wallaroo/core/boundary"
 use "wallaroo/core/checkpoint"
+use "wallaroo/core/cluster_manager"
+use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
-use "wallaroo/core/partitioning"
+use "wallaroo/core/data_receiver"
 use "wallaroo/core/invariant"
+use "wallaroo/core/keys"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
+use "wallaroo/core/network"
+use "wallaroo/core/partitioning"
+use "wallaroo/core/recovery"
+use "wallaroo/core/router_registry"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
 use "wallaroo/core/source/barrier_source"
+use "wallaroo/core/source/connector_source"
 use "wallaroo/core/step"
 use "wallaroo/core/topology"
 use "wallaroo_labs/collection_helpers"
@@ -51,7 +53,7 @@ use "wallaroo_labs/messages"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/queue"
 use "wallaroo_labs/string_set"
-use "wallaroo/core/source/connector_source"
+
 
 class val LocalTopology
   let _app_name: String
@@ -219,6 +221,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   let _env: Env
   let _auth: AmbientAuth
   let _connections: Connections
+  let _autoscale: Autoscale
   let _router_registry: RouterRegistry
   let _metrics_conn: MetricsSink
   let _data_receivers: DataReceivers
@@ -273,7 +276,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   var _t: USize = 0
 
   new create(app_name: String, worker_name: WorkerName, env: Env,
-    auth: AmbientAuth, connections: Connections,
+    auth: AmbientAuth, connections: Connections, autoscale: Autoscale,
     router_registry: RouterRegistry, metrics_conn: MetricsSink,
     is_initializer: Bool, data_receivers: DataReceivers,
     event_log: EventLog, recovery: Recovery,
@@ -292,6 +295,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _env = env
     _auth = auth
     _connections = connections
+    _autoscale = autoscale
     _router_registry = router_registry
     _metrics_conn = metrics_conn
     _is_initializer = is_initializer
@@ -350,7 +354,7 @@ actor LocalTopologyInitializer is LayoutInitializer
             MetricsReporter(_app_name, _worker_name,
               _metrics_conn),
             data_channel_filepath, this, _data_receivers, _recovery_replayer,
-            _router_registry, _the_journal, _do_local_file_io)
+            _autoscale, _router_registry, _the_journal, _do_local_file_io)
 
         _connections.make_and_register_recoverable_data_channel_listener(
           _auth, consume data_notifier, _router_registry,
@@ -359,8 +363,8 @@ actor LocalTopologyInitializer is LayoutInitializer
         match cluster_initializer
           | let ci: ClusterInitializer =>
             _connections.create_initializer_data_channel_listener(
-              _data_receivers, _recovery_replayer, _router_registry, ci,
-              data_channel_filepath, this)
+              _data_receivers, _recovery_replayer, _autoscale,
+              _router_registry, ci, data_channel_filepath, this)
         end
       end
     else
@@ -1221,7 +1225,7 @@ actor LocalTopologyInitializer is LayoutInitializer
             MetricsReporter(_app_name, _worker_name,
               _metrics_conn),
             data_channel_filepath, this, _data_receivers, _recovery_replayer,
-            _router_registry, _the_journal, _do_local_file_io)
+            _autoscale, _router_registry, _the_journal, _do_local_file_io)
 
         _connections.make_and_register_recoverable_data_channel_listener(
           _auth, consume data_notifier, _router_registry,
@@ -1230,8 +1234,8 @@ actor LocalTopologyInitializer is LayoutInitializer
         match cluster_initializer
         | let ci: ClusterInitializer =>
           _connections.create_initializer_data_channel_listener(
-            _data_receivers, _recovery_replayer, _router_registry, ci,
-            data_channel_filepath, this)
+            _data_receivers, _recovery_replayer, _autoscale, _router_registry,
+            ci, data_channel_filepath, this)
         end
       end
     else
@@ -1344,12 +1348,6 @@ actor LocalTopologyInitializer is LayoutInitializer
         + " None").cstring())
     end
 
-  be receive_immigrant_key(msg: KeyMigrationMsg) =>
-    _router_registry.receive_immigrant_key(msg)
-
-  be ack_migration_batch_complete(sender: String) =>
-    _router_registry.ack_migration_batch_complete(sender)
-
   be worker_join(conn: TCPConnection, joining_worker_name: String,
     joining_worker_count: USize)
   =>
@@ -1362,7 +1360,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     | let t: LocalTopology =>
       let current_worker_count = t.worker_names.size()
       let new_t = local_topology_for_joining_worker(t, joining_worker_name)
-      _router_registry.worker_join(conn, joining_worker_name,
+      _autoscale.worker_join(conn, joining_worker_name,
         joining_worker_count, new_t, current_worker_count)
     else
       Fail()
@@ -1376,7 +1374,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   =>
     let new_workers = recover iso Array[WorkerName] end
     for w in control_addrs.keys() do new_workers.push(w) end
-    _router_registry.connect_to_joining_workers(consume new_workers,
+    _autoscale.connect_to_joining_workers(consume new_workers,
       new_step_group_routing_ids, coordinator)
 
     for w in control_addrs.keys() do
@@ -1437,7 +1435,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     if target_workers.size() > 0 then
       if _are_valid_shrink_candidates(target_workers) then
         let remaining_workers = _remove_worker(target_workers)
-        _router_registry.inject_shrink_autoscale_barrier(remaining_workers,
+        _autoscale.inject_shrink_autoscale_barrier(remaining_workers,
           target_workers)
         let reply = ExternalMsgEncoder.shrink_error_response(
           "Shrinking by " + target_workers.size().string() + " workers!")
@@ -1459,7 +1457,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       end
       if candidates.size() > 0 then
         let remaining_workers = _remove_worker(candidates)
-        _router_registry.inject_shrink_autoscale_barrier(remaining_workers,
+        _autoscale.inject_shrink_autoscale_barrier(remaining_workers,
           candidates)
         let reply = ExternalMsgEncoder.shrink_error_response(
           "Shrinking by " + candidates.size().string() + " workers!")
@@ -1481,7 +1479,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     leaving_workers: Array[WorkerName] val)
   =>
     _remove_worker(leaving_workers)
-    _router_registry.inject_shrink_autoscale_barrier(remaining_workers,
+    _autoscale.inject_shrink_autoscale_barrier(remaining_workers,
       leaving_workers)
 
   be prepare_shrink(remaining_workers: Array[WorkerName] val,
@@ -1535,7 +1533,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _add_boundary(w, boundary, builder)
     _router_registry.register_boundaries(_outgoing_boundaries,
       _outgoing_boundary_builders)
-    _router_registry.joining_worker_initialized(w, step_group_routing_ids)
+    _autoscale.joining_worker_initialized(w, step_group_routing_ids)
 
   fun ref _remove_worker(ws: Array[WorkerName] val): Array[WorkerName] val =>
     match _topology

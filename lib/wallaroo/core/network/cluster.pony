@@ -57,5 +57,5 @@ trait tag Cluster
   be inform_worker_of_boundary_count(target_worker: String, count: USize) =>
     None
 
-  be ack_migration_batch_complete(ack_target: String) =>
+  be worker_completed_migration_batch(ack_target: String) =>
     None

@@ -96,11 +96,11 @@ class _TestDataChannel is DataChannelListenNotify
       let b_initiator = BarrierCoordinator(auth, worker_name, conns, "init")
       let s_initiator = CheckpointInitiator(auth, "", "", conns, 0, event_log,
         b_initiator, "", SimpleJournalNoop, false)
-      let a_initiator = AutoscaleInitiator(worker_name, b_initiator,
+      let a_initiator = AutoscaleBarrierInitiator(worker_name, b_initiator,
         s_initiator)
       let rr = RouterRegistry(auth, worker_name, dr, conns,
         _DummyRecoveryFileCleaner, 1, false, "",
-        b_initiator, s_initiator, a_initiator)
+        b_initiator, s_initiator)
       h.dispose_when_done(DataChannelListener(auth, consume this, rr))
       h.dispose_when_done(conns)
       h.complete_action("server create")
@@ -126,8 +126,7 @@ class _TestDataChannel is DataChannelListenNotify
       _h.fail_action("client create")
     end
 
-  fun ref connected(listen: DataChannelListener ref,
-    router_registry: RouterRegistry): DataChannelNotify iso^ ?
+  fun ref connected(listen: DataChannelListener ref): DataChannelNotify iso^ ?
   =>
     try
       let notify = (_server_conn_notify = None) as DataChannelNotify iso^

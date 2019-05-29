@@ -20,21 +20,23 @@ use "buffered"
 use "collections"
 use "time"
 use "files"
-use "wallaroo_labs/bytes"
-use "wallaroo_labs/time"
-use "wallaroo/core/boundary"
-use "wallaroo/core/common"
+use "wallaroo/core/autoscale"
 use "wallaroo/core/barrier"
+use "wallaroo/core/boundary"
+use "wallaroo/core/checkpoint"
+use "wallaroo/core/common"
 use "wallaroo/core/data_receiver"
+use "wallaroo/core/initialization"
+use "wallaroo/core/messages"
+use "wallaroo/core/metrics"
 use "wallaroo/core/network"
 use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
-use "wallaroo/core/checkpoint"
-use "wallaroo_labs/mort"
-use "wallaroo/core/messages"
-use "wallaroo/core/metrics"
 use "wallaroo/core/topology"
-use "wallaroo/core/initialization"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/mort"
+use "wallaroo_labs/time"
+
 
 class DataChannelListenNotifier is DataChannelListenNotify
   let _name: String
@@ -48,6 +50,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
   let _layout_initializer: LayoutInitializer tag
   let _data_receivers: DataReceivers
   let _recovery_replayer: RecoveryReconnecter
+  let _autoscale: Autoscale
   let _router_registry: RouterRegistry
   let _the_journal: SimpleJournal
   let _do_local_file_io: Bool
@@ -59,6 +62,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
     recovery_file: FilePath,
     layout_initializer: LayoutInitializer tag,
     data_receivers: DataReceivers, recovery_replayer: RecoveryReconnecter,
+    autoscale: Autoscale,
     router_registry: RouterRegistry, the_journal: SimpleJournal,
     do_local_file_io: Bool, joining: Bool = false)
   =>
@@ -71,6 +75,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
     _layout_initializer = layout_initializer
     _data_receivers = data_receivers
     _recovery_replayer = recovery_replayer
+    _autoscale = autoscale
     _router_registry = router_registry
     _the_journal = the_journal
     _do_local_file_io = do_local_file_io
@@ -125,13 +130,10 @@ class DataChannelListenNotifier is DataChannelListenNotify
       h.cstring(), s.cstring())
     Fail()
 
-  fun ref connected(
-    listen: DataChannelListener ref,
-    router_registry: RouterRegistry): DataChannelNotify iso^
-  =>
+  fun ref connected(listen: DataChannelListener ref): DataChannelNotify iso^ =>
     DataChannelConnectNotifier(_connections, _auth,
     _metrics_reporter.clone(), _layout_initializer, _data_receivers,
-    _recovery_replayer, router_registry)
+    _recovery_replayer, _autoscale, _router_registry)
 
 class DataChannelConnectNotifier is DataChannelNotify
   let _connections: Connections
@@ -141,6 +143,7 @@ class DataChannelConnectNotifier is DataChannelNotify
   let _layout_initializer: LayoutInitializer tag
   let _data_receivers: DataReceivers
   let _recovery_replayer: RecoveryReconnecter
+  let _autoscale: Autoscale
   let _router_registry: RouterRegistry
 
   let _queue: Array[Array[U8] val] = _queue.create()
@@ -153,7 +156,7 @@ class DataChannelConnectNotifier is DataChannelNotify
     metrics_reporter: MetricsReporter iso,
     layout_initializer: LayoutInitializer tag,
     data_receivers: DataReceivers, recovery_replayer: RecoveryReconnecter,
-    router_registry: RouterRegistry)
+    autoscale: Autoscale, router_registry: RouterRegistry)
   =>
     _connections = connections
     _auth = auth
@@ -161,6 +164,7 @@ class DataChannelConnectNotifier is DataChannelNotify
     _layout_initializer = layout_initializer
     _data_receivers = data_receivers
     _recovery_replayer = recovery_replayer
+    _autoscale = autoscale
     _router_registry = router_registry
     _receiver = _WaitingDataReceiver(_auth, this, _data_receivers)
 
@@ -179,7 +183,7 @@ class DataChannelConnectNotifier is DataChannelNotify
     """
     // State change to our real DataReceiver.
     _receiver = _DataReceiver(_auth, _connections, _metrics_reporter.clone(),
-      _layout_initializer, _data_receivers, _recovery_replayer,
+      _layout_initializer, _data_receivers, _recovery_replayer, _autoscale,
       _router_registry, this, dr)
     dr.data_connect(sender_boundary_id, highest_seq_id, conn)
     for msg in _queue.values() do
@@ -273,6 +277,7 @@ class _DataReceiver is _DataReceiverWrapper
   let _layout_initializer: LayoutInitializer tag
   let _data_receivers: DataReceivers
   let _recovery_replayer: RecoveryReconnecter
+  let _autoscale: Autoscale
   let _router_registry: RouterRegistry
   let _dccn: DataChannelConnectNotifier ref
   let _data_receiver: DataReceiver
@@ -281,7 +286,7 @@ class _DataReceiver is _DataReceiverWrapper
     metrics_reporter: MetricsReporter iso,
     layout_initializer: LayoutInitializer tag,
     data_receivers: DataReceivers, recovery_replayer: RecoveryReconnecter,
-    router_registry: RouterRegistry,
+    autoscale: Autoscale, router_registry: RouterRegistry,
     dccn: DataChannelConnectNotifier ref, dr: DataReceiver)
   =>
     _auth = auth
@@ -290,6 +295,7 @@ class _DataReceiver is _DataReceiverWrapper
     _layout_initializer = layout_initializer
     _data_receivers = data_receivers
     _recovery_replayer = recovery_replayer
+    _autoscale = autoscale
     _router_registry = router_registry
     _dccn = dccn
     _data_receiver = dr
@@ -320,16 +326,12 @@ class _DataReceiver is _DataReceiverWrapper
       ifdef "trace" then
         @printf[I32]("Received KeyMigrationMsg on Data Channel\n".cstring())
       end
-      _layout_initializer.receive_immigrant_key(km)
+      _router_registry.receive_immigrant_key(km)
     | let m: MigrationBatchCompleteMsg =>
       ifdef "trace" then
         @printf[I32]("Received MigrationBatchCompleteMsg on Data Channel\n".cstring())
       end
-      // Go through layout_initializer and router_registry to make sure
-      // pending messages on registry are processed first. That's because
-      // the current message path for receiving immigrant steps is
-      // layout_initializer then router_registry.
-      _layout_initializer.ack_migration_batch_complete(m.sender_name)
+      _autoscale.worker_completed_migration_batch(m.sender_name)
     | let aw: AckDataReceivedMsg =>
       ifdef "trace" then
         @printf[I32]("Received AckDataReceivedMsg on Data Channel\n"

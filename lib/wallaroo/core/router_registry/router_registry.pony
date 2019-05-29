@@ -69,7 +69,6 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
   let _recovery_file_cleaner: RecoveryFileCleaner
   let _barrier_coordinator: BarrierCoordinator
   let _checkpoint_initiator: CheckpointInitiator
-  let _autoscale_initiator: AutoscaleInitiator
   var _data_router: DataRouter
   var _local_keys: Map[RoutingId, StringSet] = _local_keys.create()
   let _partition_routers: Map[RoutingId, StatePartitionRouter] =
@@ -179,11 +178,6 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
     is_joining: Bool, initializer_name: WorkerName,
     barrier_coordinator: BarrierCoordinator,
     checkpoint_initiator: CheckpointInitiator,
-    autoscale_initiator: AutoscaleInitiator,
-    // TODO: Only a joining worker has workers available to pass in here
-    // which it needs to initialize Autoscale. We should probably
-    // refactor this.
-    workers: (Array[WorkerName] val | None) = None,
     contacted_worker: (WorkerName | None) = None)
   =>
     _auth = auth
@@ -193,7 +187,6 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
     _recovery_file_cleaner = recovery_file_cleaner
     _barrier_coordinator = barrier_coordinator
     _checkpoint_initiator = checkpoint_initiator
-    _autoscale_initiator = autoscale_initiator
     _stop_the_world_pause = stop_the_world_pause
     _connections.register_disposable(this)
     _id = (digestof this).u128()
@@ -204,8 +197,6 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
         recover Map[RoutingId, Array[Step] val] end,
         recover Map[RoutingId, RoutingId] end)
     _initializer_name = initializer_name
-    _autoscale = Autoscale(_auth, _worker_name, this, _connections, is_joining,
-      workers)
 
   fun _worker_count(): USize =>
     _outgoing_boundaries.size() + 1
@@ -249,6 +240,9 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
         Fail()
       end
     end
+
+  be set_autoscale(a: Autoscale) =>
+    _autoscale = a
 
   be set_data_router(dr: DataRouter) =>
     _data_router = dr
@@ -627,7 +621,28 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
     let promises = Promises[None].join(ps.values())
     promises.next[None]({(_: None) => promise(None)})
 
-  fun ref clean_shutdown() =>
+  // TODO: How should we handle this pattern? This is where we send a promise
+  // to retrieve a value that we need before we can continue processing. Pub
+  // sub doesn't work in cases where we need to ensure we have the latest
+  // value at certain point.
+  be list_producers(promise: Promise[SetIs[Producer] val]) =>
+    let ps: SetIs[Producer] iso = recover SetIs[Producer] end
+    for p in _producers.values() do
+      ps.set(p)
+    end
+    promise(consume ps)
+
+  be list_boundaries(promise: Promise[Map[WorkerName, OutgoingBoundary] val])
+  =>
+    let bs: Map[WorkerName, OutgoingBoundary] iso =
+      recover Map[WorkerName, OutgoingBoundary] end
+    for (w, b) in _outgoing_boundaries.pairs() do
+      bs(w) = b
+    end
+    promise(consume bs)
+
+  // !TODO!: This probably shouldn't be here.
+  be clean_shutdown() =>
     _recovery_file_cleaner.clean_shutdown()
 
   // TODO: Move management of stop the world to another actor
@@ -662,26 +677,13 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
     _mute_request(_worker_name)
     _connections.stop_the_world(exclusions)
 
-  fun ref initiate_stop_the_world_for_grow_migration(
+  be initiate_stop_the_world_for_grow_migration(
     new_workers: Array[WorkerName] val)
   =>
     _initiated_stop_the_world = true
-    try
-      let msg = ChannelMsgEncoder.initiate_stop_the_world_for_join_migration(
-        _worker_name, new_workers, _auth)?
-      _connections.send_control_to_cluster_with_exclusions(msg, new_workers)
-    else
-      Fail()
-    end
     _stop_the_world_for_grow_migration(new_workers)
 
-    let promise = Promise[None]
-    promise.next[None]({(_: None) =>
-      _self.join_autoscale_barrier_complete()})
-    _autoscale_initiator.initiate_autoscale(promise
-      where joining_workers = new_workers)
-
-  fun ref stop_the_world_for_grow_migration(
+  be stop_the_world_for_grow_migration(
     new_workers: Array[WorkerName] val)
   =>
     """
@@ -701,27 +703,14 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
       .cstring())
     _stop_the_world(exclusions)
 
-  fun ref initiate_stop_the_world_for_shrink_migration(
+  be initiate_stop_the_world_for_shrink_migration(
     remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
     _initiated_stop_the_world = true
-    try
-      let msg = ChannelMsgEncoder.initiate_stop_the_world_for_shrink_migration(
-        _worker_name, remaining_workers, leaving_workers, _auth)?
-      _connections.send_control_to_cluster(msg)
-    else
-      Fail()
-    end
     _stop_the_world_for_shrink_migration()
 
-    let promise = Promise[None]
-    promise.next[None]({(_: None) =>
-      _self.shrink_autoscale_barrier_complete()})
-    _autoscale_initiator.initiate_autoscale(promise
-      where leaving_workers = leaving_workers)
-
-  fun ref stop_the_world_for_shrink_migration(
+  be stop_the_world_for_shrink_migration(
     remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
@@ -736,13 +725,19 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
       .cstring())
     _stop_the_world()
 
+  // !TODO!: Currently we are conflating autoscale with the more general
+  // stop and resume the world protocol. These need to be disentangled.
   fun ref _try_resume_the_world() =>
     if _initiated_stop_the_world then
-      let promise = Promise[None]
-      promise.next[None]({(_: None) => _self.initiate_autoscale_complete()})
-      _autoscale_initiator.initiate_autoscale_resume_acks(promise)
+      try
+        (_autoscale as Autoscale).ready_to_resume_the_world()
+      else
+        Fail()
+      end
 
       // We are done with this round of leaving workers
+      //!TODO!: RouterRegistry shouldn't know about autoscale-specific
+      // concepts.
       _leaving_workers = recover Array[WorkerName] end
     end
 
@@ -840,59 +835,7 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
   /////////////////////////////////////////////////////////////////////////////
   // JOINING WORKER
   /////////////////////////////////////////////////////////////////////////////
-  be worker_join(conn: TCPConnection, worker: WorkerName,
-    worker_count: USize, local_topology: LocalTopology,
-    current_worker_count: USize)
-  =>
-    try
-      (_autoscale as Autoscale).worker_join(conn, worker, worker_count,
-        local_topology, current_worker_count)
-    else
-      Fail()
-    end
-
-  fun ref request_checkpoint_id_for_autoscale() =>
-    let promise = Promise[(CheckpointId, RollbackId)]
-    promise.next[None](_self~update_checkpoint_id_for_autoscale())
-    _checkpoint_initiator.lookup_checkpoint_id(promise)
-
-  be update_checkpoint_id_for_autoscale(ids: (CheckpointId, RollbackId)) =>
-    try
-      (_autoscale as Autoscale).update_checkpoint_id(ids._1, ids._2)
-    else
-      Fail()
-    end
-
-  be join_autoscale_barrier_complete() =>
-    try
-      (_autoscale as Autoscale).grow_autoscale_barrier_complete()
-    else
-      Fail()
-    end
-
-  be connect_to_joining_workers(ws: Array[WorkerName] val,
-    new_step_group_routing_ids:
-      Map[WorkerName, Map[RoutingId, RoutingId] val] val,
-    coordinator: WorkerName)
-  =>
-    try
-      (_autoscale as Autoscale).connect_to_joining_workers(ws, coordinator)
-    else
-      Fail()
-    end
-
-  be joining_worker_initialized(worker: WorkerName,
-    step_group_routing_ids: Map[RoutingId, RoutingId] val)
-  =>
-    _add_joining_worker_to_routers(worker, step_group_routing_ids)
-    try
-      (_autoscale as Autoscale).joining_worker_initialized(worker,
-        step_group_routing_ids)
-    else
-      Fail()
-    end
-
-  fun ref _add_joining_worker_to_routers(worker: WorkerName,
+  be add_joining_worker_to_routers(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
   =>
     for (sg_rid, w_rid) in step_group_routing_ids.pairs() do
@@ -927,13 +870,8 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
       end
     end
 
-  fun inform_joining_worker(conn: TCPConnection, worker: WorkerName,
-    local_topology: LocalTopology, checkpoint_id: CheckpointId,
-    rollback_id: RollbackId)
-  =>
-    _connections.inform_joining_worker(conn, worker, local_topology,
-      checkpoint_id, rollback_id, _initializer_name)
-
+  // Called if we are the joining worker and we need to announce we're
+  // initialized
   be inform_contacted_worker_of_initialization(
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
   =>
@@ -971,100 +909,28 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
       source.reconnect_boundary(target_worker)
     end
 
-  be pre_register_joining_workers(ws: Array[WorkerName] val) =>
-    try
-      (_autoscale as Autoscale).pre_register_joining_workers(ws)
-    else
-      Fail()
-    end
-
-  be producer_acked_registering(p: Producer) =>
-    try
-      (_autoscale as Autoscale).producer_acked_registering(p)
-    else
-      Fail()
-    end
-
-  be boundary_acked_registering(b: OutgoingBoundary) =>
-    try
-      (_autoscale as Autoscale).boundary_acked_registering(b)
-    else
-      Fail()
-    end
-
-
   /////////////////////////////////////////////////////////////////////////////
   // NEW WORKER PARTITION MIGRATION
   /////////////////////////////////////////////////////////////////////////////
-  be report_connected_to_joining_worker(connected_worker: WorkerName) =>
-    try
-      (_autoscale as Autoscale).worker_connected_to_joining_workers(
-        connected_worker)
-    else
-      Fail()
-    end
 
-  be remote_stop_the_world_for_join_migration_request(coordinator: WorkerName,
-    joining_workers: Array[WorkerName] val)
-  =>
-    """
-    Only one worker is contacted by all joining workers to indicate that a
-    join is requested. That worker, when it's ready to stop the world in
-    preparation for migration, sends a message to all other current workers,
-    telling them to it's time to stop the world. This behavior is called when
-    that message is received.
-    """
-    try
-      (_autoscale as Autoscale).stop_the_world_for_join_migration_initiated(
-        coordinator, joining_workers)
-    else
-      Fail()
-    end
-
-  be remote_join_migration_request(joining_workers: Array[WorkerName] val,
-    checkpoint_id: CheckpointId)
-  =>
-    """
-    Only one worker is contacted by all joining workers to indicate that a
-    join is requested. That worker, when it's ready to begin step migration,
-    then sends a message to all other current workers, telling them to begin
-    migration to the joining workers as well. This behavior is called when
-    that message is received.
-    """
-    if not ArrayHelpers[WorkerName].contains[WorkerName](joining_workers,
-      _worker_name)
-    then
-      try
-        (_autoscale as Autoscale).join_migration_initiated(joining_workers,
-          checkpoint_id)
-      else
-        Fail()
-      end
-    end
-
-  be initiate_autoscale_complete() =>
-    try
-      (_autoscale as Autoscale).autoscale_complete()
-    else
-      Fail()
-    end
-    _resume_all_remote()
-    _resume_the_world(_worker_name)
-
-  be autoscale_complete() =>
-    try
-      (_autoscale as Autoscale).autoscale_complete()
-    else
-      Fail()
-    end
-
-  be prepare_join_migration(target_workers: Array[WorkerName] val) =>
+  // !TODO!
+  // Once all workers connect to joining workers, the coordinator hands
+  // the reigns over to RouterRegistry to handle join migration. This
+  // shouldn't be a behavior anymore. In fact, should RouterRegistry be
+  // involved here at all?
+  //
+  // Once we get a checkpoint id from CheckpointInitiator, we initiate.
+  // This currently includes, telling BarrierCoordinator about new workers,
+  // informing other non-coordinators to begin migration, informing joining
+  // workers of joining worker names, telling source coordinators to begin
+  // migration, and telling routers to migrate steps.
+  be prepare_grow_migration(target_workers: Array[WorkerName] val) =>
     let lookup_next_checkpoint_id = Promise[CheckpointId]
     lookup_next_checkpoint_id.next[None](
-      _self~initiate_join_migration(target_workers))
+      _self~initiate_grow_migration(target_workers))
     _checkpoint_initiator.lookup_next_checkpoint_id(lookup_next_checkpoint_id)
 
-  be initiate_join_migration(target_workers: Array[WorkerName] val,
+  be initiate_grow_migration(target_workers: Array[WorkerName] val,
     next_checkpoint_id: CheckpointId)
   =>
     // Update BarrierCoordinator about new workers
@@ -1078,7 +944,7 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
     // Inform other current workers to begin migration
     try
       let msg =
-        ChannelMsgEncoder.initiate_join_migration(target_workers,
+        ChannelMsgEncoder.initiate_grow_migration(target_workers,
           next_checkpoint_id, _auth)?
       _connections.send_control_to_cluster_with_exclusions(msg, target_workers)
     else
@@ -1096,9 +962,15 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
       Fail()
     end
 
-    begin_join_migration(target_workers, next_checkpoint_id)
+    _begin_grow_migration(target_workers, next_checkpoint_id)
 
-  fun ref begin_join_migration(target_workers: Array[WorkerName] val,
+  //!@<- Fix naming initiate vs. begin is confusing
+  be begin_grow_migration(target_workers: Array[WorkerName] val,
+    next_checkpoint_id: CheckpointId)
+  =>
+    _begin_grow_migration(target_workers, next_checkpoint_id)
+
+  fun ref _begin_grow_migration(target_workers: Array[WorkerName] val,
     next_checkpoint_id: CheckpointId)
   =>
     """
@@ -1106,7 +978,9 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
     """
     for source_coordinator in _source_coordinators.values() do
       _source_coordinators_waiting_list.set(source_coordinator)
-      source_coordinator.begin_join_migration(target_workers)
+      // !TODO!: Are we missing the source coordinators on non-coordinator
+      // workers for autoscale?
+      source_coordinator.begin_grow_migration(target_workers)
     end
     if ((_partition_routers.size() == 0) and
         (_source_coordinators_waiting_list.size() == 0))
@@ -1128,13 +1002,14 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
         had_steps_to_migrate = true
       end
     end
+    // !TODO! This might miss source coordinators that need to migrate stuff.
     if not had_steps_to_migrate then
       try_to_resume_processing_immediately()
     end
 
   be key_migration_complete(key: Key) =>
     """
-    Step with provided step id has been created on another worker.
+    State for the provided key has been migrated to another worker.
     """
     if _key_waiting_list.size() > 0 then
       _key_waiting_list.unset(key)
@@ -1147,7 +1022,7 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
       try_to_resume_processing_immediately()
     end
 
-  fun send_migration_batch_complete_msg(target: WorkerName) =>
+  be send_migration_batch_complete_msg(target: WorkerName) =>
     """
     Inform migration target that the entire migration batch has been sent.
     """
@@ -1157,20 +1032,7 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
       Fail()
     end
 
-  be process_migrating_target_ack(target: WorkerName) =>
-    """
-    Called when we receive a migration batch ack from the new worker
-    (i.e. migration target) indicating it's ready to receive data messages
-    """
-    @printf[I32]("--Processing migration batch complete ack from %s\n"
-      .cstring(), target.cstring())
-    try
-      (_autoscale as Autoscale).receive_join_migration_ack(target)
-    else
-      Fail()
-    end
-
-  fun ref inform_joining_workers_of_hash_partitions(
+  be inform_joining_workers_of_hash_partitions(
     joining_workers: Array[WorkerName] val)
   =>
     let hash_partitions_trn = recover trn Map[RoutingId, HashPartitions] end
@@ -1191,22 +1053,13 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
       _checkpoint_initiator.add_worker(w)
     end
 
-  fun ref complete_join(joining_workers: Array[WorkerName] val,
+  be complete_grow(joining_workers: Array[WorkerName] val,
     is_coordinator: Bool)
   =>
     _connections.request_cluster_unmute()
     _unmute_request(_worker_name)
 
-  be receive_hash_partitions(
-    hash_partitions: Map[RoutingId, HashPartitions] val)
-  =>
-    try
-      (_autoscale as Autoscale).receive_hash_partitions(hash_partitions)
-    else
-      Fail()
-    end
-
-  fun ref update_hash_partitions(
+  be update_hash_partitions(
     hash_partitions: Map[RoutingId, HashPartitions] val)
   =>
     """
@@ -1224,20 +1077,9 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
       end
     end
 
-  be ack_migration_batch_complete(sender_name: WorkerName) =>
-    """
-    Called when a new (joining) worker needs to ack to worker sender_name that
-    it's ready to start receiving messages after migration. It will only
-    do this once it's ensured all of its producers have registered downstream.
-    """
-    try
-      (_autoscale as Autoscale).worker_completed_migration_batch(sender_name)
-    else
-      Fail()
-    end
-
   fun ref _migrate_partition_steps(step_group: RoutingId,
-    target_workers: Array[WorkerName] val, next_checkpoint_id: CheckpointId): Bool
+    target_workers: Array[WorkerName] val, next_checkpoint_id: CheckpointId):
+    Bool
   =>
     """
     Called to initiate migrating partition steps to a target worker in order
@@ -1300,40 +1142,16 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
   /////////////////////////////////////////////////////////////////////////////
   // SHRINK TO FIT
   /////////////////////////////////////////////////////////////////////////////
-  be inject_shrink_autoscale_barrier(remaining_workers: Array[WorkerName] val,
-    leaving_workers: Array[WorkerName] val)
-  =>
-    try
-      (_autoscale as Autoscale).inject_shrink_autoscale_barrier(
-        remaining_workers, leaving_workers)
-    else
-      Fail()
-    end
-
-  be shrink_autoscale_barrier_complete() =>
-    try
-      (_autoscale as Autoscale).shrink_autoscale_barrier_complete()
-    else
-      Fail()
-    end
-
-  be remote_stop_the_world_for_shrink_migration_request(
-    coordinator: WorkerName, remaining_workers: Array[WorkerName] val,
-    leaving_workers: Array[WorkerName] val)
-  =>
-    try
-      (_autoscale as Autoscale).stop_the_world_for_shrink_migration_initiated(
-        coordinator, remaining_workers, leaving_workers)
-    else
-      Fail()
-    end
 
   be initiate_shrink(remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
     """
-    This should only be called on the worker contacted via an external
-    message to initiate a shrink.
+    This is called on the worker contacted via an external message to
+    initiate. It's called when the initial shrink barrier is complete. If the
+    contacted worker is not eligible to be coordinator, it will
+    forward it to someone else. Right now this happens if the contacted worker
+    is going to be a leaving worker.
     """
     if ArrayHelpers[WorkerName].contains[WorkerName](leaving_workers,
       _worker_name)
@@ -1400,14 +1218,7 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
       listener.begin_shrink_migration(leaving_workers)
     end
 
-  be prepare_leaving_migration(remaining_workers: Array[WorkerName] val,
-    leaving_workers: Array[WorkerName] val)
-  =>
-    let lookup_next_checkpoint_id = Promise[CheckpointId]
-    lookup_next_checkpoint_id.next[None](
-      _self~begin_leaving_migration(remaining_workers, leaving_workers))
-    _checkpoint_initiator.lookup_next_checkpoint_id(lookup_next_checkpoint_id)
-
+  //!@<- begin vs. initiate
   be begin_leaving_migration(remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val, next_checkpoint_id: CheckpointId)
   =>
@@ -1416,12 +1227,6 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
     as part of shrink to fit.
     """
     @printf[I32]("Beginning process of leaving cluster.\n".cstring())
-    try
-      (_autoscale as Autoscale).begin_leaving_migration(remaining_workers)
-    else
-      Fail()
-    end
-
     for source_coordinator in _source_coordinators.values() do
       _source_coordinators_waiting_list.set(source_coordinator)
       source_coordinator.begin_shrink_migration(leaving_workers)
@@ -1512,28 +1317,7 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
       Fail()
     end
 
-  fun ref send_leaving_migration_ack_request(
-    remaining_workers: Array[String] val)
-  =>
-    try
-      let msg = ChannelMsgEncoder.leaving_migration_ack_request(_worker_name,
-        _auth)?
-      for w in remaining_workers.values() do
-        _connections.send_control(w, msg)
-      end
-    else
-      Fail()
-    end
-
-  be receive_leaving_migration_ack(worker: WorkerName) =>
-    try
-      (_autoscale as Autoscale).receive_leaving_migration_ack(worker)
-    else
-      Fail()
-    end
-
-  fun ref all_leaving_workers_finished(leaving_workers: Array[WorkerName] val)
-  =>
+  be all_leaving_workers_finished(leaving_workers: Array[WorkerName] val) =>
     for w in leaving_workers.values() do
       _barrier_coordinator.remove_worker(w)
       _checkpoint_initiator.remove_worker(w)

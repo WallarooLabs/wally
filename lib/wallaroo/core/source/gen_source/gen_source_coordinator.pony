@@ -241,7 +241,7 @@ actor GenSourceCoordinator[In: Any val] is SourceCoordinator
   //////////////
   // AUTOSCALE
   /////////////
-  be begin_join_migration(joining_workers: Array[WorkerName] val) =>
+  be begin_grow_migration(joining_workers: Array[WorkerName] val) =>
     _router_registry.source_coordinator_migration_complete(this)
 
   be begin_shrink_migration(leaving_workers: Array[WorkerName] val) =>

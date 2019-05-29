@@ -77,9 +77,9 @@ primitive _BarrierCoordinatorDummyBuilder
     BarrierCoordinator(auth, "w", _ConnectionsDummyBuilder(env, auth),
       "init")
 
-primitive _AutoscaleInitiatorDummyBuilder
-  fun apply(env: Env, auth: AmbientAuth): AutoscaleInitiator =>
-    AutoscaleInitiator("w", _BarrierCoordinatorDummyBuilder(env, auth),
+primitive _AutoscaleBarrierInitiatorDummyBuilder
+  fun apply(env: Env, auth: AmbientAuth): AutoscaleBarrierInitiator =>
+    AutoscaleBarrierInitiator("w", _BarrierCoordinatorDummyBuilder(env, auth),
       _CheckpointInitiatorDummyBuilder(env, auth))
 
 primitive _CheckpointInitiatorDummyBuilder
