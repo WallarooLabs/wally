@@ -69,7 +69,7 @@ trait tag SourceCoordinator is (DisposableActor & BoundaryUpdatable &
   be add_worker(worker: WorkerName)
   be remove_worker(worker: WorkerName)
   be receive_msg(msg: SourceCoordinatorMsg)
-  be begin_join_migration(joining_workers: Array[WorkerName] val)
+  be begin_grow_migration(joining_workers: Array[WorkerName] val)
   be begin_shrink_migration(leaving_workers: Array[WorkerName] val)
   be initiate_barrier(token: BarrierToken)
   be checkpoint_complete(checkpoint_id: CheckpointId)

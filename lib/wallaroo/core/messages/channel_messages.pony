@@ -71,13 +71,13 @@ primitive ChannelMsgEncoder
     """
     _encode(MigrationBatchCompleteMsg(sender), auth)?
 
-  fun ack_migration_batch_complete(worker: WorkerName,
+  fun worker_completed_migration_batch(worker: WorkerName,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
     Sent to ack that a batch of steps has finished immigrating to this step
     """
-    _encode(AckMigrationBatchCompleteMsg(worker), auth)?
+    _encode(WorkerCompletedMigrationBatch(worker), auth)?
 
   fun key_migration_complete(key: Key,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -290,13 +290,13 @@ primitive ChannelMsgEncoder
     _encode(JoiningWorkerInitializedMsg(worker_name, c_addr, d_addr,
       step_group_routing_ids), auth)?
 
-  fun initiate_stop_the_world_for_join_migration(sender: WorkerName,
+  fun initiate_stop_the_world_for_grow_migration(sender: WorkerName,
     new_workers: Array[String] val, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(InitiateStopTheWorldForJoinMigrationMsg(sender, new_workers),
+    _encode(InitiateStopTheWorldForGrowMigrationMsg(sender, new_workers),
       auth)?
 
-  fun initiate_join_migration(new_workers: Array[WorkerName] val,
+  fun initiate_grow_migration(new_workers: Array[WorkerName] val,
     checkpoint_id: CheckpointId, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -306,7 +306,7 @@ primitive ChannelMsgEncoder
     migration as well. We include the next checkpoint id so that local key
     changes can be logged correctly.
     """
-    _encode(InitiateJoinMigrationMsg(new_workers, checkpoint_id), auth)?
+    _encode(InitiateGrowMigrationMsg(new_workers, checkpoint_id), auth)?
 
   fun pre_register_joining_workers(new_workers: Array[WorkerName] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -1042,7 +1042,7 @@ class val MigrationBatchCompleteMsg is ChannelMsg
   new val create(sender: WorkerName) =>
     sender_name = sender
 
-class val AckMigrationBatchCompleteMsg is ChannelMsg
+class val WorkerCompletedMigrationBatch is ChannelMsg
   let sender_name: WorkerName
 
   new val create(sender: WorkerName) =>
@@ -1404,7 +1404,7 @@ class val JoiningWorkerInitializedMsg is ChannelMsg
     data_addr = d_addr
     step_group_routing_ids = s_routing_ids
 
-class val InitiateStopTheWorldForJoinMigrationMsg is ChannelMsg
+class val InitiateStopTheWorldForGrowMigrationMsg is ChannelMsg
   let sender: WorkerName
   let new_workers: Array[String] val
 
@@ -1412,7 +1412,7 @@ class val InitiateStopTheWorldForJoinMigrationMsg is ChannelMsg
     sender = s
     new_workers = ws
 
-class val InitiateJoinMigrationMsg is ChannelMsg
+class val InitiateGrowMigrationMsg is ChannelMsg
   let new_workers: Array[String] val
   let checkpoint_id: CheckpointId
 

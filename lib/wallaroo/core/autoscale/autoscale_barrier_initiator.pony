@@ -23,8 +23,8 @@ use "wallaroo/core/checkpoint"
 use "wallaroo_labs/mort"
 
 
-actor AutoscaleInitiator
-  let _self: AutoscaleInitiator tag = this
+actor AutoscaleBarrierInitiator
+  let _self: AutoscaleBarrierInitiator tag = this
   let _worker_name: WorkerName
   let _barrier_coordinator: BarrierCoordinator
   let _checkpoint_initiator: CheckpointInitiator
@@ -96,5 +96,5 @@ actor AutoscaleInitiator
     _checkpoint_initiator.restart_repeating_checkpoints()
 
   be dispose() =>
-    @printf[I32]("Shutting down AutoscaleInitiator\n".cstring())
+    @printf[I32]("Shutting down AutoscaleBarrierInitiator\n".cstring())
     None

@@ -335,9 +335,10 @@ actor Startup
       checkpoint_initiator.initialize_checkpoint_id()
       connections.register_disposable(checkpoint_initiator)
 
-      let autoscale_initiator = AutoscaleInitiator(
-        _startup_options.worker_name, barrier_coordinator, checkpoint_initiator)
-      connections.register_disposable(autoscale_initiator)
+      let autoscale_barrier_initiator = AutoscaleBarrierInitiator(
+        _startup_options.worker_name, barrier_coordinator,
+        checkpoint_initiator)
+      connections.register_disposable(autoscale_barrier_initiator)
 
       _setup_shutdown_handler(connections, this, auth)
 
@@ -349,9 +350,13 @@ actor Startup
       let router_registry = RouterRegistry(auth, _startup_options.worker_name,
         data_receivers, connections, this,
         _startup_options.stop_the_world_pause, _is_joining, initializer_name,
-        barrier_coordinator, checkpoint_initiator, autoscale_initiator
+        barrier_coordinator, checkpoint_initiator
         where contacted_worker = initializer_name)
       _router_registry = router_registry
+
+      let autoscale = Autoscale(auth, _startup_options.worker_name,
+        autoscale_barrier_initiator, router_registry, connections, _is_joining,
+        initializer_name, checkpoint_initiator)
 
       let recovery_reconnecter = RecoveryReconnecter(auth,
         _startup_options.worker_name, d_service, data_receivers,
@@ -364,7 +369,7 @@ actor Startup
       let local_topology_initializer =
         LocalTopologyInitializer(
           _app_name, _startup_options.worker_name,
-          _env, auth, connections, router_registry, metrics_conn,
+          _env, auth, connections, autoscale, router_registry, metrics_conn,
           _startup_options.is_initializer, data_receivers, event_log, recovery,
           recovery_reconnecter, checkpoint_initiator, barrier_coordinator,
           _local_topology_file, _data_channel_file, _worker_names_file,
@@ -406,8 +411,8 @@ actor Startup
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections, _startup_options.is_initializer,
           _cluster_initializer, local_topology_initializer, recovery,
-          recovery_reconnecter, router_registry, barrier_coordinator,
-          checkpoint_initiator, control_channel_filepath,
+          recovery_reconnecter, autoscale, router_registry,
+          barrier_coordinator, checkpoint_initiator, control_channel_filepath,
           d_host, d_service, event_log,
           this, _the_journal as SimpleJournal,
           _startup_options.do_local_file_io,
@@ -460,7 +465,7 @@ actor Startup
       Fail()
     end
 
-  be complete_join(info_sending_host: String, m: InformJoiningWorkerMsg) =>
+  be complete_grow(info_sending_host: String, m: InformJoiningWorkerMsg) =>
     try
       let auth = _env.root as AmbientAuth
 
@@ -545,8 +550,9 @@ actor Startup
       checkpoint_initiator.initialize_checkpoint_id(
         (m.checkpoint_id, m.rollback_id))
 
-      let autoscale_initiator = AutoscaleInitiator(
-        _startup_options.worker_name, barrier_coordinator, checkpoint_initiator)
+      let autoscale_barrier_initiator = AutoscaleBarrierInitiator(
+        _startup_options.worker_name, barrier_coordinator,
+        checkpoint_initiator)
 
       _setup_shutdown_handler(connections, this, auth)
 
@@ -567,8 +573,12 @@ actor Startup
         _startup_options.worker_name, data_receivers,
         connections, this, _startup_options.stop_the_world_pause, _is_joining,
         initializer_name, barrier_coordinator, checkpoint_initiator,
-        autoscale_initiator, consume non_joining_workers, m.sender_name)
+        m.sender_name)
       _router_registry = router_registry
+
+      let autoscale = Autoscale(auth, _startup_options.worker_name,
+        autoscale_barrier_initiator, router_registry, connections, _is_joining,
+        initializer_name, checkpoint_initiator, consume non_joining_workers)
 
       let recovery_reconnecter = RecoveryReconnecter(auth,
         _startup_options.worker_name, _startup_options.my_d_service,
@@ -581,7 +591,7 @@ actor Startup
       let local_topology_initializer =
         LocalTopologyInitializer(
           _app_name, _startup_options.worker_name,
-          _env, auth, connections, router_registry, metrics_conn,
+          _env, auth, connections, autoscale, router_registry, metrics_conn,
           _startup_options.is_initializer, data_receivers,
           event_log, recovery, recovery_reconnecter, checkpoint_initiator,
           barrier_coordinator, _local_topology_file, _data_channel_file,
@@ -630,8 +640,8 @@ actor Startup
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections, _startup_options.is_initializer,
           _cluster_initializer, local_topology_initializer, recovery,
-          recovery_reconnecter, router_registry, barrier_coordinator,
-          checkpoint_initiator, control_channel_filepath,
+          recovery_reconnecter, autoscale, router_registry,
+          barrier_coordinator, checkpoint_initiator, control_channel_filepath,
           _startup_options.my_d_host, _startup_options.my_d_service,
           event_log, this, _the_journal as SimpleJournal,
           _startup_options.do_local_file_io,

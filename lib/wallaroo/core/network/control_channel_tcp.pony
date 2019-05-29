@@ -22,6 +22,7 @@ use "files"
 use "promises"
 use "time"
 use "wallaroo"
+use "wallaroo/core/autoscale"
 use "wallaroo/core/common"
 use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
@@ -48,6 +49,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _connections: Connections
   let _recovery: Recovery
   let _recovery_replayer: RecoveryReconnecter
+  let _autoscale: Autoscale
   let _router_registry: RouterRegistry
   let _barrier_coordinator: BarrierCoordinator
   let _checkpoint_initiator: CheckpointInitiator
@@ -61,7 +63,8 @@ class ControlChannelListenNotifier is TCPListenNotify
     connections: Connections, is_initializer: Bool,
     initializer: (ClusterInitializer | None) = None,
     layout_initializer: LayoutInitializer, recovery: Recovery,
-    recovery_replayer: RecoveryReconnecter, router_registry: RouterRegistry,
+    recovery_replayer: RecoveryReconnecter, autoscale: Autoscale,
+    router_registry: RouterRegistry,
     barrier_coordinator: BarrierCoordinator, checkpoint_initiator: CheckpointInitiator,
     recovery_file: FilePath, data_host: String, data_service: String,
     event_log: EventLog, recovery_file_cleaner: RecoveryFileCleaner,
@@ -78,6 +81,7 @@ class ControlChannelListenNotifier is TCPListenNotify
     _connections = connections
     _recovery = recovery
     _recovery_replayer = recovery_replayer
+    _autoscale = autoscale
     _router_registry = router_registry
     _barrier_coordinator = barrier_coordinator
     _checkpoint_initiator = checkpoint_initiator
@@ -118,8 +122,9 @@ class ControlChannelListenNotifier is TCPListenNotify
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
     ControlChannelConnectNotifier(_worker_name, _auth, _connections,
       _initializer, _layout_initializer, _recovery, _recovery_replayer,
-      _router_registry, _barrier_coordinator, _checkpoint_initiator,
-      _d_host, _d_service, _event_log, _recovery_file_cleaner)
+      _autoscale, _router_registry, _barrier_coordinator,
+      _checkpoint_initiator, _d_host, _d_service, _event_log,
+      _recovery_file_cleaner)
 
   fun ref closed(listen: TCPListener ref) =>
     @printf[I32]((_worker_name + " control: listener closed\n").cstring())
@@ -132,6 +137,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _layout_initializer: LayoutInitializer
   let _recovery: Recovery
   let _recovery_replayer: RecoveryReconnecter
+  let _autoscale: Autoscale
   let _router_registry: RouterRegistry
   let _barrier_coordinator: BarrierCoordinator
   let _checkpoint_initiator: CheckpointInitiator
@@ -144,7 +150,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   new iso create(worker_name: String, auth: AmbientAuth,
     connections: Connections, initializer: (ClusterInitializer | None),
     layout_initializer: LayoutInitializer, recovery: Recovery,
-    recovery_replayer: RecoveryReconnecter, router_registry: RouterRegistry,
+    recovery_replayer: RecoveryReconnecter, autoscale: Autoscale,
+    router_registry: RouterRegistry,
     barrier_coordinator: BarrierCoordinator, checkpoint_initiator: CheckpointInitiator,
     data_host: String, data_service: String, event_log: EventLog,
     recovery_file_cleaner: RecoveryFileCleaner)
@@ -156,6 +163,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     _layout_initializer = layout_initializer
     _recovery = recovery
     _recovery_replayer = recovery_replayer
+    _autoscale = autoscale
     _router_registry = router_registry
     _barrier_coordinator = barrier_coordinator
     _checkpoint_initiator = checkpoint_initiator
@@ -352,9 +360,9 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           Fail()
         end
       | let m: AnnounceHashPartitionsGrowMsg =>
-        _router_registry.receive_hash_partitions(m.hash_partitions)
+        _autoscale.receive_hash_partitions(m.hash_partitions)
       | let m: ConnectedToJoiningWorkersMsg =>
-        _router_registry.report_connected_to_joining_worker(m.sender)
+        _autoscale.report_connected_to_joining_worker(m.sender)
       | let m: AnnounceNewSourceMsg =>
         _router_registry.register_remote_source(m.sender, m.source_id)
       | let m: KeyMigrationCompleteMsg =>
@@ -376,18 +384,18 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         else
           Fail()
         end
-      | let m: InitiateStopTheWorldForJoinMigrationMsg =>
-        _router_registry.remote_stop_the_world_for_join_migration_request(
+      | let m: InitiateStopTheWorldForGrowMigrationMsg =>
+        _autoscale.remote_stop_the_world_for_grow_migration_request(
           m.sender, m.new_workers)
-      | let m: InitiateJoinMigrationMsg =>
-        _router_registry.remote_join_migration_request(m.new_workers,
+      | let m: InitiateGrowMigrationMsg =>
+        _autoscale.remote_grow_migration_request(m.new_workers,
           m.checkpoint_id)
       | let m: PreRegisterJoiningWorkersMsg =>
-        _router_registry.pre_register_joining_workers(m.joining_workers)
+        _autoscale.pre_register_joining_workers(m.joining_workers)
       | let m: AutoscaleCompleteMsg =>
-        _router_registry.autoscale_complete()
+        _autoscale.autoscale_complete()
       | let m: InitiateStopTheWorldForShrinkMigrationMsg =>
-        _router_registry.remote_stop_the_world_for_shrink_migration_request(
+        _autoscale.remote_stop_the_world_for_shrink_migration_request(
           m.sender, m.remaining_workers, m.leaving_workers)
       | let m: LeavingMigrationAckRequestMsg =>
         match _layout_initializer
@@ -408,19 +416,19 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         end
         _router_registry.disconnect_from_leaving_worker(m.sender)
       | let m: LeavingMigrationAckMsg =>
-        _router_registry.receive_leaving_migration_ack(m.sender)
-      | let m: AckMigrationBatchCompleteMsg =>
+        _autoscale.receive_leaving_migration_ack(m.sender)
+      | let m: WorkerCompletedMigrationBatch =>
         ifdef "trace" then
-          @printf[I32](("Received AckMigrationBatchCompleteMsg on Control " +
+          @printf[I32](("Received WorkerCompletedMigrationBatch on Control " +
             "Channel\n").cstring())
         end
-        _router_registry.process_migrating_target_ack(m.sender_name)
+        _autoscale.receive_grow_migration_ack(m.sender_name)
       | let m: BeginLeavingMigrationMsg =>
         ifdef "trace" then
           @printf[I32](("Received BeginLeavingMigrationMsg on Control " +
             "Channel\n").cstring())
         end
-        _router_registry.prepare_leaving_migration(m.remaining_workers,
+        _autoscale.prepare_leaving_migration(m.remaining_workers,
           m.leaving_workers)
       | let m: InitiateShrinkMsg =>
         match _layout_initializer
@@ -702,7 +710,7 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
           // make sure we have the correct addresses in Connections
           (let remote_host, _) = conn.remote_address().name()?
           @printf[I32]("***Received cluster information!***\n".cstring())
-          _startup.complete_join(remote_host, m)
+          _startup.complete_grow(remote_host, m)
         else
           Fail()
         end
