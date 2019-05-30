@@ -17,6 +17,8 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "wallaroo/core/common"
+use "wallaroo_labs/collection_helpers"
 
 /////////////////////////////////////////////////////////////////////////////
 // TODO: Replace using this with the badly named SetIs once we address a bug
@@ -41,5 +43,28 @@ class StringSet
 
   fun values(): MapValues[String, String, HashEq[String],
     this->HashMap[String, String, HashEq[String]]]^
+  =>
+    _map.values()
+
+class KeySet
+  let _map: HashMap[Key, Key, HashableKey] = _map.create()
+
+  fun ref set(s: Key) =>
+    _map(s) = s
+
+  fun ref unset(s: Key) =>
+    try _map.remove(s)? end
+
+  fun contains(s: Key): Bool =>
+    _map.contains(s)
+
+  fun ref clear() =>
+    _map.clear()
+
+  fun size(): USize =>
+    _map.size()
+
+  fun values(): MapValues[Key, Key, HashableKey,
+    this->HashMap[Key, Key, HashableKey]]^
   =>
     _map.values()

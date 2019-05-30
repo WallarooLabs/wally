@@ -33,6 +33,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/state"
 use "wallaroo/core/step"
 use "wallaroo/core/windows"
+use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/guid"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
@@ -310,7 +311,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
   let _state_initializer: StateInitializer[In, Out, S] val
   let _next_runner: Runner
 
-  var _state_map: Map[Key, StateWrapper[In, Out, S]] = _state_map.create()
+  var _state_map: HashMap[Key, StateWrapper[In, Out, S], HashableKey] = _state_map.create()
   let _event_log: EventLog
   let _wb: Writer = Writer
   let _rb: Reader = Reader
@@ -555,7 +556,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
         let state_wrapper = _state_initializer.decode(_rb, _auth)?
         ifdef "checkpoint_trace" then
           @printf[I32]("Successfully imported key %s\n".cstring(),
-            key.cstring())
+            key.string().cstring())
         end
         _state_map(key) = state_wrapper
         step.register_key(s_group, key)
@@ -597,7 +598,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
             Fail()
           end
         end
-        @printf[I32]("SERIALIZING KEY %s\n".cstring(), k.cstring())
+        @printf[I32]("SERIALIZING KEY %s\n".cstring(), HashableKey.string(k).cstring())
       end
 
       let key_size = k.size()
@@ -628,7 +629,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
       while bytes_left > 0 do
         let key_size = _rb.u32_be()?.usize()
         bytes_left = bytes_left - 4
-        let key = String.from_array(_rb.block(key_size)?)
+        let key: Key = String.from_array(_rb.block(key_size)?)
         bytes_left = bytes_left - key_size
         let state_size = _rb.u32_be()?.usize()
         bytes_left = bytes_left - 4
@@ -637,7 +638,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
         let state_wrapper = _state_initializer.decode(reader, _auth)?
         ifdef "checkpoint_trace" then
           @printf[I32]("OVERWRITING STATE FOR KEY %s\n".cstring(),
-            key.cstring())
+            HashableKey.string(key).cstring())
         end
         _state_map(key) = state_wrapper
       end

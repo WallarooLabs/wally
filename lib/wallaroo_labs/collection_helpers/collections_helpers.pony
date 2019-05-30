@@ -17,6 +17,8 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "wallaroo/core/common"
+use "wallaroo_labs/mort"
 
 primitive SetHelpers[V]
   fun forall(s: SetIs[V] box, pred: {(box->V!): Bool}): Bool =>
@@ -77,3 +79,17 @@ primitive ArrayHelpers[V]
       return false
     end
     true
+
+primitive HashableKey
+  fun hash(k: box->Key!): USize =>
+    @ponyint_hash_block[USize](k.cpointer(0), k.size())
+
+  fun eq(x: box->Key!, y: box->Key!): Bool =>
+    if x.size() != y.size() then
+      false
+    else
+      @memcmp[I32](x.cpointer(0), y.cpointer(0), x.size()) == 0
+    end
+
+  fun string(k: Key): String =>
+    k

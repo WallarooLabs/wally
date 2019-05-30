@@ -22,6 +22,7 @@ use "debug"
 use "itertools"
 use "json"
 use "ponytest"
+use "wallaroo/core/common"
 
 actor Main is TestList
   new create(env: Env) => PonyTest(env, this)
@@ -48,9 +49,9 @@ class iso _TestStateEntityEncode is UnitTest
   fun name(): String => "query_json/test_state_entity_encode"
 
   fun apply(h: TestHelper) ? =>
-    let source_ids_a: Array[String] val = ["a";"b";"c"]
-    let source_ids_b: Array[String] val = ["x";"y";"z"]
-    let e = recover trn Map[String, Array[String] val] end
+    let source_ids_a: Array[Key] val = ["a";"b";"c"]
+    let source_ids_b: Array[Key] val = ["x";"y";"z"]
+    let e = recover trn Map[String, Array[Key] val] end
     e.update("worker_a", source_ids_a)
     e.update("worker_b", source_ids_b)
     let encoded = StateEntityQueryEncoder.state_entity_keys(consume e)
@@ -95,7 +96,7 @@ class iso _TestEncodeDecodeClusterStatus is UnitTest
     end
 
 primitive _AssertJsonArrayEq
-  fun apply(h: TestHelper, json_arr: JsonArray, arr: Array[String] val) ? =>
+  fun apply(h: TestHelper, json_arr: JsonArray, arr: Array[Key] val) ? =>
     for i in Range(0, json_arr.data.size()) do
       h.assert_eq[String](json_arr.data(i)? as String, arr(i)?)
     end

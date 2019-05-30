@@ -451,7 +451,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         _save_worker_names()
 
         // Determine if we need to read in local keys for our state collections
-        let local_keys: Map[RoutingId, StringSet val] val =
+        let local_keys: Map[RoutingId, KeySet val] val =
           if _is_recovering then
             @printf[I32]("Reading local keys from file.\n".cstring())
             try
@@ -459,12 +459,12 @@ actor LocalTopologyInitializer is LayoutInitializer
                 checkpoint_target as CheckpointId)
             else
               Fail()
-              recover val Map[RoutingId, StringSet val] end
+              recover val Map[RoutingId, KeySet val] end
             end
           else
             // We don't have any local keys yet since this is our initial
             // startup.
-            recover iso Map[RoutingId, StringSet val] end
+            recover iso Map[RoutingId, KeySet val] end
           end
 
         if t.is_empty() then

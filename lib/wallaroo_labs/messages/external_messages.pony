@@ -166,7 +166,7 @@ primitive ExternalMsgEncoder
     _encode(_StateEntityQuery(), "", wb)
 
   fun state_entity_query_response(
-    local_keys: Map[RoutingId, StringSet],
+    local_keys: Map[RoutingId, KeySet],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
     let digest_map = _state_entity_digest(local_keys)
@@ -196,7 +196,7 @@ primitive ExternalMsgEncoder
     _encode(_StateEntityCountQuery(), "", wb)
 
   fun state_entity_count_query_response(
-    local_keys: Map[U128, StringSet],
+    local_keys: Map[U128, KeySet],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
     let digest_map = _state_entity_digest(local_keys)
@@ -243,8 +243,8 @@ primitive ExternalMsgEncoder
     digest_map("stateless_partitions") = consume stateless_ps
     consume digest_map
 
-  fun _state_entity_digest(local_keys: Map[RoutingId, StringSet]):
-    Map[String, Array[String] val] val
+  fun _state_entity_digest(local_keys: Map[RoutingId, KeySet]):
+    Map[String, Array[Key] val] val
   =>
     let state_ps = recover trn Map[String, Array[Key] val] end
 

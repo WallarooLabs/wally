@@ -537,7 +537,7 @@ class val StatePartitionRouter is Router
         _hash_partitions.get_claimant_by_key(key)?
       else
         @printf[I32](("Could not find claimant for key " +
-          " '%s'\n\n").cstring(), key.string().cstring())
+          " '%s'\n\n").cstring(), HashableKey.string(key).cstring())
         Fail()
         return (true, latest_ts)
       end
@@ -704,7 +704,7 @@ class val StatePartitionRouter is Router
   fun val rebalance_steps_grow(auth: AmbientAuth,
     target_workers: Array[(String, OutgoingBoundary)] val,
     router_registry: RouterRegistry ref,
-    local_keys: StringSet,
+    local_keys: KeySet,
     checkpoint_id: CheckpointId): (StatePartitionRouter, Bool)
   =>
     """
@@ -791,7 +791,7 @@ class val StatePartitionRouter is Router
     target_workers: Array[(String, OutgoingBoundary)] val,
     leaving_workers: Array[String] val,
     router_registry: RouterRegistry ref,
-    local_keys: StringSet,
+    local_keys: KeySet,
     checkpoint_id: CheckpointId): Bool
   =>
     // If we're using local routing, then there is nothing to migrate.
@@ -867,7 +867,7 @@ class val StatePartitionRouter is Router
         step.send_state(boundary, _step_group, key, checkpoint_id)
         @printf[I32](
           "^^Migrating key %s to outgoing boundary %s/%lx\n"
-            .cstring(), key.cstring(), target_worker.cstring(), boundary)
+            .cstring(), HashableKey.string(key).cstring(), target_worker.cstring(), boundary)
       end
       true
     else
