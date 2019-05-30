@@ -70,7 +70,7 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
   let _barrier_coordinator: BarrierCoordinator
   let _checkpoint_initiator: CheckpointInitiator
   var _data_router: DataRouter
-  var _local_keys: Map[RoutingId, StringSet] = _local_keys.create()
+  var _local_keys: Map[RoutingId, KeySet] = _local_keys.create()
   let _partition_routers: Map[RoutingId, StatePartitionRouter] =
     _partition_routers.create()
   let _stateless_partition_routers: Map[RoutingId, StatelessPartitionRouter] =
@@ -106,7 +106,7 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
   // route outputs to a stateless partition. Map is from partition id to
   // state name of state steps that need to know.
   let _stateless_partition_routers_router_subs:
-    Map[U128, StringSet] =
+    Map[U128, KeySet] =
     _stateless_partition_routers_router_subs.create()
   //
   ////////////////
@@ -138,7 +138,7 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
 
   // TODO: Add management of pending keys to Autoscale protocol class
   // Keys migrated out and waiting for acknowledgement
-  let _key_waiting_list: StringSet = _key_waiting_list.create()
+  let _key_waiting_list: KeySet = _key_waiting_list.create()
 
   // TODO: Add management of pending source listeners to Autoscale protocol
   // class
@@ -253,7 +253,7 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
   =>
     _partition_routers(step_group) = pr
     if not _local_keys.contains(step_group) then
-      _local_keys(step_group) = StringSet
+      _local_keys(step_group) = KeySet
     end
 
   be set_stateless_partition_router(partition_id: U128,
@@ -470,7 +470,7 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
   =>
     try
       if not _local_keys.contains(step_group) then
-        _local_keys(step_group) = StringSet
+        _local_keys(step_group) = KeySet
       end
       _local_keys(step_group)?.set(key)
       (_local_topology_initializer as LocalTopologyInitializer)
@@ -488,7 +488,7 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
     checkpoint_id: (CheckpointId | None) = None)
   =>
     try
-      _local_keys.insert_if_absent(step_group, StringSet)?
+      _local_keys.insert_if_absent(step_group, KeySet)?
       _local_keys(step_group)?.unset(key)
       (_local_topology_initializer as LocalTopologyInitializer)
         .unregister_key(step_group, key, checkpoint_id)
@@ -816,12 +816,12 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
   /////////////////////////////////////////////////////////////////////////////
   // ROLLBACK
   /////////////////////////////////////////////////////////////////////////////
-  be rollback_keys(r_keys: Map[RoutingId, StringSet val] val,
+  be rollback_keys(r_keys: Map[RoutingId, KeySet val] val,
     promise: Promise[None])
   =>
-    let new_keys = Map[RoutingId, StringSet]
+    let new_keys = Map[RoutingId, KeySet]
     for (step_group, keys) in r_keys.pairs() do
-      let ks = StringSet
+      let ks = KeySet
       for k in keys.values() do
         ks.set(k)
       end

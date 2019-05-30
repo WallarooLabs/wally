@@ -458,23 +458,17 @@ class ConnectorSourceNotify[In: Any val]
                 end
 
                 // get message key
-                let key_string =
+                let key =
                   match m.key
-                  | None =>
+                  | let k: Key =>
+                    k
+                  else
                     ""
-                  | let str: String val =>
-                    str
-                  | let a: Array[U8] val =>
-                    let k' = recover trn String(a.size()) end
-                    for c in a.values() do
-                      k'.push(c)
-                    end
-                    consume k'
                   end
 
                 // process message
                 return _run_and_subsequent_activity(latest_metrics_id, ingest_ts,
-                  pipeline_time_spent, key_string, source, decoded, s,
+                  pipeline_time_spent, key, source, decoded, s,
                   m.message_id, m.flags)
               else
                 // _handler.decode(bytes) failed
@@ -522,7 +516,7 @@ class ConnectorSourceNotify[In: Any val]
   fun ref _run_and_subsequent_activity(latest_metrics_id: U16,
     ingest_ts: U64,
     pipeline_time_spent: U64,
-    key_string: String val,
+    key: Key,
     source: ConnectorSource[In] ref,
     decoded: (In val| None val),
     s: _StreamState,
@@ -542,8 +536,8 @@ class ConnectorSourceNotify[In: Any val]
     // needs a way to provide the Kafka key here.
 
     let initial_key =
-      if key_string isnt None then
-        key_string
+      if key isnt None then
+        key
       else
         // TODO [post-source-migration] should this be stream_id for messages
         // that do not provide a key?

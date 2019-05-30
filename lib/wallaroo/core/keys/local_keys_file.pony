@@ -78,9 +78,9 @@ class LocalKeysFile
     _file.writev(_writer.done())
 
   fun ref read_local_keys(checkpoint_id: CheckpointId):
-    Map[RoutingId, StringSet val] val
+    Map[RoutingId, KeySet val] val
   =>
-    let lks = Map[RoutingId, StringSet]
+    let lks = Map[RoutingId, KeySet]
     let r = Reader
     _file.seek_start(0)
     if _file.size() > 0 then
@@ -111,7 +111,7 @@ class LocalKeysFile
 
             match cmd
             | LocalKeysFileCommand.add() =>
-              lks.insert_if_absent(step_group, StringSet)?.set(key)
+              lks.insert_if_absent(step_group, KeySet)?.set(key)
             | LocalKeysFileCommand.remove() =>
               if lks.contains(step_group) then
                 try
@@ -138,9 +138,9 @@ class LocalKeysFile
     end
     @printf[I32]("Finished reading local keys\n".cstring())
 
-    let lks_iso = recover iso Map[RoutingId, StringSet val] end
+    let lks_iso = recover iso Map[RoutingId, KeySet val] end
     for (r_id, keys) in lks.pairs() do
-      let ks = recover iso StringSet end
+      let ks = recover iso KeySet end
       for k in keys.values() do
         ks.set(k)
       end

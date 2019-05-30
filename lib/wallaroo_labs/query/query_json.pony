@@ -21,6 +21,7 @@ use "itertools"
 use "json"
 use "../messages"
 use "../../wallaroo/core/common"
+use "../../wallaroo_labs/collection_helpers"
 
 type _StepIds is Array[String] val
 type _StepIdsByWorker is Map[String, _StepIds] val
@@ -38,20 +39,27 @@ primitive PartitionQueryStateAndStatelessCountsEncoder
 
 primitive StateEntityQueryEncoder
   fun state_entity_keys(
-    digest: Map[String, Array[String] val] val):
+    digest: Map[String, Array[Key] val] val):
     String
   =>
     let o = JsonObject
-    for (k,vs) in digest.pairs() do o.data(k) = _EncodeStringArray(vs) end
+    for (k,vs) in digest.pairs() do o.data(k) = _EncodeKeyArray(vs) end
     o.string()
 
 primitive StateEntityCountQueryEncoder
   fun state_entity_count(
-    digest: Map[String, Array[String] val] val):
+    digest: Map[String, Array[Key] val] val):
     String
   =>
     let o = JsonObject
-    for (k,v) in digest.pairs() do o.data(k) = _EncodeArrayLength(v) end
+    for (k,v) in digest.pairs() do
+      // Type hack/workaround
+      let v2: Array[String] trn = recover v2.create() end
+      for key in v.values() do
+        v2.push("")
+      end
+      o.data(k) = _EncodeArrayLength(consume v2)
+    end
     o.string()
 
 
@@ -193,6 +201,12 @@ primitive _EncodeStringArray
   fun apply(a: Array[String val] val) : JsonArray =>
     let arr = JsonArray
     for v in a.values() do arr.data.push(v) end
+    arr
+
+primitive _EncodeKeyArray
+  fun apply(a: Array[Key val] val) : JsonArray =>
+    let arr = JsonArray
+    for v in a.values() do arr.data.push(HashableKey.string(v)) end
     arr
 
 primitive _DecodeStringArray
