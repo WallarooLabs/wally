@@ -556,7 +556,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
         let state_wrapper = _state_initializer.decode(_rb, _auth)?
         ifdef "checkpoint_trace" then
           @printf[I32]("Successfully imported key %s\n".cstring(),
-            key.string().cstring())
+            HashableKey.string(key).cstring())
         end
         _state_map(key) = state_wrapper
         step.register_key(s_group, key)
@@ -598,7 +598,8 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
             Fail()
           end
         end
-        @printf[I32]("SERIALIZING KEY %s\n".cstring(), HashableKey.string(k).cstring())
+        @printf[I32]("SERIALIZING KEY %s\n".cstring(),
+          HashableKey.string(k).cstring())
       end
 
       let key_size = k.size()

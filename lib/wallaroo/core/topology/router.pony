@@ -562,7 +562,7 @@ class val StatePartitionRouter is Router
       else
         ifdef debug then
           @printf[I32](("StatePartitionRouter.route: No state step for " +
-            "key '%s'\n\n").cstring(), key.string().cstring())
+            "key '%s'\n\n").cstring(), HashableKey.string(key).cstring())
         end
         Fail()
         (false, latest_ts)
@@ -867,7 +867,8 @@ class val StatePartitionRouter is Router
         step.send_state(boundary, _step_group, key, checkpoint_id)
         @printf[I32](
           "^^Migrating key %s to outgoing boundary %s/%lx\n"
-            .cstring(), HashableKey.string(key).cstring(), target_worker.cstring(), boundary)
+            .cstring(), HashableKey.string(key).cstring(),
+            target_worker.cstring(), boundary)
       end
       true
     else
