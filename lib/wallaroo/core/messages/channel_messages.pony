@@ -685,6 +685,15 @@ primitive ChannelMsgEncoder
 
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg =>
+    @printf[I32]("!@ ChannelMsgDecoder %s bytes!!!\n".cstring(), data.size().string().cstring())
+    //!@
+    // @printf[I32]("!@ <<<".cstring())
+    // for b in data.values() do
+    //   @printf[I32]("%s ".cstring(), b.string().cstring())
+    // end
+    // @printf[I32](">>>!@\n".cstring())
+
+
     try
       match Serialised.input(InputSerialisedAuth(auth), data)(
         DeserialiseAuth(auth))?

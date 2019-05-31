@@ -1,7 +1,37 @@
+/*
+
+Copyright (C) 2016-2017, Wallaroo Labs
+Copyright (C) 2016-2017, The Pony Developers
+Copyright (c) 2014-2015, Causality Ltd.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+*/
+
 use "buffered"
 use "collections"
 use "net"
 use "wallaroo_labs/bytes"
+use "wallaroo_labs/mort"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
@@ -25,11 +55,13 @@ trait TCPActor
 trait TestableTCPHandler[T: TCPActor ref]
   fun is_connected(): Bool
 
-  fun ref connect(host: String, service: String, from: String,
-    conn: TCPActor ref)
+  fun ref accept()
 
-  fun ref event_notify(event: AsioEventID, flags: U32, arg: U32,
-    actor_type: T)
+  fun ref connect(host: String, service: String, from: String)
+
+  fun ref event_notify(event: AsioEventID, flags: U32, arg: U32)
+
+  fun ref write(data: ByteSeq)
 
   fun ref writev(data: ByteSeqIter)
 
@@ -45,17 +77,28 @@ trait TestableTCPHandler[T: TCPActor ref]
 
   fun ref set_nodelay(state: Bool)
 
+  fun local_address(): NetAddress
+
+  fun remote_address(): NetAddress
+
+  /////////////
+  // TODO: these mute/unmute methods should be removed
+  fun ref mute() => Fail()
+  fun ref unmute() => Fail()
+
 class EmptyTCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
   fun is_connected(): Bool => false
 
-  fun ref connect(host: String, service: String, from: String,
-    conn: TCPActor ref)
-  =>
+  fun ref accept() =>
     None
 
-  fun ref event_notify(event: AsioEventID, flags: U32, arg: U32,
-    actor_type: T)
-  =>
+  fun ref connect(host: String, service: String, from: String) =>
+    None
+
+  fun ref event_notify(event: AsioEventID, flags: U32, arg: U32) =>
+    None
+
+  fun ref write(data: ByteSeq) =>
     None
 
   fun ref writev(data: ByteSeqIter) =>
@@ -78,6 +121,12 @@ class EmptyTCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
 
   fun ref set_nodelay(state: Bool) =>
     None
+
+  fun local_address(): NetAddress =>
+    NetAddress
+
+  fun remote_address(): NetAddress =>
+    NetAddress
 
 class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
   let _tcp_actor: T
@@ -116,18 +165,17 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
   fun is_connected(): Bool =>
     _connected
 
-  fun ref connect(host: String, service: String, from: String,
-    conn: TCPActor ref)
-  =>
+  fun ref accept() =>
+    None
+
+  fun ref connect(host: String, service: String, from: String) =>
     if not _connected then
-      _connect_count = @pony_os_connect_tcp[U32](conn,
+      _connect_count = @pony_os_connect_tcp[U32](_tcp_actor,
         host.cstring(), service.cstring(), from.cstring())
       _notify_connecting()
     end
 
-  fun ref event_notify(event: AsioEventID, flags: U32, arg: U32,
-    actor_type: T)
-  =>
+  fun ref event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     """
     Handle socket events.
     """
@@ -236,6 +284,13 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
 
       _try_shutdown(where locally_initiated_close = false)
     end
+
+  fun ref write(data: ByteSeq) =>
+    """
+    Write a single sequence of bytes.
+    """
+    // Not currently supported here
+    Fail()
 
   fun ref writev(data: ByteSeqIter) =>
     """
@@ -410,9 +465,7 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
     end
 
   fun can_send(): Bool =>
-    _connected and
-      _writeable and
-      not _closed
+    _connected and _writeable and not _closed
 
   fun ref read_again() =>
     """
@@ -553,3 +606,19 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
       _throttled = false
       _notify.unthrottled(_tcp_actor)
     end
+
+  fun local_address(): NetAddress =>
+    """
+    Return the local IP address.
+    """
+    let ip = recover NetAddress end
+    @pony_os_sockname[Bool](_fd, ip)
+    ip
+
+  fun remote_address(): NetAddress =>
+    """
+    Return the remote IP address.
+    """
+    let ip = recover NetAddress end
+    @pony_os_peername[Bool](_fd, ip)
+    ip

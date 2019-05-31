@@ -177,6 +177,7 @@ class DataChannelConnectNotifier is TestableDataChannelNotify[DataChannel ref]
     called once we have found (or initially created) the DataReceiver for
     the DataChannel corresponding to this notify.
     """
+
     // State change to our real DataReceiver.
     _receiver = _DataReceiver(_auth, _connections, _metrics_reporter.clone(),
       _layout_initializer, _data_receivers, _recovery_replayer,
@@ -230,6 +231,7 @@ class DataChannelConnectNotifier is TestableDataChannelNotify[DataChannel ref]
 
   fun ref closed(conn: DataChannel ref, locally_initiated_close: Bool) =>
     @printf[I32]("DataChannelConnectNotifier: server closed\n".cstring())
+    conn.closed()
 
 trait _DataReceiverWrapper
   fun ref decode_and_process(conn: DataChannel ref, data: Array[U8] val) =>

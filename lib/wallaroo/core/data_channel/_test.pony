@@ -125,7 +125,7 @@ class _TestDataChannel is DataChannelListenNotify
       let notify = (_client_conn_notify = None) as
         TestableDataChannelNotify[DataChannel ref] iso^
       (let host, let port) = listen.local_address().name()?
-      _h.dispose_when_done(DataChannel(auth, consume notify, host, port))
+      _h.dispose_when_done(DataChannel._accept(listen, consume notify, -1))
       _h.complete_action("client create")
     else
       _h.fail_action("client create")
