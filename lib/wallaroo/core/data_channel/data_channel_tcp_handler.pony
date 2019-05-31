@@ -42,9 +42,8 @@ use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 
-class DataChannelTCPHandler is TestableTCPHandler[DataChannel ref]
-  let _tcp_actor: DataChannel ref
-  var _notify: TCPHandlerNotify[DataChannel ref]
+class DataChannelTCPHandler is TestableTCPHandler
+  let _tcp_actor: TCPActor
   var _connect_count: U32
 
   var _fd: U32 = -1
@@ -77,11 +76,12 @@ class DataChannelTCPHandler is TestableTCPHandler[DataChannel ref]
   var _muted: Bool = false
 
   new create(data_channel: DataChannel ref,
-    notify: TCPHandlerNotify[DataChannel ref],
+    //!2
+    // notify: TCPHandlerNotify[DataChannel ref],
     fd: U32, init_size: USize, max_size: USize)
   =>
     _tcp_actor = data_channel
-    _notify = consume notify
+    // _notify = consume notify
 
     _connect_count = 0
     _fd = fd
@@ -96,7 +96,7 @@ class DataChannelTCPHandler is TestableTCPHandler[DataChannel ref]
     _readable = true
 
   fun ref accept() =>
-    _notify.accepted(_tcp_actor)
+    _tcp_actor.accepted()
     _queue_read()
     _pending_reads()
 
@@ -119,7 +119,7 @@ class DataChannelTCPHandler is TestableTCPHandler[DataChannel ref]
     """
     if not _closed then
       _in_sent = true
-      write_final(_notify.sent(_tcp_actor, data))
+      write_final(_tcp_actor.sent(data))
       _in_sent = false
     end
 
@@ -131,11 +131,11 @@ class DataChannelTCPHandler is TestableTCPHandler[DataChannel ref]
       _in_sent = true
 
       ifdef windows then
-        for bytes in _notify.sentv(_tcp_actor, data).values() do
+        for bytes in _tcp_actor.sentv(data).values() do
           write_final(bytes)
         end
       else
-        for bytes in _notify.sentv(_tcp_actor, data).values() do
+        for bytes in _tcp_actor.sentv(data).values() do
           _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
           _pending_writev_total = _pending_writev_total + bytes.size()
           _pending.push((bytes, 0))
@@ -152,7 +152,7 @@ class DataChannelTCPHandler is TestableTCPHandler[DataChannel ref]
     A `received` call on the notifier must contain exactly `qty` bytes. If
     `qty` is zero, the call can contain any amount of data.
     """
-    _expect = _notify.expect(_tcp_actor, qty)
+    _expect = qty
 
   fun ref set_nodelay(state: Bool) =>
     """
@@ -194,7 +194,7 @@ class DataChannelTCPHandler is TestableTCPHandler[DataChannel ref]
             _writeable = true
             _readable = true
 
-            _notify.connected(_tcp_actor)
+            _tcp_actor.connected()
             _queue_read()
             _pending_reads()
 
@@ -440,7 +440,7 @@ class DataChannelTCPHandler is TestableTCPHandler[DataChannel ref]
         data.truncate(_read_len)
         _read_len = 0
 
-        _notify.received(_tcp_actor, consume data, 1)
+        _tcp_actor.received(consume data, 1)
         _read_buf_size()
       end
 
@@ -514,7 +514,7 @@ class DataChannelTCPHandler is TestableTCPHandler[DataChannel ref]
             received_count = received_count + 1
 
             // check if we should yield to let another actor run
-            if (not _notify.received(_tcp_actor, consume data, received_count))
+            if (not _tcp_actor.received(consume data, received_count))
               or (received_count >= _max_received_count)
             then
               _read_buf_size()
@@ -574,9 +574,9 @@ class DataChannelTCPHandler is TestableTCPHandler[DataChannel ref]
     Inform the notifier that we're connecting.
     """
     if _connect_count > 0 then
-      _notify.connecting(_tcp_actor, _connect_count)
+      _tcp_actor.connecting(_connect_count)
     else
-      _notify.connect_failed(_tcp_actor)
+      _tcp_actor.connect_failed()
       _hard_close()
     end
 
@@ -661,12 +661,12 @@ class DataChannelTCPHandler is TestableTCPHandler[DataChannel ref]
     @pony_os_socket_close[None](_fd)
     _fd = -1
 
-    _notify.closed(_tcp_actor, locally_initiated_close)
+    _tcp_actor.closed(locally_initiated_close)
 
   fun ref _apply_backpressure() =>
     if not _throttled then
       _throttled = true
-      _notify.throttled(_tcp_actor)
+      _tcp_actor.throttled()
     end
     ifdef not windows then
       _writeable = false
@@ -679,7 +679,7 @@ class DataChannelTCPHandler is TestableTCPHandler[DataChannel ref]
   fun ref _release_backpressure() =>
     if _throttled then
       _throttled = false
-      _notify.unthrottled(_tcp_actor)
+      _tcp_actor.unthrottled()
     end
 
   fun local_address(): NetAddress =>

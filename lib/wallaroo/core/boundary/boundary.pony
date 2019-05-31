@@ -127,34 +127,41 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     (Promise[OutgoingBoundary] | None) = None
 
   // TCP
-  var _tcp_handler: TestableTCPHandler[OutgoingBoundary ref] =
-    EmptyTCPHandler[OutgoingBoundary ref]
-  let _notify: TestableBoundaryNotify[OutgoingBoundary ref]
+  var _tcp_handler: TestableTCPHandler = EmptyTCPHandler
+
+  var _header: Bool = true
+  let _reconnect_closed_delay: U64
+  let _reconnect_failed_delay: U64
+  var _initial_connection_was_established: Bool = false
 
   new create(auth: AmbientAuth, worker_name: String, target_worker: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
     from: String = "", init_size: USize = 64, max_size: USize = 65_536,
-    spike_config:(SpikeConfig | None) = None)
+    spike_config:(SpikeConfig | None) = None,
+    reconnect_closed_delay: U64 = 100_000_000,
+    reconnect_failed_delay: U64 = 10_000_000_000)
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
     _auth = auth
-    ifdef "spike" then
-      match spike_config
-      | let sc: SpikeConfig =>
-        var notify = recover iso BoundaryNotify(_auth, _routing_id,
-          worker_name, target_worker, host, service) end
-        _notify = SpikeBoundaryNotifyWrapper(consume notify, sc)
-      else
-        _notify = BoundaryNotify(_auth, _routing_id, worker_name,
-          target_worker, host, service)
-      end
-    else
-      _notify = BoundaryNotify(_auth, _routing_id, worker_name,
-        target_worker, host, service)
-    end
+
+    //!@ Spike has to wrap something else now.
+    // ifdef "spike" then
+    //   match spike_config
+    //   | let sc: SpikeConfig =>
+    //     var notify = recover iso BoundaryNotify(_auth, _routing_id,
+    //       worker_name, target_worker, host, service) end
+    //     _notify = SpikeBoundaryNotifyWrapper(consume notify, sc)
+    //   else
+    //     _notify = BoundaryNotify(_auth, _routing_id, worker_name,
+    //       target_worker, host, service)
+    //   end
+    // else
+    //   _notify = BoundaryNotify(_auth, _routing_id, worker_name,
+    //     target_worker, host, service)
+    // end
 
     _worker_name = worker_name
     _target_worker = target_worker
@@ -162,8 +169,12 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _service = service
     _from = from
     _metrics_reporter = consume metrics_reporter
-    _tcp_handler = TCPHandler[OutgoingBoundary ref](this, _notify,
-      init_size, max_size)
+    _reconnect_closed_delay = reconnect_closed_delay
+    _reconnect_failed_delay = reconnect_failed_delay
+    _tcp_handler = TCPHandler(this, init_size, max_size)
+
+  fun ref tcp_handler(): TestableTCPHandler =>
+    _tcp_handler
 
   //
   // Application startup lifecycle event
@@ -277,7 +288,6 @@ actor OutgoingBoundary is (Consumer & TCPActor)
 
   be register_routing_id(routing_id: RoutingId) =>
     _routing_id = routing_id
-    _notify.register_routing_id(routing_id)
 
     ifdef "identify_routing_ids" then
       @printf[I32]("===OutgoingBoundary %s routing_id registered===\n"
@@ -425,7 +435,6 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _unmute_upstreams()
     _timers.dispose()
     _tcp_handler.close()
-    _notify.dispose()
 
   be request_ack() =>
     // TODO: How do we propagate this down?
@@ -565,7 +574,6 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     end
     _host = host
     _service = service
-    _notify.update_address(_host, _service)
     _reconnect()
 
   ///////////
@@ -609,30 +617,6 @@ actor OutgoingBoundary is (Consumer & TCPActor)
       not _replaying and
       not _backup_queue_is_overflowing()
 
-  ///////////
-  // TCP
-  ///////////
-  be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
-    _tcp_handler.event_notify(event, flags, arg)
-
-  be write_again() =>
-    _tcp_handler.write_again()
-
-  be read_again() =>
-    _tcp_handler.read_again()
-
-  fun ref expect(qty: USize = 0) =>
-    _tcp_handler.expect(qty)
-
-  fun ref set_nodelay(state: Bool) =>
-    _tcp_handler.set_nodelay(state)
-
-  fun ref close() =>
-    _tcp_handler.close()
-
-  fun ref _writev(data: ByteSeqIter) =>
-    _tcp_handler.writev(data)
-
   fun ref set_connection_not_initialized() =>
     _connection_initialized = false
 
@@ -665,51 +649,15 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   fun ref reset_reconnect_pause() =>
     _reconnect_pause = _initial_reconnect_pause
 
-trait TestableBoundaryNotify[T: TCPActor ref] is TCPHandlerNotify[T]
-  fun ref update_address(host: String, service: String)
-  fun ref register_routing_id(r_id: RoutingId)
 
-class BoundaryNotify is TestableBoundaryNotify[OutgoingBoundary ref]
-  let _auth: AmbientAuth
-  var _routing_id: RoutingId
-  let _worker_name: WorkerName
-  let _target_worker: WorkerName
-  var _host: String
-  var _service: String
-  var _header: Bool = true
-  let _reconnect_closed_delay: U64
-  let _reconnect_failed_delay: U64
-  var _initial_connection_was_established: Bool = false
-
-  new create(auth: AmbientAuth, routing_id: RoutingId, worker_name: WorkerName,
-    target_worker: WorkerName, host: String, service: String,
-    reconnect_closed_delay: U64 = 100_000_000,
-    reconnect_failed_delay: U64 = 10_000_000_000)
-    =>
-    _auth = auth
-    _routing_id = routing_id
-    _worker_name = worker_name
-    _target_worker = target_worker
-    _host = host
-    _service = service
-    _reconnect_closed_delay = reconnect_closed_delay
-    _reconnect_failed_delay = reconnect_failed_delay
-
-  fun ref update_address(host: String, service: String) =>
-    _host = host
-    _service = service
-
-  fun ref register_routing_id(r_id: RoutingId) =>
-    _routing_id = r_id
-
-  fun ref received(conn: OutgoingBoundary ref, data: Array[U8] iso,
-    times: USize): Bool
-  =>
+  ////////////////////
+  // !@ OLD NOTIFY
+  fun ref received(data: Array[U8] iso, times: USize): Bool =>
     if _header then
       try
         let e = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
-        conn.expect(e)
+        expect(e)
         _header = false
       end
       true
@@ -722,29 +670,29 @@ class BoundaryNotify is TestableBoundaryNotify[OutgoingBoundary ref]
         ifdef "trace" then
           @printf[I32]("Received AckDataConnectMsg at Boundary\n".cstring())
         end
-        conn.receive_connect_ack(ac.last_id_seen)
+        receive_connect_ack(ac.last_id_seen)
       | let dd: DataDisconnectMsg =>
-        conn.dispose()
+        dispose()
       | let sn: StartNormalDataSendingMsg =>
         ifdef "trace" then
           @printf[I32]("Received StartNormalDataSendingMsg at Boundary\n"
             .cstring())
         end
-        conn.receive_connect_ack(sn.last_id_seen)
-        conn.start_normal_sending()
+        receive_connect_ack(sn.last_id_seen)
+        start_normal_sending()
       | let aw: AckDataReceivedMsg =>
         ifdef "trace" then
           @printf[I32]("Received AckDataReceivedMsg at Boundary\n".cstring())
         end
-        conn.receive_ack(aw.seq_id)
+        receive_ack(aw.seq_id)
       | let ia: ImmediateAckMsg =>
-        conn.receive_immediate_ack()
+        receive_immediate_ack()
       else
         @printf[I32](("Unknown Wallaroo data message type received at " +
           "OutgoingBoundary.\n").cstring())
       end
 
-      conn.expect(4)
+      expect(4)
       _header = true
 
       ifdef linux then
@@ -754,23 +702,24 @@ class BoundaryNotify is TestableBoundaryNotify[OutgoingBoundary ref]
       end
     end
 
-  fun ref connecting(conn: OutgoingBoundary ref, count: U32) =>
-    @printf[I32]("BoundaryNotify: attempting to connect to %s at %s:%s...\n\n"
-      .cstring(), _target_worker.cstring(), _host.cstring(),
-      _service.cstring())
+  fun ref connecting(count: U32) =>
+    @printf[I32](
+      "OutgoingBoundary: attempting to connect to %s at %s:%s...\n\n"
+        .cstring(), _target_worker.cstring(), _host.cstring(),
+        _service.cstring())
 
-  fun ref connected(conn: OutgoingBoundary ref) =>
-    @printf[I32]("BoundaryNotify: connected to %s at %s:%s...\n\n"
+  fun ref connected() =>
+    @printf[I32]("OutgoingBoundary: connected to %s at %s:%s...\n\n"
       .cstring(), _target_worker.cstring(), _host.cstring(),
       _service.cstring())
-    conn.resend_producer_registrations()
-    conn.reset_reconnect_pause()
+    resend_producer_registrations()
+    reset_reconnect_pause()
     if _initial_connection_was_established then
       // This is not the initial time we connected, so we're reconnecting.
       try
         let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
-          _routing_id, conn.seq_id, _auth)?
-        conn._writev(connect_msg)
+          _routing_id, seq_id, _auth)?
+        _tcp_handler.writev(connect_msg)
       else
         @printf[I32]("error creating data connect message on reconnect\n"
           .cstring())
@@ -778,45 +727,38 @@ class BoundaryNotify is TestableBoundaryNotify[OutgoingBoundary ref]
     else
       _initial_connection_was_established = true
     end
-    conn.set_nodelay(true)
-    conn.expect(4)
-    conn.maybe_report_initialized()
-    conn._maybe_mute_or_unmute_upstreams()
+    set_nodelay(true)
+    expect(4)
+    maybe_report_initialized()
+    _maybe_mute_or_unmute_upstreams()
 
-  fun ref closed(conn: OutgoingBoundary ref, locally_initiated_close: Bool) =>
-    @printf[I32]("BoundaryNotify: closed connection to %s at %s:%s...\n\n"
+  fun ref closed(locally_initiated_close: Bool) =>
+    @printf[I32]("OutgoingBoundary: closed connection to %s at %s:%s...\n\n"
       .cstring(), _target_worker.cstring(), _host.cstring(),
       _service.cstring())
     if not locally_initiated_close then
-      conn._schedule_reconnect()
+      _schedule_reconnect()
     end
-    conn.set_connection_not_initialized()
+    set_connection_not_initialized()
 
-  fun ref connect_failed(conn: OutgoingBoundary ref) =>
-    @printf[I32]("BoundaryNotify: connect_failed to %s at %s:%s...\n\n"
+  fun ref connect_failed() =>
+    @printf[I32]("OutgoingBoundary: connect_failed to %s at %s:%s...\n\n"
       .cstring(), _target_worker.cstring(), _host.cstring(),
       _service.cstring())
-    conn._schedule_reconnect()
+    _schedule_reconnect()
 
-  fun ref sentv(conn: OutgoingBoundary ref,
-    data: ByteSeqIter): ByteSeqIter
-  =>
-    data
-
-  fun ref expect(conn: OutgoingBoundary ref, qty: USize): USize =>
-    qty
-
-  fun ref throttled(conn: OutgoingBoundary ref) =>
-    @printf[I32]("BoundaryNotify: throttled connection to %s at %s:%s...\n\n"
+  fun ref throttled() =>
+    @printf[I32]("OutgoingBoundary: throttled connection to %s at %s:%s...\n\n"
       .cstring(), _target_worker.cstring(), _host.cstring(),
       _service.cstring())
-    conn._maybe_mute_or_unmute_upstreams()
+    _maybe_mute_or_unmute_upstreams()
 
-  fun ref unthrottled(conn: OutgoingBoundary ref) =>
-    @printf[I32]("BoundaryNotify: unthrottled connection to %s at %s:%s...\n\n"
+  fun ref unthrottled() =>
+    @printf[I32]("OutgoingBoundary: unthrottled connection to %s at %s:%s...\n\n"
       .cstring(), _target_worker.cstring(), _host.cstring(),
       _service.cstring())
-    conn._maybe_mute_or_unmute_upstreams()
+    _maybe_mute_or_unmute_upstreams()
+
 
 class _PauseBeforeReconnect is TimerNotify
   let _ob: OutgoingBoundary
