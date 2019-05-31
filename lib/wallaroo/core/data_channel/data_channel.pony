@@ -33,6 +33,7 @@ use "net"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/data_receiver"
+use "wallaroo/core/network"
 use "wallaroo_labs/mort"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
@@ -43,11 +44,23 @@ use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
+
+trait TestableDataChannelNotify[T: TCPActor ref] is TCPHandlerNotify[T]
+  fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
+    highest_seq_id: SeqId, conn: DataChannel ref)
+    """
+    Each abstract data channel (a connection from an OutgoingBoundary)
+    corresponds to a single DataReceiver. On reconnect, we want a new
+    DataChannel for that boundary to use the same DataReceiver. This is
+    called once we have found (or initially created) the DataReceiver for
+    the DataChannel corresponding to this notify.
+    """
+
 type DataChannelAuth is (AmbientAuth | NetAuth | TCPAuth | TCPConnectAuth)
 
-actor DataChannel
+actor DataChannel is TCPActor
   var _listen: (DataChannelListener | None) = None
-  var _notify: DataChannelNotify
+  var _notify: TestableDataChannelNotify[DataChannel ref]
   var _connect_count: U32
   var _fd: U32 = -1
   var _event: AsioEventID = AsioEvent.none()
@@ -71,7 +84,7 @@ actor DataChannel
 
   var _next_size: USize
   let _max_size: USize
-  let _max_received_count: U8 = 50
+  let _max_received_count: USize = 50
 
   var _read_len: USize = 0
   var _expect: USize = 0
@@ -80,7 +93,8 @@ actor DataChannel
   let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
 
 
-  new create(auth: DataChannelAuth, notify: DataChannelNotify iso,
+  new create(auth: DataChannelAuth,
+    notify: TestableDataChannelNotify[DataChannel ref] iso,
     host: String, service: String, from: String = "", init_size: USize = 64,
     max_size: USize = 16384)
   =>
@@ -97,7 +111,8 @@ actor DataChannel
       from.cstring())
     _notify_connecting()
 
-  new ip4(auth: DataChannelAuth, notify: DataChannelNotify iso,
+  new ip4(auth: DataChannelAuth,
+    notify: TestableDataChannelNotify[DataChannel ref] iso,
     host: String, service: String, from: String = "", init_size: USize = 64,
     max_size: USize = 16384)
   =>
@@ -113,7 +128,8 @@ actor DataChannel
       from.cstring())
     _notify_connecting()
 
-  new ip6(auth: DataChannelAuth, notify: DataChannelNotify iso,
+  new ip6(auth: DataChannelAuth,
+    notify: TestableDataChannelNotify[DataChannel ref] iso,
     host: String, service: String, from: String = "", init_size: USize = 64,
     max_size: USize = 16384)
   =>
@@ -129,7 +145,8 @@ actor DataChannel
       from.cstring())
     _notify_connecting()
 
-  new _accept(listen: DataChannelListener, notify: DataChannelNotify iso,
+  new _accept(listen: DataChannelListener,
+    notify: TestableDataChannelNotify[DataChannel ref] iso,
     fd: U32, init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -271,7 +288,7 @@ actor DataChannel
       _pending_reads()
     end
 
-  be set_notify(notify: DataChannelNotify iso) =>
+  be set_notify(notify: TestableDataChannelNotify[DataChannel ref] iso) =>
     """
     Change the notifier.
     """
@@ -299,7 +316,6 @@ actor DataChannel
     let ip = recover NetAddress end
     @pony_os_peername[Bool](_fd, ip)
     ip
-
 
   fun ref expect(qty: USize = 0) =>
     """
@@ -403,8 +419,12 @@ actor DataChannel
         _event = AsioEvent.none()
       end
 
-      _try_shutdown()
+      _try_shutdown(where locally_initiated_close = false)
     end
+
+  be read_again() =>
+    //!@ Remove _read_again
+    _read_again()
 
   be _read_again() =>
     """
@@ -478,6 +498,10 @@ actor DataChannel
         _release_backpressure()
       end
     end
+
+  be write_again() =>
+    //!@ Remove _write_again()
+    _write_again()
 
   be _write_again() =>
     """
@@ -593,7 +617,7 @@ actor DataChannel
         data.truncate(_read_len)
         _read_len = 0
 
-        _notify.received(this, consume data)
+        _notify.received(this, consume data, 1)
         _read_buf_size()
       end
 
@@ -637,7 +661,7 @@ actor DataChannel
     ifdef not windows then
       try
         var sum: USize = 0
-        var received_count: U8 = 0
+        var received_count: USize = 0
         _reading = true
         while _readable and not _shutdown_peer do
           // exit if muted
@@ -667,7 +691,7 @@ actor DataChannel
             received_count = received_count + 1
 
             // check if we should yield to let another actor run
-            if (not _notify.received(this, consume data))
+            if (not _notify.received(this, consume data, received_count))
               or (received_count >= _max_received_count)
             then
               _read_buf_size()
@@ -738,13 +762,13 @@ actor DataChannel
     Shut our connection down immediately. Stop reading data from the incoming
     source.
     """
-    _hard_close()
+    _hard_close(where locally_initiated_close = true)
 
   fun ref _close() =>
     _closed = true
-    _try_shutdown()
+    _try_shutdown(where locally_initiated_close = true)
 
-  fun ref _try_shutdown() =>
+  fun ref _try_shutdown(locally_initiated_close: Bool) =>
     """
     If we have closed and we have no remaining writes or pending connections,
     then shutdown.
@@ -774,7 +798,7 @@ actor DataChannel
     end
 
     if _connected and _shutdown and _shutdown_peer then
-      _hard_close()
+      _hard_close(locally_initiated_close)
     end
 
     ifdef windows then
@@ -785,7 +809,7 @@ actor DataChannel
       end
     end
 
-  fun ref _hard_close() =>
+  fun ref _hard_close(locally_initiated_close: Bool = false) =>
     """
     When an error happens, do a non-graceful close.
     """
@@ -814,7 +838,7 @@ actor DataChannel
     @pony_os_socket_close[None](_fd)
     _fd = -1
 
-    _notify.closed(this)
+    _notify.closed(this, locally_initiated_close)
 
     try (_listen as DataChannelListener)._conn_closed() end
 
@@ -830,7 +854,6 @@ actor DataChannel
       @pony_asio_event_set_writeable[None](_event, false)
       @pony_asio_event_resubscribe_write(_event)
     end
-
 
   fun ref _release_backpressure() =>
     if _throttled then

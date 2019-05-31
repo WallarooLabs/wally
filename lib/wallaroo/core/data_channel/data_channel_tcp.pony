@@ -127,13 +127,13 @@ class DataChannelListenNotifier is DataChannelListenNotify
 
   fun ref connected(
     listen: DataChannelListener ref,
-    router_registry: RouterRegistry): DataChannelNotify iso^
+    router_registry: RouterRegistry): DataChannelConnectNotifier iso^
   =>
     DataChannelConnectNotifier(_connections, _auth,
     _metrics_reporter.clone(), _layout_initializer, _data_receivers,
     _recovery_replayer, router_registry)
 
-class DataChannelConnectNotifier is DataChannelNotify
+class DataChannelConnectNotifier is TestableDataChannelNotify[DataChannel ref]
   let _connections: Connections
   let _auth: AmbientAuth
   var _header: Bool = true
@@ -189,7 +189,8 @@ class DataChannelConnectNotifier is DataChannelNotify
 
     conn._unmute(this)
 
-  fun ref received(conn: DataChannel ref, data: Array[U8] iso): Bool
+  fun ref received(conn: DataChannel ref, data: Array[U8] iso,
+    times: USize): Bool
   =>
     if _header then
       ifdef "trace" then
@@ -227,10 +228,8 @@ class DataChannelConnectNotifier is DataChannelNotify
   fun ref connected(sock: DataChannel ref) =>
     @printf[I32]("incoming connected on data channel\n".cstring())
 
-  fun ref closed(conn: DataChannel ref) =>
+  fun ref closed(conn: DataChannel ref, locally_initiated_close: Bool) =>
     @printf[I32]("DataChannelConnectNotifier: server closed\n".cstring())
-    //TODO: Initiate reconnect to downstream node here. We need to
-    //      create a new connection in OutgoingBoundary
 
 trait _DataReceiverWrapper
   fun ref decode_and_process(conn: DataChannel ref, data: Array[U8] val) =>

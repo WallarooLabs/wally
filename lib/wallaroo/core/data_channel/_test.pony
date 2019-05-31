@@ -62,13 +62,17 @@ class _TestDataChannel is DataChannelListenNotify
   port.
   """
   let _h: TestHelper
-  var _client_conn_notify: (DataChannelNotify iso | None) = None
-  var _server_conn_notify: (DataChannelNotify iso | None) = None
+  var _client_conn_notify:
+    (TestableDataChannelNotify[DataChannel ref] iso | None) = None
+  var _server_conn_notify:
+    (TestableDataChannelNotify[DataChannel ref] iso | None) = None
 
   new iso create(h: TestHelper) =>
     _h = h
 
-  fun iso apply(c: DataChannelNotify iso, s: DataChannelNotify iso) =>
+  fun iso apply(c: TestableDataChannelNotify[DataChannel ref] iso,
+    s: TestableDataChannelNotify[DataChannel ref] iso)
+  =>
     _client_conn_notify = consume c
     _server_conn_notify = consume s
 
@@ -118,7 +122,8 @@ class _TestDataChannel is DataChannelListenNotify
 
     try
       let auth = _h.env.root as AmbientAuth
-      let notify = (_client_conn_notify = None) as DataChannelNotify iso^
+      let notify = (_client_conn_notify = None) as
+        TestableDataChannelNotify[DataChannel ref] iso^
       (let host, let port) = listen.local_address().name()?
       _h.dispose_when_done(DataChannel(auth, consume notify, host, port))
       _h.complete_action("client create")
@@ -127,10 +132,12 @@ class _TestDataChannel is DataChannelListenNotify
     end
 
   fun ref connected(listen: DataChannelListener ref,
-    router_registry: RouterRegistry): DataChannelNotify iso^ ?
+    router_registry: RouterRegistry):
+    DataChannelConnectNotifier iso^ ?
   =>
     try
-      let notify = (_server_conn_notify = None) as DataChannelNotify iso^
+      let notify = (_server_conn_notify = None) as
+        DataChannelConnectNotifier iso^
       _h.complete_action("server accept")
       consume notify
     else
@@ -185,7 +192,8 @@ primitive BigString
   fun of_length(l: USize) : String =>
     String.from_array(recover Array[U8].init('a', l) end)
 
-class _TestDataChannelExpectNotify is DataChannelNotify
+class _TestDataChannelExpectNotify is
+  TestableDataChannelNotify[DataChannel ref]
   let _h: TestHelper
   let _server: Bool
   let _expected_input: String
@@ -214,7 +222,8 @@ class _TestDataChannelExpectNotify is DataChannelNotify
     _h.complete_action("expect received")
     qty
 
-  fun ref received(conn: DataChannel ref, data: Array[U8] val): Bool
+  fun ref received(conn: DataChannel ref, data: Array[U8] val,
+    times: USize): Bool
   =>
     if _frame then
       _frame = false
@@ -272,9 +281,11 @@ class iso _TestDataChannelWritev is UnitTest
     h.expect_action("client connect")
     h.expect_action("server receive")
 
-    _TestDataChannel(h)(_TestDataChannelWritevNotifyClient(h), _TestDataChannelWritevNotifyServer(h))
+    _TestDataChannel(h)(_TestDataChannelWritevNotifyClient(h),
+      _TestDataChannelWritevNotifyServer(h))
 
-class _TestDataChannelWritevNotifyClient is DataChannelNotify
+class _TestDataChannelWritevNotifyClient is
+  TestableDataChannelNotify[DataChannel ref]
   let _h: TestHelper
 
   new iso create(h: TestHelper) =>
@@ -295,14 +306,16 @@ class _TestDataChannelWritevNotifyClient is DataChannelNotify
   =>
     None
 
-class _TestDataChannelWritevNotifyServer is DataChannelNotify
+class _TestDataChannelWritevNotifyServer is
+  TestableDataChannelNotify[DataChannel ref]
   let _h: TestHelper
   var _buffer: String iso = recover iso String end
 
   new iso create(h: TestHelper) =>
     _h = h
 
-  fun ref received(conn: DataChannel ref, data: Array[U8] iso): Bool
+  fun ref received(conn: DataChannel ref, data: Array[U8] val,
+    times: USize): Bool
   =>
     _buffer.append(consume data)
 
@@ -349,7 +362,8 @@ class iso _TestDataChannelMute is UnitTest
   fun timed_out(h: TestHelper) =>
     h.complete(true)
 
-class _TestDataChannelMuteReceiveNotify is DataChannelNotify
+class _TestDataChannelMuteReceiveNotify is
+  TestableDataChannelNotify[DataChannel ref]
   """
   Notifier to fail a test if we receive data after muting the connection.
   """
@@ -366,7 +380,8 @@ class _TestDataChannelMuteReceiveNotify is DataChannelNotify
     _h.complete_action("receiver asks for data")
     _h.dispose_when_done(conn)
 
-  fun ref received(conn: DataChannel ref, data: Array[U8] val): Bool
+  fun ref received(conn: DataChannel ref, data: Array[U8] val,
+    times: USize): Bool
   =>
     _h.complete(false)
     true
@@ -376,7 +391,8 @@ class _TestDataChannelMuteReceiveNotify is DataChannelNotify
   =>
     None
 
-class _TestDataChannelMuteSendNotify is DataChannelNotify
+class _TestDataChannelMuteSendNotify is
+  TestableDataChannelNotify[DataChannel ref]
   """
   Notifier that sends data back when it receives any. Used in conjunction with
   the mute receiver to verify that after muting, we don't get any data on
@@ -396,7 +412,8 @@ class _TestDataChannelMuteSendNotify is DataChannelNotify
   fun ref connect_failed(conn: DataChannel ref) =>
     _h.fail_action("sender connected")
 
-  fun ref received(conn: DataChannel ref, data: Array[U8] val): Bool
+  fun ref received(conn: DataChannel ref, data: Array[U8] val,
+    times: USize): Bool
   =>
      conn.write("it's sad that you won't ever read this")
      _h.complete_action("sender sent data")
@@ -434,7 +451,8 @@ class iso _TestDataChannelUnmute is UnitTest
     _TestDataChannel(h)(_TestDataChannelMuteSendNotify(h),
       _TestDataChannelUnmuteReceiveNotify(h))
 
-class _TestDataChannelUnmuteReceiveNotify is DataChannelNotify
+class _TestDataChannelUnmuteReceiveNotify is
+  TestableDataChannelNotify[DataChannel ref]
   """
   Notifier to test that after muting and unmuting a connection, we get data
   """
@@ -452,7 +470,8 @@ class _TestDataChannelUnmuteReceiveNotify is DataChannelNotify
     conn.unmute(_h)
     _h.complete_action("receiver unmuted")
 
-  fun ref received(conn: DataChannel ref, data: Array[U8] val): Bool
+  fun ref received(conn: DataChannel ref, data: Array[U8] val,
+    times: USize): Bool
   =>
     _h.complete(true)
     true
@@ -465,7 +484,8 @@ class _TestDataChannelUnmuteReceiveNotify is DataChannelNotify
 class iso _TestDataChannelThrottle is UnitTest
   """
   Test that when we experience backpressure when sending that the `throttled`
-  method is called on our `DataChannelNotify` instance.
+  method is called on our `TestableDataChannelNotify[DataChannel ref]`
+  instance.
 
   We do this by starting up a server connection, muting it immediately and then
   sending data to it which should trigger a throttling to happen. We don't
@@ -489,7 +509,8 @@ class iso _TestDataChannelThrottle is UnitTest
     _TestDataChannel(h)(_TestDataChannelThrottleSendNotify(h),
       _TestDataChannelThrottleReceiveNotify(h))
 
-class _TestDataChannelThrottleReceiveNotify is DataChannelNotify
+class _TestDataChannelThrottleReceiveNotify is
+  TestableDataChannelNotify[DataChannel ref]
   """
   Notifier to that mutes itself on startup. We then send data to it in order
   to trigger backpressure on the sender.
@@ -512,7 +533,8 @@ class _TestDataChannelThrottleReceiveNotify is DataChannelNotify
   =>
     None
 
-class _TestDataChannelThrottleSendNotify is DataChannelNotify
+class _TestDataChannelThrottleSendNotify is
+  TestableDataChannelNotify[DataChannel ref]
   """
   Notifier that sends data back when it receives any. Used in conjunction with
   the mute receiver to verify that after muting, we don't get any data on
@@ -533,7 +555,8 @@ class _TestDataChannelThrottleSendNotify is DataChannelNotify
   fun ref connect_failed(conn: DataChannel ref) =>
     _h.fail_action("sender connected")
 
-  fun ref received(conn: DataChannel ref, data: Array[U8] val): Bool
+  fun ref received(conn: DataChannel ref, data: Array[U8] val,
+    times: USize): Bool
   =>
     conn.write("it's sad that you won't ever read this")
     _h.complete_action("sender sent data")
