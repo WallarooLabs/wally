@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 use "collections"
 use "wallaroo/core/boundary"
 use "wallaroo/core/data_receiver"
+use "wallaroo/core/router_registry"
 use "wallaroo/core/topology"
 
 interface DataChannelListenNotify
@@ -57,8 +58,10 @@ interface DataChannelListenNotify
     """
     None
 
-  fun ref connected(listen: DataChannelListener ref): DataChannelNotify iso^ ?
+  fun ref connected(
+    listener: DataChannelListener ref,
+    router_registry: RouterRegistry,
+    ns: U32, init_size: USize, max_size: USize): DataChannel
     """
-    Create a new DataChannelNotify to attach to a new DataChannel for a
-    newly established connection to the server.
+    Create a new DataChannel for a newly established connection to the server.
     """

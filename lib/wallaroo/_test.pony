@@ -25,10 +25,8 @@ All tests can be run by compiling and running this package.
 """
 use "ponytest"
 use cluster_manager = "core/cluster_manager"
-use data_channel = "core/data_channel"
 use initialization = "core/initialization"
 use recovery = "core/recovery"
-use spike = "core/spike"
 use step = "core/step"
 use topology = "core/topology"
 use windows = "core/windows"
@@ -42,10 +40,8 @@ actor Main is TestList
 
   fun tag tests(test: PonyTest) =>
     cluster_manager.Main.make().tests(test)
-    data_channel.Main.make().tests(test)
     initialization.Main.make().tests(test)
     recovery.Main.make().tests(test)
-    spike.Main.make().tests(test)
     step.Main.make().tests(test)
     topology.Main.make().tests(test)
     windows.Main.make().tests(test)
