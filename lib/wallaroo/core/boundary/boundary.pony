@@ -31,7 +31,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/network"
 use "wallaroo/core/recovery"
 use "wallaroo/core/routing"
-use "wallaroo/core/spike"
+use "wallaroo/core/tcp_actor"
 use "wallaroo/core/topology"
 use "wallaroo_labs/bytes"
 use "wallaroo_labs/mort"
@@ -39,26 +39,27 @@ use "wallaroo_labs/time"
 
 
 class val OutgoingBoundaryBuilder
-  let auth: AmbientAuth
-  let worker_name: String
-  let reporter: MetricsReporter val
-  let host: String
-  let service: String
-  let spike_config_none: (SpikeConfig | None)
+  let _auth: AmbientAuth
+  let _worker_name: String
+  let _reporter: MetricsReporter val
+  let _host: String
+  let _service: String
+  let _tcp_handler_builder: TestableTCPHandlerBuilder
 
-  new val create(auth': AmbientAuth, name: String, r: MetricsReporter iso,
-    h: String, s: String, spike_config: (SpikeConfig | None) = None)
+  new val create(auth: AmbientAuth, worker_name: String,
+    reporter: MetricsReporter iso, host: String, service: String,
+    tcp_handler_builder: TestableTCPHandlerBuilder)
   =>
-    auth = auth'
-    worker_name = name
-    reporter = consume r
-    host = h
-    service = s
-    spike_config_none = spike_config
+    _auth = auth
+    _worker_name = worker_name
+    _reporter = consume reporter
+    _host = host
+    _service = service
+    _tcp_handler_builder = tcp_handler_builder
 
   fun apply(routing_id: RoutingId, target_worker: String): OutgoingBoundary =>
-    let boundary = OutgoingBoundary(auth, worker_name, target_worker,
-      reporter.clone(), host, service where spike_config = spike_config_none)
+    let boundary = OutgoingBoundary(_auth, _worker_name, target_worker,
+      _tcp_handler_builder, _reporter.clone(), _host, _service)
     boundary.register_routing_id(routing_id)
     boundary
 
@@ -68,18 +69,17 @@ class val OutgoingBoundaryBuilder
     """
     Called when creating a boundary post cluster initialization
     """
-    let boundary = OutgoingBoundary(auth, worker_name, target_worker,
-      reporter.clone(), host, service where spike_config = spike_config_none)
+    let boundary = OutgoingBoundary(_auth, _worker_name, target_worker,
+      _tcp_handler_builder, _reporter.clone(), _host, _service)
     boundary.register_routing_id(routing_id)
     boundary.quick_initialize(layout_initializer)
     boundary
 
-  fun val clone_with_new_service(host': String, service': String):
+  fun val clone_with_new_service(host: String, service: String):
     OutgoingBoundaryBuilder val
   =>
-    let r = reporter.clone()
-    OutgoingBoundaryBuilder(auth, worker_name, consume r, host', service',
-      spike_config_none)
+    OutgoingBoundaryBuilder(_auth, _worker_name, _reporter.clone(),
+      host, service, _tcp_handler_builder)
 
 actor OutgoingBoundary is (Consumer & TCPActor)
   // Steplike
@@ -107,7 +107,6 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   var _routing_id: RoutingId = 0
   var _host: String
   var _service: String
-  let _from: String
   // Queuing all messages in case we need to resend them
   let _queue: Array[Array[ByteSeq] val] = _queue.create()
   // Queuing messages we haven't sent yet (these will also be queued in _queue,
@@ -135,9 +134,8 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   var _initial_connection_was_established: Bool = false
 
   new create(auth: AmbientAuth, worker_name: String, target_worker: String,
+    tcp_handler_builder: TestableTCPHandlerBuilder,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
-    from: String = "", init_size: USize = 64, max_size: USize = 65_536,
-    spike_config:(SpikeConfig | None) = None,
     reconnect_closed_delay: U64 = 100_000_000,
     reconnect_failed_delay: U64 = 10_000_000_000)
   =>
@@ -146,32 +144,14 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     will be made from the specified interface.
     """
     _auth = auth
-
-    //!@ Spike has to wrap something else now.
-    // ifdef "spike" then
-    //   match spike_config
-    //   | let sc: SpikeConfig =>
-    //     var notify = recover iso BoundaryNotify(_auth, _routing_id,
-    //       worker_name, target_worker, host, service) end
-    //     _notify = SpikeBoundaryNotifyWrapper(consume notify, sc)
-    //   else
-    //     _notify = BoundaryNotify(_auth, _routing_id, worker_name,
-    //       target_worker, host, service)
-    //   end
-    // else
-    //   _notify = BoundaryNotify(_auth, _routing_id, worker_name,
-    //     target_worker, host, service)
-    // end
-
     _worker_name = worker_name
     _target_worker = target_worker
     _host = host
     _service = service
-    _from = from
     _metrics_reporter = consume metrics_reporter
     _reconnect_closed_delay = reconnect_closed_delay
     _reconnect_failed_delay = reconnect_failed_delay
-    _tcp_handler = TCPHandler(this, init_size, max_size)
+    _tcp_handler = tcp_handler_builder(this)
 
   fun ref tcp_handler(): TestableTCPHandler =>
     _tcp_handler
@@ -185,7 +165,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer) =>
-    _tcp_handler.connect(_host, _service, _from)
+    _tcp_handler.connect(_host, _service)
     @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" + _service +
       "\n").cstring())
 
@@ -217,7 +197,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
         _initializer = initializer
         _reported_initialized = true
         _reported_ready_to_work = true
-        _tcp_handler.connect(_host, _service, _from)
+        _tcp_handler.connect(_host, _service)
 
         @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" +
           _service + "\n").cstring())
@@ -263,7 +243,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
       // set replaying to true since we might need to replay to
       // downstream before resuming
       _replaying = true
-      _tcp_handler.connect(_host, _service, _from)
+      _tcp_handler.connect(_host, _service)
     end
 
   be migrate_key(routing_id: RoutingId, step_group: RoutingId, key: Key,

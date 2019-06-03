@@ -29,6 +29,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/network"
 use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
+use "wallaroo/core/tcp_actor"
 use "wallaroo_labs/bytes"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
@@ -56,13 +57,12 @@ actor DataChannel is TCPActor
   var _receiver: _DataReceiverWrapper = _InitDataReceiver
 
   new _accept(listener: DataChannelListener,
+    tcp_handler_builder: TestableTCPHandlerBuilder,
     connections: Connections, auth: AmbientAuth,
     metrics_reporter: MetricsReporter iso,
     layout_initializer: LayoutInitializer tag,
     data_receivers: DataReceivers, recovery_replayer: RecoveryReconnecter,
-    router_registry: RouterRegistry,
-    // Remove this from here
-    fd: U32, init_size: USize = 64, max_size: USize = 16384)
+    router_registry: RouterRegistry)
   =>
     """
     A new connection accepted on a server.
@@ -76,7 +76,7 @@ actor DataChannel is TCPActor
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
     _receiver = _WaitingDataReceiver(_auth, this, _data_receivers)
-    _tcp_handler = DataChannelTCPHandler(this, fd, init_size, max_size)
+    _tcp_handler = tcp_handler_builder(this)
     _tcp_handler.accept()
 
   fun ref tcp_handler(): TestableTCPHandler =>

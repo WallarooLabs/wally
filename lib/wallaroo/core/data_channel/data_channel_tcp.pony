@@ -130,6 +130,8 @@ class DataChannelListenNotifier is DataChannelListenNotify
     router_registry: RouterRegistry,
     ns: U32, init_size: USize, max_size: USize): DataChannel
   =>
-    DataChannel._accept(listener, _connections, _auth,
+    let tcp_handler_builder = DataChannelTCPHandlerBuilder(ns,
+      init_size, max_size)
+    DataChannel._accept(listener, tcp_handler_builder, _connections, _auth,
       _metrics_reporter.clone(), _layout_initializer, _data_receivers,
-      _recovery_replayer, router_registry, ns, init_size, max_size)
+      _recovery_replayer, router_registry)

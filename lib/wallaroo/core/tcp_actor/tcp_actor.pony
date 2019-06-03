@@ -24,6 +24,12 @@ trait TCPActor
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     tcp_handler().event_notify(event, flags, arg)
 
+  //!@
+  // // TODO: This is a stopgap to allow testing of TCPActors since we can't
+  // // call _event_notify directly
+  // be test_event_notify() =>
+  //   tcp_handler().event_notify(AsioEventID.none(), 0, 0)
+
   be write_again() =>
     tcp_handler().write_again()
 

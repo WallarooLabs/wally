@@ -50,7 +50,6 @@ class StartupOptions
   var stop_the_world_pause: U64 = 2_000_000_000
   var checkpoints_enabled: Bool = true
   var time_between_checkpoints: U64 = 1_000_000_000
-  var spike_config: (SpikeConfig | None) = None
   var run_with_resilience: Bool = false
   var dos_servers: Array[(String,String)] val = recover dos_servers.create() end
 
@@ -242,21 +241,6 @@ primitive WallarooConfig
         FatalUserError("You are running a resilience-disabled binary. " +
           "You cannot run with the command line flag `--run-with-resilience`.")
       end
-    end
-
-    ifdef "spike" then
-      so.spike_config = SpikeConfig(spike_drop, spike_prob, spike_margin,
-        spike_seed)?
-      let sc = so.spike_config as SpikeConfig
-
-      @printf[I32](("|||Spike seed: " + sc.seed.string() +
-        "|||\n").cstring())
-      @printf[I32](("|||Spike drop: " + sc.drop.string() +
-        "|||\n").cstring())
-      @printf[I32](("|||Spike prob: " + sc.prob.string() +
-        "|||\n").cstring())
-      @printf[I32](("|||Spike margin: " + sc.margin.string() +
-        "|||\n").cstring())
     end
 
     (so, options.remaining())

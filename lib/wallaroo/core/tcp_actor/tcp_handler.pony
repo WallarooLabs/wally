@@ -42,12 +42,15 @@ use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 
+interface val TestableTCPHandlerBuilder
+  fun apply(tcp_actor: TCPActor ref): TestableTCPHandler
+
 trait TestableTCPHandler
   fun is_connected(): Bool
 
   fun ref accept()
 
-  fun ref connect(host: String, service: String, from: String)
+  fun ref connect(host: String, service: String)
 
   fun ref event_notify(event: AsioEventID, flags: U32, arg: U32)
 
@@ -82,7 +85,7 @@ class EmptyTCPHandler is TestableTCPHandler
   fun ref accept() =>
     None
 
-  fun ref connect(host: String, service: String, from: String) =>
+  fun ref connect(host: String, service: String) =>
     None
 
   fun ref event_notify(event: AsioEventID, flags: U32, arg: U32) =>
@@ -118,8 +121,19 @@ class EmptyTCPHandler is TestableTCPHandler
   fun remote_address(): NetAddress =>
     NetAddress
 
+class val TCPHandlerBuilder is TestableTCPHandlerBuilder
+  let _init_size: USize
+  let _max_size: USize
+
+  new val create(init_size: USize = 64, max_size: USize = 65_536) =>
+    _init_size = init_size
+    _max_size = max_size
+
+  fun apply(tcp_actor: TCPActor ref): TestableTCPHandler =>
+    TCPHandler(tcp_actor, _init_size, _max_size)
+
 class TCPHandler is TestableTCPHandler
-  let _tcp_actor: TCPActor
+  let _tcp_actor: TCPActor ref
   var _read_buf: Array[U8] iso
   var _next_size: USize
   let _max_size: USize
@@ -142,7 +156,10 @@ class TCPHandler is TestableTCPHandler
   var _muted: Bool = false
   var _expect_read_buf: Reader = Reader
 
-  new create(tcp_actor: TCPActor, init_size: USize, max_size: USize) =>
+  // !@ What is this?
+  let _from: String = ""
+
+  new create(tcp_actor: TCPActor ref, init_size: USize, max_size: USize) =>
     _tcp_actor = tcp_actor
     _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
@@ -154,10 +171,10 @@ class TCPHandler is TestableTCPHandler
   fun ref accept() =>
     None
 
-  fun ref connect(host: String, service: String, from: String) =>
+  fun ref connect(host: String, service: String) =>
     if not _connected then
       _connect_count = @pony_os_connect_tcp[U32](_tcp_actor,
-        host.cstring(), service.cstring(), from.cstring())
+        host.cstring(), service.cstring(), _from.cstring())
       _notify_connecting()
     end
 

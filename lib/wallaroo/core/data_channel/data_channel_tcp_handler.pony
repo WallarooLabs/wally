@@ -31,6 +31,7 @@ use "buffered"
 use "collections"
 use "net"
 use "wallaroo/core/network"
+use "wallaroo/core/tcp_actor"
 use "wallaroo_labs/bytes"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
@@ -42,8 +43,21 @@ use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 
+class val DataChannelTCPHandlerBuilder is TestableTCPHandlerBuilder
+  let _fd: U32
+  let _init_size: USize
+  let _max_size: USize
+
+  new val create(fd: U32, init_size: USize = 64, max_size: USize = 16384) =>
+    _fd = fd
+    _init_size = init_size
+    _max_size = max_size
+
+  fun apply(tcp_actor: TCPActor ref): TestableTCPHandler =>
+    DataChannelTCPHandler(tcp_actor, _fd, _init_size, _max_size)
+
 class DataChannelTCPHandler is TestableTCPHandler
-  let _tcp_actor: TCPActor
+  let _tcp_actor: TCPActor ref
   var _connect_count: U32
 
   var _fd: U32 = -1
@@ -75,14 +89,13 @@ class DataChannelTCPHandler is TestableTCPHandler
 
   var _muted: Bool = false
 
-  new create(data_channel: DataChannel ref,
-    //!2
-    // notify: TCPHandlerNotify[DataChannel ref],
-    fd: U32, init_size: USize, max_size: USize)
+  // !@ What is this?
+  let _from: String = ""
+
+  new create(data_channel: TCPActor ref, fd: U32,
+    init_size: USize, max_size: USize)
   =>
     _tcp_actor = data_channel
-    // _notify = consume notify
-
     _connect_count = 0
     _fd = fd
     _event = @pony_asio_event_create(_tcp_actor, fd,
@@ -103,10 +116,10 @@ class DataChannelTCPHandler is TestableTCPHandler
   fun is_connected(): Bool =>
     _connected
 
-  fun ref connect(host: String, service: String, from: String) =>
+  fun ref connect(host: String, service: String) =>
     if not _connected then
       _connect_count = @pony_os_connect_tcp[U32](_tcp_actor,
-        host.cstring(), service.cstring(), from.cstring())
+        host.cstring(), service.cstring(), _from.cstring())
       _notify_connecting()
     end
 
