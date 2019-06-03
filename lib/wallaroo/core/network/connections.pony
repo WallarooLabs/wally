@@ -36,7 +36,7 @@ use "wallaroo/core/source"
 use "wallaroo/core/source/connector_source"
 use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
-use "wallaroo/core/spike"
+use "wallaroo/core/tcp_actor"
 use "wallaroo/core/topology"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/messages"
@@ -75,7 +75,6 @@ actor Connections is Cluster
     DeterministicSourceIdGenerator
   let _connection_addresses_file: String
   let _is_joining: Bool
-  let _spike_config: (SpikeConfig | None)
   let _event_log: EventLog
   let _the_journal: SimpleJournal
   let _do_local_file_io: Bool
@@ -87,8 +86,7 @@ actor Connections is Cluster
     d_host: String, d_service: String,
     metrics_conn: MetricsSink, metrics_host: String, metrics_service: String,
     is_initializer: Bool, connection_addresses_file: String,
-    is_joining: Bool, spike_config: (SpikeConfig | None) = None,
-    event_log: EventLog, the_journal: SimpleJournal,
+    is_joining: Bool, event_log: EventLog, the_journal: SimpleJournal,
     do_local_file_io: Bool = true, log_rotation: Bool = false,
     recovery_file_cleaner: (RecoveryFileCleaner | None) = None)
   =>
@@ -103,7 +101,6 @@ actor Connections is Cluster
     _init_d_service = d_service
     _connection_addresses_file = connection_addresses_file
     _is_joining = is_joining
-    _spike_config = spike_config
     _event_log = event_log
     _the_journal = the_journal
     _do_local_file_io = do_local_file_io
@@ -642,9 +639,10 @@ actor Connections is Cluster
     service: String)
   =>
     _data_addrs(target_name) = (host, service)
+    let reporter = MetricsReporter(_app_name, _worker_name, _metrics_conn)
+    let tcp_handler_builder = TCPHandlerBuilder
     let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
-      MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
-      _spike_config)
+      consume reporter, host, service, tcp_handler_builder)
     try
       let boundary_id_string = target_name + "-connections-boundary"
       let outgoing_boundary =
@@ -663,8 +661,9 @@ actor Connections is Cluster
   =>
     _data_addrs(target_name) = (host, service)
     let reporter = MetricsReporter(_app_name, _worker_name, _metrics_conn)
+    let tcp_handler_builder = TCPHandlerBuilder
     let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
-      consume reporter, host, service, _spike_config)
+      consume reporter, host, service, tcp_handler_builder)
     let outgoing_boundary =
       boundary_builder.build_and_initialize(new_boundary_id, target_name, lti)
     _data_conn_builders(target_name) = boundary_builder

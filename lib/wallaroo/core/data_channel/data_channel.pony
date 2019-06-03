@@ -1,242 +1,92 @@
 /*
 
-Copyright (C) 2016-2017, Wallaroo Labs
-Copyright (C) 2016-2017, The Pony Developers
-Copyright (c) 2014-2015, Causality Ltd.
-All rights reserved.
+Copyright 2019 The Wallaroo Authors.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
 
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
+     http://www.apache.org/licenses/LICENSE-2.0
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ implied. See the License for the specific language governing
+ permissions and limitations under the License.
 
 */
 
 use "buffered"
 use "collections"
 use "net"
+use "time"
+use "wallaroo/core/autoscale"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/data_receiver"
+use "wallaroo/core/initialization"
+use "wallaroo/core/messages"
+use "wallaroo/core/metrics"
+use "wallaroo/core/network"
+use "wallaroo/core/recovery"
+use "wallaroo/core/router_registry"
+use "wallaroo/core/tcp_actor"
+use "wallaroo_labs/bytes"
 use "wallaroo_labs/mort"
-
-use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
-  flags: U32, nsec: U64, noisy: Bool)
-use @pony_asio_event_fd[U32](event: AsioEventID)
-use @pony_asio_event_unsubscribe[None](event: AsioEventID)
-use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
-use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
-use @pony_asio_event_destroy[None](event: AsioEventID)
+use "wallaroo_labs/time"
 
 type DataChannelAuth is (AmbientAuth | NetAuth | TCPAuth | TCPConnectAuth)
 
-actor DataChannel
-  var _listen: (DataChannelListener | None) = None
-  var _notify: DataChannelNotify
-  var _connect_count: U32
-  var _fd: U32 = -1
-  var _event: AsioEventID = AsioEvent.none()
-  var _connected: Bool = false
-  var _readable: Bool = false
-  var _reading: Bool = false
-  var _writeable: Bool = false
-  var _throttled: Bool = false
-  var _closed: Bool = false
-  var _shutdown: Bool = false
-  var _shutdown_peer: Bool = false
-  var _in_sent: Bool = false
-
-  embed _pending: List[(ByteSeq, USize)] = _pending.create()
-  embed _pending_writev: Array[USize] = _pending_writev.create()
-  var _pending_writev_total: USize = 0
-
-  var _read_buf: Array[U8] iso
-  var _read_buf_offset: USize = 0
-  var _expect_read_buf: Reader = Reader
-
-  var _next_size: USize
-  let _max_size: USize
-  let _max_received_count: U8 = 50
-
-  var _read_len: USize = 0
-  var _expect: USize = 0
-
-  var _muted: Bool = false
+actor DataChannel is TCPActor
+  var _listener: (DataChannelListener | None) = None
   let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
+  var _tcp_handler: TestableTCPHandler = EmptyTCPHandler
 
+  let _connections: Connections
+  let _auth: AmbientAuth
+  var _header: Bool = true
+  let _metrics_reporter: MetricsReporter
+  let _layout_initializer: LayoutInitializer tag
+  let _data_receivers: DataReceivers
+  let _recovery_replayer: RecoveryReconnecter
+  let _autoscale: Autoscale
+  let _router_registry: RouterRegistry
 
-  new create(auth: DataChannelAuth, notify: DataChannelNotify iso,
-    host: String, service: String, from: String = "", init_size: USize = 64,
-    max_size: USize = 16384)
-  =>
-    """
-    Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
-    will be made from the specified interface.
-    """
-    _read_buf = recover Array[U8].>undefined(init_size) end
-    _next_size = init_size
-    _max_size = max_size
-    _notify = consume notify
-    _connect_count = @pony_os_connect_tcp[U32](this,
-      host.cstring(), service.cstring(),
-      from.cstring())
-    _notify_connecting()
+  let _queue: Array[Array[U8] val] = _queue.create()
 
-  new ip4(auth: DataChannelAuth, notify: DataChannelNotify iso,
-    host: String, service: String, from: String = "", init_size: USize = 64,
-    max_size: USize = 16384)
-  =>
-    """
-    Connect via IPv4.
-    """
-    _read_buf = recover Array[U8].>undefined(init_size) end
-    _next_size = init_size
-    _max_size = max_size
-    _notify = consume notify
-    _connect_count = @pony_os_connect_tcp4[U32](this,
-      host.cstring(), service.cstring(),
-      from.cstring())
-    _notify_connecting()
+  // Initial state is an empty DataReceiver wrapper that should never
+  // be used (we fail if it is).
+  var _receiver: _DataReceiverWrapper = _InitDataReceiver
 
-  new ip6(auth: DataChannelAuth, notify: DataChannelNotify iso,
-    host: String, service: String, from: String = "", init_size: USize = 64,
-    max_size: USize = 16384)
-  =>
-    """
-    Connect via IPv6.
-    """
-    _read_buf = recover Array[U8].>undefined(init_size) end
-    _next_size = init_size
-    _max_size = max_size
-    _notify = consume notify
-    _connect_count = @pony_os_connect_tcp6[U32](this,
-      host.cstring(), service.cstring(),
-      from.cstring())
-    _notify_connecting()
-
-  new _accept(listen: DataChannelListener, notify: DataChannelNotify iso,
-    fd: U32, init_size: USize = 64, max_size: USize = 16384)
+  new _accept(listener: DataChannelListener,
+    tcp_handler_builder: TestableTCPHandlerBuilder,
+    connections: Connections, auth: AmbientAuth,
+    metrics_reporter: MetricsReporter iso,
+    layout_initializer: LayoutInitializer tag,
+    data_receivers: DataReceivers, recovery_replayer: RecoveryReconnecter,
+    autoscale: Autoscale, router_registry: RouterRegistry)
   =>
     """
     A new connection accepted on a server.
     """
-    _listen = listen
-    _notify = consume notify
-    _connect_count = 0
-    _fd = fd
-    _event = @pony_asio_event_create(this, fd,
-      AsioEvent.read_write_oneshot(), 0, true)
-    _connected = true
-    @pony_asio_event_set_writeable[None](_event, true)
-    _writeable = true
-    _read_buf = recover Array[U8].>undefined(init_size) end
-    _next_size = init_size
-    _max_size = max_size
+    _listener = listener
+    _connections = connections
+    _auth = auth
+    _metrics_reporter = consume metrics_reporter
+    _layout_initializer = layout_initializer
+    _data_receivers = data_receivers
+    _recovery_replayer = recovery_replayer
+    _autoscale = autoscale
+    _router_registry = router_registry
+    _receiver = _WaitingDataReceiver(_auth, this, _data_receivers)
+    _tcp_handler = tcp_handler_builder(this)
+    _tcp_handler.accept()
 
-    _notify.accepted(this)
-
-    _readable = true
-    _queue_read()
-    _pending_reads()
-
-  be identify_data_receiver(dr: DataReceiver, sender_step_id: RoutingId,
-    highest_seq_id: SeqId)
-  =>
-    """
-    Each abstract data channel (a connection from an OutgoingBoundary)
-    corresponds to a single DataReceiver. On reconnect, we want a new
-    DataChannel for that boundary to use the same DataReceiver. This is
-    called once we have found (or initially created) the DataReceiver for
-    this DataChannel.
-    """
-    _notify.identify_data_receiver(dr, sender_step_id, highest_seq_id, this)
-
-  be write(data: ByteSeq) =>
-    """
-    Write a single sequence of bytes.
-    """
-    if not _closed then
-      _in_sent = true
-      write_final(_notify.sent(this, data))
-      _in_sent = false
-    end
-
-  be queue(data: ByteSeq) =>
-    """
-    Queue a single sequence of bytes on linux.
-    Do nothing on windows.
-    """
-    ifdef not windows then
-      _pending_writev.>push(data.cpointer().usize()).>push(data.size())
-      _pending_writev_total = _pending_writev_total + data.size()
-      _pending.push((data, 0))
-    end
+  fun ref tcp_handler(): TestableTCPHandler =>
+    _tcp_handler
 
   be writev(data: ByteSeqIter) =>
-    _writev(data)
-
-  fun ref _writev(data: ByteSeqIter) =>
-    """
-    Write a sequence of sequences of bytes.
-    """
-
-    if not _closed then
-      _in_sent = true
-
-      ifdef windows then
-        for bytes in _notify.sentv(this, data).values() do
-          write_final(bytes)
-        end
-      else
-        for bytes in _notify.sentv(this, data).values() do
-          _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
-          _pending_writev_total = _pending_writev_total + bytes.size()
-          _pending.push((bytes, 0))
-        end
-
-        _pending_writes()
-      end
-
-      _in_sent = false
-    end
-
-  be queuev(data: ByteSeqIter) =>
-    """
-    Queue a sequence of sequences of bytes on linux.
-    Do nothing on windows.
-    """
-
-    ifdef not windows then
-      for bytes in _notify.sentv(this, data).values() do
-        _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
-        _pending_writev_total = _pending_writev_total + bytes.size()
-        _pending.push((bytes, 0))
-      end
-    end
-
-  be send_queue() =>
-    """
-    Write pending queue to network on linux.
-    Do nothing on windows.
-    """
-    ifdef not windows then
-      _pending_writes()
-    end
+    _tcp_handler.writev(data)
 
   be mute(d: Any tag) =>
     """
@@ -247,12 +97,7 @@ actor DataChannel
 
   fun ref _mute(d: Any tag) =>
     _muted_downstream.set(d)
-    if not _muted then
-      ifdef debug then
-        @printf[I32]("Muting DataChannel\n".cstring())
-      end
-      _muted = true
-    end
+    _tcp_handler.mute()
 
   be unmute(d: Any tag) =>
     """
@@ -264,18 +109,12 @@ actor DataChannel
     _muted_downstream.unset(d)
 
     if _muted_downstream.size() == 0 then
-      ifdef debug then
-        @printf[I32]("Unmuting DataChannel\n".cstring())
-      end
-      _muted = false
-      _pending_reads()
+      _tcp_handler.unmute()
     end
 
-  be set_notify(notify: DataChannelNotify iso) =>
-    """
-    Change the notifier.
-    """
-    _notify = consume notify
+  fun ref closed(locally_initiated_close: Bool) =>
+    @printf[I32]("DataChannel: server closed\n".cstring())
+    try (_listener as DataChannelListener)._conn_closed() end
 
   be dispose() =>
     """
@@ -284,557 +123,187 @@ actor DataChannel
     @printf[I32]("Shutting down DataChannel\n".cstring())
     close()
 
-  fun local_address(): NetAddress =>
-    """
-    Return the local IP address.
-    """
-    let ip = recover NetAddress end
-    @pony_os_sockname[Bool](_fd, ip)
-    ip
+  fun ref queue_msg(msg: Array[U8] val) =>
+    _queue.push(msg)
 
-  fun remote_address(): NetAddress =>
+  be identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
+    highest_seq_id: SeqId)
+  =>
     """
-    Return the remote IP address.
+    Each abstract data channel (a connection from an OutgoingBoundary)
+    corresponds to a single DataReceiver. On reconnect, we want a new
+    DataChannel for that boundary to use the same DataReceiver. This is
+    called once we have found (or initially created) the DataReceiver for
+    the DataChannel corresponding to this notify.
     """
-    let ip = recover NetAddress end
-    @pony_os_peername[Bool](_fd, ip)
-    ip
-
-
-  fun ref expect(qty: USize = 0) =>
-    """
-    A `received` call on the notifier must contain exactly `qty` bytes. If
-    `qty` is zero, the call can contain any amount of data.
-    """
-      _expect = _notify.expect(this, qty)
-
-  fun ref set_nodelay(state: Bool) =>
-    """
-    Turn Nagle on/off. Defaults to on. This can only be set on a connected
-    socket.
-    """
-    if _connected then
-      @pony_os_nodelay[None](_fd, state)
+    // State change to our real DataReceiver.
+    _receiver = _DataReceiver(_auth, _connections, _metrics_reporter.clone(),
+      _layout_initializer, _data_receivers, _recovery_replayer,
+      _autoscale, _router_registry, this, dr)
+    dr.data_connect(sender_boundary_id, highest_seq_id, this)
+    for msg in _queue.values() do
+      _receiver.decode_and_process(msg)
     end
+    _queue.clear()
 
-  fun ref set_keepalive(secs: U32) =>
-    """
-    Sets the TCP keepalive timeout to approximately secs seconds. Exact timing
-    is OS dependent. If secs is zero, TCP keepalive is disabled. TCP keepalive
-    is disabled by default. This can only be set on a connected socket.
-    """
-    if _connected then
-      @pony_os_keepalive[None](_fd, secs)
-    end
+    _unmute(this)
 
-  be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
-    """
-    Handle socket events.
-    """
-    if event isnt _event then
-      if AsioEvent.writeable(flags) then
-        // A connection has completed.
-        var fd = @pony_asio_event_fd(event)
-        _connect_count = _connect_count - 1
-
-        if not _connected and not _closed then
-          // We don't have a connection yet.
-          if @pony_os_connected[Bool](fd) then
-            // The connection was successful, make it ours.
-            _fd = fd
-            _event = event
-            _connected = true
-            _writeable = true
-            _readable = true
-
-            _notify.connected(this)
-            _queue_read()
-            _pending_reads()
-
-            // Don't call _complete_writes, as Windows will see this as a
-            // closed connection.
-            ifdef not windows then
-              if _pending_writes() then
-                //sent all data; release backpressure
-                _release_backpressure()
-              end
-            end
-          else
-            // The connection failed, unsubscribe the event and close.
-            @pony_asio_event_unsubscribe(event)
-            @pony_os_socket_close[None](fd)
-            _notify_connecting()
-          end
-        else
-          // We're already connected, unsubscribe the event and close.
-          @pony_asio_event_unsubscribe(event)
-          @pony_os_socket_close[None](fd)
-        end
-      else
-        // It's not our event.
-        if AsioEvent.disposable(flags) then
-          // It's disposable, so dispose of it.
-          @pony_asio_event_destroy(event)
-        end
+  fun ref received(data: Array[U8] iso, times: USize): Bool
+  =>
+    if _header then
+      ifdef "trace" then
+        @printf[I32]("Rcvd msg header on data channel\n".cstring())
       end
-    else
-      // At this point, it's our event.
-      if _connected and not _shutdown_peer then
-        if AsioEvent.writeable(flags) then
-          _writeable = true
-          _complete_writes(arg)
-            ifdef not windows then
-              if _pending_writes() then
-                //sent all data; release backpressure
-                _release_backpressure()
-              end
-            end
-        end
-
-        if AsioEvent.readable(flags) then
-          _readable = true
-          _complete_reads(arg)
-          _pending_reads()
-        end
-      end
-
-      if AsioEvent.disposable(flags) then
-        @pony_asio_event_destroy(event)
-        _event = AsioEvent.none()
-      end
-
-      _try_shutdown()
-    end
-
-  be _read_again() =>
-    """
-    Resume reading.
-    """
-    _pending_reads()
-
-  fun ref write_final(data: ByteSeq) =>
-    """
-    Write as much as possible to the socket. Set _writeable to false if not
-    everything was written. On an error, close the connection. This is for
-    data that has already been transformed by the notifier.
-    """
-    if not _closed then
-      ifdef windows then
-        try
-          // Add an IOCP write.
-          @pony_os_send[USize](_event, data.cpointer(), data.size()) ?
-          _pending.push((data, 0))
-
-          if _pending.size() > 32 then
-            // If more than 32 asynchronous writes are scheduled, apply
-            // backpressure. The choice of 32 is rather arbitrary an
-            // probably needs tuning
-            _apply_backpressure()
-          end
-        end
-      else
-        _pending_writev.>push(data.cpointer().usize()).>push(data.size())
-        _pending_writev_total = _pending_writev_total + data.size()
-        _pending.push((data, 0))
-        _pending_writes()
-      end
-    end
-
-  fun ref _complete_writes(len: U32) =>
-    """
-    The OS has informed as that len bytes of pending writes have completed.
-    This occurs only with IOCP on Windows.
-    """
-    ifdef windows then
-      var rem = len.usize()
-
-      if rem == 0 then
-        // IOCP reported a failed write on this chunk. Non-graceful shutdown.
-        try _pending.shift()? end
-        _hard_close()
-        return
-      end
-
-      while rem > 0 do
-        try
-          let node = _pending.head()?
-          (let data, let offset) = node()?
-          let total = rem + offset
-
-          if total < data.size() then
-            node()? = (data, total)
-            rem = 0
-          else
-            _pending.shift()?
-            rem = total - data.size()
-          end
-        end
-      end
-
-      if _pending.size() < 16 then
-        // If fewer than 16 asynchronous writes are scheduled, remove
-        // backpressure. The choice of 16 is rather arbitrary and probably
-        // needs to be tuned.
-        _release_backpressure()
-      end
-    end
-
-  be _write_again() =>
-    """
-    Resume writing.
-    """
-    _pending_writes()
-
-  fun ref _pending_writes(): Bool =>
-    """
-    Send pending data. If any data can't be sent, keep it and mark as not
-    writeable. On an error, dispose of the connection. Returns whether
-    it sent all pending data or not.
-    """
-    ifdef not windows then
-      // TODO: Make writev_batch_size user configurable
-      let writev_batch_size: USize = @pony_os_writev_max[I32]().usize()
-      var num_to_send: USize = 0
-      var bytes_to_send: USize = 0
-      var bytes_sent: USize = 0
-      while _writeable and not _shutdown_peer
-        and (_pending_writev_total > 0)
-      do
-        // yield if we sent max bytes
-        if bytes_sent > _max_size then
-          _write_again()
-          return false
-        end
-        try
-          //determine number of bytes and buffers to send
-          if (_pending_writev.size()/2) < writev_batch_size then
-            num_to_send = _pending_writev.size()/2
-            bytes_to_send = _pending_writev_total
-          else
-            //have more buffers than a single writev can handle
-            //iterate over buffers being sent to add up total
-            num_to_send = writev_batch_size
-            bytes_to_send = 0
-            for d in Range[USize](1, num_to_send*2, 2) do
-              bytes_to_send = bytes_to_send + _pending_writev(d)?
-            end
-          end
-
-          // Write as much data as possible.
-          var len = @pony_os_writev[USize](_event,
-            _pending_writev.cpointer(), num_to_send) ?
-
-          bytes_sent = bytes_sent + len
-
-          if len < bytes_to_send then
-            while len > 0 do
-              let iov_p = _pending_writev(0)?
-              let iov_s = _pending_writev(1)?
-              if iov_s <= len then
-                len = len - iov_s
-                _pending_writev.shift()?
-                _pending_writev.shift()?
-                _pending.shift()?
-                _pending_writev_total = _pending_writev_total - iov_s
-              else
-                _pending_writev.update(0, iov_p+len)?
-                _pending_writev.update(1, iov_s-len)?
-                _pending_writev_total = _pending_writev_total - len
-                len = 0
-              end
-            end
-            _apply_backpressure()
-          else
-            // sent all data we requested in this batch
-            _pending_writev_total = _pending_writev_total - bytes_to_send
-            if _pending_writev_total == 0 then
-              _pending_writev.clear()
-              _pending.clear()
-              return true
-            else
-              for d in Range[USize](0, num_to_send, 1) do
-                _pending_writev.shift()?
-                _pending_writev.shift()?
-                _pending.shift()?
-              end
-            end
-          end
-        else
-          // Non-graceful shutdown on error.
-          _hard_close()
-        end
-      end
-    end
-
-    false
-
-  fun ref _complete_reads(len: U32) =>
-    """
-    The OS has informed as that len bytes of pending reads have completed.
-    This occurs only with IOCP on Windows.
-    """
-    ifdef windows then
-      match len.usize()
-      | 0 =>
-        // The socket has been closed from the other side, or a hard close has
-        // cancelled the queued read.
-        _readable = false
-        _shutdown_peer = true
-        close()
-        return
-      | _next_size =>
-        _next_size = _max_size.min(_next_size * 2)
-      end
-
-      _read_len = _read_len + len.usize()
-
-      if (not _muted) and (_read_len >= _expect) then
-        let data = _read_buf = recover Array[U8] end
-        data.truncate(_read_len)
-        _read_len = 0
-
-        _notify.received(this, consume data)
-        _read_buf_size()
-      end
-
-      _queue_read()
-    end
-
-  fun ref _read_buf_size() =>
-    """
-    Resize the read buffer.
-    """
-    if _expect != 0 then
-      _read_buf.undefined(_expect.next_pow2().max(_next_size))
-    else
-      _read_buf.undefined(_next_size)
-    end
-
-  fun ref _queue_read() =>
-    """
-    Begin an IOCP read on Windows.
-    """
-    ifdef windows then
       try
-        @pony_os_recv[USize](
-          _event,
-          _read_buf.cpointer().usize() + _read_len,
-          _read_buf.size() - _read_len) ?
-      else
-        _hard_close()
+        let expect_bytes =
+          Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
+
+        expect(expect_bytes)
+        _header = false
       end
-    end
-
-  fun ref _pending_reads() =>
-    """
-    Unless this connection is currently muted, read while data is available,
-    guessing the next packet length as we go. If we read 4 kb of data, send
-    ourself a resume message and stop reading, to avoid starving other actors.
-    Currently we can handle a varying value of _expect (greater than 0) and
-    constant _expect of 0 but we cannot handle switching between these two
-    cases.
-    """
-    ifdef not windows then
-      try
-        var sum: USize = 0
-        var received_count: U8 = 0
-        _reading = true
-        while _readable and not _shutdown_peer do
-          // exit if muted
-          if _muted then
-            _reading = false
-            return
-          end
-
-          // distribute and data we've already read that is in the `read_buf`
-          // and able to be distributed
-          while (_read_buf_offset >= _expect) and (_read_buf_offset > 0) do
-            // get data to be distributed and update `_read_buf_offset`
-            let data =
-              if _expect == 0 then
-                let data' = _read_buf = recover Array[U8] end
-                data'.truncate(_read_buf_offset)
-                _read_buf_offset = 0
-                consume data'
-              else
-                let x = _read_buf = recover Array[U8] end
-                (let data', _read_buf) = (consume x).chop(_expect)
-                _read_buf_offset = _read_buf_offset - _expect
-                consume data'
-              end
-
-            // increment max reads
-            received_count = received_count + 1
-
-            // check if we should yield to let another actor run
-            if (not _notify.received(this, consume data))
-              or (received_count >= _max_received_count)
-            then
-              _read_buf_size()
-              _read_again()
-              _reading = false
-              return
-            end
-          end
-
-          if sum >= _max_size then
-            // If we've read _max_size, yield and read again later.
-            _read_buf_size()
-            _read_again()
-            _reading = false
-            return
-          end
-
-          // make sure we have enough space to read enough data for _expect
-          if _read_buf.size() <= _read_buf_offset then
-            _read_buf_size()
-          end
-
-          // Read as much data as possible.
-          let len = @pony_os_recv[USize](
-            _event,
-            _read_buf.cpointer(_read_buf_offset),
-            _read_buf.size() - _read_buf_offset) ?
-
-          match len
-          | 0 =>
-            // Would block, try again later.
-            // this is safe because asio thread isn't currently subscribed
-            // for a read event so will not be writing to the readable flag
-            @pony_asio_event_set_readable[None](_event, false)
-            _readable = false
-            _reading = false
-            @pony_asio_event_resubscribe_read(_event)
-            return
-          | (_read_buf.size() - _read_buf_offset) =>
-            // Increase the read buffer size.
-            _next_size = _max_size.min(_next_size * 2)
-          end
-
-          _read_buf_offset = _read_buf_offset + len
-          sum = sum + len
-        end
-      else
-        // The socket has been closed from the other side.
-        _shutdown_peer = true
-        _hard_close()
-      end
-      _reading = false
-    end
-
-  fun ref _notify_connecting() =>
-    """
-    Inform the notifier that we're connecting.
-    """
-    if _connect_count > 0 then
-      _notify.connecting(this, _connect_count)
+      true
     else
-      _notify.connect_failed(this)
-      _hard_close()
-    end
+      ifdef "trace" then
+        @printf[I32]("Rcvd msg on data channel\n".cstring())
+      end
+      _receiver.decode_and_process(consume data)
 
-  fun ref close() =>
-    """
-    Shut our connection down immediately. Stop reading data from the incoming
-    source.
-    """
-    _hard_close()
+      expect(4)
+      _header = true
 
-  fun ref _close() =>
-    _closed = true
-    _try_shutdown()
-
-  fun ref _try_shutdown() =>
-    """
-    If we have closed and we have no remaining writes or pending connections,
-    then shutdown.
-    """
-    if not _closed then
-      return
-    end
-
-    let rem = ifdef windows then
-      _pending.size()
-    else
-      _pending_writev_total
-    end
-
-    if
-      not _shutdown and
-      (_connect_count == 0) and
-      (rem == 0)
-    then
-      _shutdown = true
-
-      if _connected then
-        @pony_os_socket_shutdown[None](_fd)
+      ifdef linux then
+        true
       else
-        _shutdown_peer = true
+        false
       end
     end
 
-    if _connected and _shutdown and _shutdown_peer then
-      _hard_close()
-    end
+  fun ref accepted() =>
+    @printf[I32]("accepted data channel connection\n".cstring())
+    set_nodelay(true)
+    expect(4)
 
-    ifdef windows then
-      // On windows, wait until all outstanding IOCP operations have completed
-      // or been cancelled.
-      if not _connected and not _readable and (_pending.size() == 0) then
-        @pony_asio_event_unsubscribe(_event)
+  fun ref connected() =>
+    @printf[I32]("incoming connected on data channel\n".cstring())
+
+
+trait _DataReceiverWrapper
+  fun ref decode_and_process(data: Array[U8] val) =>
+    Fail()
+
+class _InitDataReceiver is _DataReceiverWrapper
+
+class _WaitingDataReceiver is _DataReceiverWrapper
+  let _auth: AmbientAuth
+  let _data_channel: DataChannel ref
+  let _data_receivers: DataReceivers
+
+  new create(auth: AmbientAuth, data_channel: DataChannel ref,
+    data_receivers: DataReceivers)
+  =>
+    _auth = auth
+    _data_channel = data_channel
+    _data_receivers = data_receivers
+
+  fun ref decode_and_process(data: Array[U8] val) =>
+    match ChannelMsgDecoder(data, _auth)
+    | let dc: DataConnectMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received DataConnectMsg on Data Channel\n".cstring())
       end
+      // Before we can begin processing messages on this data channel, we
+      // need to determine which DataReceiver we'll be forwarding data
+      // messages to.
+      _data_channel._mute(_data_channel)
+      _data_receivers.request_data_receiver(dc.sender_name,
+        dc.sender_boundary_id, dc.highest_seq_id, _data_channel)
+    else
+      _data_channel.queue_msg(data)
     end
 
-  fun ref _hard_close() =>
-    """
-    When an error happens, do a non-graceful close.
-    """
-    if not _connected then
-      return
+class _DataReceiver is _DataReceiverWrapper
+  let _auth: AmbientAuth
+  let _connections: Connections
+  let _metrics_reporter: MetricsReporter
+  let _layout_initializer: LayoutInitializer tag
+  let _data_receivers: DataReceivers
+  let _recovery_replayer: RecoveryReconnecter
+  let _autoscale: Autoscale
+  let _router_registry: RouterRegistry
+  let _data_channel: DataChannel ref
+  let _data_receiver: DataReceiver
+
+  new create(auth: AmbientAuth, connections: Connections,
+    metrics_reporter: MetricsReporter iso,
+    layout_initializer: LayoutInitializer tag,
+    data_receivers: DataReceivers, recovery_replayer: RecoveryReconnecter,
+    autoscale: Autoscale, router_registry: RouterRegistry,
+    data_channel: DataChannel ref, dr: DataReceiver)
+  =>
+    _auth = auth
+    _connections = connections
+    _metrics_reporter = consume metrics_reporter
+    _layout_initializer = layout_initializer
+    _data_receivers = data_receivers
+    _recovery_replayer = recovery_replayer
+    _autoscale = autoscale
+    _router_registry = router_registry
+    _data_channel = data_channel
+    _data_receiver = dr
+
+  fun ref decode_and_process(data: Array[U8] val) =>
+    // because we received this from another worker
+    let ingest_ts = WallClock.nanoseconds()
+    let my_latest_ts = ingest_ts
+
+    match ChannelMsgDecoder(data, _auth)
+    | let data_msg: DataMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received DataMsg on Data Channel\n".cstring())
+      end
+      _metrics_reporter.step_metric(data_msg.metric_name,
+        "Before receive on data channel (network time)", data_msg.metrics_id,
+        data_msg.latest_ts, ingest_ts)
+      _data_receiver.received(data_msg.delivery_msg, data_msg.producer_id,
+          data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
+          data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
+          my_latest_ts)
+    | let dc: DataConnectMsg =>
+      @printf[I32](("Received DataConnectMsg on DataChannel, but we already " +
+        "have a DataReceiver for this connection.\n").cstring())
+    | let ia: DataReceiverAckImmediatelyMsg =>
+      _data_receiver.data_receiver_ack_immediately()
+    | let km: KeyMigrationMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received KeyMigrationMsg on Data Channel\n".cstring())
+      end
+      _router_registry.receive_immigrant_key(km)
+    | let m: MigrationBatchCompleteMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received MigrationBatchCompleteMsg on Data Channel\n".cstring())
+      end
+      _autoscale.worker_completed_migration_batch(m.sender_name)
+    | let aw: AckDataReceivedMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received AckDataReceivedMsg on Data Channel\n"
+          .cstring())
+      end
+      Fail()
+    | let m: SpinUpLocalTopologyMsg =>
+      @printf[I32]("Received spin up local topology message!\n".cstring())
+    | let m: ReportStatusMsg =>
+      _data_receiver.report_status(m.code)
+    | let m: RegisterProducerMsg =>
+      _data_receiver.register_producer(m.source_id, m.target_id)
+    | let m: UnregisterProducerMsg =>
+      _data_receiver.unregister_producer(m.source_id, m.target_id)
+    | let m: ForwardBarrierMsg =>
+      _data_receiver.forward_barrier(m.target_id, m.origin_id, m.token, m.seq_id)
+    | let m: UnknownChannelMsg =>
+      @printf[I32]("Unknown Wallaroo data message type: UnknownChannelMsg.\n"
+        .cstring())
+    else
+      @printf[I32]("Unknown Wallaroo data message type.\n".cstring())
     end
 
-    _connected = false
-    _closed = true
-    _shutdown = true
-    _shutdown_peer = true
-
-    ifdef not windows then
-      // Unsubscribe immediately and drop all pending writes.
-      @pony_asio_event_unsubscribe(_event)
-      _pending_writev.clear()
-      _pending.clear()
-      _pending_writev_total = 0
-      _readable = false
-      _writeable = false
-      @pony_asio_event_set_readable[None](_event, false)
-      @pony_asio_event_set_writeable[None](_event, false)
-    end
-
-    // On windows, this will also cancel all outstanding IOCP operations.
-    @pony_os_socket_close[None](_fd)
-    _fd = -1
-
-    _notify.closed(this)
-
-    try (_listen as DataChannelListener)._conn_closed() end
-
-  fun ref _apply_backpressure() =>
-    if not _throttled then
-      _throttled = true
-      _notify.throttled(this)
-    end
-    ifdef not windows then
-      _writeable = false
-      // this is safe because asio thread isn't currently subscribed
-      // for a write event so will not be writing to the readable flag
-      @pony_asio_event_set_writeable[None](_event, false)
-      @pony_asio_event_resubscribe_write(_event)
-    end
-
-
-  fun ref _release_backpressure() =>
-    if _throttled then
-      _throttled = false
-      _notify.unthrottled(this)
-    end
 

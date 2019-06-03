@@ -1,29 +1,18 @@
 /*
 
-Copyright (C) 2016-2017, Wallaroo Labs
-Copyright (C) 2016-2017, The Pony Developers
-Copyright (c) 2014-2015, Causality Ltd.
-All rights reserved.
+Copyright 2019 The Wallaroo Authors.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
 
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
+     http://www.apache.org/licenses/LICENSE-2.0
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ implied. See the License for the specific language governing
+ permissions and limitations under the License.
 
 */
 
@@ -42,7 +31,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/network"
 use "wallaroo/core/recovery"
 use "wallaroo/core/routing"
-use "wallaroo/core/spike"
+use "wallaroo/core/tcp_actor"
 use "wallaroo/core/topology"
 use "wallaroo_labs/bytes"
 use "wallaroo_labs/mort"
@@ -50,26 +39,27 @@ use "wallaroo_labs/time"
 
 
 class val OutgoingBoundaryBuilder
-  let auth: AmbientAuth
-  let worker_name: String
-  let reporter: MetricsReporter val
-  let host: String
-  let service: String
-  let spike_config_none: (SpikeConfig | None)
+  let _auth: AmbientAuth
+  let _worker_name: String
+  let _reporter: MetricsReporter val
+  let _host: String
+  let _service: String
+  let _tcp_handler_builder: TestableTCPHandlerBuilder
 
-  new val create(auth': AmbientAuth, name: String, r: MetricsReporter iso,
-    h: String, s: String, spike_config: (SpikeConfig | None) = None)
+  new val create(auth: AmbientAuth, worker_name: String,
+    reporter: MetricsReporter iso, host: String, service: String,
+    tcp_handler_builder: TestableTCPHandlerBuilder)
   =>
-    auth = auth'
-    worker_name = name
-    reporter = consume r
-    host = h
-    service = s
-    spike_config_none = spike_config
+    _auth = auth
+    _worker_name = worker_name
+    _reporter = consume reporter
+    _host = host
+    _service = service
+    _tcp_handler_builder = tcp_handler_builder
 
   fun apply(routing_id: RoutingId, target_worker: String): OutgoingBoundary =>
-    let boundary = OutgoingBoundary(auth, worker_name, target_worker,
-      reporter.clone(), host, service where spike_config = spike_config_none)
+    let boundary = OutgoingBoundary(_auth, _worker_name, target_worker,
+      _tcp_handler_builder, _reporter.clone(), _host, _service)
     boundary.register_routing_id(routing_id)
     boundary
 
@@ -79,18 +69,17 @@ class val OutgoingBoundaryBuilder
     """
     Called when creating a boundary post cluster initialization
     """
-    let boundary = OutgoingBoundary(auth, worker_name, target_worker,
-      reporter.clone(), host, service where spike_config = spike_config_none)
+    let boundary = OutgoingBoundary(_auth, _worker_name, target_worker,
+      _tcp_handler_builder, _reporter.clone(), _host, _service)
     boundary.register_routing_id(routing_id)
     boundary.quick_initialize(layout_initializer)
     boundary
 
-  fun val clone_with_new_service(host': String, service': String):
+  fun val clone_with_new_service(host: String, service: String):
     OutgoingBoundaryBuilder val
   =>
-    let r = reporter.clone()
-    OutgoingBoundaryBuilder(auth, worker_name, consume r, host', service',
-      spike_config_none)
+    OutgoingBoundaryBuilder(_auth, _worker_name, _reporter.clone(),
+      host, service, _tcp_handler_builder)
 
 actor OutgoingBoundary is (Consumer & TCPActor)
   // Steplike
@@ -118,7 +107,6 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   var _routing_id: RoutingId = 0
   var _host: String
   var _service: String
-  let _from: String
   // Queuing all messages in case we need to resend them
   let _queue: Array[Array[ByteSeq] val] = _queue.create()
   // Queuing messages we haven't sent yet (these will also be queued in _queue,
@@ -138,43 +126,35 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     (Promise[OutgoingBoundary] | None) = None
 
   // TCP
-  var _tcp_handler: TestableTCPHandler[OutgoingBoundary ref] =
-    EmptyTCPHandler[OutgoingBoundary ref]
-  let _notify: TestableBoundaryNotify[OutgoingBoundary ref]
+  var _tcp_handler: TestableTCPHandler = EmptyTCPHandler
+
+  var _header: Bool = true
+  let _reconnect_closed_delay: U64
+  let _reconnect_failed_delay: U64
+  var _initial_connection_was_established: Bool = false
 
   new create(auth: AmbientAuth, worker_name: String, target_worker: String,
+    tcp_handler_builder: TestableTCPHandlerBuilder,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
-    from: String = "", init_size: USize = 64, max_size: USize = 65_536,
-    spike_config:(SpikeConfig | None) = None)
+    reconnect_closed_delay: U64 = 100_000_000,
+    reconnect_failed_delay: U64 = 10_000_000_000)
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
     _auth = auth
-    ifdef "spike" then
-      match spike_config
-      | let sc: SpikeConfig =>
-        var notify = recover iso BoundaryNotify(_auth, _routing_id,
-          worker_name, target_worker, host, service) end
-        _notify = SpikeBoundaryNotifyWrapper(consume notify, sc)
-      else
-        _notify = BoundaryNotify(_auth, _routing_id, worker_name,
-          target_worker, host, service)
-      end
-    else
-      _notify = BoundaryNotify(_auth, _routing_id, worker_name,
-        target_worker, host, service)
-    end
-
     _worker_name = worker_name
     _target_worker = target_worker
     _host = host
     _service = service
-    _from = from
     _metrics_reporter = consume metrics_reporter
-    _tcp_handler = TCPHandler[OutgoingBoundary ref](this, _notify,
-      init_size, max_size)
+    _reconnect_closed_delay = reconnect_closed_delay
+    _reconnect_failed_delay = reconnect_failed_delay
+    _tcp_handler = tcp_handler_builder(this)
+
+  fun ref tcp_handler(): TestableTCPHandler =>
+    _tcp_handler
 
   //
   // Application startup lifecycle event
@@ -185,7 +165,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer) =>
-    _tcp_handler.connect(_host, _service, _from, this)
+    _tcp_handler.connect(_host, _service)
     @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" + _service +
       "\n").cstring())
 
@@ -217,7 +197,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
         _initializer = initializer
         _reported_initialized = true
         _reported_ready_to_work = true
-        _tcp_handler.connect(_host, _service, _from, this)
+        _tcp_handler.connect(_host, _service)
 
         @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" +
           _service + "\n").cstring())
@@ -238,6 +218,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _pending_immediate_ack_promise = p
     try
       let msg = ChannelMsgEncoder.data_receiver_ack_immediately(_auth)?
+
       _tcp_handler.writev(msg)
     else
       Fail()
@@ -262,7 +243,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
       // set replaying to true since we might need to replay to
       // downstream before resuming
       _replaying = true
-      _tcp_handler.connect(_host, _service, _from, this)
+      _tcp_handler.connect(_host, _service)
     end
 
   be migrate_key(routing_id: RoutingId, step_group: RoutingId, key: Key,
@@ -287,7 +268,6 @@ actor OutgoingBoundary is (Consumer & TCPActor)
 
   be register_routing_id(routing_id: RoutingId) =>
     _routing_id = routing_id
-    _notify.register_routing_id(routing_id)
 
     ifdef "identify_routing_ids" then
       @printf[I32]("===OutgoingBoundary %s routing_id registered===\n"
@@ -435,7 +415,6 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _unmute_upstreams()
     _timers.dispose()
     _tcp_handler.close()
-    _notify.dispose()
 
   be request_ack() =>
     // TODO: How do we propagate this down?
@@ -575,7 +554,6 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     end
     _host = host
     _service = service
-    _notify.update_address(_host, _service)
     _reconnect()
 
   ///////////
@@ -619,30 +597,6 @@ actor OutgoingBoundary is (Consumer & TCPActor)
       not _replaying and
       not _backup_queue_is_overflowing()
 
-  ///////////
-  // TCP
-  ///////////
-  be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
-    _tcp_handler.event_notify(event, flags, arg, this)
-
-  be write_again() =>
-    _tcp_handler.write_again()
-
-  be read_again() =>
-    _tcp_handler.read_again()
-
-  fun ref expect(qty: USize = 0) =>
-    _tcp_handler.expect(qty)
-
-  fun ref set_nodelay(state: Bool) =>
-    _tcp_handler.set_nodelay(state)
-
-  fun ref close() =>
-    _tcp_handler.close()
-
-  fun ref _writev(data: ByteSeqIter) =>
-    _tcp_handler.writev(data)
-
   fun ref set_connection_not_initialized() =>
     _connection_initialized = false
 
@@ -675,51 +629,12 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   fun ref reset_reconnect_pause() =>
     _reconnect_pause = _initial_reconnect_pause
 
-trait TestableBoundaryNotify[T: TCPActor ref] is TCPHandlerNotify[T]
-  fun ref update_address(host: String, service: String)
-  fun ref register_routing_id(r_id: RoutingId)
-
-class BoundaryNotify is TestableBoundaryNotify[OutgoingBoundary ref]
-  let _auth: AmbientAuth
-  var _routing_id: RoutingId
-  let _worker_name: WorkerName
-  let _target_worker: WorkerName
-  var _host: String
-  var _service: String
-  var _header: Bool = true
-  let _reconnect_closed_delay: U64
-  let _reconnect_failed_delay: U64
-  var _initial_connection_was_established: Bool = false
-
-  new create(auth: AmbientAuth, routing_id: RoutingId, worker_name: WorkerName,
-    target_worker: WorkerName, host: String, service: String,
-    reconnect_closed_delay: U64 = 100_000_000,
-    reconnect_failed_delay: U64 = 10_000_000_000)
-    =>
-    _auth = auth
-    _routing_id = routing_id
-    _worker_name = worker_name
-    _target_worker = target_worker
-    _host = host
-    _service = service
-    _reconnect_closed_delay = reconnect_closed_delay
-    _reconnect_failed_delay = reconnect_failed_delay
-
-  fun ref update_address(host: String, service: String) =>
-    _host = host
-    _service = service
-
-  fun ref register_routing_id(r_id: RoutingId) =>
-    _routing_id = r_id
-
-  fun ref received(conn: OutgoingBoundary ref, data: Array[U8] iso,
-    times: USize): Bool
-  =>
+  fun ref received(data: Array[U8] iso, times: USize): Bool =>
     if _header then
       try
         let e = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
-        conn.expect(e)
+        expect(e)
         _header = false
       end
       true
@@ -732,29 +647,29 @@ class BoundaryNotify is TestableBoundaryNotify[OutgoingBoundary ref]
         ifdef "trace" then
           @printf[I32]("Received AckDataConnectMsg at Boundary\n".cstring())
         end
-        conn.receive_connect_ack(ac.last_id_seen)
+        receive_connect_ack(ac.last_id_seen)
       | let dd: DataDisconnectMsg =>
-        conn.dispose()
+        dispose()
       | let sn: StartNormalDataSendingMsg =>
         ifdef "trace" then
           @printf[I32]("Received StartNormalDataSendingMsg at Boundary\n"
             .cstring())
         end
-        conn.receive_connect_ack(sn.last_id_seen)
-        conn.start_normal_sending()
+        receive_connect_ack(sn.last_id_seen)
+        start_normal_sending()
       | let aw: AckDataReceivedMsg =>
         ifdef "trace" then
           @printf[I32]("Received AckDataReceivedMsg at Boundary\n".cstring())
         end
-        conn.receive_ack(aw.seq_id)
+        receive_ack(aw.seq_id)
       | let ia: ImmediateAckMsg =>
-        conn.receive_immediate_ack()
+        receive_immediate_ack()
       else
         @printf[I32](("Unknown Wallaroo data message type received at " +
           "OutgoingBoundary.\n").cstring())
       end
 
-      conn.expect(4)
+      expect(4)
       _header = true
 
       ifdef linux then
@@ -764,23 +679,24 @@ class BoundaryNotify is TestableBoundaryNotify[OutgoingBoundary ref]
       end
     end
 
-  fun ref connecting(conn: OutgoingBoundary ref, count: U32) =>
-    @printf[I32]("BoundaryNotify: attempting to connect to %s at %s:%s...\n\n"
-      .cstring(), _target_worker.cstring(), _host.cstring(),
-      _service.cstring())
+  fun ref connecting(count: U32) =>
+    @printf[I32](
+      "OutgoingBoundary: attempting to connect to %s at %s:%s...\n\n"
+        .cstring(), _target_worker.cstring(), _host.cstring(),
+        _service.cstring())
 
-  fun ref connected(conn: OutgoingBoundary ref) =>
-    @printf[I32]("BoundaryNotify: connected to %s at %s:%s...\n\n"
+  fun ref connected() =>
+    @printf[I32]("OutgoingBoundary: connected to %s at %s:%s...\n\n"
       .cstring(), _target_worker.cstring(), _host.cstring(),
       _service.cstring())
-    conn.resend_producer_registrations()
-    conn.reset_reconnect_pause()
+    resend_producer_registrations()
+    reset_reconnect_pause()
     if _initial_connection_was_established then
       // This is not the initial time we connected, so we're reconnecting.
       try
         let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
-          _routing_id, conn.seq_id, _auth)?
-        conn._writev(connect_msg)
+          _routing_id, seq_id, _auth)?
+        _tcp_handler.writev(connect_msg)
       else
         @printf[I32]("error creating data connect message on reconnect\n"
           .cstring())
@@ -788,45 +704,38 @@ class BoundaryNotify is TestableBoundaryNotify[OutgoingBoundary ref]
     else
       _initial_connection_was_established = true
     end
-    conn.set_nodelay(true)
-    conn.expect(4)
-    conn.maybe_report_initialized()
-    conn._maybe_mute_or_unmute_upstreams()
+    set_nodelay(true)
+    expect(4)
+    maybe_report_initialized()
+    _maybe_mute_or_unmute_upstreams()
 
-  fun ref closed(conn: OutgoingBoundary ref, locally_initiated_close: Bool) =>
-    @printf[I32]("BoundaryNotify: closed connection to %s at %s:%s...\n\n"
+  fun ref closed(locally_initiated_close: Bool) =>
+    @printf[I32]("OutgoingBoundary: closed connection to %s at %s:%s...\n\n"
       .cstring(), _target_worker.cstring(), _host.cstring(),
       _service.cstring())
     if not locally_initiated_close then
-      conn._schedule_reconnect()
+      _schedule_reconnect()
     end
-    conn.set_connection_not_initialized()
+    set_connection_not_initialized()
 
-  fun ref connect_failed(conn: OutgoingBoundary ref) =>
-    @printf[I32]("BoundaryNotify: connect_failed to %s at %s:%s...\n\n"
+  fun ref connect_failed() =>
+    @printf[I32]("OutgoingBoundary: connect_failed to %s at %s:%s...\n\n"
       .cstring(), _target_worker.cstring(), _host.cstring(),
       _service.cstring())
-    conn._schedule_reconnect()
+    _schedule_reconnect()
 
-  fun ref sentv(conn: OutgoingBoundary ref,
-    data: ByteSeqIter): ByteSeqIter
-  =>
-    data
-
-  fun ref expect(conn: OutgoingBoundary ref, qty: USize): USize =>
-    qty
-
-  fun ref throttled(conn: OutgoingBoundary ref) =>
-    @printf[I32]("BoundaryNotify: throttled connection to %s at %s:%s...\n\n"
+  fun ref throttled() =>
+    @printf[I32]("OutgoingBoundary: throttled connection to %s at %s:%s...\n\n"
       .cstring(), _target_worker.cstring(), _host.cstring(),
       _service.cstring())
-    conn._maybe_mute_or_unmute_upstreams()
+    _maybe_mute_or_unmute_upstreams()
 
-  fun ref unthrottled(conn: OutgoingBoundary ref) =>
-    @printf[I32]("BoundaryNotify: unthrottled connection to %s at %s:%s...\n\n"
+  fun ref unthrottled() =>
+    @printf[I32]("OutgoingBoundary: unthrottled connection to %s at %s:%s...\n\n"
       .cstring(), _target_worker.cstring(), _host.cstring(),
       _service.cstring())
-    conn._maybe_mute_or_unmute_upstreams()
+    _maybe_mute_or_unmute_upstreams()
+
 
 class _PauseBeforeReconnect is TimerNotify
   let _ob: OutgoingBoundary

@@ -1,7 +1,37 @@
+/*
+
+Copyright (C) 2016-2017, Wallaroo Labs
+Copyright (C) 2016-2017, The Pony Developers
+Copyright (c) 2014-2015, Causality Ltd.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+*/
+
 use "buffered"
 use "collections"
 use "net"
 use "wallaroo_labs/bytes"
+use "wallaroo_labs/mort"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
@@ -12,24 +42,19 @@ use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 
-trait TCPActor
-  // This behavior must be implemented so that the Pony runtime can
-  // call it.
-  be _event_notify(event: AsioEventID, flags: U32, arg: U32)
-  be write_again()
-  be read_again()
-  fun ref expect(qty: USize = 0)
-  fun ref set_nodelay(state: Bool)
-  fun ref close()
+interface val TestableTCPHandlerBuilder
+  fun apply(tcp_actor: TCPActor ref): TestableTCPHandler
 
-trait TestableTCPHandler[T: TCPActor ref]
+trait TestableTCPHandler
   fun is_connected(): Bool
 
-  fun ref connect(host: String, service: String, from: String,
-    conn: TCPActor ref)
+  fun ref accept()
 
-  fun ref event_notify(event: AsioEventID, flags: U32, arg: U32,
-    actor_type: T)
+  fun ref connect(host: String, service: String)
+
+  fun ref event_notify(event: AsioEventID, flags: U32, arg: U32)
+
+  fun ref write(data: ByteSeq)
 
   fun ref writev(data: ByteSeqIter)
 
@@ -45,17 +70,28 @@ trait TestableTCPHandler[T: TCPActor ref]
 
   fun ref set_nodelay(state: Bool)
 
-class EmptyTCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
+  fun local_address(): NetAddress
+
+  fun remote_address(): NetAddress
+
+  /////////////
+  // TODO: these mute/unmute methods should be removed
+  fun ref mute() => Fail()
+  fun ref unmute() => Fail()
+
+class EmptyTCPHandler is TestableTCPHandler
   fun is_connected(): Bool => false
 
-  fun ref connect(host: String, service: String, from: String,
-    conn: TCPActor ref)
-  =>
+  fun ref accept() =>
     None
 
-  fun ref event_notify(event: AsioEventID, flags: U32, arg: U32,
-    actor_type: T)
-  =>
+  fun ref connect(host: String, service: String) =>
+    None
+
+  fun ref event_notify(event: AsioEventID, flags: U32, arg: U32) =>
+    None
+
+  fun ref write(data: ByteSeq) =>
     None
 
   fun ref writev(data: ByteSeqIter) =>
@@ -79,9 +115,25 @@ class EmptyTCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
   fun ref set_nodelay(state: Bool) =>
     None
 
-class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
-  let _tcp_actor: T
-  let _notify: TCPHandlerNotify[T]
+  fun local_address(): NetAddress =>
+    NetAddress
+
+  fun remote_address(): NetAddress =>
+    NetAddress
+
+class val TCPHandlerBuilder is TestableTCPHandlerBuilder
+  let _init_size: USize
+  let _max_size: USize
+
+  new val create(init_size: USize = 64, max_size: USize = 65_536) =>
+    _init_size = init_size
+    _max_size = max_size
+
+  fun apply(tcp_actor: TCPActor ref): TestableTCPHandler =>
+    TCPHandler(tcp_actor, _init_size, _max_size)
+
+class TCPHandler is TestableTCPHandler
+  let _tcp_actor: TCPActor ref
   var _read_buf: Array[U8] iso
   var _next_size: USize
   let _max_size: USize
@@ -103,12 +155,10 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
   var _shutdown: Bool = false
   var _muted: Bool = false
   var _expect_read_buf: Reader = Reader
+  let _from: String = ""
 
-  new create(tcp_actor: T, notify: TCPHandlerNotify[T],
-    init_size: USize, max_size: USize)
-  =>
+  new create(tcp_actor: TCPActor ref, init_size: USize, max_size: USize) =>
     _tcp_actor = tcp_actor
-    _notify = notify
     _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
@@ -116,18 +166,17 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
   fun is_connected(): Bool =>
     _connected
 
-  fun ref connect(host: String, service: String, from: String,
-    conn: TCPActor ref)
-  =>
+  fun ref accept() =>
+    None
+
+  fun ref connect(host: String, service: String) =>
     if not _connected then
-      _connect_count = @pony_os_connect_tcp[U32](conn,
-        host.cstring(), service.cstring(), from.cstring())
+      _connect_count = @pony_os_connect_tcp[U32](_tcp_actor,
+        host.cstring(), service.cstring(), _from.cstring())
       _notify_connecting()
     end
 
-  fun ref event_notify(event: AsioEventID, flags: U32, arg: U32,
-    actor_type: T)
-  =>
+  fun ref event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     """
     Handle socket events.
     """
@@ -147,7 +196,7 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
             _writeable = true
             _readable = true
 
-            _notify.connected(_tcp_actor)
+            _tcp_actor.connected()
             _pending_reads()
 
             ifdef not windows then
@@ -183,7 +232,7 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
             _shutdown = false
             _shutdown_peer = false
 
-            _notify.connected(_tcp_actor)
+            _tcp_actor.connected()
             _pending_reads()
 
             ifdef not windows then
@@ -237,6 +286,13 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
       _try_shutdown(where locally_initiated_close = false)
     end
 
+  fun ref write(data: ByteSeq) =>
+    """
+    Write a single sequence of bytes.
+    """
+    // Not currently supported here
+    Fail()
+
   fun ref writev(data: ByteSeqIter) =>
     """
     Write a sequence of sequences of bytes.
@@ -244,7 +300,7 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
     _in_sent = true
 
     var data_size: USize = 0
-    for bytes in _notify.sentv(_tcp_actor, data).values() do
+    for bytes in _tcp_actor.sentv(data).values() do
       _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
       _pending_writev_total = _pending_writev_total + bytes.size()
       _pending.push((bytes, 0))
@@ -272,9 +328,9 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
     Inform the notifier that we're connecting.
     """
     if _connect_count > 0 then
-      _notify.connecting(_tcp_actor, _connect_count)
+      _tcp_actor.connecting(_connect_count)
     else
-      _notify.connect_failed(_tcp_actor)
+      _tcp_actor.connect_failed()
       _hard_close()
     end
 
@@ -339,7 +395,7 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
     @pony_os_socket_close[None](_fd)
     _fd = -1
 
-    _notify.closed(_tcp_actor, locally_initiated_close)
+    _tcp_actor.closed(locally_initiated_close)
 
   fun ref _pending_reads() =>
     """
@@ -384,7 +440,7 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
           _read_len = 0
 
           received_called = received_called + 1
-          if not _notify.received(_tcp_actor, consume data,
+          if not _tcp_actor.received(consume data,
             received_called)
           then
             _read_buf_size()
@@ -410,9 +466,7 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
     end
 
   fun can_send(): Bool =>
-    _connected and
-      _writeable and
-      not _closed
+    _connected and _writeable and not _closed
 
   fun ref read_again() =>
     """
@@ -524,7 +578,7 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
     if called in the `sent` notifier callback.
     """
     if not _in_sent then
-      _expect = _notify.expect(_tcp_actor, qty)
+      _expect = qty
       _read_buf_size()
     end
 
@@ -540,7 +594,7 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
   fun ref _apply_backpressure() =>
     if not _throttled then
       _throttled = true
-      _notify.throttled(_tcp_actor)
+      _tcp_actor.throttled()
     end
     _writeable = false
     // this is safe because asio thread isn't currently subscribed
@@ -551,5 +605,21 @@ class TCPHandler[T: TCPActor ref] is TestableTCPHandler[T]
   fun ref _release_backpressure() =>
     if _throttled then
       _throttled = false
-      _notify.unthrottled(_tcp_actor)
+      _tcp_actor.unthrottled()
     end
+
+  fun local_address(): NetAddress =>
+    """
+    Return the local IP address.
+    """
+    let ip = recover NetAddress end
+    @pony_os_sockname[Bool](_fd, ip)
+    ip
+
+  fun remote_address(): NetAddress =>
+    """
+    Return the remote IP address.
+    """
+    let ip = recover NetAddress end
+    @pony_os_peername[Bool](_fd, ip)
+    ip
