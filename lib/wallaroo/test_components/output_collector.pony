@@ -34,7 +34,7 @@ primitive TestOutputCollectorStepBuilder[V: (Hashable & Equatable[V] &
   fun apply(env: Env, auth: AmbientAuth, oc: TestOutputCollector[V]): Step
   =>
     Step(auth, "", RouterRunner(PassthroughPartitionerBuilder),
-      _MetricsReporterDummyBuilder(), 1, _EventLogDummyBuilder(auth),
+      MetricsReporterDummyBuilder(), 1, _EventLogDummyBuilder(auth),
       _RecoveryReconnecterDummyBuilder(env, auth),
       recover Map[String, OutgoingBoundary] end, EmptyKeyRegistry,
       DirectRouter(0, oc))

@@ -47,7 +47,7 @@ actor EmptyKeyRegistry is KeyRegistry
   =>
     None
 
-primitive _MetricsReporterDummyBuilder
+primitive MetricsReporterDummyBuilder
   fun apply(): MetricsReporter iso^ =>
     MetricsReporter("", "", _NullMetricsSink)
 
@@ -63,7 +63,7 @@ primitive _RecoveryReconnecterDummyBuilder
 primitive _DataReceiversDummyBuilder
   fun apply(env: Env, auth: AmbientAuth): DataReceivers =>
     DataReceivers(auth, _ConnectionsDummyBuilder(env, auth), "",
-      _MetricsReporterDummyBuilder())
+      MetricsReporterDummyBuilder())
 
 primitive _ConnectionsDummyBuilder
   fun apply(env: Env, auth: AmbientAuth): Connections =>
