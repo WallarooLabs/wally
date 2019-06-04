@@ -32,12 +32,6 @@ class RoutingIdGenerator
   fun ref apply(): RoutingId =>
     _guid.u128()
 
-class RequestIdGenerator
-  let _guid: GuidGenerator = GuidGenerator
-
-  fun ref apply(): RequestId =>
-    _guid.u64()
-
 primitive DeterministicSourceIdGenerator
   fun apply(text: String): RoutingId ? =>
     let temp_id = MD5(text)
