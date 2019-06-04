@@ -1,6 +1,7 @@
 use "collections"
 use "files"
 use "net"
+use "signals"
 use "time"
 use "wallaroo_labs/bytes"
 use "wallaroo_labs/math"
@@ -151,6 +152,9 @@ actor Sender
       let t2 = Timer(TriggerReport(this), _report_interval, _report_interval)
       _timers(consume t2)
     end
+    SignalHandler(TermHandler(this), Sig.term())
+    SignalHandler(TermHandler(this), Sig.int())
+    SignalHandler(TermHandler(this), Sig.hup())
 
   be send() =>
     _send()
@@ -268,3 +272,14 @@ class TriggerReport is TimerNotify
   fun ref apply(timer: Timer, count: U64): Bool =>
     _sender.report(false)
     true
+
+class TermHandler is SignalNotify
+  let _sender: Sender
+
+  new iso create(sender: Sender) =>
+    _sender = sender
+
+  fun ref apply(count: U32): Bool =>
+    @printf[I32]("* TermHandler\n".cstring())
+    _sender.report(true)
+    false
