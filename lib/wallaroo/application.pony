@@ -54,6 +54,11 @@ primitive Wallaroo
   fun range_windows(range: U64): RangeWindowsBuilder =>
     RangeWindowsBuilder(where range = range)
 
+  fun ephemeral_windows(trigger_range: U64, post_trigger_range: U64):
+    EphemeralWindowsBuilder
+  =>
+    EphemeralWindowsBuilder(trigger_range, post_trigger_range)
+
   fun count_windows(count: USize): CountWindowsBuilder =>
     CountWindowsBuilder(where count = count)
 

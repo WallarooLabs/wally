@@ -66,7 +66,7 @@ trait val StateComputation[In: Any val, Out: Any val, S: State ref] is
     StateRunnerBuilder[In, Out, S](this, step_group_id, parallelization,
       local_routing)
 
-  fun val state_wrapper(key: Key, rand: Rand): StateWrapper[In, Out, S]
+  fun val state_wrapper(key: Key, rand: Random): StateWrapper[In, Out, S]
   =>
     StateComputationWrapper[In, Out, S](this, initial_state())
 

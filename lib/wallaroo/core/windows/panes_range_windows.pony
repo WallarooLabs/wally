@@ -31,6 +31,31 @@ use "wallaroo_labs/math"
 use "wallaroo_labs/mort"
 
 
+class _SlidingWindowsWrapperBuilder[In: Any val, Out: Any val, Acc: State ref]
+  is WindowsWrapperBuilder[In, Out, Acc]
+  let _key: Key
+  let _agg: Aggregation[In, Out, Acc]
+  let _range: U64
+  let _slide: U64
+  let _delay: U64
+  let _rand: Random
+  let _late_data_policy: U16
+
+  new create(key: Key, agg: Aggregation[In, Out, Acc], range: U64, slide: U64,
+    delay: U64, rand: Random, late_data_policy: U16)
+  =>
+    _key = key
+    _agg = agg
+    _range = range
+    _slide = slide
+    _delay = delay
+    _rand = rand
+    _late_data_policy = late_data_policy
+
+  fun ref apply(watermark_ts: U64): _PanesSlidingWindows[In, Out, Acc] =>
+    _PanesSlidingWindows[In, Out, Acc](_key, _agg, _range, _slide, _delay,
+      _late_data_policy, watermark_ts, _rand)
+
 class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   WindowsWrapper[In, Out, Acc]
   """
