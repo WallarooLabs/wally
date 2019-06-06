@@ -32,15 +32,16 @@ actor _WindowTests is TestList
   new create(env: Env) => PonyTest(env, this)
   new make() => None
   fun tag tests(test: PonyTest) =>
+    test(_TumblingWindowsTriggeredOnTimeoutWatermark)
+    test(_TumblingWindowsOutputEventTimes)
+    test(_SlidingWindowsOutputEventTimes)
+    test(_OnTimeoutWatermarkTsIsJustBeforeNextWindowStart)
+    test(_EventInNewWindowCausesPreviousToFlush)
+    test(_TimeoutAfterEndOfWindowCausesFlush)
+    test(_TumblingWindowCountIsCorrectAfterFlush)
+    test(_OutputWatermarkTsIsJustBeforeNextWindowStart)
+
     test(_TestTumblingWindows)
-    test(_TestOutputWatermarkTsIsJustBeforeNextWindowStart)
-    test(_TestOnTimeoutWatermarkTsIsJustBeforeNextWindowStart)
-    test(_TestEventInNewWindowCausesPreviousToFlush)
-    test(_TestTimeoutAfterEndOfWindowCausesFlush)
-    test(_TestTumblingWindowCountIsCorrectAfterFlush)
-    test(_TestTumblingWindowsOutputEventTimes)
-    test(_TestSlidingWindowsOutputEventTimes)
-    test(_TestTumblingWindowsTimeoutTrigger)
     test(_TestSlidingWindows)
     test(_TestSlidingWindowsNoDelay)
     test(_TestSlidingWindowsOutOfOrder)
@@ -55,8 +56,8 @@ actor _WindowTests is TestList
     test(_TestStaggerDoesNotUnderflow)
     test(_TestZeroIsAValidEventTime)
 
-class iso _TestTumblingWindowsTimeoutTrigger is UnitTest
-  fun name(): String => "windows/_TestTumblingWindowsTimeoutTrigger"
+class iso _TumblingWindowsTriggeredOnTimeoutWatermark is UnitTest
+  fun name(): String => "windows/_TumblingWindowsTriggeredOnTimeoutWatermark"
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -71,11 +72,11 @@ class iso _TestTumblingWindowsTimeoutTrigger is UnitTest
     // then
     let res_array = _ForceArray(res._1)?
     h.assert_eq[USize](res_array.size(), 1)
-    h.assert_eq[USize](res_array(0)?, 111)
+    h.assert_array_eq[USize](res_array, [111])
     h.assert_true(res._2 != TimeoutWatermark())
 
-class iso _TestTumblingWindowsOutputEventTimes is UnitTest
-  fun name(): String => "windows/_TestTumblingWindowsOutputEventTimes"
+class iso _TumblingWindowsOutputEventTimes is UnitTest
+  fun name(): String => "windows/_TumblingWindowsOutputEventTimes"
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -94,18 +95,25 @@ class iso _TestTumblingWindowsOutputEventTimes is UnitTest
     h.assert_eq[U64](res_array(0)?._2, Seconds(114)-1)
     h.assert_eq[U64](res._2, Seconds(114)-1)
 
-class iso _TestSlidingWindowsOutputEventTimes is UnitTest
-  fun name(): String => "windows/_TestSlidingWindowsOutputEventTimes"
+class iso _SlidingWindowsOutputEventTimes is UnitTest
+  fun name(): String => "windows/_SlidingWindowsOutputEventTimes"
 
   fun apply(h: TestHelper) ? =>
     // given
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(5)
     let delay: U64 = Seconds(10)
-    let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay, _Zeros)
-             .>apply(1, Seconds(111), Seconds(111))
-             .>apply(2, Seconds(121), Seconds(121))
+    //!@
+    // let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+    //   delay, _Zeros)
+    let sw =
+      RangeWindowsBuilder(range)
+        .with_slide(slide)
+        .with_delay(delay)
+        .over[USize, USize, _Total](_Sum)
+        .state_wrapper("key", _Zeros)
+        .>apply(1, Seconds(111), Seconds(111))
+        .>apply(2, Seconds(121), Seconds(121))
 
     // when
     let res = sw(3, Seconds(141), Seconds(141))
@@ -133,9 +141,9 @@ class iso _TestSlidingWindowsOutputEventTimes is UnitTest
 // !TODO!: Add tests that shows empty windows are created when an event
 // 'in the future' comes in.
 
-class iso _TestOnTimeoutWatermarkTsIsJustBeforeNextWindowStart is UnitTest
+class iso _OnTimeoutWatermarkTsIsJustBeforeNextWindowStart is UnitTest
   fun name(): String =>
-    "windows/_TestOnTimeoutWatermarkTsIsJustBeforeNextWindowStart"
+    "windows/_OnTimeoutWatermarkTsIsJustBeforeNextWindowStart"
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -154,9 +162,9 @@ class iso _TestOnTimeoutWatermarkTsIsJustBeforeNextWindowStart is UnitTest
     h.assert_eq[USize](res_array(0)?, 1)
     h.assert_eq[U64](res._2, Milliseconds(5050)-1)
 
-class iso _TestEventInNewWindowCausesPreviousToFlush is UnitTest
+class iso _EventInNewWindowCausesPreviousToFlush is UnitTest
   fun name(): String =>
-    "windows/_TestEventInNewWindowCausesPreviousToFlush"
+    "windows/_EventInNewWindowCausesPreviousToFlush"
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -169,9 +177,9 @@ class iso _TestEventInNewWindowCausesPreviousToFlush is UnitTest
     // then
     h.assert_array_eq[USize]([3], _ForceArray(res._1)?)
 
-class iso _TestTimeoutAfterEndOfWindowCausesFlush is UnitTest
+class iso _TimeoutAfterEndOfWindowCausesFlush is UnitTest
   fun name(): String =>
-    "windows/_TestTimeoutAfterEndOfWindowCausesFlush"
+    "windows/_TimeoutAfterEndOfWindowCausesFlush"
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -184,32 +192,9 @@ class iso _TestTimeoutAfterEndOfWindowCausesFlush is UnitTest
     // then
     h.assert_array_eq[USize]([3], _ForceArray(res._1)?)
 
-class iso _Test10 is UnitTest  // TODO: Rename this test
+class iso _TumblingWindowCountIsCorrectAfterFlush is UnitTest
   fun name(): String =>
-    "windows/_Test10"
-
-  fun apply(h: TestHelper) ? =>
-    // given
-    let tw = _TotalTumblingWindow(Milliseconds(50000), _NonZeroSum)
-             .>apply(1, Milliseconds(5000), Milliseconds(5000))
-             .>apply(3, Milliseconds(5300), Milliseconds(5300))
-             .>apply(11, Milliseconds(6050), Milliseconds(6050))
-             .>apply(13, Milliseconds(6051), Milliseconds(6051))
-             .>apply(13, Milliseconds(6052), Milliseconds(6052))
-             .>apply(13, Milliseconds(6053), Milliseconds(6053))
-
-    // when
-    let res = tw.on_timeout(TimeoutWatermark(), 0)
-
-    // then
-    let res_array = _ForceArray(res._1)?
-    h.assert_eq[USize](res_array.size(), 1)
-    h.assert_eq[USize](res_array(0)?, 24)
-    h.assert_eq[U64](res._2, Milliseconds(6100)-1)
-
-class iso _TestTumblingWindowCountIsCorrectAfterFlush is UnitTest
-  fun name(): String =>
-    "windows/_TestTumblingWindowCountIsCorrectAfterFlush"
+    "windows/_TumblingWindowCountIsCorrectAfterFlush"
 
   fun apply(h: TestHelper) =>
     // given
@@ -223,20 +208,23 @@ class iso _TestTumblingWindowCountIsCorrectAfterFlush is UnitTest
     h.assert_eq[U64](tw.earliest_start_ts(), Milliseconds(5300))
     h.assert_eq[USize](tw.window_count(), 1)
 
-class iso _TestOutputWatermarkTsIsJustBeforeNextWindowStart is UnitTest
+class iso _OutputWatermarkTsIsJustBeforeNextWindowStart is UnitTest
   fun name(): String =>
-    "windows/_TestOutputWatermarkTsIsJustBeforeNextWindowStart"
+    "windows/_OutputWatermarkTsIsJustBeforeNextWindowStart"
 
   fun apply(h: TestHelper) ? =>
     // given
     let range: U64 = Milliseconds(50)
-    let slide = range
-    let delay: U64 = 0
     let upstream_id: U128 = 1000
     let now: U64 = 1000
-    let tw = RangeWindows[USize, USize, _Total]("key", _NonZeroSum, range,
-      slide, delay, _Zeros)
-    tw(1, Milliseconds(5000), Milliseconds(5000))
+    //!@
+    // let tw = RangeWindows[USize, USize, _Total]("key", _NonZeroSum, range,
+    //   slide, delay, _Zeros)
+    let tw =
+      RangeWindowsBuilder(range)
+        .over[USize, USize, _Total](_NonZeroSum)
+        .state_wrapper("key", _Zeros)
+        .>apply(1, Milliseconds(5000), Milliseconds(5000))
 
     // when
     let res = tw(3, Milliseconds(5100), Milliseconds(5100))
@@ -252,10 +240,15 @@ class iso _TestTumblingWindows is UnitTest
   fun apply(h: TestHelper) ? =>
     let range: U64 = Seconds(10)
     // Tumbling windows have the same slide as range
-    let slide = range
     let delay: U64 = Seconds(10)
-    let tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay, _Zeros)
+    //!@
+    // let tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+    //   delay, _Zeros)
+    let tw =
+      RangeWindowsBuilder(range)
+        .with_delay(delay)
+        .over[USize, USize, _Total](_Sum)
+        .state_wrapper("key", _Zeros)
 
     // First window's data
     var res = tw(2, Seconds(96), Seconds(101))
@@ -297,21 +290,28 @@ class iso _TestSlidingWindows is UnitTest
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(10)
-    let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay, _Zeros)
+    //!@
+    // let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+    //   delay, _Zeros)
+    let sw =
+      RangeWindowsBuilder(range)
+        .with_slide(slide)
+        .with_delay(delay)
+        .over[USize, USize, _Total](_Sum)
+        .state_wrapper("key", _Zeros)
 
     // First 2 windows values
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(92), Seconds(100)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(93), Seconds(102)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(94), Seconds(103)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(5, Seconds(95), Seconds(104)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
     // Second 2 windows with values
     h.assert_array_eq[USize]([], _OutArray(sw(1, Seconds(102), Seconds(106)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(103), Seconds(107)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(104), Seconds(108)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(105), Seconds(109)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
     // Third 2 windows with values.
     h.assert_array_eq[USize]([14;14],
       _OutArray(sw(10, Seconds(108), Seconds(112)))?)
@@ -321,7 +321,7 @@ class iso _TestSlidingWindows is UnitTest
       _OutArray(sw(30, Seconds(110), Seconds(114)))?)
     h.assert_array_eq[USize]([],
       _OutArray(sw(40, Seconds(111), Seconds(115)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
     // Fourth set of windows
     // Use this message to trigger 10 windows.
     h.assert_array_eq[USize]([10;10;40;110;107;100;100;70;0;0],
@@ -331,14 +331,14 @@ class iso _TestSlidingWindows is UnitTest
     h.assert_array_eq[USize]([0], _OutArray(sw(3, Seconds(193), Seconds(202)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(194), Seconds(203)))?)
     h.assert_array_eq[USize]([5], _OutArray(sw(5, Seconds(195), Seconds(204)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
     // Fifth 2 windows with values
     // These values are missing? @jtfmumm need your eye here
     h.assert_array_eq[USize]([14], _OutArray(sw(1, Seconds(202), Seconds(206)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(203), Seconds(207)))?)
     h.assert_array_eq[USize]([14], _OutArray(sw(3, Seconds(204), Seconds(208)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(205), Seconds(209)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
     // Sixth 2 windows with values.
     h.assert_array_eq[USize]([14;14],
       _OutArray(sw(10, Seconds(211), Seconds(212)))?)
@@ -348,7 +348,7 @@ class iso _TestSlidingWindows is UnitTest
       _OutArray(sw(30, Seconds(213), Seconds(214)))?)
     h.assert_array_eq[USize]([],
       _OutArray(sw(40, Seconds(214), Seconds(215)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
 
 
 class iso _TestSlidingWindowsNoDelay is UnitTest
@@ -357,21 +357,26 @@ class iso _TestSlidingWindowsNoDelay is UnitTest
   fun apply(h: TestHelper) ? =>
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(2)
-    let delay: U64 = Seconds(0)
-    let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay, _Zeros)
+    //!@
+    // let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+    //   delay, _Zeros)
+    let sw =
+      RangeWindowsBuilder(range)
+        .with_slide(slide)
+        .over[USize, USize, _Total](_Sum)
+        .state_wrapper("key", _Zeros)
 
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(92), Seconds(100)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(93), Seconds(102)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(94), Seconds(103)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(5, Seconds(95), Seconds(104)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
     // Second 2 windows with values
     h.assert_array_eq[USize]([], _OutArray(sw(1, Seconds(102), Seconds(106)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(103), Seconds(107)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(104), Seconds(108)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(105), Seconds(109)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
     // Third 2 windows with values.
     h.assert_array_eq[USize]([20; 20],
       _OutArray(sw(10, Seconds(108), Seconds(112)))?)
@@ -381,7 +386,7 @@ class iso _TestSlidingWindowsNoDelay is UnitTest
       _OutArray(sw(30, Seconds(110), Seconds(114)))?)
     h.assert_array_eq[USize]([],
       _OutArray(sw(40, Seconds(111), Seconds(115)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
     // Fourth set of windows
     h.assert_array_eq[USize]([100;100;70;0;0],
     // Use this message to trigger 10 windows.
@@ -391,7 +396,7 @@ class iso _TestSlidingWindowsNoDelay is UnitTest
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(194), Seconds(203)))?)
     h.assert_array_eq[USize]([9],
       _OutArray(sw(5, Seconds(195), Seconds(204)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
 
 class iso _TestSlidingWindowsOutOfOrder is UnitTest
   fun name(): String => "windows/_TestSlidingWindowsOutOfOrder"
@@ -400,22 +405,29 @@ class iso _TestSlidingWindowsOutOfOrder is UnitTest
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(10)
-    let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay, _Zeros)
+    //!@
+    // let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+    //   delay, _Zeros)
+    let sw =
+      RangeWindowsBuilder(range)
+        .with_slide(slide)
+        .with_delay(delay)
+        .over[USize, USize, _Total](_Sum)
+        .state_wrapper("key", _Zeros)
 
     // First 2 windows values
     h.assert_array_eq[USize]([], _OutArray(sw(5, Seconds(95), Seconds(100)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(94), Seconds(102)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(93), Seconds(103)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(92), Seconds(104)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
 
     // Second 2 windows with values
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(105), Seconds(106)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(104), Seconds(107)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(103), Seconds(108)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(1, Seconds(102), Seconds(109)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
 
     // Third 2 windows with values.
     h.assert_array_eq[USize]([14; 14],
@@ -426,13 +438,13 @@ class iso _TestSlidingWindowsOutOfOrder is UnitTest
       _OutArray(sw(20, Seconds(109), Seconds(114)))?)
     h.assert_array_eq[USize]([  ],
       _OutArray(sw(10, Seconds(108), Seconds(115)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
 
     // Fourth set of windows
     h.assert_array_eq[USize]([10;10;40;110;107;100;100;70;0;0],
       // Use the below message to trigger 10 windows.
       _OutArray(sw(2, Seconds(192), Seconds(200)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
 
 class iso _TestSlidingWindowsGCD is UnitTest
   fun name(): String => "windows/_TestSlidingWindowsGCD"
@@ -443,8 +455,15 @@ class iso _TestSlidingWindowsGCD is UnitTest
     // This delay will be normalized up to 12 because 10 is not a multiple
     // of the slide.
     let delay: U64 = Seconds(10)
-    let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay, _Zeros)
+    //!@
+    // let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+    //   delay, _Zeros)
+    let sw =
+      RangeWindowsBuilder(range)
+        .with_slide(slide)
+        .with_delay(delay)
+        .over[USize, USize, _Total](_Sum)
+        .state_wrapper("key", _Zeros)
 
     // First set of windows values
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(92), Seconds(100)))?)
@@ -502,8 +521,15 @@ class iso _TestSlidingWindowsLateData is UnitTest
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(10)
-    let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay, _Zeros)
+    //!@
+    // let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+    //   delay, _Zeros)
+    let sw =
+      RangeWindowsBuilder(range)
+        .with_slide(slide)
+        .with_delay(delay)
+        .over[USize, USize, _Total](_Sum)
+        .state_wrapper("key", _Zeros)
 
     // Some initial values
     h.assert_array_eq[USize]([], _OutArray(sw(1, Seconds(92), Seconds(100)))?)
@@ -525,35 +551,42 @@ class iso _TestSlidingWindowsEarlyData is UnitTest
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(10)
-    let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay, _Zeros)
+    //!@
+    // let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+    //   delay, _Zeros)
+    let sw =
+      RangeWindowsBuilder(range)
+        .with_slide(slide)
+        .with_delay(delay)
+        .over[USize, USize, _Total](_Sum)
+        .state_wrapper("key", _Zeros)
 
     // First values
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(92), Seconds(100)))?)
     // Send in a bunch of early values
     h.assert_array_eq[USize]([], _OutArray(sw(1, Seconds(102), Seconds(100)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
     h.assert_array_eq[USize]([], _OutArray(sw(2, Seconds(103), Seconds(100)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
     h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(104), Seconds(100)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(105), Seconds(100)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
     h.assert_array_eq[USize]([],
       _OutArray(sw(10, Seconds(108), Seconds(100)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
     h.assert_array_eq[USize]([],
       _OutArray(sw(20, Seconds(109), Seconds(100)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
     h.assert_array_eq[USize]([],
       _OutArray(sw(30, Seconds(110), Seconds(100)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
     h.assert_array_eq[USize]([],
       _OutArray(sw(40, Seconds(111), Seconds(100)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
     // Send in more normal values
     h.assert_array_eq[USize]([], _OutArray(sw(3, Seconds(93), Seconds(102)))?)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
     h.assert_array_eq[USize]([], _OutArray(sw(4, Seconds(94), Seconds(103)))?)
     h.assert_array_eq[USize]([], _OutArray(sw(5, Seconds(95), Seconds(104)))?)
     // Send in late values just to trigger stuff
@@ -578,8 +611,15 @@ class iso _TestSlidingWindowsStragglers is UnitTest
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(1_000)
-    let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      delay, _Zeros)
+    //!@
+    // let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+    //   delay, _Zeros)
+    let sw =
+      RangeWindowsBuilder(range)
+        .with_slide(slide)
+        .with_delay(delay)
+        .over[USize, USize, _Total](_Sum)
+        .state_wrapper("key", _Zeros)
 
     // Last heard threshold of 100 seconds
     let watermarks = StageWatermarks(Seconds(100_000))
@@ -621,7 +661,7 @@ class iso _TestSlidingWindowsStragglers is UnitTest
     h.assert_eq[USize](_ForceArray(res._1)?(499)?, 1 + 3 + 5)
     h.assert_eq[USize](_ForceArray(res._1)?(500)?, 1 + 3 + 5)
     h.assert_eq[USize](_ForceArray(res._1)?(501)?, 5)
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, USize, _Total](sw))
 
 class iso _TestSlidingWindowsStragglersSequence is UnitTest
   fun name(): String => "windows/_TestSlidingWindowsStragglersSequence"
@@ -630,8 +670,14 @@ class iso _TestSlidingWindowsStragglersSequence is UnitTest
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(1_000)
-    let sw = RangeWindows[USize, Array[USize] val, _Collected]("key",
-      _Collect, range, slide, delay, _Zeros)
+    // let sw = RangeWindows[USize, Array[USize] val, _Collected]("key",
+    //   _Collect, range, slide, delay, _Zeros)
+    let sw =
+      RangeWindowsBuilder(range)
+        .with_slide(slide)
+        .with_delay(delay)
+        .over[USize, Array[USize] val, _Collected](_Collect)
+        .state_wrapper("key", _Zeros)
 
     // Last heard threshold of 100 seconds
     let watermarks = StageWatermarks(Seconds(100_000))
@@ -701,7 +747,8 @@ class iso _TestSlidingWindowsStragglersSequence is UnitTest
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, Array[USize] val, _Collected](
+      sw))
 
   fun _sum(arr: Array[USize] val): USize =>
     var sum: USize = 0
@@ -717,8 +764,15 @@ class iso _TestSlidingWindowsSequence is UnitTest
     let range: U64 = Seconds(50)
     let slide: U64 = Seconds(25)
     let delay: U64 = Seconds(3000)
-    let sw = RangeWindows[USize, Array[USize] val, _Collected]("key",
-      _Collect, range, slide, delay, _Zeros)
+    //!@
+    // let sw = RangeWindows[USize, Array[USize] val, _Collected]("key",
+    //   _Collect, range, slide, delay, _Zeros)
+    let sw =
+      RangeWindowsBuilder(range)
+        .with_slide(slide)
+        .with_delay(delay)
+        .over[USize, Array[USize] val, _Collected](_Collect)
+        .state_wrapper("key", _Zeros)
 
     // var wm: USize = 4_888
     // res = sw(0, Seconds(4_889), Seconds(wm))
@@ -740,72 +794,86 @@ class iso _TestSlidingWindowsSequence is UnitTest
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, Array[USize] val, _Collected](
+      sw))
     res = sw(21, Seconds(10_907), Seconds(10_907))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, Array[USize] val, _Collected](
+      sw))
     res = sw(22, Seconds(10_912), Seconds(10_912))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, Array[USize] val, _Collected](
+      sw))
     res = sw(23, Seconds(10_918), Seconds(10_918))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, Array[USize] val, _Collected](
+      sw))
     res = sw(24, Seconds(10_924), Seconds(10_924))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, Array[USize] val, _Collected](
+      sw))
     res = sw(25, Seconds(10_929), Seconds(10_929))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, Array[USize] val, _Collected](
+      sw))
     res = sw(26, Seconds(10_935), Seconds(10_935))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, Array[USize] val, _Collected](
+      sw))
     res = sw(27, Seconds(10_940), Seconds(10_940))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, Array[USize] val, _Collected](
+      sw))
     res = sw(28, Seconds(10_945), Seconds(10_945))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, Array[USize] val, _Collected](
+      sw))
     res = sw(29, Seconds(10_951), Seconds(10_951))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, Array[USize] val, _Collected](
+      sw))
     res = sw(30, Seconds(10_957), Seconds(10_957))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, Array[USize] val, _Collected](
+      sw))
     res = sw(31, Seconds(10_964), Seconds(10_964))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, Array[USize] val, _Collected](
+      sw))
     res = sw(32, Seconds(10_968), Seconds(10_968))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, Array[USize] val, _Collected](
+      sw))
     res = sw(33, Seconds(10_973), Seconds(10_973))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
     end
-    h.assert_true(sw.check_panes_increasing())
+    h.assert_true(CheckPanesAreIncreasing[USize, Array[USize] val, _Collected](
+      sw))
     res = sw(34, Seconds(10_979), Seconds(10_979))
     for c in _ForceArrayArray(res._1)?.values() do
       h.assert_eq[Bool](CheckAnyDecreaseOrIncreaseByOne(c), true)
@@ -881,14 +949,19 @@ class iso _TestStaggerIsSane is UnitTest
 
   fun apply(h: TestHelper) ? =>
     let range: U64 = Seconds(1)
-    let slide = range
     let delay: U64 = Seconds(2)
     // Make sure that for any generated window, the
     // first event is never lost due to random stagger.
     for random_window in Range(0,1000) do
-      var tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-        delay, Rand(Time.nanos().u64(), Time.nanos().u64()))
-        .>apply(1, Seconds(10), Seconds(10))
+      //!@
+      // var tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+      //   delay, Rand(Time.nanos().u64(), Time.nanos().u64()))
+      let tw =
+        RangeWindowsBuilder(range)
+          .with_delay(delay)
+          .over[USize, USize, _Total](_Sum)
+          .state_wrapper("key", Rand(Time.nanos().u64(), Time.nanos().u64()))
+          .>apply(1, Seconds(10), Seconds(10))
       var res = tw(99, Seconds(14), Seconds(14))
       h.assert_array_eq[USize]([0;0;1], _ForceArray(res._1)?)
     end
@@ -898,10 +971,15 @@ class iso _TestStaggerDoesNotUnderflow is UnitTest
 
   fun apply(h: TestHelper) ? =>
     let range: U64 = Seconds(1)
-    let slide = range
     let delay: U64 = Seconds(1)
-    var tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-        delay, _Ones)
+    //!@
+    // var tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+    //     delay, _Ones)
+    let tw =
+      RangeWindowsBuilder(range)
+        .with_delay(delay)
+        .over[USize, USize, _Total](_Sum)
+        .state_wrapper("key", _Ones)
         .>apply(1, Milliseconds(999), Milliseconds(999))
 
     var res = tw(2, Seconds(2)+1, Seconds(2)+1)
@@ -914,8 +992,14 @@ class iso _TestZeroIsAValidEventTime is UnitTest
     let range: U64 = 1
     let slide = range
     let delay: U64 = 0
-    var tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-        delay, _Zeros)
+    //!@
+    // var tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
+    //     delay, _Zeros)
+    let tw =
+      RangeWindowsBuilder(range)
+        .with_delay(delay)
+        .over[USize, USize, _Total](_Sum)
+        .state_wrapper("key", _Zeros)
         .>apply(1, 0, 0)
     var res = tw(2, 1, 1)
     h.assert_array_eq[USize]([1], _ForceArray(res._1)?)
@@ -1036,22 +1120,26 @@ primitive _ForceArrayArray
 
 primitive _TotalTumblingWindow
   fun apply(range: U64, calculation: Aggregation[USize, USize, _Total]):
-    RangeWindows[USize, USize, _Total]
+    InitializableWindows[USize, USize, _Total]
   =>
     let slide = range
     let delay: U64 = 0
-    RangeWindows[USize, USize, _Total]("key",
-      _NonZeroSum, range, slide, delay, _Zeros)
+    let windows_wrapper_builder = _SlidingWindowsWrapperBuilder[USize, USize,
+      _Total]("key", _NonZeroSum, range, slide, delay, _Zeros,
+      LateDataPolicy.drop())
+    InitializableWindows[USize, USize, _Total](windows_wrapper_builder)
 
 primitive _CollectTumblingWindow
   fun apply(range: U64, calculation: Aggregation[USize, Array[USize] val,
-    _Collected]): RangeWindows[USize, Array[USize] val, _Collected]
+    _Collected]): InitializableWindows[USize, Array[USize] val, _Collected]
   =>
     let slide = range
     let delay: U64 = 0
-    RangeWindows[USize, Array[USize] val, _Collected]("key",
-      _Collect, range, slide, delay, _Zeros)
-
+    let windows_wrapper_builder = _SlidingWindowsWrapperBuilder[USize,
+      Array[USize] val, _Collected]("key", _Collect, range, slide, delay,
+      _Zeros, LateDataPolicy.drop())
+    InitializableWindows[USize, Array[USize] val, _Collected](
+      windows_wrapper_builder)
 
 class _Zeros is Random
   new ref create(x: U64 val = 0, y: U64 val = 0) => None
@@ -1060,3 +1148,14 @@ class _Zeros is Random
 class _Ones is Random
   new ref create(x: U64 val = 0, y: U64 val = 0) => None
   fun ref next(): U64 => 1
+
+primitive CheckPanesAreIncreasing
+  fun apply[In: Any val, Out: Any val, Acc: State ref](
+    state_wrapper: StateWrapper[In, Out, Acc]): Bool
+  =>
+    match state_wrapper
+    | let iw: InitializableWindows[In, Out, Acc] =>
+      iw.check_panes_increasing()
+    else
+      false
+    end

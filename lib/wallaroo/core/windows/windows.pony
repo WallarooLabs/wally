@@ -78,6 +78,31 @@ class RangeWindowsBuilder
     RangeWindowsStateInitializer[In, Out, S](agg, _range, _slide, _delay,
       _late_data_policy, _align_windows)
 
+class EphemeralWindowsBuilder
+  let _trigger_range: U64
+  let _post_trigger_range: U64
+  var _delay: U64
+  var _late_data_policy: U16 = LateDataPolicy.drop()
+
+  new create(trigger_range: U64, post_trigger_range: U64) =>
+    _trigger_range = trigger_range
+    _post_trigger_range = post_trigger_range
+    _delay = 0
+
+  fun ref with_delay(delay: U64): EphemeralWindowsBuilder =>
+    _delay = delay
+    this
+
+  fun ref with_late_data_policy(p: U16): EphemeralWindowsBuilder =>
+    _late_data_policy = p
+    this
+
+  fun ref over[In: Any val, Out: Any val, S: State ref](
+    agg: Aggregation[In, Out, S]): StateInitializer[In, Out, S]
+  =>
+    EphemeralWindowsStateInitializer[In, Out, S](agg, _trigger_range,
+      _post_trigger_range, _delay, _late_data_policy)
+
 class CountWindowsBuilder
   var _count: USize
 
@@ -176,6 +201,7 @@ class val GlobalWindowStateInitializer[In: Any val, Out: Any val,
   fun name(): String =>
     _agg.name()
 
+// !@ Move to new file
 class GlobalWindow[In: Any val, Out: Any val, Acc: State ref] is
   Windows[In, Out, Acc]
   let _key: Key
@@ -250,8 +276,9 @@ class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
     // If the application will be using aligned windows, we must
     // ingore the provided Rand and supply Zeroes.
     let rand' = if _align_windows then _Zeroes else rand end
-    RangeWindows[In, Out, Acc](key, _agg, _range, _slide, _delay, rand',
-      _late_data_policy)
+    let windows_wrapper_builder = _SlidingWindowsWrapperBuilder[In, Out, Acc](
+      key, _agg, _range, _slide, _delay, rand', _late_data_policy)
+    InitializableWindows[In, Out, Acc](windows_wrapper_builder)
 
   fun val runner_builder(step_group_id: RoutingId, parallelization: USize,
     local_routing: Bool): RunnerBuilder
@@ -271,7 +298,7 @@ class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
       let data: Array[U8] iso = in_reader.block(in_reader.size())?
       match Serialised.input(InputSerialisedAuth(auth), consume data)(
         DeserialiseAuth(auth))?
-      | let sw: RangeWindows[In, Out, Acc] => sw
+      | let iw: InitializableWindows[In, Out, Acc] => iw
       else
         error
       end
@@ -282,15 +309,17 @@ class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
   fun name(): String =>
     _agg.name()
 
-class RangeWindows[In: Any val, Out: Any val, Acc: State ref] is
+//!@ Move to new file
+class InitializableWindows[In: Any val, Out: Any val, Acc: State ref] is
   Windows[In, Out, Acc]
+  """
+  Used for windows types that need to go through an initialization phase in
+  order to initialize windows using information from the first message received
+  for a given key.
+  """
   var _phase: WindowsPhase[In, Out, Acc] = EmptyWindowsPhase[In, Out, Acc]
 
-  new create(key: Key, agg: Aggregation[In, Out, Acc], range: U64, slide: U64,
-    delay: U64, rand: Random, late_data_policy: U16 = LateDataPolicy.drop())
-  =>
-    let wrapper_builder = _SlidingWindowsWrapperBuilder[In, Out, Acc](key, agg,
-      range, slide, delay, rand, late_data_policy)
+  new create(wrapper_builder: WindowsWrapperBuilder[In, Out, Acc]) =>
     _phase = InitialWindowsPhase[In, Out, Acc](this, wrapper_builder)
 
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
@@ -345,30 +374,67 @@ class RangeWindows[In: Any val, Out: Any val, Acc: State ref] is
   fun check_panes_increasing(): Bool =>
     _phase.check_panes_increasing()
 
-class _SlidingWindowsWrapperBuilder[In: Any val, Out: Any val, Acc: State ref]
-  is WindowsWrapperBuilder[In, Out, Acc]
-  let _key: Key
+
+////////////////////////////
+// EPHEMERAL WINDOWS
+////////////////////////////
+class val EphemeralWindowsStateInitializer[In: Any val, Out: Any val,
+  Acc: State ref] is StateInitializer[In, Out, Acc]
   let _agg: Aggregation[In, Out, Acc]
-  let _range: U64
-  let _slide: U64
+  let _trigger_range: U64
+  let _post_trigger_range: U64
   let _delay: U64
-  let _rand: Random
   let _late_data_policy: U16
 
-  new create(key: Key, agg: Aggregation[In, Out, Acc], range: U64, slide: U64,
-    delay: U64, rand: Random, late_data_policy: U16)
+  new val create(agg: Aggregation[In, Out, Acc], trigger_range: U64,
+    post_trigger_range: U64, delay: U64, late_data_policy: U16)
   =>
-    _key = key
+    if trigger_range == 0 then
+      FatalUserError("Ephemeral windows must have a trigger range greater " +
+        "than 0!")
+    end
     _agg = agg
-    _range = range
-    _slide = slide
+    _trigger_range = trigger_range
+    _post_trigger_range = post_trigger_range
     _delay = delay
-    _rand = rand
     _late_data_policy = late_data_policy
 
-  fun ref apply(watermark_ts: U64): _PanesSlidingWindows[In, Out, Acc] =>
-    _PanesSlidingWindows[In, Out, Acc](_key, _agg, _range, _slide, _delay,
-      _late_data_policy, watermark_ts, _rand)
+  fun state_wrapper(key: Key, rand: Random): StateWrapper[In, Out, Acc] =>
+    // If the application will be using aligned windows, we must
+    // ingore the provided Rand and supply Zeroes.
+    let window_wrapper_builder = _EphemeralWindowWrapperBuilder[In, Out, Acc](
+      key, _agg, _trigger_range, _post_trigger_range, _delay, rand,
+      _late_data_policy)
+    InitializableWindows[In, Out, Acc](window_wrapper_builder)
+
+  fun val runner_builder(step_group_id: RoutingId, parallelization: USize,
+    local_routing: Bool): RunnerBuilder
+  =>
+    StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelization,
+      local_routing)
+
+  fun timeout_interval(): U64 =>
+    // !TODO!: Decide if we should set a minimum to this interval to
+    // avoid extremely frequent timer messages.
+    _trigger_range + _delay
+
+  fun val decode(in_reader: Reader, auth: AmbientAuth):
+    StateWrapper[In, Out, Acc] ?
+  =>
+    try
+      let data: Array[U8] iso = in_reader.block(in_reader.size())?
+      match Serialised.input(InputSerialisedAuth(auth), consume data)(
+        DeserialiseAuth(auth))?
+      | let iw: InitializableWindows[In, Out, Acc] => iw
+      else
+        error
+      end
+    else
+      error
+    end
+
+  fun name(): String =>
+    _agg.name()
 
 ////////////////////////////
 // TUMBLING COUNT WINDOWS
@@ -412,6 +478,7 @@ class val TumblingCountWindowsStateInitializer[In: Any val, Out: Any val,
   fun name(): String =>
     _agg.name()
 
+//!@ Move to new file
 class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
   Windows[In, Out, Acc]
   let _key: Key
