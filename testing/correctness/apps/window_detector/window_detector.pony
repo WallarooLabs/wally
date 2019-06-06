@@ -44,16 +44,22 @@ use "wallaroo_labs/time"
 
 
 primitive Tumbling
+  fun name(): String => "Tumbling"
 primitive Counting
+  fun name(): String => "Counting"
 primitive Sliding
+  fun name(): String => "Sliding"
 type WindowType is (Tumbling | Counting | Sliding)
 
 primitive Drop
   fun apply(): U16 => LateDataPolicy.drop()
+  fun name(): String => "Drop"
 primitive FirePerMessage
   fun apply(): U16 => LateDataPolicy.fire_per_message()
+  fun name(): String => "FirePerMessage"
 primitive PlaceInOldestWindow
   fun apply(): U16 => LateDataPolicy.place_in_oldest_window()
+  fun name(): String => "PlaceInOldestWindow"
 type WindowPolicy is (Drop | FirePerMessage | PlaceInOldestWindow)
 
 
@@ -119,6 +125,15 @@ actor Main
           end
         end
       end
+
+      // Print out options
+      env.out.print("Running window_detector.pony with options:")
+      env.out.print("  --window-policy: " + window_policy.name())
+      env.out.print("  --window-type: " + window_type.name())
+      env.out.print("  --window-delay: " + window_delay.string())
+      env.out.print("  --window-size: " + window_size.string())
+      env.out.print("  --window-slide: " + window_slide.string())
+      env.out.print("  --decoder: " + decoder_type)
 
       // Pre-construct the window step based on config option
       let window_step = match window_type
