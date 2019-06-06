@@ -31,27 +31,28 @@ def parse_output(bs):
 
 def test_drop_policy():
     # Test specific configration
+    # TODO: policy is override subset rather than full policy
     policy = base_window_policy.copy()
     policy['window-policy'] = 'drop'
 
     # boiler plate test execution entry point
     with WindowDetector(config=policy) as test:
         # Create a data generator
+        # Obviated by below TODO
         gen = iter_generator(items=out_of_order_ts, to_bytes = serialise_input)
 
         # Send some data, use block=False to background senders
-        # call returns sender instance
+        # call returns sender instanceA
+        # TODO: replace with `test.send(data:iterable [, src_name, block,
+        # sender_type])`
         test.send_tcp(gen)
 
         # Specify end condition (as function over sink)
+        # TODO: replace with `test.completes_when(condition_func)`
         test.sink_await(out_of_order_ts_drop, timeout=30, func=parse_output)
 
         # Test validation logic
-        output = []
-        for fd, stream in test.collect().items():
-            # merge streams
-            for message in stream:
-                output.append(parse_output(message))
+        output = test.collect()
         assert(out_of_order_ts_drop == output), (
             "Expected {} but received {}"
             .format(out_of_order_ts_drop, output))

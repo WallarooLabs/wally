@@ -12,6 +12,9 @@
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
+import json
+import logging
+
 from .base import Application
 from .configurations import base_window_policy
 
@@ -24,6 +27,16 @@ class WindowDetector(Application):
         super().__init__()
         self.sources = ['Detector']
         self.config = config
+
+    def parse_output(self, bs):
+        logging.debug('parse_output: {}'.format(repr(bs)))
+        return json.loads(bs[4:])['value']
+
+    def collect(self):
+        data = super().collect(None) # {'0': [...]}
+        output = [self.parse_output(v) for v in data[0]]
+
+        return output
 
 
 class WindowDetectorPython3(Application):
