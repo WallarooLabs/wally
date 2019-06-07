@@ -8,7 +8,7 @@ import conformance
 
 # Test specific imports
 from conformance.applications import WindowDetector
-from conformance.completes_when import data_in_sink
+from conformance.completes_when import data_in_sink_contains
 
 
 # input
@@ -24,16 +24,17 @@ out_of_order_ts_firepermessage = [1, 2, 3, 4, 5]
 
 
 def test_drop_policy():
-    policy = {'window-policy': 'drop'}
+    conf = {'window-late-data-policy': 'drop'}
 
     # boiler plate test execution entry point
-    with WindowDetector(config=policy) as test:
+    with WindowDetector(config=conf) as test:
         # Send some data, use block=False to background senders
         # call returns sender instanceA
         test.send(out_of_order_ts)
 
         # Specify end condition (as function over sink)
-        test.completes_when(data_in_sink(out_of_order_ts_drop), timeout=30)
+        test.completes_when(data_in_sink_contains(out_of_order_ts_drop),
+            timeout=30)
 
         # Test validation logic
         output = test.collect()
@@ -43,14 +44,16 @@ def test_drop_policy():
 
 
 def test_firepermessage_policy():
-    policy = {'window-policy': 'fire-per-message'}
+    conf = {'window-late-data-policy': 'fire-per-message'}
 
     # boiler plate test execution entry point
-    with WindowDetector(config=policy) as test:
+    with WindowDetector(config=conf) as test:
         test.send(out_of_order_ts)
 
         # Specify end condition (as function over sink)
-        test.completes_when(data_in_sink(out_of_order_ts_drop), timeout=30)
+        test.completes_when(
+            data_in_sink_contains(out_of_order_ts_firepermessage),
+            timeout=30)
 
         # Test validation logic
         output = test.collect()
