@@ -50,17 +50,14 @@ class TCPSourceNotify[In: Any val]
 
   new iso create(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: FramedSourceHandler[In] val,
-    runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
-    router': Router, metrics_reporter: MetricsReporter iso,
-    event_log: EventLog, target_router: Router)
+    runner: Runner iso, router': Router, metrics_reporter: MetricsReporter iso)
   =>
     _source_id = source_id
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"
     _auth = auth
     _handler = handler
-    _runner = runner_builder(event_log, auth, None, target_router,
-      partitioner_builder)
+    _runner = consume runner
     _router = router'
     _metrics_reporter = consume metrics_reporter
     _header_size = _handler.header_length()
@@ -68,7 +65,9 @@ class TCPSourceNotify[In: Any val]
   fun routes(): Map[RoutingId, Consumer] val =>
     _router.routes()
 
-  fun ref received(source: TCPSource[In] ref, data: Array[U8] iso): Bool =>
+  fun ref received(source: TCPSource[In] ref, data: Array[U8] iso,
+    consumer_sender: TestableConsumerSender): Bool
+  =>
     if _header then
       try
         let payload_size: USize = _handler.payload_length(consume data)?
@@ -113,9 +112,9 @@ class TCPSourceNotify[In: Any val]
 
           if decoded isnt None then
             _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-              "tcp-source-key", event_ts, _watermark_ts, _source_id, source,
+              "tcp-source-key", event_ts, _watermark_ts, consumer_sender,
               _router, _msg_id_gen(), None, decode_end_ts, latest_metrics_id,
-              ingest_ts, _metrics_reporter)
+              ingest_ts)
           else
             (true, ingest_ts)
           end

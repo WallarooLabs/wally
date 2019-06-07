@@ -43,6 +43,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     DeterministicSourceIdGenerator
   var _router: Router
   let _routes: SetIs[Consumer] = _routes.create()
+  var _consumer_sender: TestableConsumerSender = DummyConsumerSender
   // _outputs keeps track of all output targets by step id. There might be
   // duplicate consumers in this map (unlike _routes) since there might be
   // multiple target step ids over a boundary
@@ -146,10 +147,13 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       _mute_local()
     end
 
+    _consumer_sender = ConsumerSender(_source_id, this,
+      _metrics_reporter.clone())
+
   be first_checkpoint_complete() =>
     _unmute_local()
     for (id, c) in _outputs.pairs() do
-      Route.register_producer(_source_id, id, this, c)
+      _consumer_sender.register_producer(id, c)
     end
 
   fun ref metrics_reporter(): MetricsReporter =>
@@ -212,7 +216,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
       _outputs(id) = c
       _routes.set(c)
-      Route.register_producer(_source_id, id, this, c)
+      _consumer_sender.register_producer(id, c)
     end
 
   be register_downstream() =>
@@ -232,7 +236,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
   fun ref _unregister_output(id: RoutingId, c: Consumer) =>
     try
-      Route.unregister_producer(_source_id, id, this, c)
+      _consumer_sender.unregister_producer(id, c)
       _outputs.remove(id)?
       _remove_route_if_no_output(c)
     else
@@ -465,7 +469,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       Fail()
     end
     _notify.received(this, consume value, key, msg_metadata,
-      network_received_timestamp)
+      network_received_timestamp, _consumer_sender)
 
     ifdef "trace" then
       @printf[I32](("seq_id: " + current_sequence_id().string() + " => offset: "

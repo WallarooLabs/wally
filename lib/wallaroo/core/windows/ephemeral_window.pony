@@ -98,10 +98,13 @@ class _EphemeralWindow[In: Any val, Out: Any val, Acc: State ref] is
       _highest_seen_event_ts = event_ts
     end
     //!@ FAKE
-    (recover Array[(Out, U64)] end, 0)
+    (recover Array[(Out, U64)] end, 0, true)
 
   fun ref attempt_to_trigger(watermark_ts: U64): WindowOutputs[Out] =>
-    (recover Array[(Out, U64)] end, 0)
+    //!@ If before remove point
+    (recover Array[(Out, U64)] end, 0, true)
+    //!@ If after remove point
+    // (recover Array[(Out, U64)] end, 0, false)
 
   fun window_count(): USize =>
     1

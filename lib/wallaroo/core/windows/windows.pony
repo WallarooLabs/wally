@@ -29,7 +29,7 @@ use "wallaroo/core/topology"
 use "wallaroo_labs/math"
 use "wallaroo_labs/mort"
 
-type WindowOutputs[Out: Any val] is (Array[(Out, U64)] val, U64)
+type WindowOutputs[Out: Any val] is (Array[(Out, U64)] val, U64, Bool)
 
 primitive EmptyWindow
 primitive EmptyPane
@@ -117,13 +117,13 @@ class CountWindowsBuilder
 trait Windows[In: Any val, Out: Any val, Acc: State ref] is
   StateWrapper[In, Out, Acc]
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
 
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
 
   fun ref flush_windows(input_watermark_ts: U64,
-    output_watermark_ts: U64): (ComputationResult[Out], U64)
+    output_watermark_ts: U64): (ComputationResult[Out], U64, Bool)
 
   fun window_count(): USize
 
@@ -133,15 +133,15 @@ trait Windows[In: Any val, Out: Any val, Acc: State ref] is
   /////////
   fun ref _initial_apply(input: In, event_ts: U64, watermark_ts: U64,
     windows_wrapper: WindowsWrapper[In, Out, Acc]):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
   =>
-    (None, 0)
+    (None, 0, true)
 
   fun ref _initial_attempt_to_trigger(input_watermark_ts: U64,
     windows_wrapper: WindowsWrapper[In, Out, Acc]):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
   =>
-    (None, 0)
+    (None, 0, true)
 
 trait WindowsWrapperBuilder[In: Any val, Out: Any val, Acc: State ref]
   fun ref apply(watermark_ts: U64): WindowsWrapper[In, Out, Acc]
@@ -214,24 +214,24 @@ class GlobalWindow[In: Any val, Out: Any val, Acc: State ref] is
     _acc = agg.initial_accumulator()
 
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
   =>
     _agg.update(input, _acc)
     // We trigger a result per message
     let res = _agg.output(_key, event_ts, _acc)
-    (res, watermark_ts)
+    (res, watermark_ts, true)
 
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
   =>
     // We trigger per message, so we do nothing on the timer
-    (recover val Array[Out] end, input_watermark_ts)
+    (recover val Array[Out] end, input_watermark_ts, true)
 
   fun ref flush_windows(input_watermark_ts: U64,
-    output_watermark_ts: U64): (ComputationResult[Out], U64)
+    output_watermark_ts: U64): (ComputationResult[Out], U64, Bool)
   =>
     // We trigger per message, so there is nothing to flush
-    (recover val Array[Out] end, output_watermark_ts)
+    (recover val Array[Out] end, output_watermark_ts, true)
 
   fun window_count(): USize => 1
 
@@ -323,24 +323,24 @@ class InitializableWindows[In: Any val, Out: Any val, Acc: State ref] is
     _phase = InitialWindowsPhase[In, Out, Acc](this, wrapper_builder)
 
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
   =>
     _phase(input, event_ts, watermark_ts)
 
   fun ref _initial_apply(input: In, event_ts: U64, watermark_ts: U64,
     windows_wrapper: WindowsWrapper[In, Out, Acc]):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
   =>
     _phase = ProcessingWindowsPhase[In, Out, Acc](windows_wrapper)
     _phase(input, event_ts, watermark_ts)
 
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
   =>
     _attempt_to_trigger(input_watermark_ts)
 
   fun ref flush_windows(input_watermark_ts: U64,
-    output_watermark_ts: U64): (ComputationResult[Out], U64)
+    output_watermark_ts: U64): (ComputationResult[Out], U64, Bool)
   =>
     _attempt_to_trigger(TimeoutWatermark())
 
@@ -360,13 +360,13 @@ class InitializableWindows[In: Any val, Out: Any val, Acc: State ref] is
     end
 
   fun ref _attempt_to_trigger(input_watermark_ts: U64):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
   =>
     _phase.attempt_to_trigger(input_watermark_ts)
 
   fun ref _initial_attempt_to_trigger(input_watermark_ts: U64,
     windows_wrapper: WindowsWrapper[In, Out, Acc]):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
   =>
     _phase = ProcessingWindowsPhase[In, Out, Acc](windows_wrapper)
     _phase.attempt_to_trigger(input_watermark_ts)
@@ -495,7 +495,7 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
     _acc = agg.initial_accumulator()
 
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
   =>
     var out: (Out | None) = None
     _agg.update(input, _acc)
@@ -505,10 +505,10 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
       out = _trigger(event_ts)
     end
 
-    (out, watermark_ts)
+    (out, watermark_ts, true)
 
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
   =>
     var out: (Out | None) = None
     var new_output_watermark_ts = output_watermark_ts
@@ -516,10 +516,10 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
       out = _trigger(new_output_watermark_ts)
       new_output_watermark_ts = input_watermark_ts
     end
-    (out, new_output_watermark_ts)
+    (out, new_output_watermark_ts, true)
 
   fun ref flush_windows(input_watermark_ts: U64,
-    output_watermark_ts: U64): (ComputationResult[Out], U64)
+    output_watermark_ts: U64): (ComputationResult[Out], U64, Bool)
   =>
     var out: (Out | None) = None
     var new_output_watermark_ts = output_watermark_ts
@@ -527,7 +527,7 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
       out = _trigger(new_output_watermark_ts)
       new_output_watermark_ts = input_watermark_ts
     end
-    (out, new_output_watermark_ts)
+    (out, new_output_watermark_ts, true)
 
   fun window_count(): USize => 1
 

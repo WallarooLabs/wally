@@ -23,157 +23,102 @@ use "random"
 use "time"
 use "wallaroo/core/aggregations"
 use "wallaroo/core/common"
+use "wallaroo/core/partitioning"
 use "wallaroo/core/state"
+use "wallaroo/test_components"
 use "wallaroo_labs/time"
 
 
-/*
-StateRunner interface:
-  //!@ This can't be passed into Builder?
-  fun ref set_step_id(id: RoutingId)
+actor _StateRunnerTests is TestList
+  new create(env: Env) => PonyTest(env, this)
+  new make() => None
+  fun tag tests(test: PonyTest) =>
+    test(_KeyIsAddedWhenFirstMessageForKeyIsReceived)
+    test(_KeyIsRemovedWhenStateIsRemoved)
+    test(_KeyIsAddedWhenMessageForKeyIsReceivedAfterStateWasRemoved)
 
-  fun ref rollback(payload: ByteSeq val)
+class iso _KeyIsAddedWhenFirstMessageForKeyIsReceived is UnitTest
+  //!@ Can we statically access the class name with something like __loc()?
+  fun name(): String =>
+    "topology/state_runner/_KeyIsAddedWhenFirstMessageForKeyIsReceived"
 
-  fun ref set_triggers(stt: StepTimeoutTrigger, watermarks: StageWatermarks)
+  fun apply(h: TestHelper) ? =>
+    // given
+    let auth = h.env.root as AmbientAuth
+    let key = "key"
+    let router = DirectRouter(0, DummyConsumer)
+    let consumer_sender = MockConsumerSender[USize](h)
+    let mock_state_init = MockStateInitializer[USize](h, auth)
+    let mock_key_registry = MockKeyRegistry(h)
+    let state_runner = mock_state_init.create_runner(where
+      key_registry = mock_key_registry)
 
-  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, key: Key, event_ts: U64, watermark_ts: U64,
-    producer_id: RoutingId, producer: Producer ref, router: Router,
-    i_msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64,
-    metrics_reporter: MetricsReporter ref): (Bool, U64)
+    // StateRunner[USize, USize, Array[USize]](
+    //   0/*RoutingId*/, mock_state_init, mock_key_registry
+    //   _EventLogDummyBuilder(auth), auth, consume mock_runner, false)
 
-  //!@ Why is this here?
-  fun rotate_log()
+    // when
+    TestRunnerSender[USize].send(1, key, state_runner, router, consumer_sender)
 
-  fun ref on_timeout(producer_id: RoutingId, producer: Producer ref,
-    router: Router, metrics_reporter: MetricsReporter ref,
-    watermarks: StageWatermarks)
+    // then
+    mock_key_registry.has_key(key)
 
-  fun ref flush_local_state(producer_id: RoutingId, producer: Producer ref,
-    router: Router, metrics_reporter: MetricsReporter ref,
-    watermarks: StageWatermarks)
+    h.long_test(1_000_000_000)
 
-  fun name(): String
+class iso _KeyIsRemovedWhenStateIsRemoved is UnitTest
+  //!@ Can we statically access the class name with something like __loc()?
+  fun name(): String =>
+    "topology/state_runner/_KeyIsRemovedWhenStateIsRemoved"
 
-  fun ref import_key_state(step: Step ref, s_group: RoutingId, key: Key,
-    s: ByteSeq val)
+  fun apply(h: TestHelper) ? =>
+    // given
+    let auth = h.env.root as AmbientAuth
+    let key = "key"
+    let router = DirectRouter(0, DummyConsumer)
+    let consumer_sender = MockConsumerSender[USize](h)
+    let mock_state_init = MockStateInitializer[USize](h, auth where
+      lifetime = 2)
+    let mock_key_registry = MockKeyRegistry(h)
+    let state_runner = mock_state_init.create_runner(where
+      key_registry = mock_key_registry)
+    TestRunnerSender[USize].send(1, key, state_runner, router, consumer_sender)
 
-  fun ref export_key_state(step: Step ref, key: Key): ByteSeq val
+    // when
+    // Because state lifetime is 2, this should trigger key removal.
+    TestRunnerSender[USize].send(2, key, state_runner, router, consumer_sender)
 
-  fun ref serialize_state(): ByteSeq val
+    // then
+    mock_key_registry.does_not_have_key(key)
 
-  fun ref replace_serialized_state(payload: ByteSeq val)
-
-  PRIVATE
-  fun ref _send_flushed_outputs(key: Key, out: ComputationResult[Out],
-    output_watermark_ts: U64, producer_id: RoutingId, producer: Producer ref,
-    router: Router, metrics_reporter: MetricsReporter ref,
-    watermarks: StageWatermarks, artificial_ingress_ts: U64)
-
-StateRunner fields:
-  let _step_group: RoutingId
-  let _state_initializer: StateInitializer[In, Out, S] val
-  let _next_runner: Runner
-
-  var _state_map: HashMap[Key, StateWrapper[In, Out, S], HashableKey] = _state_map.create()
-  let _event_log: EventLog
-  let _wb: Writer = Writer
-  let _rb: Reader = Reader
-  let _auth: AmbientAuth
-  var _step_id: (RoutingId | None)
-
-  // !TODO! This is for creating unaligned windows with random starting
-  // points. We should refactor so that we can control the seed for testing.
-  let _rand: Rand = Rand
-
-  let _local_routing: Bool
-
-  // Timeouts
-  var _step_timeout_trigger: (StepTimeoutTrigger | None) = None
-  let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
-*/
+    h.long_test(1_000_000_000)
 
 
-/*
-!@ We can use next_runner to check outputs
-*/
+class iso _KeyIsAddedWhenMessageForKeyIsReceivedAfterStateWasRemoved
+  is UnitTest
+  //!@ Can we statically access the class name with something like __loc()?
+  fun name(): String =>
+    "topology/state_runner/" +
+      "_KeyIsAddedWhenMessageForKeyIsReceivedAfterStateWasRemoved"
 
-// actor _StateRunnerTests is TestList
-//   new create(env: Env) => PonyTest(env, this)
-//   new make() => None
-//   fun tag tests(test: PonyTest) =>
-//     test(_KeyIsAddedWhenFirstMessageForKeyIsReceived)
-//     test(_KeyIsRemovedWhenStateIsRemoved)
-//     test(_KeyIsAddedWhenMessageForKeyIsReceivedAfterStateWasRemoved)
+  fun apply(h: TestHelper) ? =>
+    // given
+    let auth = h.env.root as AmbientAuth
+    let key = "key"
+    let router = DirectRouter(0, DummyConsumer)
+    let consumer_sender = MockConsumerSender[USize](h)
+    let mock_state_init = MockStateInitializer[USize](h, auth where
+      lifetime = 2)
+    let mock_key_registry = MockKeyRegistry(h)
+    let state_runner = mock_state_init.create_runner(where
+      key_registry = mock_key_registry)
+    TestRunnerSender[USize].send(1, key, state_runner, router, consumer_sender)
+    // Because state lifetime is 2, this should trigger key removal.
+    TestRunnerSender[USize].send(2, key, state_runner, router, consumer_sender)
 
-// class iso _KeyIsAddedWhenFirstMessageForKeyIsReceived is UnitTest
-//   //!@ Can we statically access the class name with something like __loc()?
-//   fun name(): String =>
-//     "topology/state_runner/_KeyIsAddedWhenFirstMessageForKeyIsReceived"
+    // when
+    TestRunnerSender[USize].send(3, key, state_runner, router, consumer_sender)
 
-//   fun apply(h: TestHelper) ? =>
+    // then
+    mock_key_registry.has_key(key)
 
-//     // given
-//     let key = "key"
-//     let mock_state_init = ...
-//     let state_runner = StateRunner[In, Out, State](step_group': RoutingId,
-//       state_initializer: StateInitializer[In, Out, S] val,
-//       key_registry: KeyRegistry, event_log: EventLog,
-//       auth: AmbientAuth, next_runner: Runner iso, local_routing: Bool)
-
-//     // when
-//     state_runner.run[](...)
-
-//     // then
-//     mock_key_registry.has_registered_key(key)
-
-// class iso _KeyIsRemovedWhenStateIsRemoved is UnitTest
-//   //!@ Can we statically access the class name with something like __loc()?
-//   fun name(): String =>
-//     "topology/state_runner/_KeyIsRemovedWhenStateIsRemoved"
-
-//   fun apply(h: TestHelper) ? =>
-
-//     // given
-//     let key = "key"
-//     let mock_state_init = ...(n_messages_before_remove)
-//     let state_runner = StateRunner[In, Out, State](step_group': RoutingId,
-//       state_initializer: StateInitializer[In, Out, S] val,
-//       key_registry: KeyRegistry, event_log: EventLog,
-//       auth: AmbientAuth, next_runner: Runner iso, local_routing: Bool)
-//     state_runner.run[](...)
-
-//     // when
-//     // DELETE STATE!
-//     state_runner.run[](...)
-
-//     // then
-//     mock_key_registry.does_not_have_registered_key(key)
-
-// class iso _KeyIsAddedWhenMessageForKeyIsReceivedAfterStateWasRemoved
-//   is UnitTest
-//   //!@ Can we statically access the class name with something like __loc()?
-//   fun name(): String =>
-//     "topology/state_runner/" +
-//       "_KeyIsAddedWhenMessageForKeyIsReceivedAfterStateWasRemoved"
-
-//   fun apply(h: TestHelper) ? =>
-
-//     // given
-//     let key = "key"
-//     let mock_state_init = ...(n_messages_before_remove)
-//     let state_runner = StateRunner[In, Out, State](step_group': RoutingId,
-//       state_initializer: StateInitializer[In, Out, S] val,
-//       key_registry: KeyRegistry, event_log: EventLog,
-//       auth: AmbientAuth, next_runner: Runner iso, local_routing: Bool)
-//     state_runner.run[](...)
-//     // DELETE STATE!
-//     state_runner.run[](...)
-
-//     // when
-//     // NEW MESSAGE FOR DELETED KEY
-//     state_runner.run[](...)
-
-//     // then
-//     mock_key_registry.has_registered_key(key)
+    h.long_test(1_000_000_000)

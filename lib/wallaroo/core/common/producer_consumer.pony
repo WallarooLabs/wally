@@ -20,6 +20,7 @@ use "collections"
 use "promises"
 use "wallaroo/core/boundary"
 use "wallaroo/core/initialization"
+use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
@@ -36,7 +37,6 @@ trait tag Producer is (Muteable & Resilient)
   fun ref has_route_to(c: Consumer): Bool
   fun ref next_sequence_id(): SeqId
   fun ref current_sequence_id(): SeqId
-  fun ref metrics_reporter(): MetricsReporter
   fun ref check_effective_input_watermark(current_ts: U64): U64
   fun ref update_output_watermark(w: U64): (U64, U64)
   be remove_route_to_consumer(id: RoutingId, c: Consumer)
@@ -59,6 +59,23 @@ trait tag Consumer is (Runnable & Initializable & StatusReporter &
   // flexible approach.
   be register_producer(id: RoutingId, producer: Producer)
   be unregister_producer(id: RoutingId, producer: Producer)
+
+trait TestableConsumerSender
+  fun ref send[D: Any val](metric_name: String,
+    pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
+    watermark_ts: U64, msg_uid: MsgId, frac_ids: FractionalMessageId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
+    consumer: Consumer)
+
+  fun ref forward(delivery_msg: DeliveryMsg, pipeline_time_spent: U64,
+    latest_ts: U64, metrics_id: U16, metric_name: String,
+    worker_ingress_ts: U64, boundary: OutgoingBoundary)
+
+  fun ref register_producer(consumer_id: RoutingId, consumer: Consumer)
+
+  fun ref unregister_producer(consumer_id: RoutingId, consumer: Consumer)
+
+  fun ref update_output_watermark(w: U64): (U64, U64)
 
 trait tag Runnable
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,

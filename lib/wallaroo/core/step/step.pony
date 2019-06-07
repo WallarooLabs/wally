@@ -36,7 +36,6 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/network"
 use "wallaroo/core/rebalancing"
 use "wallaroo/core/recovery"
-use "wallaroo/core/router_registry"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/state"
@@ -56,6 +55,8 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   var _seq_id_generator: StepSeqIdGenerator = StepSeqIdGenerator
 
   var _phase: StepPhase = _InitialStepPhase
+
+  var _consumer_sender: TestableConsumerSender = DummyConsumerSender
 
   // _routes contains one route per Consumer
   let _routes: SetIs[Consumer] = _routes.create()
@@ -79,19 +80,16 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
 
-  let _key_registry: KeyRegistry
-
   // Watermarks
   var _watermarks: StageWatermarks = _watermarks.create()
 
   let _timers: Timers = Timers
 
   new create(auth: AmbientAuth, worker_name: WorkerName, runner: Runner iso,
-    metrics_reporter': MetricsReporter iso,
+    metrics_reporter: MetricsReporter iso,
     id: U128, event_log: EventLog,
     recovery_replayer: RecoveryReconnecter,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    key_registry: KeyRegistry,
     router': Router = EmptyRouter, is_recovering: Bool = false)
   =>
     _auth = auth
@@ -100,11 +98,10 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     match _runner
     | let r: RollbackableRunner => r.set_step_id(id)
     end
-    _metrics_reporter = consume metrics_reporter'
+    _metrics_reporter = consume metrics_reporter
     _event_log = event_log
     _recovery_replayer = recovery_replayer
     _recovery_replayer.register_step(this)
-    _key_registry = key_registry
     _id = id
 
     for (worker, boundary) in outgoing_boundaries.pairs() do
@@ -134,6 +131,8 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       @printf[I32]("===Step %s created===\n".cstring(),
         _id.string().cstring())
     end
+
+    _consumer_sender = ConsumerSender(_id, this, _metrics_reporter.clone())
 
   //
   // Application startup lifecycle event
@@ -168,9 +167,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
 
   be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
-
-  fun ref metrics_reporter(): MetricsReporter =>
-    _metrics_reporter
 
   fun routing_id(): RoutingId =>
     _id
@@ -210,11 +206,11 @@ actor Step is (Producer & Consumer & BarrierProcessor)
 
     _outputs(id) = c
     _routes.set(c)
-    Route.register_producer(_id, id, this, c)
+    _consumer_sender.register_producer(id, c)
 
   fun ref _unregister_output(id: RoutingId, c: Consumer) =>
     try
-      Route.unregister_producer(_id, id, this, c)
+      _consumer_sender.unregister_producer(id, c)
       _outputs.remove(id)?
       _remove_route_if_no_output(c)
     else
@@ -328,9 +324,9 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
 
     (let is_finished, let last_ts) = _runner.run[D](metric_name,
-      pipeline_time_spent, data, key, event_ts, input_watermark_ts, _id, this,
-      _router, msg_uid, frac_ids, my_latest_ts, my_metrics_id,
-      worker_ingress_ts, _metrics_reporter)
+      pipeline_time_spent, data, key, event_ts, input_watermark_ts,
+      _consumer_sender, _router, msg_uid, frac_ids, my_latest_ts,
+      my_metrics_id, worker_ingress_ts)
 
     if is_finished then
       ifdef "trace" then
@@ -441,12 +437,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
         key, checkpoint_id, _auth)
     end
 
-  fun ref register_key(step_group: RoutingId, key: Key) =>
-    _key_registry.register_key(step_group, key)
-
-  fun ref unregister_key(step_group: RoutingId, key: Key) =>
-    _key_registry.unregister_key(step_group, key)
-
   //////////////
   // BARRIER
   //////////////
@@ -480,8 +470,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
         then
           // We're leaving, so we need to flush any remaining worker local
           // state (which won't be migrated).
-          _runner.flush_local_state(_id, this, _router, _metrics_reporter,
-            _watermarks)
+          _runner.flush_local_state(_consumer_sender, _router, _watermarks)
         end
       end
 
@@ -583,7 +572,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   fun ref finish_triggering_timeout() =>
     match _runner
     | let tr: TimeoutTriggeringRunner =>
-      tr.on_timeout(_id, this, _router, _metrics_reporter, _watermarks)
+      tr.on_timeout(_consumer_sender, _router, _watermarks)
     else
       Fail()
     end

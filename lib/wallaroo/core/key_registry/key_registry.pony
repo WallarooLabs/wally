@@ -1,6 +1,6 @@
 /*
 
-Copyright 2017 The Wallaroo Authors.
+Copyright 2019 The Wallaroo Authors.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -16,24 +16,13 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "collections"
-use "ponytest"
-use "wallaroo_labs/equality"
-use "wallaroo/core/boundary"
+
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
-use "wallaroo/core/data_receiver"
-use "wallaroo/core/network"
-use "wallaroo/core/recovery"
-use "wallaroo/core/metrics"
-use "wallaroo/core/routing"
 
-actor Main is TestList
-  new create(env: Env) =>
-    PonyTest(env, this)
 
-  new make() =>
-    None
-
-  fun tag tests(test: PonyTest) =>
-    _TestRouterEquality.make().tests(test)
-    _StateRunnerTests.make().tests(test)
+trait tag KeyRegistry
+  be register_key(step_group: RoutingId, key: Key,
+    checkpoint_id: (CheckpointId | None) = None)
+  be unregister_key(step_group: RoutingId, key: Key,
+    checkpoint_id: (CheckpointId | None) = None)

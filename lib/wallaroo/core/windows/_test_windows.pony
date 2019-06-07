@@ -103,9 +103,6 @@ class iso _SlidingWindowsOutputEventTimes is UnitTest
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(5)
     let delay: U64 = Seconds(10)
-    //!@
-    // let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-    //   delay, _Zeros)
     let sw =
       RangeWindowsBuilder(range)
         .with_slide(slide)
@@ -217,9 +214,6 @@ class iso _OutputWatermarkTsIsJustBeforeNextWindowStart is UnitTest
     let range: U64 = Milliseconds(50)
     let upstream_id: U128 = 1000
     let now: U64 = 1000
-    //!@
-    // let tw = RangeWindows[USize, USize, _Total]("key", _NonZeroSum, range,
-    //   slide, delay, _Zeros)
     let tw =
       RangeWindowsBuilder(range)
         .over[USize, USize, _Total](_NonZeroSum)
@@ -241,9 +235,6 @@ class iso _TestTumblingWindows is UnitTest
     let range: U64 = Seconds(10)
     // Tumbling windows have the same slide as range
     let delay: U64 = Seconds(10)
-    //!@
-    // let tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-    //   delay, _Zeros)
     let tw =
       RangeWindowsBuilder(range)
         .with_delay(delay)
@@ -290,9 +281,6 @@ class iso _TestSlidingWindows is UnitTest
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(10)
-    //!@
-    // let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-    //   delay, _Zeros)
     let sw =
       RangeWindowsBuilder(range)
         .with_slide(slide)
@@ -357,9 +345,6 @@ class iso _TestSlidingWindowsNoDelay is UnitTest
   fun apply(h: TestHelper) ? =>
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(2)
-    //!@
-    // let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-    //   delay, _Zeros)
     let sw =
       RangeWindowsBuilder(range)
         .with_slide(slide)
@@ -405,9 +390,6 @@ class iso _TestSlidingWindowsOutOfOrder is UnitTest
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(10)
-    //!@
-    // let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-    //   delay, _Zeros)
     let sw =
       RangeWindowsBuilder(range)
         .with_slide(slide)
@@ -455,9 +437,6 @@ class iso _TestSlidingWindowsGCD is UnitTest
     // This delay will be normalized up to 12 because 10 is not a multiple
     // of the slide.
     let delay: U64 = Seconds(10)
-    //!@
-    // let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-    //   delay, _Zeros)
     let sw =
       RangeWindowsBuilder(range)
         .with_slide(slide)
@@ -521,9 +500,6 @@ class iso _TestSlidingWindowsLateData is UnitTest
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(10)
-    //!@
-    // let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-    //   delay, _Zeros)
     let sw =
       RangeWindowsBuilder(range)
         .with_slide(slide)
@@ -551,9 +527,6 @@ class iso _TestSlidingWindowsEarlyData is UnitTest
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(10)
-    //!@
-    // let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-    //   delay, _Zeros)
     let sw =
       RangeWindowsBuilder(range)
         .with_slide(slide)
@@ -611,9 +584,6 @@ class iso _TestSlidingWindowsStragglers is UnitTest
     let range: U64 = Seconds(10)
     let slide: U64 = Seconds(2)
     let delay: U64 = Seconds(1_000)
-    //!@
-    // let sw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-    //   delay, _Zeros)
     let sw =
       RangeWindowsBuilder(range)
         .with_slide(slide)
@@ -764,9 +734,6 @@ class iso _TestSlidingWindowsSequence is UnitTest
     let range: U64 = Seconds(50)
     let slide: U64 = Seconds(25)
     let delay: U64 = Seconds(3000)
-    //!@
-    // let sw = RangeWindows[USize, Array[USize] val, _Collected]("key",
-    //   _Collect, range, slide, delay, _Zeros)
     let sw =
       RangeWindowsBuilder(range)
         .with_slide(slide)
@@ -953,9 +920,6 @@ class iso _TestStaggerIsSane is UnitTest
     // Make sure that for any generated window, the
     // first event is never lost due to random stagger.
     for random_window in Range(0,1000) do
-      //!@
-      // var tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-      //   delay, Rand(Time.nanos().u64(), Time.nanos().u64()))
       let tw =
         RangeWindowsBuilder(range)
           .with_delay(delay)
@@ -972,9 +936,6 @@ class iso _TestStaggerDoesNotUnderflow is UnitTest
   fun apply(h: TestHelper) ? =>
     let range: U64 = Seconds(1)
     let delay: U64 = Seconds(1)
-    //!@
-    // var tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-    //     delay, _Ones)
     let tw =
       RangeWindowsBuilder(range)
         .with_delay(delay)
@@ -992,9 +953,6 @@ class iso _TestZeroIsAValidEventTime is UnitTest
     let range: U64 = 1
     let slide = range
     let delay: U64 = 0
-    //!@
-    // var tw = RangeWindows[USize, USize, _Total]("key", _Sum, range, slide,
-    //     delay, _Zeros)
     let tw =
       RangeWindowsBuilder(range)
         .with_delay(delay)
@@ -1079,7 +1037,8 @@ primitive CheckAnyDecreaseOrIncreaseByOne
     true
 
 primitive _OutArray
-  fun apply(outs_ts: (ComputationResult[USize], U64)): Array[USize] val ? =>
+  fun apply(outs_ts: (ComputationResult[USize], U64, Bool)): Array[USize] val ?
+  =>
     _ForceArray(outs_ts._1)?
 
 primitive _ForceArray

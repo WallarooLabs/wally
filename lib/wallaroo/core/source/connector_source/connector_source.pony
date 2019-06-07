@@ -41,6 +41,7 @@ use "wallaroo/core/data_receiver"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/metrics"
+use "wallaroo/core/partitioning"
 use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
 use "wallaroo/core/routing"
@@ -65,6 +66,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     DeterministicSourceIdGenerator
   var _router: Router
   let _routes: SetIs[Consumer] = _routes.create()
+  var _consumer_sender: TestableConsumerSender = DummyConsumerSender
   // _outputs keeps track of all output targets by step id. There might be
   // duplicate consumers in this map (unlike _routes) since there might be
   // multiple target step ids over a boundary
@@ -104,8 +106,9 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
 
   new create(source_id: RoutingId, auth: AmbientAuth,
     listen: ConnectorSourceCoordinator[In],
+    runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
     notify_parameters: ConnectorSourceNotifyParameters[In],
-    event_log: EventLog, router': Router,
+    event_log: EventLog, router': Router, target_router: Router,
     tcp_handler_builder: TestableTCPHandlerBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
@@ -121,8 +124,11 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     _tcp_handler_builder = tcp_handler_builder
     _metrics_reporter = consume metrics_reporter'
     _listen = listen
-    _notify = ConnectorSourceNotify[In](source_id, notify_parameters,
-      _listen, is_recovering)
+    let runner = runner_builder(router_registry, event_log, _auth,
+      _metrics_reporter.clone() where router = target_router,
+        partitioner_builder = partitioner_builder)
+    _notify = ConnectorSourceNotify[In](source_id, consume runner,
+      notify_parameters, _listen, is_recovering)
     _layout_initializer = layout_initializer
     _router_registry = router_registry
 
@@ -159,6 +165,9 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
       @printf[I32]("===ConnectorSource %s created===\n".cstring(),
         _source_id.string().cstring())
     end
+
+    _consumer_sender = ConsumerSender(_source_id, this,
+      _metrics_reporter.clone())
 
   be accept(fd: U32, init_size: USize = 64, max_size: USize = 16384) =>
     """
@@ -239,7 +248,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
 
       _outputs(id) = c
       _routes.set(c)
-      Route.register_producer(_source_id, id, this, c)
+      _consumer_sender.register_producer(id, c)
     end
 
   be register_downstream() =>
@@ -262,7 +271,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
 
   fun ref _unregister_output(id: RoutingId, c: Consumer) =>
     try
-      Route.unregister_producer(_source_id, id, this, c)
+      _consumer_sender.unregister_producer(id, c)
       _outputs.remove(id)?
       _remove_route_if_no_output(c)
     else
@@ -576,8 +585,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     _listen._conn_closed(_source_id, this)
 
   fun ref received(data: Array[U8] iso, times: USize): Bool =>
-    @printf[I32]("!@ ConnectorSource: calling received!\n".cstring())
-    _notify.received(this, consume data)
+    _notify.received(this, consume data, _consumer_sender)
 
   fun ref throttled() =>
     _notify.throttled(this)

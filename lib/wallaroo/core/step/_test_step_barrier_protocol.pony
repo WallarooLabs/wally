@@ -48,6 +48,7 @@ class iso _ForwardDataMessagesIfNoBarrier is UnitTest
     // Emit those same messages immediately
 
     // given
+    let key = "key"
     let test_finished_msg: USize = -1
     let auth = h.env.root as AmbientAuth
     let expected: Array[(USize | BarrierToken)] val =
@@ -64,9 +65,11 @@ class iso _ForwardDataMessagesIfNoBarrier is UnitTest
     // when
     let inputs1: Array[USize] val = recover [1; 2; 3; 4; 5] end
     let inputs2: Array[USize] val = recover [6; 7; 8; 9; 10] end
-    TestStepSender[USize].send_seq(step, inputs1, upstream1_id, upstream1)
-    TestStepSender[USize].send_seq(step, inputs2, upstream2_id, upstream2)
-    TestStepSender[USize].send(step, test_finished_msg, upstream1_id,
+    TestStepSender[USize].send_seq(inputs1, key, step, upstream1_id,
+      upstream1)
+    TestStepSender[USize].send_seq(inputs2, key, step, upstream2_id,
+      upstream2)
+    TestStepSender[USize].send(test_finished_msg, key, step, upstream1_id,
       upstream1)
 
     // then
@@ -86,10 +89,12 @@ class iso _DontForwardDataMessagesIfNotAllBarriers is UnitTest
     // The upstream2 data messages should be forwarded.
 
     // given
+    let key = "key"
     let test_finished_msg: USize = -1
     let auth = h.env.root as AmbientAuth
     let token = TestBarrierToken(1)
-    let expected: Array[(USize | BarrierToken)] val = recover [6; 7; 8; 9; 10] end
+    let expected: Array[(USize | BarrierToken)] val =
+      recover [6; 7; 8; 9; 10] end
     let oc = TestOutputCollector[USize](h, expected, test_finished_msg)
     let step = TestOutputCollectorStepBuilder[USize](h.env, auth, oc)
     let upstream1 = DummyProducer
@@ -103,11 +108,13 @@ class iso _DontForwardDataMessagesIfNotAllBarriers is UnitTest
     let inputs1: Array[USize] val = recover [1; 2; 3; 4; 5] end
     let inputs2: Array[USize] val = recover [6; 7; 8; 9; 10] end
     TestStepSender[USize].send_barrier(step, token, upstream1_id, upstream1)
-    TestStepSender[USize].send_seq(step, inputs1, upstream1_id, upstream1)
-    TestStepSender[USize].send_seq(step, inputs2, upstream2_id, upstream2)
+    TestStepSender[USize].send_seq(inputs1, key, step, upstream1_id,
+      upstream1)
+    TestStepSender[USize].send_seq(inputs2, key, step, upstream2_id,
+      upstream2)
     // We have to send this from upstream2 or it won't arrive at our output
     // collector downstream.
-    TestStepSender[USize].send(step, test_finished_msg, upstream2_id,
+    TestStepSender[USize].send(test_finished_msg, key, step, upstream2_id,
       upstream2)
 
     // then
@@ -115,9 +122,11 @@ class iso _DontForwardDataMessagesIfNotAllBarriers is UnitTest
 
     h.long_test(1_000_000_000)
 
-class iso _ForwardDataMessagesFromBlockedUpstreamAfterFinalBarrierArrives is UnitTest
+class iso _ForwardDataMessagesFromBlockedUpstreamAfterFinalBarrierArrives
+  is UnitTest
   fun name(): String =>
-    "step/barrier_protocol/_ForwardDataMessagesFromBlockedUpstreamAfterFinalBarrierArrives"
+    "step/barrier_protocol/" +
+      "_ForwardDataMessagesFromBlockedUpstreamAfterFinalBarrierArrives"
 
   fun apply(h: TestHelper) ? =>
     // Send barrier from upstream1 but not from upstream2
@@ -127,6 +136,7 @@ class iso _ForwardDataMessagesFromBlockedUpstreamAfterFinalBarrierArrives is Uni
     // The upstream2 data messages should be forwarded.
 
     // given
+    let key = "key"
     let test_finished_msg: USize = -1
     let auth = h.env.root as AmbientAuth
     let token = TestBarrierToken(1)
@@ -149,12 +159,14 @@ class iso _ForwardDataMessagesFromBlockedUpstreamAfterFinalBarrierArrives is Uni
     let inputs1: Array[USize] val = recover [1; 2; 3; 4; 5] end
     let inputs2: Array[USize] val = recover [6; 7; 8; 9; 10] end
     TestStepSender[USize].send_barrier(step, token, upstream1_id, upstream1)
-    TestStepSender[USize].send_seq(step, inputs1, upstream1_id, upstream1)
-    TestStepSender[USize].send_seq(step, inputs2, upstream2_id, upstream2)
+    TestStepSender[USize].send_seq(inputs1, key, step, upstream1_id,
+      upstream1)
+    TestStepSender[USize].send_seq(inputs2, key, step, upstream2_id,
+      upstream2)
     TestStepSender[USize].send_barrier(step, token, upstream2_id, upstream2)
     // We can send this from upstream1 because both upstreams should be
     // unblocked after both barriers arrive.
-    TestStepSender[USize].send(step, test_finished_msg, upstream1_id,
+    TestStepSender[USize].send(test_finished_msg, key, step, upstream1_id,
       upstream1)
 
     // then
@@ -174,6 +186,7 @@ class iso _QueuedBarriersAreSentWhenCompletedLater is UnitTest
     // The upstream2 data messages should be forwarded.
 
     // given
+    let key = "key"
     let test_finished_msg: USize = -1
     let auth = h.env.root as AmbientAuth
     let token1 = TestBarrierToken(1)
@@ -200,19 +213,23 @@ class iso _QueuedBarriersAreSentWhenCompletedLater is UnitTest
     let inputs2b: Array[USize] val = recover [4] end
     // Upstream1 sends a data message, the first token, second data message,
     // and second token. The second token should now be queued.
-    TestStepSender[USize].send_seq(step, inputs1a, upstream1_id, upstream1)
+    TestStepSender[USize].send_seq(inputs1a, key, step, upstream1_id,
+      upstream1)
     TestStepSender[USize].send_barrier(step, token1, upstream1_id, upstream1)
-    TestStepSender[USize].send_seq(step, inputs1b, upstream1_id, upstream1)
+    TestStepSender[USize].send_seq(inputs1b, key, step, upstream1_id,
+      upstream1)
     TestStepSender[USize].send_barrier(step, token2, upstream1_id, upstream1)
     // Upstream2 sends its data message and tokens.
-    TestStepSender[USize].send_seq(step, inputs2a, upstream2_id, upstream2)
+    TestStepSender[USize].send_seq(inputs2a, key, step, upstream2_id,
+      upstream2)
     TestStepSender[USize].send_barrier(step, token1, upstream2_id, upstream2)
     TestStepSender[USize].send_barrier(step, token2, upstream2_id, upstream2)
-    TestStepSender[USize].send_seq(step, inputs2b, upstream2_id, upstream2)
+    TestStepSender[USize].send_seq(inputs2b, key, step, upstream2_id,
+      upstream2)
 
     // We can send this from upstream1 because both upstreams should be
     // unblocked after both barriers arrive.
-    TestStepSender[USize].send(step, test_finished_msg, upstream1_id,
+    TestStepSender[USize].send(test_finished_msg, key, step, upstream1_id,
       upstream1)
 
     // then
