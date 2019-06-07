@@ -221,6 +221,30 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
+  conformance-tests:
+    executor: wallaroo-ci
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make integration-tests-testing-conformance debug=true
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
+  conformance-tests-with-resilience:
+    executor: wallaroo-ci
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: |
+          ulimit -c unlimited
+          ulimit -a
+          make integration-tests-testing-conformance debug=true resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
 workflows:
   version: 2
   test:
@@ -330,6 +354,20 @@ workflows:
             - integration-tests-testing-correctness-apps-with-resilience
 
       - topology-tests-python3-with-resilience:
+          requires:
+            - integration-tests
+            - integration-tests-testing-correctness-apps
+            - integration-tests-with-resilience
+            - integration-tests-testing-correctness-apps-with-resilience
+
+      - conformance-tests:
+          requires:
+            - integration-tests
+            - integration-tests-testing-correctness-apps
+            - integration-tests-with-resilience
+            - integration-tests-testing-correctness-apps-with-resilience
+
+      - conformance-tests-with-resilience:
           requires:
             - integration-tests
             - integration-tests-testing-correctness-apps
