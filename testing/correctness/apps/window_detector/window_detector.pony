@@ -73,7 +73,7 @@ actor Main
       let window_policy_options: Array[String] val = ["drop"
         "fire-per-message"
         "place-in-oldest-window"]
-      options.add("window-policy", "", StringArgument)
+      options.add("window-late-data-policy", "", StringArgument)
       var window_policy: WindowPolicy = Drop
       options.add("window-type", "", StringArgument)
       var window_type: WindowType = Tumbling
@@ -89,7 +89,7 @@ actor Main
 
       for option in options do
         match option
-        | ("window-policy", let arg: String) =>
+        | ("window-late-data-policy", let arg: String) =>
           if arg == "fire-per-message" then
             window_policy = FirePerMessage
           elseif arg == "place-in-oldest-window" then
@@ -128,7 +128,7 @@ actor Main
 
       // Print out options
       env.out.print("Running window_detector.pony with options:")
-      env.out.print("  --window-policy: " + window_policy.name())
+      env.out.print("  --window-late-data-policy: " + window_policy.name())
       env.out.print("  --window-type: " + window_type.name())
       env.out.print("  --window-delay: " + window_delay.string())
       env.out.print("  --window-size: " + window_size.string())

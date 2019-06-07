@@ -127,6 +127,8 @@ class Application:
         command = "{} {}".format(self.command,
             " ".join(("--{} {}".format(k, v)
                       for k, v in self.config.items())))
+        if os.environ.get("resilience") == 'on':
+                command += ' --run-with-resilience'
         self.cluster = Cluster(command = command,
                      host = self.host,
                      sources = self.sources,
