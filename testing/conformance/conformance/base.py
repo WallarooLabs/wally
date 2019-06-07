@@ -24,12 +24,15 @@ from integration.cluster import Cluster
 from integration.logger import (add_in_memory_log_stream,
                                 set_logging)
 
-from integration.end_points import (Reader,
+from integration.end_points import (iter_generator,
+                                    Reader,
                                     Sender)
 
 from integration.external import save_logs_to_file
 
 set_logging(name="conformance")
+
+from .control import CompletesWhenNotifier
 
 
 class TestHarnessException(Exception):
@@ -51,9 +54,19 @@ class Application:
     ##########
     # In/Out #
     ##########
-    def send_tcp(self, gen, src_name=None, block=True):
-        logging.debug("send_tcp")
-        sender = self.add_tcp_sender(gen, src_name)
+    def send(self, data, src_name=None, block=True, sender_cls=Sender):
+        logging.debug("send(data={!r}, src_name={!r}, block={!r}, sender_cls="
+                "{!r}".format(data, src_name, block, sender_cls))
+        if not self.cluster:
+            raise TestHarnessException("Can't add a sender before creating "
+                    "a cluster!")
+        if src_name is None:
+            src_name = self.sources[0]
+        gen = iter_generator(items = data,
+                             to_bytes = self.serialise_input)
+        sender = sender_cls(address = self.cluster.source_addrs[0][src_name],
+                        reader = Reader(gen))
+        self.cluster.add_sender(sender, start=True)
         if block:
             sender.join()
             if sender.error:
@@ -61,16 +74,11 @@ class Application:
         logging.debug("end of send_tcp")
         return sender
 
-    def add_tcp_sender(self, gen, src_name=None, start=True):
-        if not self.cluster:
-            raise TestHarnessException("Can't add a sender before creating "
-                    "a cluster!")
-        if src_name is None:
-            src_name = self.sources[0]
-        sender = Sender(address = self.cluster.source_addrs[0][src_name],
-                        reader = Reader(gen))
-        self.cluster.add_sender(sender, start)
-        return sender
+    def serialise_input(self, v):
+        return v.encode()
+
+    def parse_output(self, v):
+        return v.decode()
 
     def sink_await(self, values, timeout=30, func=lambda x: x, sink=-1):
         if not self.cluster:
@@ -78,8 +86,13 @@ class Application:
                     "a cluster!")
         self.cluster.sink_await(values, timeout, func, sink)
 
-    # TODO
-    #def sink_expect(self, *args, **kwargs):
+    def completes_when(self, test_func, timeout=30):
+        notifier = CompletesWhenNotifier(self, test_func,
+            timeout, period=0.1)
+        notifier.start()
+        notifier.join()
+        if notifier.error:
+            raise notifier.error
 
     def collect(self, sink=None):
         if not self.cluster:

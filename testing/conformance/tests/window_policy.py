@@ -1,4 +1,3 @@
-import json
 import logging
 import time
 
@@ -9,47 +8,32 @@ import conformance
 
 # Test specific imports
 from conformance.applications import WindowDetector
-from conformance.configurations import base_window_policy
-from conformance.inputs import out_of_order_ts
-from conformance.expectations import (out_of_order_ts_drop,
-                                      out_of_order_ts_firepermessage)
-
-# Get a data generator
-from integration.end_points import iter_generator
+from conformance.completes_when import data_in_sink
 
 
-# Provide a function for iter_generator to use to serialise each item
-def serialise_input(v):
-    return json.dumps(v).encode()
+# input
+out_of_order_ts = [{'ts': 1000000000, 'key': 'key', 'value': 2},
+                   {'ts': 1001000000, 'key': 'key', 'value': 3},
+                   {'ts': 1002000000, 'key': 'key', 'value': 4},
+                   {'ts':         50, 'key': 'key', 'value': 1},
+                   {'ts': 1003000000, 'key': 'key', 'value': 5}]
 
-
-# A function for converting byte output from sink to match expectation values
-def parse_output(bs):
-    logging.debug('parse_output: {}'.format(repr(bs)))
-    return json.loads(bs[4:])['value']
+# Expectations
+out_of_order_ts_drop = [2, 3, 4, 5]
+out_of_order_ts_firepermessage = [1, 2, 3, 4, 5]
 
 
 def test_drop_policy():
-    # Test specific configration
-    # TODO: policy is override subset rather than full policy
-    policy = base_window_policy.copy()
-    policy['window-policy'] = 'drop'
+    policy = {'window-policy': 'drop'}
 
     # boiler plate test execution entry point
     with WindowDetector(config=policy) as test:
-        # Create a data generator
-        # Obviated by below TODO
-        gen = iter_generator(items=out_of_order_ts, to_bytes = serialise_input)
-
         # Send some data, use block=False to background senders
         # call returns sender instanceA
-        # TODO: replace with `test.send(data:iterable [, src_name, block,
-        # sender_type])`
-        test.send_tcp(gen)
+        test.send(out_of_order_ts)
 
         # Specify end condition (as function over sink)
-        # TODO: replace with `test.completes_when(condition_func)`
-        test.sink_await(out_of_order_ts_drop, timeout=30, func=parse_output)
+        test.completes_when(data_in_sink(out_of_order_ts_drop), timeout=30)
 
         # Test validation logic
         output = test.collect()
@@ -59,28 +43,17 @@ def test_drop_policy():
 
 
 def test_firepermessage_policy():
-    # Test specific configration
-    policy = base_window_policy.copy()
-    policy['window-policy'] = 'fire-per-message'
+    policy = {'window-policy': 'fire-per-message'}
 
     # boiler plate test execution entry point
     with WindowDetector(config=policy) as test:
-        # Create a data generator
-        gen = iter_generator(items=out_of_order_ts, to_bytes = serialise_input)
-
-        # Send some data, use block=False to background senders
-        # call returns sender instance
-        test.send_tcp(gen)
+        test.send(out_of_order_ts)
 
         # Specify end condition (as function over sink)
-        test.sink_await(out_of_order_ts_drop, timeout=30, func=parse_output)
+        test.completes_when(data_in_sink(out_of_order_ts_drop), timeout=30)
 
         # Test validation logic
-        output = []
-        for fd, stream in test.collect().items():
-            # merge streams
-            for message in stream:
-                output.append(parse_output(message))
+        output = test.collect()
         assert(out_of_order_ts_firepermessage == output), (
             "Expected {} but received {}"
             .format(out_of_order_ts_firepermessage, output))
