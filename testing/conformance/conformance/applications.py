@@ -23,14 +23,21 @@ class WindowDetector(Application):
     name = 'WindowDetector'
     command = 'window_detector'
 
-    def __init__(self, config=base_window_policy):
+    def __init__(self, config={}):
         super().__init__()
         self.sources = ['Detector']
-        self.config = config
+        self.config = base_window_policy.copy()
+        self.config.update(config)
+        logging.info("Running {!r} with config {!r}".format(
+            self.__class__.name, self.config))
+
+    # Provide a function for iter_generator to use to serialise each item
+    def serialise_input(self, v):
+        return json.dumps(v).encode()
 
     def parse_output(self, bs):
         logging.debug('parse_output: {}'.format(repr(bs)))
-        return json.loads(bs[4:])['value']
+        return json.loads(bs[4:].decode())['value']
 
     def collect(self):
         data = super().collect(None) # {'0': [...]}

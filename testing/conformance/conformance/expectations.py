@@ -12,6 +12,4 @@
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
-out_of_order_ts_drop = [2, 3, 4, 5]
-out_of_order_ts_firepermessage = [1, 2, 3, 4, 5]
 
