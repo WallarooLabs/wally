@@ -162,9 +162,11 @@ actor TCPSourceCoordinator[In: Any val] is SourceCoordinator
       rb.append(temp_id)
       let source_id = try rb.u128_le()? else Fail(); 0 end
 
+      let runner = _runner_builder(_router_registry, _event_log, _auth,
+        _metrics_reporter.clone() where router = _target_router,
+        partitioner_builder = _partitioner_builder)
       let notify = TCPSourceNotify[In](source_id, _pipeline_name, _env,
-        _auth, _handler, _runner_builder, _partitioner_builder, _router,
-        _metrics_reporter.clone(), _event_log, _target_router)
+        _auth, _handler, consume runner, _router, _metrics_reporter.clone())
       let source = TCPSource[In](source_id, _auth, this,
         consume notify, _event_log, _router,
         SourceTCPHandlerBuilder,

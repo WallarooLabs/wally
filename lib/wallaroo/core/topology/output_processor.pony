@@ -26,10 +26,9 @@ primitive OutputProcessor
     pipeline_time_spent: U64,
     output: (Out | Array[Out] val | Array[(Out,U64)] val), key: Key,
     event_ts: U64, new_watermark_ts: U64, old_watermark_ts: U64,
-    producer_id: RoutingId, producer: Producer ref,
-    router: Router, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
-    computation_end: U64, metrics_id: U16, worker_ingress_ts: U64,
-    metrics_reporter: MetricsReporter ref): (Bool, U64)
+    consumer_sender: TestableConsumerSender, router: Router,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId,
+    computation_end: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
     """
     Send any outputs of a computation along to the next Runner, returning
@@ -39,8 +38,8 @@ primitive OutputProcessor
     match output
     | let o: Out val =>
       next_runner.run[Out](metric_name, pipeline_time_spent, o, key, event_ts,
-        new_watermark_ts, producer_id, producer, router, i_msg_uid, frac_ids,
-        computation_end, metrics_id, worker_ingress_ts, metrics_reporter)
+        new_watermark_ts, consumer_sender, router, i_msg_uid, frac_ids,
+        computation_end, metrics_id, worker_ingress_ts)
     | let os: Array[Out] val =>
       var this_is_finished = true
       var this_last_ts = computation_end
@@ -75,8 +74,8 @@ primitive OutputProcessor
         // generating a new one here?
         (let f, let ts) = next_runner.run[Out](metric_name,
           pipeline_time_spent, o, key, event_ts, next_watermark_ts,
-          producer_id, producer, router, i_msg_uid, o_frac_ids,
-          computation_end, metrics_id, worker_ingress_ts, metrics_reporter)
+          consumer_sender, router, i_msg_uid, o_frac_ids,
+          computation_end, metrics_id, worker_ingress_ts)
 
         // we are sending multiple messages, only mark this message as
         // finished if all are finished
@@ -117,9 +116,8 @@ primitive OutputProcessor
         // that we have received in the function call.
         (let f, let ts) = next_runner.run[Out](metric_name,
           pipeline_time_spent, o, key, o_event_ts, // This here is crucial.
-          next_watermark_ts,
-          producer_id, producer, router, i_msg_uid, o_frac_ids,
-          computation_end, metrics_id, worker_ingress_ts, metrics_reporter)
+          next_watermark_ts, consumer_sender, router, i_msg_uid, o_frac_ids,
+          computation_end, metrics_id, worker_ingress_ts)
 
         if (f == false) then
           this_is_finished = false

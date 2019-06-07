@@ -36,8 +36,7 @@ primitive TestOutputCollectorStepBuilder[V: (Hashable & Equatable[V] &
     Step(auth, "", RouterRunner(PassthroughPartitionerBuilder),
       _MetricsReporterDummyBuilder(), 1, _EventLogDummyBuilder(auth),
       _RecoveryReconnecterDummyBuilder(env, auth),
-      recover Map[String, OutgoingBoundary] end, EmptyKeyRegistry,
-      DirectRouter(0, oc))
+      recover Map[String, OutgoingBoundary] end, DirectRouter(0, oc))
 
 actor TestOutputCollector[V: (Hashable & Equatable[V] & Stringable val)]
   is Consumer

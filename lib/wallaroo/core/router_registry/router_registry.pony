@@ -30,6 +30,7 @@ use "wallaroo/core/data_channel"
 use "wallaroo/core/data_receiver"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
+use "wallaroo/core/key_registry"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/network"
@@ -46,12 +47,6 @@ use "wallaroo_labs/string_set"
 
 
 type _RouterSub is (BoundaryUpdatable & RouterUpdatable)
-
-trait tag KeyRegistry
-  be register_key(step_group: RoutingId, key: Key,
-    checkpoint_id: (CheckpointId | None) = None)
-  be unregister_key(step_group: RoutingId, key: Key,
-    checkpoint_id: (CheckpointId | None) = None)
 
 trait tag WorldStopperAndResumer
   be stop_the_world(exclusions: Array[WorkerName] val =

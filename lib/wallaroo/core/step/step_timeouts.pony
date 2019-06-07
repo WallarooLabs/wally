@@ -25,9 +25,8 @@ use "wallaroo/core/windows"
 
 trait TimeoutTriggeringRunner
   fun ref set_triggers(stt: StepTimeoutTrigger, watermarks: StageWatermarks)
-  fun ref on_timeout(producer_id: RoutingId, step: Step ref,
-    router: Router, metrics_reporter: MetricsReporter ref,
-    watermarks: StageWatermarks)
+  fun ref on_timeout(consumer_sender: TestableConsumerSender,
+    router: Router, watermarks: StageWatermarks)
 
 class StepTimeoutTrigger
   let _step: Step ref

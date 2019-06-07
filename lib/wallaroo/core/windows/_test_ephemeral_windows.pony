@@ -38,8 +38,10 @@ actor _EphemeralWindowTests is TestList
     test(_MessageAfterTriggerPointIsPlacedInWindowAndWindowIsTriggered)
     test(_MessageForOpenButTriggeredWindowIsTreatedAsDropLateData)
     test(_MessageForOpenButTriggeredWindowIsTreatedAsFirePerMessageLateData)
-    //!@ Test that we return the right Bool
-    // test(_WatermarkAfterRemovePointInitiatesStateRemoval)
+    test(_KeyIsRetainedForFirstMessage)
+    test(_KeyIsRetainedForMessageBeforeTriggerPoint)
+    test(_KeyIsRetainedForTriggeredWindowBeforeRemovePoint)
+    test(_KeyIsNotRetainedForTriggeredWindowAfterRemovePoint)
 
 class iso _FirstMessageForOpenWindowIsPlacedInWindow is UnitTest
   fun name(): String =>
@@ -164,3 +166,92 @@ class iso _MessageForOpenButTriggeredWindowIsTreatedAsFirePerMessageLateData
     let res_array = _ForceArrayArray(res._1)?
     h.assert_eq[USize](res_array.size(), 1)
     h.assert_array_eq[USize](res_array(0)?, [3])
+
+class iso _KeyIsRetainedForFirstMessage is UnitTest
+  fun name(): String =>
+    "windows/ephemeral_windows/" +
+      "_KeyIsRetainedForFirstMessage"
+
+  fun apply(h: TestHelper) =>
+    // given
+    let trigger_range = Seconds(5)
+    let post_trigger_range = Seconds(5)
+    let ew =
+      EphemeralWindowsBuilder(trigger_range, post_trigger_range)
+        .over[USize, Array[USize] val, _Collected](_Collect)
+        .state_wrapper("key", _Zeros)
+
+    // when
+    let res = ew(1, Seconds(100), Seconds(100))
+
+    // then
+    // Check that retain_state return value is true
+    h.assert_eq[Bool](res._3, true)
+
+class iso _KeyIsRetainedForMessageBeforeTriggerPoint is UnitTest
+  fun name(): String =>
+    "windows/ephemeral_windows/" +
+      "_KeyIsRetainedForMessageBeforeTriggerPoint"
+
+  fun apply(h: TestHelper) =>
+    // given
+    let trigger_range = Seconds(5)
+    let post_trigger_range = Seconds(5)
+    let ew =
+      EphemeralWindowsBuilder(trigger_range, post_trigger_range)
+        .over[USize, Array[USize] val, _Collected](_Collect)
+        .state_wrapper("key", _Zeros)
+        .>apply(1, Seconds(100), Seconds(100))
+
+    // when
+    let res = ew(2, Seconds(103), Seconds(103))
+
+    // then
+    // Check that retain_state return value is true
+    h.assert_eq[Bool](res._3, true)
+
+class iso _KeyIsRetainedForTriggeredWindowBeforeRemovePoint is UnitTest
+  fun name(): String =>
+    "windows/ephemeral_windows/" +
+      "_KeyIsRetainedForTriggeredWindowBeforeRemovePoint"
+
+  fun apply(h: TestHelper) =>
+    // given
+    let trigger_range = Seconds(5)
+    let post_trigger_range = Seconds(5)
+    let ew =
+      EphemeralWindowsBuilder(trigger_range, post_trigger_range)
+        .over[USize, Array[USize] val, _Collected](_Collect)
+        .state_wrapper("key", _Zeros)
+        .>apply(1, Seconds(100), Seconds(100))
+        .>apply(2, Seconds(106), Seconds(106))
+
+    // when
+    let res = ew(2, Seconds(107), Seconds(107))
+
+    // then
+    // Check that retain_state return value is true
+    h.assert_eq[Bool](res._3, true)
+
+class iso _KeyIsNotRetainedForTriggeredWindowAfterRemovePoint is UnitTest
+  fun name(): String =>
+    "windows/ephemeral_windows/" +
+      "_KeyIsNotRetainedForTriggeredWindowAfterRemovePoint"
+
+  fun apply(h: TestHelper) =>
+    // given
+    let trigger_range = Seconds(5)
+    let post_trigger_range = Seconds(5)
+    let ew =
+      EphemeralWindowsBuilder(trigger_range, post_trigger_range)
+        .over[USize, Array[USize] val, _Collected](_Collect)
+        .state_wrapper("key", _Zeros)
+        .>apply(1, Seconds(100), Seconds(100))
+        .>apply(2, Seconds(106), Seconds(106))
+
+    // when
+    let res = ew(2, Seconds(111), Seconds(111))
+
+    // then
+    // Check that retain_state return value is false
+    h.assert_eq[Bool](res._3, false)

@@ -23,6 +23,7 @@ use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/partitioning"
 use "wallaroo/core/metrics"
+use "wallaroo/core/router_registry"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
@@ -35,11 +36,12 @@ primitive KafkaSourceNotifyBuilder[In: Any val]
     auth: AmbientAuth, handler: SourceHandler[In] val,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
     router: Router, metrics_reporter: MetricsReporter iso, event_log: EventLog,
-    target_router: Router): KafkaSourceNotify[In] iso^
+    target_router: Router, router_registry: RouterRegistry):
+    KafkaSourceNotify[In] iso^
   =>
     KafkaSourceNotify[In](source_id, pipeline_name, env, auth, handler,
       runner_builder, partitioner_builder, router, consume metrics_reporter,
-      event_log, target_router)
+      event_log, target_router, router_registry)
 
 class KafkaSourceNotify[In: Any val]
   let _source_id: RoutingId
@@ -57,7 +59,8 @@ class KafkaSourceNotify[In: Any val]
     auth: AmbientAuth, handler: SourceHandler[In] val,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
     router': Router, metrics_reporter: MetricsReporter iso,
-    event_log: EventLog, target_router: Router)
+    event_log: EventLog, target_router: Router,
+    router_registry: RouterRegistry)
   =>
     _source_id = source_id
     _pipeline_name = pipeline_name
@@ -65,8 +68,8 @@ class KafkaSourceNotify[In: Any val]
     _env = env
     _auth = auth
     _handler = handler
-    _runner = runner_builder(event_log, auth, None, target_router,
-      partitioner_builder)
+    _runner = runner_builder(router_registry, event_log, auth,
+      metrics_reporter.clone(), None, target_router, partitioner_builder)
     _router = router'
     _metrics_reporter = consume metrics_reporter
 
@@ -76,7 +79,7 @@ class KafkaSourceNotify[In: Any val]
   fun ref received(source: KafkaSource[In] ref, kafka_msg_value: Array[U8] iso,
     kafka_msg_key: (Array[U8] val | None),
     kafka_msg_metadata: KafkaMessageMetadata val,
-    network_received_timestamp: U64)
+    network_received_timestamp: U64, consumer_sender: TestableConsumerSender)
   =>
     _metrics_reporter.pipeline_ingest(_pipeline_name, _source_name)
     let ingest_ts = WallClock.nanoseconds()
@@ -128,9 +131,8 @@ class KafkaSourceNotify[In: Any val]
         let watermark_ts = ingest_ts
 
         _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-          consume initial_key, ingest_ts, watermark_ts, _source_id, source,
-          _router, msg_id, None, decode_end_ts, latest_metrics_id, ingest_ts,
-          _metrics_reporter)
+          consume initial_key, ingest_ts, watermark_ts, consumer_sender,
+          _router, msg_id, None, decode_end_ts, latest_metrics_id, ingest_ts)
       else
         @printf[I32](("Unable to decode message at " + _pipeline_name +
           " source\n").cstring())

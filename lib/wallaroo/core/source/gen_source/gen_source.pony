@@ -80,6 +80,7 @@ actor GenSource[V: Any val] is Source
   var _router: Router
 
   let _routes: SetIs[Consumer] = _routes.create()
+  var _consumer_sender: TestableConsumerSender = DummyConsumerSender
   // _outputs keeps track of all output targets by step id. There might be
   // duplicate consumers in this map (unlike _routes) since there might be
   // multiple target step ids over a boundary
@@ -135,8 +136,8 @@ actor GenSource[V: Any val] is Source
     _layout_initializer = layout_initializer
     _router_registry = router_registry
 
-    _runner = runner_builder(event_log, auth, None, target_router,
-      partitioner_builder)
+    _runner = runner_builder(_router_registry, event_log, auth,
+      _metrics_reporter.clone(), None, target_router, partitioner_builder)
     _router = router'
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
@@ -160,6 +161,9 @@ actor GenSource[V: Any val] is Source
 
     // register resilient with event log
     _event_log.register_resilient(_source_id, this)
+
+    _consumer_sender = ConsumerSender(_source_id, this,
+      _metrics_reporter.clone())
 
     _mute()
     ifdef "resilience" then
@@ -199,9 +203,8 @@ actor GenSource[V: Any val] is Source
       _cur_value = _generator(next')
       (let is_finished, let last_ts) =
         _runner.run[V](_pipeline_name, pipeline_time_spent, next',
-          "gen-source-key", ingest_ts, watermark_ts, _source_id, this, _router,
-          _msg_id_gen(), None, decode_end_ts, latest_metrics_id, ingest_ts,
-          _metrics_reporter)
+          "gen-source-key", ingest_ts, watermark_ts, _consumer_sender, _router,
+          _msg_id_gen(), None, decode_end_ts, latest_metrics_id, ingest_ts)
 
       if is_finished then
         let end_ts = WallClock.nanoseconds()
@@ -230,7 +233,7 @@ actor GenSource[V: Any val] is Source
     """
     _unmute_local()
     for (id, c) in _outputs.pairs() do
-      Route.register_producer(_source_id, id, this, c)
+      _consumer_sender.register_producer(id, c)
     end
 
   be update_router(router': Router) =>
@@ -285,7 +288,7 @@ actor GenSource[V: Any val] is Source
 
       _outputs(id) = c
       _routes.set(c)
-      Route.register_producer(_source_id, id, this, c)
+      _consumer_sender.register_producer(id, c)
     end
 
   be register_downstream() =>
@@ -308,7 +311,7 @@ actor GenSource[V: Any val] is Source
 
   fun ref _unregister_output(id: RoutingId, c: Consumer) =>
     try
-      Route.unregister_producer(_source_id, id, this, c)
+      _consumer_sender.unregister_producer(id, c)
       _outputs.remove(id)?
       _remove_route_if_no_output(c)
     else

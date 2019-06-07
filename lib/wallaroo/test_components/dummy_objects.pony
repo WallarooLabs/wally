@@ -24,6 +24,7 @@ use "wallaroo/core/boundary"
 use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
 use "wallaroo/core/data_receiver"
+use "wallaroo/core/key_registry"
 use "wallaroo/core/metrics"
 use "wallaroo/core/network"
 use "wallaroo/core/partitioning"
@@ -42,6 +43,7 @@ actor EmptyKeyRegistry is KeyRegistry
     checkpoint_id: (CheckpointId | None) = None)
   =>
     None
+
   be unregister_key(step_group: RoutingId, key: Key,
     checkpoint_id: (CheckpointId | None) = None)
   =>

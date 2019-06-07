@@ -86,9 +86,6 @@ class iso _LateDataTriggersOwnWindowUnderFirePerMessage is UnitTest
 
     // given
     let range: U64 = Seconds(10)
-    //!@
-    // let tw = RangeWindows[USize, Array[USize] val, _Collected]("key",
-    //   _Collect, range, slide, delay, _Zeros, LateDataPolicy.fire_per_message())
     let tw =
       RangeWindowsBuilder(range)
         .with_late_data_policy(LateDataPolicy.fire_per_message())
@@ -151,9 +148,6 @@ class iso _FirePerMessageUsesEventTimeAsOutputTsForLateData is UnitTest
   fun apply(h: TestHelper) ? =>
     // given
     let range: U64 = Seconds(10)
-    //!@
-    // let tw = RangeWindows[USize, USize, _Total]("key",
-    //   _Sum, range, slide, delay, _Zeros, LateDataPolicy.fire_per_message())
     let tw =
       RangeWindowsBuilder(range)
         .with_late_data_policy(LateDataPolicy.fire_per_message())
@@ -190,10 +184,6 @@ class iso _PlaceInOldestWindowOneWindow is UnitTest
 
     // given
     let range: U64 = Seconds(10)
-    //!@
-    // let tw = RangeWindows[USize, Array[USize] val, _Collected]("key",
-    //   _Collect, range, slide, delay, _Zeros,
-    //   LateDataPolicy.place_in_oldest_window())
     let tw =
       RangeWindowsBuilder(range)
         .with_late_data_policy(LateDataPolicy.place_in_oldest_window())
@@ -227,10 +217,6 @@ class iso _PlaceInOldestWindowTwoWindows is UnitTest
 
     // given
     let range: U64 = Seconds(10)
-    //!@
-    // let tw = RangeWindows[USize, Array[USize] val, _Collected]("key",
-    //   _Collect, range, slide, delay, _Zeros,
-    //   LateDataPolicy.place_in_oldest_window())
     let tw =
       RangeWindowsBuilder(range)
         .with_late_data_policy(LateDataPolicy.place_in_oldest_window())
@@ -263,10 +249,6 @@ class iso _PlaceInOldestWindowDoesntAutomaticallyTrigger is UnitTest
 
     // given
     let range: U64 = Seconds(10)
-    //!@
-    // let tw = RangeWindows[USize, Array[USize] val, _Collected]("key",
-    //   _Collect, range, slide, delay, _Zeros,
-    //   LateDataPolicy.place_in_oldest_window())
     let tw =
       RangeWindowsBuilder(range)
         .with_late_data_policy(LateDataPolicy.place_in_oldest_window())

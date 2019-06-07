@@ -24,6 +24,7 @@ use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
 use "wallaroo/core/data_receiver"
 use "wallaroo/core/initialization"
+use "wallaroo/core/key_registry"
 use "wallaroo/core/metrics"
 use "wallaroo/core/network"
 use "wallaroo/core/partitioning"
@@ -73,16 +74,16 @@ class val StepBuilder
   fun apply(routing_id: RoutingId, worker_name: WorkerName, next: Router,
     metrics_conn: MetricsSink, event_log: EventLog,
     recovery_replayer: RecoveryReconnecter, auth: AmbientAuth,
+    key_registry: KeyRegistry,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    router_registry: RouterRegistry, is_recovering: Bool,
-    router: Router = EmptyRouter): Step tag
+    is_recovering: Bool, router: Router = EmptyRouter): Step tag
   =>
-    let runner = _runner_builder(where event_log = event_log, auth = auth,
-      router = router, partitioner_builder = _partitioner_builder)
-    let step = Step(auth, worker_name, consume runner,
-      MetricsReporter(_app_name, worker_name, metrics_conn), routing_id,
-      event_log, recovery_replayer,
-      outgoing_boundaries, router_registry
+    let reporter = MetricsReporter(_app_name, worker_name, metrics_conn)
+    let runner = _runner_builder(key_registry, event_log, auth,
+      reporter.clone() where router = router,
+      partitioner_builder = _partitioner_builder)
+    let step = Step(auth, worker_name, consume runner, reporter.clone(),
+      routing_id, event_log, recovery_replayer, outgoing_boundaries
       where router' = router, is_recovering = is_recovering)
     step.update_router(next)
     step

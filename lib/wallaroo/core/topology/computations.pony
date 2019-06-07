@@ -92,15 +92,15 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref] is
     _state = state
 
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
   =>
     let res = _comp(input, _state)
-    (res, watermark_ts)
+    (res, watermark_ts, true)
 
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
   =>
-    (None, input_watermark_ts)
+    (None, input_watermark_ts, true)
 
   fun ref encode(auth: AmbientAuth): ByteSeq =>
      _encoder_decoder.encode(_state, auth)

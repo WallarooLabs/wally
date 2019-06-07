@@ -129,12 +129,8 @@ class val ConnectorSourceNotifyParameters[In: Any val]
   let env: Env
   let auth: AmbientAuth
   let handler: FramedSourceHandler[In] val
-  let runner_builder: RunnerBuilder
-  let partitioner_builder: PartitionerBuilder
   let router: Router
   let metrics_reporter: MetricsReporter val
-  let event_log: EventLog
-  let target_router: Router
   let cookie: String
   let max_credits: U32
   let refill_credits: U32
@@ -143,21 +139,16 @@ class val ConnectorSourceNotifyParameters[In: Any val]
 
   new val create(pipeline_name': String, env': Env,
     auth': AmbientAuth, handler': FramedSourceHandler[In] val,
-    runner_builder': RunnerBuilder, partitioner_builder': PartitionerBuilder,
     router': Router, metrics_reporter': MetricsReporter val,
-    event_log': EventLog, target_router': Router, cookie': String,
-    max_credits': U32, refill_credits': U32, host': String, service': String)
+    cookie': String, max_credits': U32, refill_credits': U32, host': String,
+    service': String)
   =>
     pipeline_name = pipeline_name'
     env = env'
     auth = auth'
     handler = handler'
-    runner_builder = runner_builder'
-    partitioner_builder = partitioner_builder'
     router = router'
     metrics_reporter = metrics_reporter'
-    event_log = event_log'
-    target_router = target_router'
     cookie = cookie'
     max_credits = max_credits'
     refill_credits = refill_credits'
@@ -210,7 +201,7 @@ class ConnectorSourceNotify[In: Any val]
   // policies
   var _watermark_ts: U64 = 0
 
-  new create(source_id': RoutingId,
+  new create(source_id': RoutingId, runner: Runner iso,
     parameters: ConnectorSourceNotifyParameters[In],
     coordinator': ConnectorSourceCoordinator[In], is_recovering: Bool)
   =>
@@ -220,8 +211,7 @@ class ConnectorSourceNotify[In: Any val]
     _env = parameters.env
     _auth = parameters.auth
     _handler = parameters.handler
-    _runner = parameters.runner_builder(parameters.event_log, _auth, None,
-      parameters.target_router, parameters.partitioner_builder)
+    _runner = consume runner
     _router = parameters.router
     _metrics_reporter = recover iso parameters.metrics_reporter.clone() end
     _header_size = _handler.header_length()
@@ -242,7 +232,8 @@ class ConnectorSourceNotify[In: Any val]
       _prep_for_rollback = true
     end
 
-  fun ref received(source: ConnectorSource[In] ref, data: Array[U8] iso): Bool
+  fun ref received(source: ConnectorSource[In] ref, data: Array[U8] iso,
+    consumer_sender: TestableConsumerSender): Bool
   =>
     // ignore messages if session isn't active
     // necessary for dealing with overflow data during restart
@@ -267,7 +258,7 @@ class ConnectorSourceNotify[In: Any val]
       let latest_metrics_id: U16 = 1
 
       received_connector_msg(source, consume data, latest_metrics_id,
-        ingest_ts, pipeline_time_spent)
+        ingest_ts, pipeline_time_spent, consumer_sender)
     end
 
   /////////////////////////////
@@ -278,7 +269,8 @@ class ConnectorSourceNotify[In: Any val]
     data: Array[U8] iso,
     latest_metrics_id: U16,
     ingest_ts: U64,
-    pipeline_time_spent: U64): Bool
+    pipeline_time_spent: U64,
+    consumer_sender: TestableConsumerSender): Bool
   =>
     if _prep_for_rollback then
       // Anything that the connector sends us is ignored while we wait
@@ -471,8 +463,8 @@ class ConnectorSourceNotify[In: Any val]
 
                 // process message
                 return _run_and_subsequent_activity(latest_metrics_id,
-                  ingest_ts, pipeline_time_spent, key, source, decoded, s,
-                  m.message_id, m.flags)
+                  ingest_ts, pipeline_time_spent, key, source, consumer_sender,
+                  decoded, s, m.message_id, m.flags)
               else
                 // _handler.decode(bytes) failed
                 if m.message is None then
@@ -522,6 +514,7 @@ class ConnectorSourceNotify[In: Any val]
     pipeline_time_spent: U64,
     key: Key,
     source: ConnectorSource[In] ref,
+    consumer_sender: TestableConsumerSender,
     decoded: (In val| None val),
     s: _StreamState,
     message_id: (cwm.MessageId|None),
@@ -562,9 +555,8 @@ class ConnectorSourceNotify[In: Any val]
         (true, ingest_ts)
       | let d: In =>
         _runner.run[In](_pipeline_name, pipeline_time_spent, d,
-          consume initial_key, ingest_ts, _watermark_ts, source_id,
-          source, _router, msg_uid, None, decode_end_ts,
-          latest_metrics_id, ingest_ts, _metrics_reporter)
+          consume initial_key, ingest_ts, _watermark_ts, consumer_sender,
+          _router, msg_uid, None, decode_end_ts, latest_metrics_id, ingest_ts)
       end
 
     match message_id

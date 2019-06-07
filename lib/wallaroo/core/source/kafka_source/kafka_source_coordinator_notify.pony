@@ -21,6 +21,7 @@ use "wallaroo_labs/mort"
 use "wallaroo/core/common"
 use "wallaroo/core/partitioning"
 use "wallaroo/core/metrics"
+use "wallaroo/core/router_registry"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
@@ -34,12 +35,14 @@ class KafkaSourceCoordinatorNotify[In: Any val]
   let _metrics_reporter: MetricsReporter
   let _event_log: EventLog
   let _target_router: Router
+  let _router_registry: RouterRegistry
 
   new iso create(pipeline_name: String, auth: AmbientAuth,
     handler: SourceHandler[In] val, runner_builder: RunnerBuilder,
     partitioner_builder: PartitionerBuilder, router': Router,
     metrics_reporter: MetricsReporter iso,
-    event_log: EventLog, target_router: Router)
+    event_log: EventLog, target_router: Router,
+    router_registry: RouterRegistry)
   =>
     _pipeline_name = pipeline_name
     _auth = auth
@@ -50,10 +53,12 @@ class KafkaSourceCoordinatorNotify[In: Any val]
     _metrics_reporter = consume metrics_reporter
     _event_log = event_log
     _target_router = target_router
+    _router_registry = router_registry
 
   fun ref build_source(source_id: RoutingId, env: Env):
     KafkaSourceNotify[In] iso^
   =>
     KafkaSourceNotify[In](source_id, _pipeline_name, env, _auth,
       _handler, _runner_builder, _partitioner_builder, _router,
-      _metrics_reporter.clone(), _event_log, _target_router)
+      _metrics_reporter.clone(), _event_log, _target_router,
+      _router_registry)

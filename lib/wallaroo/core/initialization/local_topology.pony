@@ -1013,9 +1013,8 @@ actor LocalTopologyInitializer is LayoutInitializer
     let steps = Map[RoutingId, Step]
     for r_id in routing_ids.values() do
       let next_step = builder(r_id, _worker_name, output_router,
-        _metrics_conn, _event_log, _recovery_replayer, _auth,
-        _outgoing_boundaries, _router_registry
-        where is_recovering = is_recovering)
+        _metrics_conn, _event_log, _recovery_replayer, _auth, _router_registry,
+        _outgoing_boundaries where is_recovering = is_recovering)
 
       steps(r_id) = next_step
       _connections.register_disposable(next_step)

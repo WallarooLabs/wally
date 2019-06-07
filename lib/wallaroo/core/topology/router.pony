@@ -40,16 +40,18 @@ use "wallaroo_labs/string_set"
 
 trait val Router is (Hashable & Equatable[Router])
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    key: Key, event_ts: U64, watermark_ts: U64, producer_id: RoutingId,
-    producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
+    key: Key, event_ts: U64, watermark_ts: U64,
+    consumer_sender: TestableConsumerSender,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   fun routes(): Map[RoutingId, Consumer] val
   fun routes_not_in(router: Router): Map[RoutingId, Consumer] val
 
 primitive EmptyRouter is Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    key: Key, event_ts: U64, watermark_ts: U64, producer_id: RoutingId,
-    producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
+    key: Key, event_ts: U64, watermark_ts: U64,
+    consumer_sender: TestableConsumerSender,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
     (true, latest_ts)
@@ -75,31 +77,19 @@ class val DirectRouter is Router
     _target = target
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    key: Key, event_ts: U64, watermark_ts: U64, producer_id: RoutingId,
-    producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
+    key: Key, event_ts: U64, watermark_ts: U64,
+    consumer_sender: TestableConsumerSender,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DirectRouter\n".cstring())
     end
 
-    if producer.has_route_to(_target) then
-      ifdef "trace" then
-        @printf[I32]("DirectRouter found Route\n".cstring())
-      end
-      Route.run[D](metric_name, pipeline_time_spent, data, key, event_ts,
-        watermark_ts,
-        // hand down producer so we can call _next_sequence_id()
-        producer_id, producer,
-        // incoming envelope
-        i_msg_uid, frac_ids,
-        latest_ts, metrics_id, worker_ingress_ts,
-        _target)
-      (false, latest_ts)
-    else
-      // TODO: What do we do if we get None?
-      (true, latest_ts)
-    end
+    consumer_sender.send[D](metric_name, pipeline_time_spent, data, key,
+      event_ts, watermark_ts, i_msg_uid, frac_ids, latest_ts, metrics_id,
+      worker_ingress_ts, _target)
+    (false, latest_ts)
 
   fun routes(): Map[RoutingId, Consumer] val =>
     let m = recover iso Map[RoutingId, Consumer] end
@@ -145,8 +135,9 @@ class val MultiRouter is Router
     end
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    key: Key, event_ts: U64, watermark_ts: U64, producer_id: RoutingId,
-    producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
+    key: Key, event_ts: U64, watermark_ts: U64,
+    consumer_sender: TestableConsumerSender,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
     ifdef "trace" then
@@ -172,7 +163,7 @@ class val MultiRouter is Router
         match router
         | let dr: DirectRouter =>
           dr.route[D](metric_name, pipeline_time_spent, data,
-            key, event_ts, watermark_ts, producer_id, producer, i_msg_uid,
+            key, event_ts, watermark_ts, consumer_sender, i_msg_uid,
             o_frac_ids, latest_ts, metrics_id, worker_ingress_ts)
         else
           Fail()
@@ -250,30 +241,23 @@ class val ProxyRouter is Router
     _auth = auth
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    key: Key, event_ts: U64, watermark_ts: U64, producer_id: RoutingId,
-    producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
+    key: Key, event_ts: U64, watermark_ts: U64,
+    consumer_sender: TestableConsumerSender,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at ProxyRouter\n".cstring())
     end
 
-    if producer.has_route_to(_target) then
-      ifdef "trace" then
-        @printf[I32]("ProxyRouter found Route\n".cstring())
-      end
-      let delivery_msg = ForwardMsg[D](
-        _target_proxy_address.routing_id, _worker_name, data, key, event_ts,
-        watermark_ts, metric_name, _target_proxy_address, i_msg_uid, frac_ids)
+    let delivery_msg = ForwardMsg[D](
+      _target_proxy_address.routing_id, _worker_name, data, key, event_ts,
+      watermark_ts, metric_name, _target_proxy_address, i_msg_uid, frac_ids)
 
-      Route.forward(delivery_msg, pipeline_time_spent, producer_id, producer,
-        latest_ts, metrics_id, metric_name, worker_ingress_ts, _target)
+    consumer_sender.forward(delivery_msg, pipeline_time_spent,
+      latest_ts, metrics_id, metric_name, worker_ingress_ts, _target)
 
-      (false, latest_ts)
-    else
-      Fail()
-      (true, latest_ts)
-    end
+    (false, latest_ts)
 
   fun copy_with_new_target_id(target_id: RoutingId): ProxyRouter =>
     ProxyRouter(_worker_name, _target,
@@ -524,8 +508,9 @@ class val StatePartitionRouter is Router
     _step_group
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    key: Key, event_ts: U64, watermark_ts: U64, producer_id: RoutingId,
-    producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
+    key: Key, event_ts: U64, watermark_ts: U64,
+    consumer_sender: TestableConsumerSender,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
     ifdef "trace" then
@@ -546,19 +531,13 @@ class val StatePartitionRouter is Router
         let idx = (HashKey(key) % _state_steps.size().u128()).usize()
 
         let s = _state_steps(idx)?
-        if producer.has_route_to(s) then
-          ifdef "trace" then
-            @printf[I32]("PartitionRouter found Route\n".cstring())
-          end
-          Route.run[D](metric_name, pipeline_time_spent,
-            data, key, event_ts, watermark_ts, producer_id, producer,
-            i_msg_uid, frac_ids, latest_ts, metrics_id, worker_ingress_ts, s)
-          (false, latest_ts)
-        else
-          // TODO: What do we do if we get None?
-          Fail()
-          (true, latest_ts)
+        ifdef "trace" then
+          @printf[I32]("PartitionRouter found Route\n".cstring())
         end
+        consumer_sender.send[D](metric_name, pipeline_time_spent,
+          data, key, event_ts, watermark_ts, i_msg_uid, frac_ids, latest_ts,
+          metrics_id, worker_ingress_ts, s)
+        (false, latest_ts)
       else
         ifdef debug then
           @printf[I32](("StatePartitionRouter.route: No state step for " +
@@ -571,12 +550,11 @@ class val StatePartitionRouter is Router
       try
         let r = _hashed_node_routes(worker)?
         let msg = r.build_msg[D](_worker_name, metric_name,
-          pipeline_time_spent, data, key, event_ts, watermark_ts, producer_id,
-          producer, i_msg_uid, frac_ids, latest_ts, metrics_id,
-          worker_ingress_ts)
+          pipeline_time_spent, data, key, event_ts, watermark_ts, i_msg_uid,
+          frac_ids, latest_ts, metrics_id, worker_ingress_ts)
         r.route[ForwardStatePartitionMsg[D]](metric_name,
-          pipeline_time_spent, msg, key, event_ts, watermark_ts, producer_id,
-          producer, i_msg_uid, frac_ids, latest_ts, metrics_id,
+          pipeline_time_spent, msg, key, event_ts, watermark_ts,
+          consumer_sender, i_msg_uid, frac_ids, latest_ts, metrics_id,
           worker_ingress_ts)
       else
         // We should have a route to any claimant we know about
@@ -962,8 +940,9 @@ class val StatelessPartitionRouter is Router
     _partition_id
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    key: Key, event_ts: U64, watermark_ts: U64, producer_id: RoutingId,
-    producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
+    key: Key, event_ts: U64, watermark_ts: U64,
+    consumer_sender: TestableConsumerSender,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
     ifdef "trace" then
@@ -977,31 +956,18 @@ class val StatelessPartitionRouter is Router
       if target_worker == _worker_name then
         let s_idx = (hashed_key % _local_partitions.size().u128()).usize()
         let step = _local_partitions(s_idx)?
-        if producer.has_route_to(step) then
-          ifdef "trace" then
-            @printf[I32]("StatelessPartitionRouter found Route\n".cstring())
-          end
-          Route.run[D](metric_name, pipeline_time_spent, data, key, event_ts,
-            watermark_ts, producer_id, producer, i_msg_uid, frac_ids,
-            latest_ts, metrics_id, worker_ingress_ts, step)
-          (false, latest_ts)
-        else
-          Fail()
-          (true, latest_ts)
-        end
+        consumer_sender.send[D](metric_name, pipeline_time_spent, data, key,
+          event_ts, watermark_ts, i_msg_uid, frac_ids,
+          latest_ts, metrics_id, worker_ingress_ts, step)
+        (false, latest_ts)
       else
         let msg = ForwardStatelessPartitionMsg[D](_partition_id, _worker_name,
           data, key, event_ts, watermark_ts, metric_name, i_msg_uid, frac_ids)
         let proxy = _proxies(target_worker)?
         let ob = proxy.target_boundary()
-        if producer.has_route_to(ob) then
-          Route.forward(msg, pipeline_time_spent, producer_id, producer,
-            latest_ts, metrics_id, metric_name, worker_ingress_ts, ob)
-          (false, latest_ts)
-        else
-          Fail()
-          (true, latest_ts)
-        end
+        consumer_sender.forward(msg, pipeline_time_spent, latest_ts,
+          metrics_id, metric_name, worker_ingress_ts, ob)
+        (false, latest_ts)
       end
     else
       @printf[I32]("Can't find route!\n".cstring())
@@ -1149,40 +1115,32 @@ class val HashedProxyRouter is Router
 
   fun build_msg[D: Any val](worker_name: WorkerName, metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
-    watermark_ts: U64, producer_id: RoutingId, producer: Producer ref,
-    i_msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64): ForwardStatePartitionMsg[D]
+    watermark_ts: U64, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
+    ForwardStatePartitionMsg[D]
   =>
     ForwardStatePartitionMsg[D](_target_step_group, _target_worker_name,
       data, key, event_ts, watermark_ts, metric_name, i_msg_uid, frac_ids)
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    key: Key, event_ts: U64, watermark_ts: U64, producer_id: RoutingId,
-    producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
+    key: Key, event_ts: U64, watermark_ts: U64,
+    consumer_sender: TestableConsumerSender,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at HashedProxyRouter\n".cstring())
     end
 
-    if producer.has_route_to(_target) then
-      ifdef "trace" then
-        @printf[I32]("HashedProxyRouter found Route\n".cstring())
-      end
-
-      match data
-      | let m: DeliveryMsg =>
-        Route.forward(m, pipeline_time_spent, producer_id, producer,
-          latest_ts, metrics_id, metric_name, worker_ingress_ts, _target)
-      else
-        Fail()
-      end
-
-      (false, latest_ts)
+    match data
+    | let m: DeliveryMsg =>
+      consumer_sender.forward(m, pipeline_time_spent, latest_ts, metrics_id,
+        metric_name, worker_ingress_ts, _target)
     else
       Fail()
-      (true, latest_ts)
     end
+
+    (false, latest_ts)
 
   fun routes(): Map[RoutingId, Consumer] val =>
     recover val Map[RoutingId, Consumer] end

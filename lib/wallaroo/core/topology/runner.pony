@@ -26,6 +26,7 @@ use "serialise"
 use "wallaroo/core/common"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
+use "wallaroo/core/key_registry"
 use "wallaroo/core/metrics"
 use "wallaroo/core/partitioning"
 use "wallaroo/core/recovery"
@@ -45,13 +46,11 @@ trait Runner
   // the computation
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, key: Key, event_ts: U64, watermark_ts: U64,
-    producer_id: RoutingId, producer: Producer ref, router: Router,
+    consumer_sender: TestableConsumerSender, router: Router,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64,
-    metrics_reporter: MetricsReporter ref): (Bool, U64)
-  fun ref flush_local_state(producer_id: RoutingId, producer: Producer ref,
-    router: Router, metrics_reporter: MetricsReporter ref,
-    watermarks: StageWatermarks) => None
+    metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
+  fun ref flush_local_state(consumer_sender: TestableConsumerSender,
+    router: Router, watermarks: StageWatermarks) => None
   fun name(): String
 
 trait SerializableStateRunner
@@ -66,7 +65,8 @@ trait RollbackableRunner
   fun ref set_step_id(id: U128)
 
 trait val RunnerBuilder
-  fun apply(event_log: EventLog, auth: AmbientAuth,
+  fun apply(key_registry: KeyRegistry, event_log: EventLog, auth: AmbientAuth,
+    metrics_reporter: MetricsReporter iso,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
     partitioner_builder: PartitionerBuilder = PassthroughPartitionerBuilder):
@@ -86,8 +86,8 @@ class val RunnerSequenceBuilder is RunnerBuilder
   let _parallelism: USize
   let _local_routing: Bool
 
-  new val create(bs: Array[RunnerBuilder] val, parallelism': USize,
-    local_routing': Bool)
+  new val create(bs: Array[RunnerBuilder] val,
+    parallelism': USize, local_routing': Bool)
   =>
     _runner_builders = bs
     _routing_group =
@@ -99,8 +99,8 @@ class val RunnerSequenceBuilder is RunnerBuilder
     _parallelism = parallelism'
     _local_routing = local_routing'
 
-  fun apply(event_log: EventLog,
-    auth: AmbientAuth,
+  fun apply(key_registry: KeyRegistry, event_log: EventLog,
+    auth: AmbientAuth, metrics_reporter: MetricsReporter iso,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
     partitioner_builder: PartitionerBuilder = PassthroughPartitionerBuilder):
@@ -117,7 +117,8 @@ class val RunnerSequenceBuilder is RunnerBuilder
         end
       match next_builder
       | let rb: RunnerBuilder =>
-        latest_runner = rb(event_log, auth, consume latest_runner, router)
+        latest_runner = rb(key_registry, event_log, auth,
+          metrics_reporter.clone(), consume latest_runner, router)
       end
       remaining = remaining - 1
     end
@@ -167,8 +168,8 @@ class val StatelessComputationRunnerBuilder[In: Any val, Out: Any val] is
     _parallelism = parallelism'
     _local_routing = local_routing'
 
-  fun apply(event_log: EventLog,
-    auth: AmbientAuth,
+  fun apply(key_registry: KeyRegistry, event_log: EventLog,
+    auth: AmbientAuth, metrics_reporter: MetricsReporter iso,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
     partitioner_builder: PartitionerBuilder = PassthroughPartitionerBuilder):
@@ -176,10 +177,11 @@ class val StatelessComputationRunnerBuilder[In: Any val, Out: Any val] is
   =>
     match (consume next_runner)
     | let r: Runner iso =>
-      StatelessComputationRunner[In, Out](_comp, consume r)
+      StatelessComputationRunner[In, Out](_comp, consume r,
+        consume metrics_reporter)
     else
       StatelessComputationRunner[In, Out](_comp,
-        RouterRunner(partitioner_builder))
+        RouterRunner(partitioner_builder), consume metrics_reporter)
     end
 
   fun name(): String => _comp.name()
@@ -203,8 +205,8 @@ class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
     _parallelism = parallelism'
     _local_routing = local_routing'
 
-  fun apply(event_log: EventLog,
-    auth: AmbientAuth,
+  fun apply(key_registry: KeyRegistry, event_log: EventLog,
+    auth: AmbientAuth, metrics_reporter: MetricsReporter iso,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
     partitioner_builder: PartitionerBuilder = PassthroughPartitionerBuilder):
@@ -212,10 +214,11 @@ class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
   =>
     match (consume next_runner)
     | let r: Runner iso =>
-      StateRunner[In, Out, S](_step_group, _state_init, event_log, auth,
-        consume r, _local_routing)
+      StateRunner[In, Out, S](_step_group, _state_init, key_registry,
+        event_log, auth, consume metrics_reporter, consume r, _local_routing)
     else
-      StateRunner[In, Out, S](_step_group, _state_init, event_log, auth,
+      StateRunner[In, Out, S](_step_group, _state_init, key_registry,
+        event_log, auth, consume metrics_reporter,
         RouterRunner(partitioner_builder), _local_routing)
     end
 
@@ -229,20 +232,21 @@ class StatelessComputationRunner[In: Any val, Out: Any val] is Runner
   let _next: Runner
   let _computation: StatelessComputation[In, Out] val
   let _computation_name: String
+  let _metrics_reporter: MetricsReporter
 
   new iso create(computation: StatelessComputation[In, Out] val,
-    next: Runner iso)
+    next: Runner iso, metrics_reporter: MetricsReporter iso)
   =>
     _computation = computation
     _computation_name = _computation.name()
     _next = consume next
+    _metrics_reporter = consume metrics_reporter
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, key: Key, event_ts: U64, watermark_ts: U64,
-    producer_id: RoutingId, producer: Producer ref, router: Router,
+    consumer_sender: TestableConsumerSender, router: Router,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64,
-    metrics_reporter: MetricsReporter ref): (Bool, U64)
+    metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
     match data
     | let input: In =>
@@ -262,37 +266,37 @@ class StatelessComputationRunner[In: Any val, Out: Any val] is Runner
       // input watermark for stateless computations (i.e. the output
       // watermark always equals the input after each message).
       (let new_watermark_ts, let old_watermark_ts) =
-        producer.update_output_watermark(watermark_ts)
+        consumer_sender.update_output_watermark(watermark_ts)
 
       (let is_finished, let last_ts) =
         match result
         | None => (true, computation_end)
         | let o: Out =>
           OutputProcessor[Out](_next, metric_name, pipeline_time_spent, o,
-            key, event_ts, new_watermark_ts, old_watermark_ts, producer_id,
-            producer, router, i_msg_uid, frac_ids, computation_end,
-            new_metrics_id, worker_ingress_ts, metrics_reporter)
+            key, event_ts, new_watermark_ts, old_watermark_ts, consumer_sender,
+            router, i_msg_uid, frac_ids, computation_end,
+            new_metrics_id, worker_ingress_ts)
         | let os: Array[Out] val =>
           OutputProcessor[Out](_next, metric_name, pipeline_time_spent, os,
-            key, event_ts, new_watermark_ts, old_watermark_ts, producer_id,
-            producer, router, i_msg_uid, frac_ids, computation_end,
-            new_metrics_id, worker_ingress_ts, metrics_reporter)
+            key, event_ts, new_watermark_ts, old_watermark_ts, consumer_sender,
+            router, i_msg_uid, frac_ids, computation_end,
+            new_metrics_id, worker_ingress_ts)
         | let os: Array[(Out,U64)] val =>
           OutputProcessor[Out](_next, metric_name, pipeline_time_spent, os,
-            key, event_ts, new_watermark_ts, old_watermark_ts, producer_id,
-            producer, router, i_msg_uid, frac_ids, computation_end,
-            new_metrics_id, worker_ingress_ts, metrics_reporter)
+            key, event_ts, new_watermark_ts, old_watermark_ts, consumer_sender,
+            router, i_msg_uid, frac_ids, computation_end,
+            new_metrics_id, worker_ingress_ts)
         end
 
       let latest_metrics_id = ifdef "detailed-metrics" then
-          metrics_reporter.step_metric(metric_name, _computation_name,
+          _metrics_reporter.step_metric(metric_name, _computation_name,
             metrics_id, latest_ts, computation_start where prefix = "Before")
           metrics_id + 1
         else
           metrics_id
         end
 
-      metrics_reporter.step_metric(metric_name, _computation_name,
+      _metrics_reporter.step_metric(metric_name, _computation_name,
         latest_metrics_id, computation_start, computation_end)
 
       (is_finished, last_ts)
@@ -312,6 +316,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
   let _next_runner: Runner
 
   var _state_map: HashMap[Key, StateWrapper[In, Out, S], HashableKey] = _state_map.create()
+  let _key_registry: KeyRegistry
   let _event_log: EventLog
   let _wb: Writer = Writer
   let _rb: Reader = Reader
@@ -328,16 +333,22 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
   var _step_timeout_trigger: (StepTimeoutTrigger | None) = None
   let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
 
+  let _metrics_reporter: MetricsReporter
+
   new iso create(step_group': RoutingId,
-    state_initializer: StateInitializer[In, Out, S] val, event_log: EventLog,
-    auth: AmbientAuth, next_runner: Runner iso, local_routing: Bool)
+    state_initializer: StateInitializer[In, Out, S] val,
+    key_registry: KeyRegistry, event_log: EventLog,
+    auth: AmbientAuth, metrics_reporter: MetricsReporter iso,
+    next_runner: Runner iso, local_routing: Bool)
   =>
     _step_group = step_group'
     _state_initializer = state_initializer
     _next_runner = consume next_runner
+    _key_registry = key_registry
     _event_log = event_log
     _step_id = None
     _auth = auth
+    _metrics_reporter = consume metrics_reporter
     _local_routing = local_routing
 
   fun ref set_step_id(id: RoutingId) =>
@@ -356,10 +367,9 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, key: Key, event_ts: U64, watermark_ts: U64,
-    producer_id: RoutingId, producer: Producer ref, router: Router,
+    consumer_sender: TestableConsumerSender, router: Router,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64,
-    metrics_reporter: MetricsReporter ref): (Bool, U64)
+    metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
     match data
     | let input: In =>
@@ -367,16 +377,10 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
         try
           _state_map(key)?
         else
-          match producer
-          | let s: Step ref =>
-            s.register_key(_step_group, key)
-            let new_state = _state_initializer.state_wrapper(key, _rand)
-            _state_map(key) = new_state
-            new_state
-          else
-            Fail()
-            EmptyStateWrapper[In, Out, State]
-          end
+          _key_registry.register_key(_step_group, key)
+          let new_state = _state_initializer.state_wrapper(key, _rand)
+          _state_map(key) = new_state
+          new_state
         end
 
       let new_metrics_id = ifdef "detailed-metrics" then
@@ -389,7 +393,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
 
       let computation_start = WallClock.nanoseconds()
 
-      (let result, let output_watermark_ts) =
+      (let result, let output_watermark_ts, let retain_state) =
         // !TODO!: This match is a hack to avoid segfaulting on the
         // state_wrapper.apply() call below when the state wrapper is a Python
         // state computation. We need to determine the cause of this problem
@@ -405,7 +409,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
       let computation_end = WallClock.nanoseconds()
 
       (let new_watermark_ts, let old_watermark_ts) =
-        producer.update_output_watermark(output_watermark_ts)
+        consumer_sender.update_output_watermark(output_watermark_ts)
 
       (let is_finished, let last_ts) =
         match result
@@ -413,32 +417,29 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
         | let o: Out =>
           OutputProcessor[Out](_next_runner, metric_name,
             pipeline_time_spent, o, key, event_ts, new_watermark_ts,
-            old_watermark_ts, producer_id, producer, router, i_msg_uid,
-            frac_ids, computation_end, new_metrics_id, worker_ingress_ts,
-            metrics_reporter)
+            old_watermark_ts, consumer_sender, router, i_msg_uid,
+            frac_ids, computation_end, new_metrics_id, worker_ingress_ts)
         | let os: Array[Out] val =>
           OutputProcessor[Out](_next_runner, metric_name,
             pipeline_time_spent, os, key, event_ts, new_watermark_ts,
-            old_watermark_ts, producer_id, producer, router, i_msg_uid,
-            frac_ids, computation_end, new_metrics_id, worker_ingress_ts,
-            metrics_reporter)
+            old_watermark_ts, consumer_sender, router, i_msg_uid,
+            frac_ids, computation_end, new_metrics_id, worker_ingress_ts)
         | let os: Array[(Out,U64)] val =>
           OutputProcessor[Out](_next_runner, metric_name,
             pipeline_time_spent, os, key, event_ts, new_watermark_ts,
-            old_watermark_ts, producer_id, producer, router, i_msg_uid,
-            frac_ids, computation_end, new_metrics_id, worker_ingress_ts,
-            metrics_reporter)
+            old_watermark_ts, consumer_sender, router, i_msg_uid,
+            frac_ids, computation_end, new_metrics_id, worker_ingress_ts)
         end
 
       let latest_metrics_id = ifdef "detailed-metrics" then
-          metrics_reporter.step_metric(metric_name, _state_initializer.name(),
+          _metrics_reporter.step_metric(metric_name, _state_initializer.name(),
             metrics_id, latest_ts, computation_start where prefix = "Before")
           metrics_id + 1
         else
           metrics_id
         end
 
-      metrics_reporter.step_metric(metric_name, _state_initializer.name(),
+      _metrics_reporter.step_metric(metric_name, _state_initializer.name(),
         latest_metrics_id, computation_start, computation_end)
 
       (is_finished, last_ts)
@@ -454,9 +455,8 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     //rotate
     None
 
-  fun ref on_timeout(producer_id: RoutingId, producer: Producer ref,
-    router: Router, metrics_reporter: MetricsReporter ref,
-    watermarks: StageWatermarks)
+  fun ref on_timeout(consumer_sender: TestableConsumerSender,
+    router: Router, watermarks: StageWatermarks)
   =>
     let on_timeout_ts = WallClock.nanoseconds()
     for (key, sw) in _state_map.pairs() do
@@ -464,12 +464,11 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
         on_timeout_ts)
       let initial_output_watermark_ts = watermarks.output_watermark()
 
-      (let out, let output_watermark_ts) =
+      (let out, let output_watermark_ts, _) =
         sw.on_timeout(input_watermark_ts, initial_output_watermark_ts)
 
       _send_flushed_outputs(key, out, output_watermark_ts,
-        producer_id, producer, router, metrics_reporter,
-        watermarks, on_timeout_ts)
+        consumer_sender, router, watermarks, on_timeout_ts)
     end
     match _step_timeout_trigger
     | let stt: StepTimeoutTrigger =>
@@ -484,9 +483,8 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
       end
     end
 
-  fun ref flush_local_state(producer_id: RoutingId, producer: Producer ref,
-    router: Router, metrics_reporter: MetricsReporter ref,
-    watermarks: StageWatermarks)
+  fun ref flush_local_state(consumer_sender: TestableConsumerSender,
+    router: Router, watermarks: StageWatermarks)
   =>
     // We only flush local state if we're involved in worker local routing.
     if _local_routing then
@@ -496,19 +494,17 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
       for (key, sw) in _state_map.pairs() do
         let initial_output_watermark_ts = watermarks.output_watermark()
 
-        (let out, let output_watermark_ts) =
+        (let out, let output_watermark_ts, _) =
           sw.flush_windows(input_watermark_ts, initial_output_watermark_ts)
 
         _send_flushed_outputs(key, out, output_watermark_ts,
-          producer_id, producer, router, metrics_reporter,
-          watermarks, current_ts)
+          consumer_sender, router, watermarks, current_ts)
       end
     end
 
   fun ref _send_flushed_outputs(key: Key, out: ComputationResult[Out],
-    output_watermark_ts: U64, producer_id: RoutingId, producer: Producer ref,
-    router: Router, metrics_reporter: MetricsReporter ref,
-    watermarks: StageWatermarks, artificial_ingress_ts: U64)
+    output_watermark_ts: U64, consumer_sender: TestableConsumerSender,
+    router: Router, watermarks: StageWatermarks, artificial_ingress_ts: U64)
   =>
     (let new_watermark_ts, let old_watermark_ts) =
       watermarks.update_output_watermark(output_watermark_ts)
@@ -526,20 +522,20 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
       OutputProcessor[Out](
         _next_runner, metrics_name, pipeline_time_spent,
         o, key, output_watermark_ts, new_watermark_ts, old_watermark_ts,
-        producer_id, producer, router, new_i_msg_uid, None, latest_ts,
-        metrics_id, artificial_ingress_ts, metrics_reporter)
+        consumer_sender, router, new_i_msg_uid, None, latest_ts,
+        metrics_id, artificial_ingress_ts)
     | let os: Array[Out] val =>
       OutputProcessor[Out](
         _next_runner, metrics_name, pipeline_time_spent,
         os, key, output_watermark_ts, new_watermark_ts, old_watermark_ts,
-        producer_id, producer, router, new_i_msg_uid, None, latest_ts,
-        metrics_id, artificial_ingress_ts, metrics_reporter)
+        consumer_sender, router, new_i_msg_uid, None, latest_ts,
+        metrics_id, artificial_ingress_ts)
     | let os: Array[(Out,U64)] val =>
       OutputProcessor[Out](
         _next_runner, metrics_name, pipeline_time_spent,
         os, key, output_watermark_ts, new_watermark_ts, old_watermark_ts,
-        producer_id, producer, router, new_i_msg_uid, None, latest_ts,
-        metrics_id, artificial_ingress_ts, metrics_reporter)
+        consumer_sender, router, new_i_msg_uid, None, latest_ts,
+        metrics_id, artificial_ingress_ts)
     end
 
   fun name(): String => _state_initializer.name()
@@ -559,7 +555,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
             HashableKey.string(key).cstring())
         end
         _state_map(key) = state_wrapper
-        step.register_key(s_group, key)
+        _key_registry.register_key(s_group, key)
       else
         Fail()
       end
@@ -567,11 +563,11 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
       // We got the key but no accompanying state, so we initialize
       // ourselves.
       _state_map(key) = _state_initializer.state_wrapper(key, _rand)
-      step.register_key(s_group, key)
+      _key_registry.register_key(s_group, key)
     end
 
   fun ref export_key_state(step: Step ref, key: Key): ByteSeq val =>
-    step.unregister_key(_step_group, key)
+    _key_registry.unregister_key(_step_group, key)
     let state_wrapper =
       try
         _state_map.remove(key)?._2
@@ -658,14 +654,13 @@ class iso RouterRunner is Runner
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, key: Key, event_ts: U64, watermark_ts: U64,
-    producer_id: RoutingId, producer: Producer ref, router: Router,
+    consumer_sender: TestableConsumerSender, router: Router,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64,
-    metrics_reporter: MetricsReporter ref): (Bool, U64)
+    metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
     let new_key = _partitioner[D](data, key)
     router.route[D](metric_name, pipeline_time_spent, data, new_key, event_ts,
-      watermark_ts, producer_id, producer, i_msg_uid, frac_ids, latest_ts,
+      watermark_ts, consumer_sender, i_msg_uid, frac_ids, latest_ts,
       metrics_id, worker_ingress_ts)
 
   fun name(): String => "Router runner"

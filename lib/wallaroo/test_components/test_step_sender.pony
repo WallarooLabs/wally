@@ -24,15 +24,17 @@ use "wallaroo/core/step"
 use "wallaroo/core/topology"
 
 primitive TestStepSender[V: (Hashable & Equatable[V] val)]
-  fun send_seq(step: Step, inputs: Array[V] val, producer_id: RoutingId,
-    producer: Producer)
+  fun send_seq(inputs: Array[V] val, key: Key, step: Step,
+    producer_id: RoutingId, producer: Producer)
   =>
     for input in inputs.values() do
-      send(step, input, producer_id, producer)
+      send(input, key, step, producer_id, producer)
     end
 
-  fun send(step: Step, input: V, producer_id: RoutingId, producer: Producer) =>
-    step.run[V]("", 1, input, "", 1, 1, producer_id, producer, 1, None, 1, 1,
+  fun send(input: V, key: Key, step: Step, producer_id: RoutingId,
+    producer: Producer)
+  =>
+    step.run[V]("", 1, input, key, 1, 1, producer_id, producer, 1, None, 1, 1,
       1, 1)
 
   fun send_barrier(step: Step, token: BarrierToken, producer_id: RoutingId,

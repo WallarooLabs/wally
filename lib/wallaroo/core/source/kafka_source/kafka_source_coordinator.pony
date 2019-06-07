@@ -217,7 +217,7 @@ actor KafkaSourceCoordinator[In: Any val] is (SourceCoordinator & KafkaClientMan
 
     _notify = KafkaSourceCoordinatorNotify[In](_pipeline_name, _auth,
       _handler, _runner_builder, _partitioner_builder, _router,
-      _metrics_reporter.clone(), _event_log, _target_router)
+      _metrics_reporter.clone(), _event_log, _target_router, _router_registry)
 
     match router
     | let pr: StatePartitionRouter =>

@@ -63,15 +63,15 @@ interface val StateInitializer[In: Any val, Out: Any val, S: State ref] is
     StateWrapper[In, Out, S] ?
 
 trait ref StateWrapper[In: Any val, Out: Any val, S: State ref]
-  // Return (output, output_watermark_ts)
+  // Return (output, output_watermark_ts, retain_state)
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
   fun ref flush_windows(input_watermark_ts: U64,
-    output_watermark_ts: U64): (ComputationResult[Out], U64)
+    output_watermark_ts: U64): (ComputationResult[Out], U64, Bool)
   =>
-    (None, input_watermark_ts)
+    (None, input_watermark_ts, true)
   fun ref encode(auth: AmbientAuth): ByteSeq
 
 class EmptyState is State
@@ -79,16 +79,16 @@ class EmptyState is State
 class EmptyStateWrapper[In: Any val, Out: Any val, S: State ref]
   // Return (output, output_watermark_ts)
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
-    (ComputationResult[Out], U64)
+    (ComputationResult[Out], U64, Bool)
   =>
     Fail()
-    (None, 0)
+    (None, 0, true)
 
   fun ref on_timeout(input_watermark_ts: U64, output_watermark_ts: U64,
-    watermarks: StageWatermarks): (ComputationResult[Out], U64)
+    watermarks: StageWatermarks): (ComputationResult[Out], U64, Bool)
   =>
     Fail()
-    (None, 0)
+    (None, 0, true)
 
   fun ref encode(auth: AmbientAuth): ByteSeq =>
     Fail()

@@ -137,7 +137,8 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       end
 
       // Check if we need to trigger and clear windows
-      (var outs, var output_watermark_ts) = attempt_to_trigger(watermark_ts)
+      (var outs, var output_watermark_ts, var retain_state) =
+        attempt_to_trigger(watermark_ts)
 
       // If we haven't already applied the input, do it now.
       if not applied then
@@ -174,10 +175,10 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
           _apply_input(input, new_earliest_ts, new_earliest_ts)
         end
       end
-      (consume outs, output_watermark_ts)
+      (consume outs, output_watermark_ts, retain_state)
     else
       Fail()
-      (recover Array[(Out, U64)] end, 0)
+      (recover Array[(Out, U64)] end, 0, true)
     end
 
   // TODO: Update signature -> `true` is not very clear as the return value.
@@ -212,7 +213,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     end
 
   fun ref attempt_to_trigger(input_watermark_ts: U64):
-    (Array[(Out, U64)] iso^, U64)
+    (Array[(Out, U64)] iso^, U64, Bool)
   =>
     let outs = recover iso Array[(Out, U64)] end
     var output_watermark_ts: U64 = 0
@@ -261,7 +262,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     else
       Fail()
     end
-    (consume outs, output_watermark_ts)
+    (consume outs, output_watermark_ts, true)
 
   fun ref _check_first_window(watermark_ts: U64, trigger_diff: U64):
     ((Out | None), U64, Bool)
