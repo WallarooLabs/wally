@@ -14,7 +14,7 @@
 
 base_window_policy = {
                       'window-delay': 0,
-                      'window-policy': 'drop',
+                      'window-late-data-policy': 'drop',
                       'window-size': 1000,
                       'window-slide': 0,
                       'window-type': 'tumbling',
