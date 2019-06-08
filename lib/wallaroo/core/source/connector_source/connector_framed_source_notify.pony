@@ -242,7 +242,8 @@ class ConnectorSourceNotify[In: Any val]
       _prep_for_rollback = true
     end
 
-  fun ref received(source: ConnectorSource[In] ref, data: Array[U8] iso): Bool =>
+  fun ref received(source: ConnectorSource[In] ref, data: Array[U8] iso): Bool
+  =>
     // ignore messages if session isn't active
     // necessary for dealing with overflow data during restart
     if not _session_active then return true end
@@ -296,7 +297,8 @@ class ConnectorSourceNotify[In: Any val]
     let data': Array[U8] val = consume data
     try
       ifdef "trace" then
-        @printf[I32]("TRACE: decode data: %s\n".cstring(), _print_array[U8](data').cstring())
+        @printf[I32]("TRACE: decode data: %s\n".cstring(), _print_array[U8](
+          data').cstring())
       end
       let connector_msg = cwm.Frame.decode(data')?
       match connector_msg
@@ -305,8 +307,8 @@ class ConnectorSourceNotify[In: Any val]
           @printf[I32]("TRACE: got HelloMsg\n".cstring())
         end
         if _fsm_state isnt _ProtoFsmConnected then
-          @printf[I32]("ERROR: %s.received_connector_msg: state is %d\n".cstring(),
-            __loc.type_name().cstring(), _fsm_state())
+          @printf[I32]("ERROR: %s.received_connector_msg: state is %d\n"
+            .cstring(), __loc.type_name().cstring(), _fsm_state())
           Fail()
         end
 
@@ -316,8 +318,8 @@ class ConnectorSourceNotify[In: Any val]
           return _to_error_state(source, "Unknown protocol version")
         end
         if m.cookie != _cookie then
-          @printf[I32]("ERROR: %s.received_connector_msg: bad cookie %s\n".cstring(),
-            __loc.type_name().cstring(), m.cookie.cstring())
+          @printf[I32]("ERROR: %s.received_connector_msg: bad cookie %s\n"
+            .cstring(), __loc.type_name().cstring(), m.cookie.cstring())
           return _to_error_state(source, "Bad cookie")
         end
 
@@ -384,7 +386,8 @@ class ConnectorSourceNotify[In: Any val]
 
         // try to process message
         if not _active_streams.contains(m.stream_id) then
-          return _to_error_state(source, "Bad stream_id " + m.stream_id.string())
+          return _to_error_state(source, "Bad stream_id " +
+            m.stream_id.string())
         else
           try
             let s = _active_streams(m.stream_id)?
@@ -410,8 +413,8 @@ class ConnectorSourceNotify[In: Any val]
               // 1. remove state from _active_streams
               try
                 _active_streams.remove(m.stream_id)?
-                @printf[I32]("Successfully removed %s from _active\n".cstring(),
-                m.stream_id.string().cstring())
+                @printf[I32]("Successfully removed %s from _active\n"
+                  .cstring(), m.stream_id.string().cstring())
               else
                 @printf[I32](("Something went wrong trying to remove %s " +
                   "from _active\n").cstring(),
@@ -467,8 +470,8 @@ class ConnectorSourceNotify[In: Any val]
                   end
 
                 // process message
-                return _run_and_subsequent_activity(latest_metrics_id, ingest_ts,
-                  pipeline_time_spent, key, source, decoded, s,
+                return _run_and_subsequent_activity(latest_metrics_id,
+                  ingest_ts, pipeline_time_spent, key, source, decoded, s,
                   m.message_id, m.flags)
               else
                 // _handler.decode(bytes) failed
@@ -476,7 +479,8 @@ class ConnectorSourceNotify[In: Any val]
                   // TODO [post-source-migration] revisit this error message
                   return _to_error_state(source, "No message bytes and BOUNDARY not set")
                 end
-                @printf[I32](("Unable to decode message at " + _pipeline_name + " source\n").cstring())
+                @printf[I32](("Unable to decode message at " + _pipeline_name +
+                  " source\n").cstring())
                 ifdef debug then
                   Fail()
                 end
@@ -546,8 +550,8 @@ class ConnectorSourceNotify[In: Any val]
         msg_uid.string()
       end
 
-    // TODO [source-migration]: We need a way to assign watermarks based on the policy
-    // for any particular connector.
+    // TODO [source-migration]: We need a way to assign watermarks based on
+    // the policy for any particular connector.
     if ingest_ts > _watermark_ts then
       _watermark_ts = ingest_ts
     end
@@ -656,8 +660,8 @@ class ConnectorSourceNotify[In: Any val]
     // and a notify_ack after an in-between-checkpoints-closed will have the
     // correct last_seen as its last_acked.
     //
-    // So the assumption here is the "last_seen" vs. "last_acked" discrepancy is
-    // corrected either:
+    // So the assumption here is the "last_seen" vs. "last_acked" discrepancy
+    // is corrected either:
     //  1. at the next checkpoint, when last_seen becomes last_acked in the
     //    checkpointed state
     //  2. during a rollback, when the state rolls back to actual last_acked
@@ -729,7 +733,8 @@ class ConnectorSourceNotify[In: Any val]
       _clear_streams()
       _prep_for_rollback = true
       ifdef "trace" then
-        @printf[I32]("TRACE: %s.%s\n".cstring(), __loc.type_name().cstring(), __loc.method_name().cstring())
+        @printf[I32]("TRACE: %s.%s\n".cstring(), __loc.type_name().cstring(),
+          __loc.method_name().cstring())
       end
     end
 
@@ -888,7 +893,8 @@ class ConnectorSourceNotify[In: Any val]
 
     // create a promise for handling result
     let promise = Promise[NotifyResult[In]]
-    promise.next[None](recover NotifyResultFulfill[In](stream_id, _session_id) end)
+    promise.next[None](recover NotifyResultFulfill[In](stream_id, _session_id)
+      end)
 
     // send request to take ownership of this stream id
     let request_id = ConnectorStreamNotifyId(stream_id, _session_id)

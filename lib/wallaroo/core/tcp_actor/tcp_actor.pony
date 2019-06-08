@@ -16,6 +16,8 @@ Copyright 2019 The Wallaroo Authors.
 
 */
 
+use "wallaroo_labs/mort"
+
 
 trait TCPActor
   fun ref tcp_handler(): TestableTCPHandler
@@ -29,6 +31,10 @@ trait TCPActor
 
   be read_again() =>
     tcp_handler().read_again()
+
+  //!@ Temporary fix because of Pony wallaroo_labs/mort import bug
+  be fail() =>
+    Fail()
 
   fun ref expect(qty: USize = 0) =>
     tcp_handler().expect(qty)

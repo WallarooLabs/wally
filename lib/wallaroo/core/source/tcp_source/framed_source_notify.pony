@@ -34,7 +34,6 @@ use "wallaroo/core/topology"
 
 class TCPSourceNotify[In: Any val]
   let _source_id: RoutingId
-  let _env: Env
   let _auth: AmbientAuth
   let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
   var _header: Bool = true
@@ -58,7 +57,6 @@ class TCPSourceNotify[In: Any val]
     _source_id = source_id
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"
-    _env = env
     _auth = auth
     _handler = handler
     _runner = runner_builder(event_log, auth, None, target_router,
@@ -177,33 +175,3 @@ class TCPSourceNotify[In: Any val]
 
   fun ref closed(source: TCPSource[In] ref) =>
     @printf[I32]("TCPSource connection closed\n".cstring())
-
-  fun ref connecting(conn: TCPSource[In] ref, count: U32) =>
-    """
-    Called if name resolution succeeded for a TCPSource and we are now
-    waiting for a connection to the server to succeed. The count is the number
-    of connections we're trying. The notifier will be informed each time the
-    count changes, until a connection is made or connect_failed() is called.
-    """
-    None
-
-  fun ref connected(conn: TCPSource[In] ref) =>
-    """
-    Called when we have successfully connected to the server.
-    """
-    None
-
-  fun ref connect_failed(conn: TCPSource[In] ref) =>
-    """
-    Called when we have failed to connect to all possible addresses for the
-    server. At this point, the connection will never be established.
-    """
-    None
-
-  fun ref expect(conn: TCPSource[In] ref, qty: USize): USize =>
-    """
-    Called when the connection has been told to expect a certain quantity of
-    bytes. This allows nested notifiers to change the expected quantity, which
-    allows a lower level protocol to handle any framing (e.g. SSL).
-    """
-    qty

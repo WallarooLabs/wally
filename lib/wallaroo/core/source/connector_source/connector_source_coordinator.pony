@@ -46,8 +46,18 @@ use "wallaroo/core/router_registry"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
+use "wallaroo/core/tcp_actor"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
+
+use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
+  flags: U32, nsec: U64, noisy: Bool)
+use @pony_asio_event_fd[U32](event: AsioEventID)
+use @pony_asio_event_unsubscribe[None](event: AsioEventID)
+use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
+use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
+use @pony_asio_event_destroy[None](event: AsioEventID)
+use @pony_asio_event_set_writeable[None](event: AsioEventID, writeable: Bool)
 
 
 actor ConnectorSourceCoordinator[In: Any val] is
@@ -184,6 +194,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
       let source_id = try _routing_id_gen(source_name)? else Fail(); 0 end
       let source = ConnectorSource[In](source_id, _auth, this,
          notify_parameters, _event_log, _router,
+         SourceTCPHandlerBuilder,
         _outgoing_boundary_builders, _layout_initializer,
         _metrics_reporter.clone(), _router_registry, _is_recovering)
       source.mute(this)
