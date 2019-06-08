@@ -453,9 +453,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       _unmute()
     end
 
-  fun ref is_muted(): Bool =>
-    _muted
-
   be receive_kafka_message(client: KafkaClient, value: Array[U8] iso,
     key: (Array[U8] val | None), msg_metadata: KafkaMessageMetadata val,
     network_received_timestamp: U64)

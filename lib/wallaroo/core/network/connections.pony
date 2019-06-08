@@ -640,7 +640,7 @@ actor Connections is Cluster
   =>
     _data_addrs(target_name) = (host, service)
     let reporter = MetricsReporter(_app_name, _worker_name, _metrics_conn)
-    let tcp_handler_builder = TCPHandlerBuilder
+    let tcp_handler_builder = OutgoingBoundaryTCPHandlerBuilder
     let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
       consume reporter, host, service, tcp_handler_builder)
     try
@@ -661,7 +661,7 @@ actor Connections is Cluster
   =>
     _data_addrs(target_name) = (host, service)
     let reporter = MetricsReporter(_app_name, _worker_name, _metrics_conn)
-    let tcp_handler_builder = TCPHandlerBuilder
+    let tcp_handler_builder = OutgoingBoundaryTCPHandlerBuilder
     let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
       consume reporter, host, service, tcp_handler_builder)
     let outgoing_boundary =

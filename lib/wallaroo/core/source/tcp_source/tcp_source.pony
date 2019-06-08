@@ -44,18 +44,12 @@ use "wallaroo/core/recovery"
 use "wallaroo/core/router_registry"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
+use "wallaroo/core/tcp_actor"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
-use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
-  flags: U32, nsec: U64, noisy: Bool)
-use @pony_asio_event_fd[U32](event: AsioEventID)
-use @pony_asio_event_unsubscribe[None](event: AsioEventID)
-use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
-use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
-use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSource[In: Any val] is Source
+actor TCPSource[In: Any val] is (Source & TCPActor)
   """
   # TCPSource
 
@@ -84,25 +78,12 @@ actor TCPSource[In: Any val] is Source
   // TCP
   let _listen: TCPSourceCoordinator[In]
   let _notify: TCPSourceNotify[In]
-  var _next_size: USize = 0
-  var _max_size: USize = 0
-  var _connect_count: U32 = 0
-  var _fd: U32 = -1
-  var _expect: USize = 0
-  var _connected: Bool = false
-  var _closed: Bool = false
-  var _event: AsioEventID = AsioEvent.none()
-  var _read_buf: Array[U8] iso = recover Array[U8] end
-  var _read_buf_offset: USize = 0
-  var _shutdown_peer: Bool = false
-  var _readable: Bool = false
-  var _reading: Bool = false
-  var _shutdown: Bool = false
+  var _tcp_handler: TestableTCPHandler = EmptyTCPHandler
+  let _tcp_handler_builder: TestableTCPHandlerBuilder
+
   // Start muted. Wait for unmute to begin processing
   var _muted: Bool = true
   var _disposed: Bool = false
-  var _expect_read_buf: Reader = Reader
-  var _max_received_count: U8 = 50
   let _muted_by: SetIs[Any tag] = _muted_by.create()
 
   let _router_registry: RouterRegistry
@@ -118,6 +99,7 @@ actor TCPSource[In: Any val] is Source
   new create(source_id: RoutingId, auth: AmbientAuth,
     listen: TCPSourceCoordinator[In], notify: TCPSourceNotify[In] iso,
     event_log: EventLog, router': Router,
+    tcp_handler_builder: TestableTCPHandlerBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     metrics_reporter': MetricsReporter iso, router_registry: RouterRegistry)
@@ -128,6 +110,7 @@ actor TCPSource[In: Any val] is Source
     _source_id = source_id
     _auth = auth
     _event_log = event_log
+    _tcp_handler_builder = tcp_handler_builder
     _metrics_reporter = consume metrics_reporter'
     _listen = listen
     _notify = consume notify
@@ -173,24 +156,9 @@ actor TCPSource[In: Any val] is Source
     A new connection accepted on a server.
     """
     if not _disposed then
-      _notify.accepted(this)
-
-      _connect_count = 0
-      _fd = fd
-      _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write_oneshot(), 0, true)
-      _connected = true
-      _read_buf = recover Array[U8].>undefined(init_size) end
-      _read_buf_offset = 0
-      _next_size = init_size
-      _max_size = max_size
-
-      _readable = true
-      _closed = false
-      _shutdown = false
-      _shutdown_peer = false
-
-      _pending_reads()
+      _tcp_handler = _tcp_handler_builder.for_connection(fd, init_size,
+        max_size, this, _muted)
+      _tcp_handler.accept()
     end
 
   be first_checkpoint_complete() =>
@@ -511,267 +479,25 @@ actor TCPSource[In: Any val] is Source
   /////////
   // TCP
   /////////
-  be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
-    """
-    Handle socket events.
-    """
-    if event isnt _event then
-      if AsioEvent.writeable(flags) then
-        // A connection has completed.
-        var fd = @pony_asio_event_fd(event)
-        _connect_count = _connect_count - 1
+  fun ref tcp_handler(): TestableTCPHandler =>
+    _tcp_handler
 
-        if not _connected and not _closed then
-          // We don't have a connection yet.
-          if @pony_os_connected[Bool](fd) then
-            // The connection was successful, make it ours.
-            _fd = fd
-            _event = event
-            _connected = true
-            _readable = true
-
-            _notify.connected(this)
-
-            _pending_reads()
-          else
-            // The connection failed, unsubscribe the event and close.
-            @pony_asio_event_unsubscribe(event)
-            @pony_os_socket_close[None](fd)
-            _notify_connecting()
-          end
-        else
-          // We're already connected, unsubscribe the event and close.
-          if not AsioEvent.disposable(flags) then
-            @pony_asio_event_unsubscribe(event)
-          end
-          if _connected then
-            @pony_os_socket_close[None](fd)
-          end
-          _try_shutdown()
-        end
-      else
-        // It's not our event.
-        if AsioEvent.disposable(flags) then
-          // It's disposable, so dispose of it.
-          @pony_asio_event_destroy(event)
-        end
-      end
-    else
-      if _connected and not _shutdown_peer then
-        if AsioEvent.readable(flags) then
-          _readable = true
-          _pending_reads()
-        end
-      end
-
-      if AsioEvent.disposable(flags) then
-        @pony_asio_event_destroy(event)
-        _event = AsioEvent.none()
-      end
-
-      _try_shutdown()
-    end
-
-  fun ref _notify_connecting() =>
-    """
-    Inform the notifier that we're connecting.
-    """
-    if _connect_count > 0 then
-      _notify.connecting(this, _connect_count)
-    else
-      _notify.connect_failed(this)
-      _hard_close()
-    end
-
-  fun ref close() =>
-    """
-    Shut our connection down immediately. Stop reading data from the incoming
-    source.
-    """
-    _hard_close()
-
-  fun ref _try_shutdown() =>
-    """
-    If we have closed and we have no remaining writes or pending connections,
-    then shutdown.
-    """
-    if not _closed then
-      return
-    end
-
-    if
-      not _shutdown and
-      (_connect_count == 0)
-    then
-      _shutdown = true
-
-      if _connected then
-        @pony_os_socket_shutdown[None](_fd)
-      else
-        _shutdown_peer = true
-      end
-    end
-
-    if _connected and _shutdown and _shutdown_peer then
-      _hard_close()
-    end
-
-  fun ref _hard_close() =>
-    """
-    When an error happens, do a non-graceful close.
-    """
-    if not _connected then
-      return
-    end
-
-    _connected = false
-    _closed = true
-    _shutdown = true
-    _shutdown_peer = true
-
-    // Unsubscribe immediately and drop all pending writes.
-    @pony_asio_event_unsubscribe(_event)
-    _readable = false
-    @pony_asio_event_set_readable[None](_event, false)
-
-    @pony_os_socket_close[None](_fd)
-    _fd = -1
-
-    _event = AsioEvent.none()
-    _expect_read_buf.clear()
-    _expect = 0
-
-    _notify.closed(this)
-
-    _listen._conn_closed(this)
-
-  fun ref _pending_reads() =>
-    """
-    Unless this connection is currently muted, read while data is available,
-    guessing the next packet length as we go. If we read 5 kb of data, send
-    ourself a resume message and stop reading, to avoid starving other actors.
-    Currently we can handle a varying value of _expect (greater than 0) and
-    constant _expect of 0 but we cannot handle switching between these two
-    cases.
-    """
-    try
-      var sum: USize = 0
-      var received_count: U8 = 0
-      _reading = true
-
-      while _readable and not _shutdown_peer do
-        // exit if muted
-        if _muted then
-          _reading = false
-          return
-        end
-
-        // distribute and data we've already read that is in the `read_buf`
-        // and able to be distributed
-        while (_read_buf_offset >= _expect) and (_read_buf_offset > 0) do
-          // get data to be distributed and update `_read_buf_offset`
-          let data =
-            if _expect == 0 then
-              let data' = _read_buf = recover Array[U8] end
-              data'.truncate(_read_buf_offset)
-              _read_buf_offset = 0
-              consume data'
-            else
-              let x = _read_buf = recover Array[U8] end
-              (let data', _read_buf) = (consume x).chop(_expect)
-              _read_buf_offset = _read_buf_offset - _expect
-              consume data'
-            end
-
-          // increment max reads
-          received_count = received_count + 1
-
-          // check if we should yield to let another actor run
-          if (not _notify.received(this, consume data))
-            or (received_count >= _max_received_count)
-          then
-            _read_buf_size()
-            _read_again()
-            _reading = false
-            return
-          end
-        end
-
-        if sum >= _max_size then
-          // If we've read _max_size, yield and read again later.
-          _read_buf_size()
-          _read_again()
-          _reading = false
-          return
-        end
-
-        // make sure we have enough space to read enough data for _expect
-        if _read_buf.size() <= _read_buf_offset then
-          _read_buf_size()
-        end
-
-        // Read as much data as possible.
-        let len = @pony_os_recv[USize](
-          _event,
-          _read_buf.cpointer(_read_buf_offset),
-          _read_buf.size() - _read_buf_offset) ?
-
-        match len
-        | 0 =>
-          // Would block, try again later.
-          // this is safe because asio thread isn't currently subscribed
-          // for a read event so will not be writing to the readable flag
-          @pony_asio_event_set_readable[None](_event, false)
-          _readable = false
-          _reading = false
-          @pony_asio_event_resubscribe_read(_event)
-          return
-        | (_read_buf.size() - _read_buf_offset) =>
-          // Increase the read buffer size.
-          _next_size = _max_size.min(_next_size * 2)
-        end
-
-        _read_buf_offset = _read_buf_offset + len
-        sum = sum + len
-      end
-    else
-      // The socket has been closed from the other side.
-      _shutdown_peer = true
-      _hard_close()
-    end
-
-    _reading = false
-
-  be _read_again() =>
-    """
-    Resume reading.
-    """
-    _pending_reads()
-
-  fun ref _read_buf_size() =>
-    """
-    Resize the read buffer.
-    """
-    if _expect != 0 then
-      _read_buf.undefined(_expect.next_pow2().max(_next_size))
-    else
-      _read_buf.undefined(_next_size)
-    end
-
+  ///////////////
+  // MUTE/UNMUTE
+  ///////////////
   fun ref _mute() =>
     ifdef debug then
       @printf[I32]("Muting TCPSource\n".cstring())
     end
     _muted = true
+    _tcp_handler.mute()
 
   fun ref _unmute() =>
     ifdef debug then
       @printf[I32]("Unmuting TCPSource\n".cstring())
     end
     _muted = false
-    if not _reading then
-      _pending_reads()
-    end
+    _tcp_handler.unmute()
 
   fun ref _mute_local() =>
     _muted_by.set(this)
@@ -795,13 +521,15 @@ actor TCPSource[In: Any val] is Source
       _unmute()
     end
 
-  fun ref is_muted(): Bool =>
-    _muted
+  //////////////////////
+  // NOTIFY CODE
+  //////////////////////
+  fun ref accepted() =>
+    _notify.accepted(this)
 
-  fun ref expect(qty: USize = 0) =>
-    """
-    A `received` call on the notifier must contain exactly `qty` bytes. If
-    `qty` is zero, the call can contain any amount of data.
-    """
-    // TODO: verify that removal of "in_sent" check is harmless
-    _expect = _notify.expect(this, qty)
+  fun ref closed(locally_initiated_close: Bool) =>
+    _notify.closed(this)
+    _listen._conn_closed(this)
+
+  fun ref received(data: Array[U8] iso, times: USize): Bool =>
+    _notify.received(this, consume data)
