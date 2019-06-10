@@ -51,10 +51,16 @@ class _EphemeralWindowWrapperBuilder[In: Any val, Out: Any val, Acc: State ref]
     _delay = delay
     _rand = rand
     _late_data_policy = late_data_policy
+    if _late_data_policy == LateDataPolicy.place_in_oldest_window() then
+      FatalUserError("'Place in oldest window' is not a valid late data policy for ephemeral windows.")
+    end
 
-  fun ref apply(watermark_ts: U64): _EphemeralWindow[In, Out, Acc] =>
+  fun ref apply(first_event_ts: U64, watermark_ts: U64):
+    WindowsWrapper[In, Out, Acc]
+  =>
     _EphemeralWindow[In, Out, Acc](_key, _agg, _trigger_range,
-      _post_trigger_range, _delay, _late_data_policy, watermark_ts, _rand)
+      _post_trigger_range, _delay, _late_data_policy, first_event_ts,
+      watermark_ts, _rand)
 
 class _EphemeralWindow[In: Any val, Out: Any val, Acc: State ref] is
   WindowsWrapper[In, Out, Acc]
@@ -62,55 +68,99 @@ class _EphemeralWindow[In: Any val, Out: Any val, Acc: State ref] is
   A window created for an ephemeral key. There are four possibilities for a
   message received for an ephemeral key:
     - It's the first for the key -> open a new ephemeral window
-    - It arrives at an open, non-triggered window -> call update()
-    - It arrives at an open, triggered window -> apply late data policy
+    - It arrives at an existing, non-triggered window -> call update()
+    - It arrives at an existing, triggered window -> apply late data policy
     - It arrives after the ephemeral window was removed -> treat as first
       message for ephemeral key (i.e. open a new ephemeral window).
   """
   let _key: Key
   let _agg: Aggregation[In, Out, Acc]
+  let _acc: Acc
   let _identity_acc: Acc
   let _delay: U64
   var _highest_seen_event_ts: U64
   var _starting_event_ts: U64
+  var _starting_watermark_ts: U64
   var _trigger_point: U64
   var _remove_point: U64
   let _late_data_policy: U16
+  var _already_triggered: Bool = false
 
   new create(key: Key, agg: Aggregation[In, Out, Acc], trigger_range: U64, post_trigger_range: U64, delay: U64, late_data_policy: U16,
-    watermark_ts: U64, rand: Random)
+    first_event_ts: U64, watermark_ts: U64, rand: Random)
   =>
     _key = key
     _agg = agg
     _delay = delay
     _identity_acc = _agg.initial_accumulator()
+    _acc = _identity_acc
     _highest_seen_event_ts = watermark_ts
-    _starting_event_ts = watermark_ts
-    _trigger_point = _starting_event_ts + trigger_range
+    _starting_event_ts = first_event_ts
+    _starting_watermark_ts = watermark_ts
+    _trigger_point = _starting_watermark_ts + trigger_range
     _remove_point = _trigger_point + post_trigger_range
     _late_data_policy = late_data_policy
 
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
     WindowOutputs[Out]
   =>
-    //!@ Do we need this?
-    if event_ts > _highest_seen_event_ts then
-      _highest_seen_event_ts = event_ts
+    var outs: Array[(Out, U64)] iso = recover outs.create() end
+    var output_watermark_ts = watermark_ts
+    let retain_state = watermark_ts < _remove_point
+    if not _already_triggered then
+      _agg.update(input, _acc)
+      match _try_trigger_window(watermark_ts)
+      | let o: Out => outs.push((o, watermark_ts))
+      end
+    else
+      match _apply_late_data_policy(input, event_ts)
+      | let o: Out => outs.push((o, watermark_ts))
+      end
+      output_watermark_ts = output_watermark_ts.max(event_ts)
     end
-    //!@ FAKE
-    (recover Array[(Out, U64)] end, 0, true)
+    (consume outs, watermark_ts, retain_state)
 
   fun ref attempt_to_trigger(watermark_ts: U64): WindowOutputs[Out] =>
-    //!@ If before remove point
-    (recover Array[(Out, U64)] end, 0, true)
-    //!@ If after remove point
-    // (recover Array[(Out, U64)] end, 0, false)
+    var outs: Array[(Out, U64)] iso = recover outs.create() end
+    let retain_state = watermark_ts < _remove_point
+    if not _already_triggered then
+      match _try_trigger_window(watermark_ts)
+      | let o: Out => outs.push((o, watermark_ts))
+      end
+    end
+    (consume outs, watermark_ts, retain_state)
 
-  fun window_count(): USize =>
-    1
+  fun ref _try_trigger_window(watermark_ts: U64): (Out | None) =>
+    if watermark_ts > _trigger_point then
+      _already_triggered = true
+      _agg.output(_key, watermark_ts, _acc)
+    else
+      None
+    end
 
-  fun earliest_start_ts(): U64 =>
-    _starting_event_ts
+  fun ref _apply_late_data_policy(input: In, event_ts: U64): (Out | None)
+  =>
+    match _late_data_policy
+    | LateDataPolicy.drop() =>
+      ifdef debug then
+        @printf[I32]("Ephemeral window has already been triggered. Ignoring.\n".cstring())
+      end
+      None
+    | LateDataPolicy.fire_per_message() =>
+      let acc = _agg.initial_accumulator()
+      _agg.update(input, acc)
+      // We are currently using the event timestamp of the late message
+      // as the window end timestamp.
+      match _agg.output(_key, event_ts, acc)
+      | let o: Out =>
+        o
+      else
+        None
+      end
+    | LateDataPolicy.place_in_oldest_window() =>
+      Fail()
+      None
+    end
 
   fun check_panes_increasing(): Bool =>
     false

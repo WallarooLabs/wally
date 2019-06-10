@@ -125,8 +125,6 @@ trait Windows[In: Any val, Out: Any val, Acc: State ref] is
   fun ref flush_windows(input_watermark_ts: U64,
     output_watermark_ts: U64): (ComputationResult[Out], U64, Bool)
 
-  fun window_count(): USize
-
   /////////
   // _initial_* methods for windows that behave differently the first time
   // they encounter a watermark
@@ -144,7 +142,8 @@ trait Windows[In: Any val, Out: Any val, Acc: State ref] is
     (None, 0, true)
 
 trait WindowsWrapperBuilder[In: Any val, Out: Any val, Acc: State ref]
-  fun ref apply(watermark_ts: U64): WindowsWrapper[In, Out, Acc]
+  fun ref apply(first_event_ts: U64, watermark_ts: U64):
+    WindowsWrapper[In, Out, Acc]
 
 trait WindowsWrapper[In: Any val, Out: Any val, Acc: State ref]
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
@@ -152,10 +151,7 @@ trait WindowsWrapper[In: Any val, Out: Any val, Acc: State ref]
 
   fun ref attempt_to_trigger(watermark_ts: U64): WindowOutputs[Out]
 
-  fun window_count(): USize
-
-  fun earliest_start_ts(): U64
-
+  // !TODO! We should probably remove this.
   fun check_panes_increasing(): Bool =>
     false
 
@@ -201,7 +197,6 @@ class val GlobalWindowStateInitializer[In: Any val, Out: Any val,
   fun name(): String =>
     _agg.name()
 
-// !@ Move to new file
 class GlobalWindow[In: Any val, Out: Any val, Acc: State ref] is
   Windows[In, Out, Acc]
   let _key: Key
@@ -232,8 +227,6 @@ class GlobalWindow[In: Any val, Out: Any val, Acc: State ref] is
   =>
     // We trigger per message, so there is nothing to flush
     (recover val Array[Out] end, output_watermark_ts, true)
-
-  fun window_count(): USize => 1
 
   fun ref encode(auth: AmbientAuth): ByteSeq =>
     try
@@ -309,7 +302,6 @@ class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
   fun name(): String =>
     _agg.name()
 
-//!@ Move to new file
 class InitializableWindows[In: Any val, Out: Any val, Acc: State ref] is
   Windows[In, Out, Acc]
   """
@@ -343,12 +335,6 @@ class InitializableWindows[In: Any val, Out: Any val, Acc: State ref] is
     output_watermark_ts: U64): (ComputationResult[Out], U64, Bool)
   =>
     _attempt_to_trigger(TimeoutWatermark())
-
-  fun window_count(): USize =>
-    _phase.window_count()
-
-  fun earliest_start_ts(): U64 =>
-    _phase.earliest_start_ts()
 
   fun ref encode(auth: AmbientAuth): ByteSeq =>
     try
@@ -478,7 +464,6 @@ class val TumblingCountWindowsStateInitializer[In: Any val, Out: Any val,
   fun name(): String =>
     _agg.name()
 
-//!@ Move to new file
 class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
   Windows[In, Out, Acc]
   let _key: Key
@@ -528,8 +513,6 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
       new_output_watermark_ts = input_watermark_ts
     end
     (out, new_output_watermark_ts, true)
-
-  fun window_count(): USize => 1
 
   fun ref _trigger(output_watermark_ts: U64): (Out | None) =>
     var out: (Out | None) = None

@@ -52,7 +52,9 @@ class _SlidingWindowsWrapperBuilder[In: Any val, Out: Any val, Acc: State ref]
     _rand = rand
     _late_data_policy = late_data_policy
 
-  fun ref apply(watermark_ts: U64): _PanesSlidingWindows[In, Out, Acc] =>
+  fun ref apply(first_event_ts: U64, watermark_ts: U64):
+    _PanesSlidingWindows[In, Out, Acc]
+  =>
     _PanesSlidingWindows[In, Out, Acc](_key, _agg, _range, _slide, _delay,
       _late_data_policy, watermark_ts, _rand)
 
@@ -110,17 +112,6 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       _panes.push(EmptyPane)
       _panes_start_ts.push(pane_start)
       pane_start = pane_start + _pane_size
-    end
-
-  fun window_count(): USize =>
-    ((_panes.size() - _panes_per_slide) / _panes_per_slide) + 1
-
-  fun earliest_start_ts(): U64 =>
-    try
-      _panes_start_ts(_earliest_window_idx)?
-    else
-      Fail()
-      0
     end
 
   fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
