@@ -37,6 +37,7 @@ use "wallaroo/core/windows"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/guid"
 use "wallaroo_labs/mort"
+use "wallaroo_labs/string_set"
 use "wallaroo_labs/time"
 
 
@@ -316,6 +317,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
   let _next_runner: Runner
 
   var _state_map: HashMap[Key, StateWrapper[In, Out, S], HashableKey] = _state_map.create()
+  let _keys_to_remove: KeySet = _keys_to_remove.create()
   let _key_registry: KeyRegistry
   let _event_log: EventLog
   let _wb: Writer = Writer
@@ -442,6 +444,10 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
       _metrics_reporter.step_metric(metric_name, _state_initializer.name(),
         latest_metrics_id, computation_start, computation_end)
 
+      if not retain_state then
+        _remove_key(key)
+      end
+
       (is_finished, last_ts)
     else
       @printf[I32](("StateStatelessComputationRunner: Input was not correct " +
@@ -459,13 +465,18 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     router: Router, watermarks: StageWatermarks)
   =>
     let on_timeout_ts = WallClock.nanoseconds()
+
     for (key, sw) in _state_map.pairs() do
       let input_watermark_ts = watermarks.check_effective_input_watermark(
         on_timeout_ts)
       let initial_output_watermark_ts = watermarks.output_watermark()
 
-      (let out, let output_watermark_ts, _) =
+      (let out, let output_watermark_ts, let retain_state) =
         sw.on_timeout(input_watermark_ts, initial_output_watermark_ts)
+
+      if not retain_state then
+        _keys_to_remove.set(key)
+      end
 
       _send_flushed_outputs(key, out, output_watermark_ts,
         consumer_sender, router, watermarks, on_timeout_ts)
@@ -483,6 +494,11 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
       end
     end
 
+    for k in _keys_to_remove.values() do
+      _remove_key(k)
+    end
+    _keys_to_remove.clear()
+
   fun ref flush_local_state(consumer_sender: TestableConsumerSender,
     router: Router, watermarks: StageWatermarks)
   =>
@@ -494,13 +510,22 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
       for (key, sw) in _state_map.pairs() do
         let initial_output_watermark_ts = watermarks.output_watermark()
 
-        (let out, let output_watermark_ts, _) =
+        (let out, let output_watermark_ts, let retain_state) =
           sw.flush_windows(input_watermark_ts, initial_output_watermark_ts)
+
+        if not retain_state then
+          _keys_to_remove.set(key)
+        end
 
         _send_flushed_outputs(key, out, output_watermark_ts,
           consumer_sender, router, watermarks, current_ts)
       end
     end
+
+    for k in _keys_to_remove.values() do
+      _remove_key(k)
+    end
+    _keys_to_remove.clear()
 
   fun ref _send_flushed_outputs(key: Key, out: ComputationResult[Out],
     output_watermark_ts: U64, consumer_sender: TestableConsumerSender,
@@ -539,6 +564,14 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     end
 
   fun name(): String => _state_initializer.name()
+
+  fun ref _remove_key(key: Key) =>
+    try
+      _state_map.remove(key)?
+    else
+      Fail()
+    end
+    _key_registry.unregister_key(_step_group, key)
 
   fun ref import_key_state(step: Step ref, s_group: RoutingId, key: Key,
     s: ByteSeq val)
