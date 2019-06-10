@@ -74,10 +74,14 @@ class MockStateWrapper[InOut: Any val]
     let retain_state =
       match _lifetime
       | let l: USize =>
-        if l > 0 then
-          _lifetime = l - 1
-        end
-        l > 0
+        let new_l =
+          if l > 0 then
+            l - 1
+          else
+            l
+          end
+        _lifetime = new_l
+        new_l > 0
       else
         true
       end
