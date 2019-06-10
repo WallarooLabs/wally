@@ -38,9 +38,7 @@ actor _WindowTests is TestList
     test(_OnTimeoutWatermarkTsIsJustBeforeNextWindowStart)
     test(_EventInNewWindowCausesPreviousToFlush)
     test(_TimeoutAfterEndOfWindowCausesFlush)
-    test(_TumblingWindowCountIsCorrectAfterFlush)
     test(_OutputWatermarkTsIsJustBeforeNextWindowStart)
-
     test(_TestTumblingWindows)
     test(_TestSlidingWindows)
     test(_TestSlidingWindowsNoDelay)
@@ -188,22 +186,6 @@ class iso _TimeoutAfterEndOfWindowCausesFlush is UnitTest
 
     // then
     h.assert_array_eq[USize]([3], _ForceArray(res._1)?)
-
-class iso _TumblingWindowCountIsCorrectAfterFlush is UnitTest
-  fun name(): String =>
-    "windows/_TumblingWindowCountIsCorrectAfterFlush"
-
-  fun apply(h: TestHelper) =>
-    // given
-    let tw = _TotalTumblingWindow(Milliseconds(50), _NonZeroSum)
-             .>apply(1, Milliseconds(5000), Milliseconds(5000))
-
-    // when
-    tw(3, Milliseconds(5300), Milliseconds(5300))
-
-    // then
-    h.assert_eq[U64](tw.earliest_start_ts(), Milliseconds(5300))
-    h.assert_eq[USize](tw.window_count(), 1)
 
 class iso _OutputWatermarkTsIsJustBeforeNextWindowStart is UnitTest
   fun name(): String =>

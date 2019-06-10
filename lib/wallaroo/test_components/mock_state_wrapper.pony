@@ -41,7 +41,7 @@ class val MockStateInitializer[InOut: Any val] is
   fun val decode(in_reader: Reader, auth: AmbientAuth):
     StateWrapper[InOut, InOut, ArrayState[InOut]]
   =>
-    //!@ We need a real decoded thing here probably
+    // !TODO! We need a real decoded thing here probably
     MockStateWrapper[InOut](_h, _lifetime)
 
   fun val runner_builder(step_group_id: RoutingId, parallelization: USize,
@@ -98,5 +98,5 @@ class MockStateWrapper[InOut: Any val]
     (None, input_watermark_ts, true)
 
   fun ref encode(auth: AmbientAuth): ByteSeq =>
-    //!@ Do we need something real here?
+    // !TODO! Do we need something real here?
     recover Array[U8] end

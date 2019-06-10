@@ -35,13 +35,19 @@ actor _EphemeralWindowTests is TestList
   fun tag tests(test: PonyTest) =>
     test(_FirstMessageForOpenWindowIsPlacedInWindow)
     test(_MessageBeforeTriggerPointForOpenWindowIsPlacedInWindow)
-    test(_MessageAfterTriggerPointIsPlacedInWindowAndWindowIsTriggered)
-    test(_MessageForOpenButTriggeredWindowIsTreatedAsDropLateData)
-    test(_MessageForOpenButTriggeredWindowIsTreatedAsFirePerMessageLateData)
+    test(_FirstMessageAfterTriggerPointIsPlacedInWindowAndWindowIsTriggered)
+    test(_MessageForExistingButTriggeredWindowIsTreatedAsDropLateData)
+    test(
+      _MessageForExistingButTriggeredWindowIsTreatedAsFirePerMessageLateData)
     test(_KeyIsRetainedForFirstMessage)
     test(_KeyIsRetainedForMessageBeforeTriggerPoint)
     test(_KeyIsRetainedForTriggeredWindowBeforeRemovePoint)
     test(_KeyIsNotRetainedForTriggeredWindowAfterRemovePoint)
+    test(_OnTimeoutBeforeTriggerPointDoesNothing)
+    test(_OnTimeoutNonTriggeredWindowAfterTriggerPointTriggersWindow)
+    test(_OnTimeoutTriggeredWindowAfterTriggerPointDoesNothing)
+    test(_OnTimeoutNonTriggeredWindowAfterRemovePointTriggersWindowAndRemoves)
+    test(_OnTimeoutTriggeredWindowAfterRemovePointRemoves)
 
 class iso _FirstMessageForOpenWindowIsPlacedInWindow is UnitTest
   fun name(): String =>
@@ -59,7 +65,7 @@ class iso _FirstMessageForOpenWindowIsPlacedInWindow is UnitTest
         .>apply(1, Seconds(100), Seconds(100))
 
     // when
-    let res = ew(2, Seconds(9999), Seconds(106))
+    let res = ew.on_timeout(Seconds(111), Seconds(100))
 
     // then
     let res_array = _ForceArrayArray(res._1)?
@@ -89,11 +95,11 @@ class iso _MessageBeforeTriggerPointForOpenWindowIsPlacedInWindow is UnitTest
     h.assert_eq[USize](res_array.size(), 1)
     h.assert_array_eq[USize](res_array(0)?, [1; 2])
 
-class iso _MessageAfterTriggerPointIsPlacedInWindowAndWindowIsTriggered
+class iso _FirstMessageAfterTriggerPointIsPlacedInWindowAndWindowIsTriggered
   is UnitTest
   fun name(): String =>
     "windows/ephemeral_windows/" +
-      "_MessageAfterTriggerPointIsPlacedInWindowAndWindowIsTriggered"
+      "_FirstMessageAfterTriggerPointIsPlacedInWindowAndWindowIsTriggered"
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -106,10 +112,6 @@ class iso _MessageAfterTriggerPointIsPlacedInWindowAndWindowIsTriggered
         .>apply(1, Seconds(100), Seconds(100))
 
     // when
-    //!@ This raises question about whether the trigger point has to do with
-    // the message event_ts at all.  It seems like the only thing that matters
-    // is whether the window is triggered yet. So a policy that respects a
-    // trigger point for the message might be a separate feature.
     let res = ew(2, Seconds(106), Seconds(106))
 
     // then
@@ -117,10 +119,11 @@ class iso _MessageAfterTriggerPointIsPlacedInWindowAndWindowIsTriggered
     h.assert_eq[USize](res_array.size(), 1)
     h.assert_array_eq[USize](res_array(0)?, [1; 2])
 
-class iso _MessageForOpenButTriggeredWindowIsTreatedAsDropLateData is UnitTest
+class iso _MessageForExistingButTriggeredWindowIsTreatedAsDropLateData
+  is UnitTest
   fun name(): String =>
     "windows/ephemeral_windows/" +
-      "_MessageAfterTriggerPointForOpenWindowIsTreatedAsDropLateData"
+      "_MessageForExistingButTriggeredWindowIsTreatedAsDropLateExisting"
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -138,14 +141,13 @@ class iso _MessageForOpenButTriggeredWindowIsTreatedAsDropLateData is UnitTest
 
     // then
     let res_array = _ForceArrayArray(res._1)?
-    h.assert_eq[USize](res_array.size(), 1)
-    h.assert_array_eq[USize](res_array(0)?, [])
+    h.assert_eq[USize](res_array.size(), 0)
 
-class iso _MessageForOpenButTriggeredWindowIsTreatedAsFirePerMessageLateData
+class iso _MessageForExistingButTriggeredWindowIsTreatedAsFirePerMessageLateData
   is UnitTest
   fun name(): String =>
     "windows/ephemeral_windows/" +
-      "_MessageForOpenButTriggeredWindowIsTreatedAsFirePerMessageLateData"
+      "_MessageForExistingButTriggeredWindowIsTreatedAsFirePerMessageLateData"
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -254,4 +256,132 @@ class iso _KeyIsNotRetainedForTriggeredWindowAfterRemovePoint is UnitTest
 
     // then
     // Check that retain_state return value is false
+    h.assert_eq[Bool](res._3, false)
+
+class iso _OnTimeoutBeforeTriggerPointDoesNothing is UnitTest
+  fun name(): String =>
+    "windows/ephemeral_windows/" +
+      "_OnTimeoutBeforeTriggerPointDoesNothing"
+
+  fun apply(h: TestHelper) ? =>
+    // given
+    let trigger_range = Seconds(5)
+    let post_trigger_range = Seconds(5)
+    let ew =
+      EphemeralWindowsBuilder(trigger_range, post_trigger_range)
+        .over[USize, Array[USize] val, _Collected](_Collect)
+        .state_wrapper("key", _Zeros)
+        .>apply(1, Seconds(100), Seconds(100))
+
+    // when
+    let res = ew.on_timeout(Seconds(104), Seconds(100))
+
+    // then
+    let res_array = _ForceArrayArray(res._1)?
+    h.assert_eq[USize](res_array.size(), 0)
+    // retain state
+    h.assert_eq[Bool](res._3, true)
+
+class iso _OnTimeoutNonTriggeredWindowAfterTriggerPointTriggersWindow
+  is UnitTest
+  fun name(): String =>
+    "windows/ephemeral_windows/" +
+      "_OnTimeoutNonTriggeredWindowAfterTriggerPointTriggersWindow"
+
+  fun apply(h: TestHelper) ? =>
+    // given
+    let trigger_range = Seconds(5)
+    let post_trigger_range = Seconds(5)
+    let ew =
+      EphemeralWindowsBuilder(trigger_range, post_trigger_range)
+        .over[USize, Array[USize] val, _Collected](_Collect)
+        .state_wrapper("key", _Zeros)
+        .>apply(1, Seconds(100), Seconds(100))
+
+    // when
+    let res = ew.on_timeout(Seconds(106), Seconds(100))
+
+    // then
+    let res_array = _ForceArrayArray(res._1)?
+    h.assert_eq[USize](res_array.size(), 1)
+    h.assert_array_eq[USize](res_array(0)?, [1])
+    // retain state
+    h.assert_eq[Bool](res._3, true)
+
+class iso _OnTimeoutTriggeredWindowAfterTriggerPointDoesNothing
+  is UnitTest
+  fun name(): String =>
+    "windows/ephemeral_windows/" +
+      "_OnTimeoutTriggeredWindowAfterTriggerPointDoesNothing"
+
+  fun apply(h: TestHelper) ? =>
+    // given
+    let trigger_range = Seconds(5)
+    let post_trigger_range = Seconds(5)
+    let ew =
+      EphemeralWindowsBuilder(trigger_range, post_trigger_range)
+        .over[USize, Array[USize] val, _Collected](_Collect)
+        .state_wrapper("key", _Zeros)
+        .>apply(1, Seconds(100), Seconds(100))
+        .>on_timeout(Seconds(106), Seconds(100))
+
+    // when
+    let res = ew.on_timeout(Seconds(108), Seconds(106))
+
+    // then
+    let res_array = _ForceArrayArray(res._1)?
+    h.assert_eq[USize](res_array.size(), 0)
+    // retain state
+    h.assert_eq[Bool](res._3, true)
+
+class iso _OnTimeoutNonTriggeredWindowAfterRemovePointTriggersWindowAndRemoves
+  is UnitTest
+  fun name(): String =>
+    "windows/ephemeral_windows/" +
+      "_OnTimeoutNonTriggeredWindowAfterRemovePointTriggersWindowAndRemoves"
+
+  fun apply(h: TestHelper) ? =>
+    // given
+    let trigger_range = Seconds(5)
+    let post_trigger_range = Seconds(5)
+    let ew =
+      EphemeralWindowsBuilder(trigger_range, post_trigger_range)
+        .over[USize, Array[USize] val, _Collected](_Collect)
+        .state_wrapper("key", _Zeros)
+        .>apply(1, Seconds(100), Seconds(100))
+
+    // when
+    let res = ew.on_timeout(Seconds(111), Seconds(100))
+
+    // then
+    let res_array = _ForceArrayArray(res._1)?
+    h.assert_eq[USize](res_array.size(), 1)
+    h.assert_array_eq[USize](res_array(0)?, [1])
+    // do not retain state
+    h.assert_eq[Bool](res._3, false)
+
+class iso _OnTimeoutTriggeredWindowAfterRemovePointRemoves
+  is UnitTest
+  fun name(): String =>
+    "windows/ephemeral_windows/" +
+      "_OnTimeoutTriggeredWindowAfterRemovePointRemoves"
+
+  fun apply(h: TestHelper) ? =>
+    // given
+    let trigger_range = Seconds(5)
+    let post_trigger_range = Seconds(5)
+    let ew =
+      EphemeralWindowsBuilder(trigger_range, post_trigger_range)
+        .over[USize, Array[USize] val, _Collected](_Collect)
+        .state_wrapper("key", _Zeros)
+        .>apply(1, Seconds(100), Seconds(100))
+        .>on_timeout(Seconds(106), Seconds(100))
+
+    // when
+    let res = ew.on_timeout(Seconds(111), Seconds(106))
+
+    // then
+    let res_array = _ForceArrayArray(res._1)?
+    h.assert_eq[USize](res_array.size(), 0)
+    // do not retain state
     h.assert_eq[Bool](res._3, false)
