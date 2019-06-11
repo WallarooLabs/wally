@@ -262,6 +262,12 @@ fun ref create2(sizes: Array[(String, U128)] val) =>
       let next_lower_bound = _lower_bounds(last_idx)?
 
       if hash >= next_lower_bound then
+        // Boundary case: if last_idx is at the edge of _lower_bounds,
+        // then we are done.
+        if ((last_idx+1) == _lower_bounds.size()) then
+          return _lb_to_c(next_lower_bound)?
+        end
+
         if hash < _lower_bounds(last_idx + 1)? then
           return _lb_to_c(next_lower_bound)?
         else
