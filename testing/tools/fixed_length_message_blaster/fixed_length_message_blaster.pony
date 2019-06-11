@@ -20,7 +20,7 @@ actor Main
       var b_arg: (USize | None) = None
       var m_arg: (USize | None) = None
       var r_arg: U64 = 0
-      var u_arg: (U64 | None) = None
+      var u_arg: U64 = 1000
 
       var options = Options(env.args)
 
@@ -81,7 +81,7 @@ actor Main
         let host = h_arg as Array[String]
         let file_path = FilePath(env.root as AmbientAuth, f_arg as String)?
         let report_interval = r_arg
-        let usec_interval = u_arg as U64
+        let usec_interval = u_arg
 
         let batches = match OpenFile(file_path)
         | let f: File =>
