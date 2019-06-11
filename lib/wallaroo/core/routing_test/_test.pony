@@ -36,6 +36,7 @@ actor Main is TestList
     test(_TestAdjustHashPartitions)
     test(_Regression2to1)
     test(_Regression0to1)
+    test(_Regression2919)
     test(Property1UnitTest[(Array[TestOp])](_TestPonycheckStateful))
 
 
@@ -171,6 +172,34 @@ class iso _Regression0to1 is UnitTest
     // NOTE: This will not fail if w is NaN: h.assert_eq[F64](1.0, w)
     h.assert_eq[Bool](false, w.nan())
     h.assert_eq[Bool](true, (w == 1))
+
+class iso _Regression2919 is UnitTest
+  """
+  Regression test for https://github.com/WallarooLabs/wallaroo/issues/2919
+  """
+  fun name(): String =>
+    "hash_partitions/" + __loc.type_name()
+
+  fun ref apply(h: TestHelper) ? =>
+    let exp: String = "expected"
+    let n1: Array[String] val = recover [exp] end
+    let hp1 = HashPartitions(n1)
+    // hp.pretty_print()
+
+    h.assert_eq[String](exp, hp1.get_claimant(U128.max_value())?)
+    h.assert_eq[String](exp, hp1.get_claimant(1)?)
+    // This is the bug #2919 case
+    h.assert_eq[String](exp, hp1.get_claimant(0)?)
+
+    let first: String = "first"
+    let n2: Array[String] val = recover [first; exp] end
+    let hp2 = HashPartitions(n2)
+
+    // This is the bug #2919 case
+    h.assert_eq[String](exp,   hp2.get_claimant( U128.max_value() / 2)?)
+    // Check off-by-one areas around the #2919 case
+    h.assert_eq[String](first, hp2.get_claimant((U128.max_value() / 2)-1)?)
+    h.assert_eq[String](exp,   hp2.get_claimant((U128.max_value() / 2)+1)?)
 
 class iso _TestAdjustHashPartitions is UnitTest
   """
