@@ -13,7 +13,7 @@ actor Main
 
   new create(env: Env) =>
     _env = env
-    let usage = "usage: $0 --host host:port --file /path/to/file --msg-size N --batch-size N [--report-interval usec] [--usec-interval usec]"
+    let usage = "usage: $0 --host host:port --file /path/to/file --msg-size N --batch-size N [--report-interval usec] [--time-limit usec] [--throttle-messages] [--usec-interval usec=1000]"
 
     try
       var h_arg: (Array[String] | None) = None
@@ -21,6 +21,8 @@ actor Main
       var b_arg: (USize | None) = None
       var m_arg: (USize | None) = None
       var r_arg: U64 = 0
+      var t_arg: U64 = 0
+      var thr_arg: Bool = false
       var u_arg: U64 = 1000
 
       var options = Options(env.args)
@@ -35,6 +37,8 @@ actor Main
         .add("batch-size", "b", I64Argument)
         .add("msg-size", "m", I64Argument)
         .add("report-interval", "r", I64Argument)
+        .add("time-limit", "t", I64Argument)
+        .add("throttle-messages", None, None)
         .add("usec-interval", "u", I64Argument)
 
       for option in options do
@@ -51,6 +55,10 @@ actor Main
           m_arg = arg.usize()
         | ("report-interval", let arg: I64) =>
           r_arg = arg.u64() * 1000
+        | ("time-limit", let arg: I64) =>
+          t_arg = arg.u64() * 1000
+        | ("throttle-messages", _) =>
+          thr_arg = true
         | ("usec-interval", let arg: I64) =>
           u_arg = arg.u64()
         end
@@ -88,6 +96,8 @@ actor Main
         let host = h_arg as Array[String]
         let file_path = FilePath(env.root as AmbientAuth, f_arg as String)?
         let report_interval = r_arg
+        let time_limit = t_arg
+        let throttle_messages = thr_arg
         let usec_interval = u_arg
 
         let batches = match OpenFile(file_path)
@@ -104,7 +114,8 @@ actor Main
 
         try
           let sender = Sender(env.root as AmbientAuth, env.err,
-            host(0)?, host(1)?, batches, usec_interval, report_interval)
+            host(0)?, host(1)?, batches, usec_interval,
+            report_interval, time_limit, throttle_messages)
           sender.start()
         else
           env.err.print("Unable to send")
@@ -131,6 +142,7 @@ actor Sender
   let _timers: Timers = Timers
   let _usec_interval: U64
   let _report_interval: U64
+  let _time_limit: U64
   var _throttled: Bool = false
   var _count_while_throttled: USize = 0
   var _bytes_sent: USize = 0
@@ -142,26 +154,34 @@ actor Sender
     port: String,
     data_chunks: Array[Array[U8] val] val,
     usec_interval: U64,
-    report_interval: U64)
+    report_interval: U64,
+    time_limit: U64,
+    throttle_messages: Bool)
   =>
-    let notifier = Notifier(err, this)
+    let notifier = Notifier(err, this, report_interval > 0, throttle_messages)
     _tcp = TCPConnection(ambient, consume notifier,
       host, port)
     _data_chunks = data_chunks
     _err = err
     _usec_interval = usec_interval
     _report_interval = report_interval
+    _time_limit = time_limit
 
   be start() =>
-    let t = Timer(TriggerSend(this), 0, _usec_interval)
+    let t = Timer(TriggerSend(this), 0, _usec_interval * 1000)
     _timers(consume t)
     if _report_interval > 0 then
-      let t2 = Timer(TriggerReport(this), _report_interval, _report_interval)
+      let t2 = Timer(TriggerReport(this, _time_limit > 0),
+        _report_interval, _report_interval)
       _timers(consume t2)
     end
-    SignalHandler(TermHandler(this), Sig.term())
-    SignalHandler(TermHandler(this), Sig.int())
-    SignalHandler(TermHandler(this), Sig.hup())
+    let term = SignalHandler(TermHandler(this, _time_limit > 0), Sig.term())
+    SignalHandler(TermHandler(this, _time_limit > 0), Sig.int())
+    SignalHandler(TermHandler(this, _time_limit > 0), Sig.hup())
+    if _time_limit > 0 then
+      let t3 = Timer(TriggerTerm(term, _time_limit > 0), _time_limit, 0)
+      _timers(consume t3)
+    end
 
   be send() =>
     _send()
@@ -184,12 +204,16 @@ actor Sender
       _count_while_throttled = _count_while_throttled + 1
     end
 
-  be report(final_report: Bool) =>
-    @printf[I32]("i %lu\n".cstring(), _bytes_sent)
+  be report(final_report: Bool, verbose: Bool) =>
+    if verbose then
+      @printf[I32]("i %lu\n".cstring(), _bytes_sent)
+    end
     _all_bytes_sent = _all_bytes_sent + _bytes_sent
     _bytes_sent = 0
     if final_report then
-      @printf[I32]("f %lu\n".cstring(), _all_bytes_sent)
+      if verbose then
+        @printf[I32]("f %lu\n".cstring(), _all_bytes_sent)
+      end
       @exit[None](I32(0))
     end
 
@@ -205,25 +229,36 @@ actor Sender
 class Notifier is TCPConnectionNotify
   let _err: OutStream
   let _sender: Sender
+  let _verbose: Bool
+  let _throttle_messages: Bool
 
-  new iso create(err: OutStream, sender: Sender tag) =>
+  new iso create(err: OutStream, sender: Sender tag, verbose: Bool,
+    throttle_messages: Bool) =>
     _err = err
     _sender = sender
+    _verbose = verbose
+    _throttle_messages = throttle_messages
 
   fun ref connect_failed(conn: TCPConnection ref) =>
-    @printf[I32]("* Unable to connect\n".cstring())
+    @printf[I32]("* unable to connect\n".cstring())
     @exit[None](I32(0))
 
   fun ref closed(conn: TCPConnection ref) =>
-    @printf[I32]("* Closed!\n".cstring())
-    _sender.report(true)
+    if _verbose then
+      @printf[I32]("* closed\n".cstring())
+    end
+    _sender.report(true, _verbose)
 
   fun ref throttled(conn: TCPConnection ref) =>
-    // @printf[I32]("* Throttled\n".cstring())
+    if _throttle_messages then
+      @printf[I32]("* throttled\n".cstring())
+    end
     _sender.throttled()
 
   fun ref unthrottled(conn: TCPConnection ref) =>
-    // @printf[I32]("* Unthrottled\n".cstring())
+    if _throttle_messages then
+      @printf[I32]("* unthrottled\n".cstring())
+    end
     _sender.unthrottled()
 
 primitive ChunkData
@@ -272,21 +307,42 @@ class TriggerSend is TimerNotify
 
 class TriggerReport is TimerNotify
   let _sender: Sender
+  let _verbose: Bool
 
-  new iso create(sender: Sender) =>
+  new iso create(sender: Sender, verbose: Bool) =>
     _sender = sender
+    _verbose = verbose
 
   fun ref apply(timer: Timer, count: U64): Bool =>
-    _sender.report(false)
+    _sender.report(false, _verbose)
     true
+
+class TriggerTerm is TimerNotify
+  let _term: SignalHandler tag
+  let _verbose: Bool
+
+  new iso create(term: SignalHandler tag, verbose: Bool) =>
+    _term = term
+    _verbose = verbose
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    if _verbose then
+      @printf[I32]("* time-limit\n".cstring())
+    end
+    _term.raise()
+    false
 
 class TermHandler is SignalNotify
   let _sender: Sender
+  let _verbose: Bool
 
-  new iso create(sender: Sender) =>
+  new iso create(sender: Sender, verbose: Bool) =>
     _sender = sender
+    _verbose = verbose
 
   fun ref apply(count: U32): Bool =>
-    @printf[I32]("* TermHandler\n".cstring())
-    _sender.report(true)
+    if _verbose then
+      @printf[I32]("* term-handler\n".cstring())
+    end
+    _sender.report(true, _verbose)
     false
