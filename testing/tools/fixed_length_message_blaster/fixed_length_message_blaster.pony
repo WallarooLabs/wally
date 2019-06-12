@@ -171,15 +171,15 @@ actor Sender
     let t = Timer(TriggerSend(this), 0, _usec_interval * 1000)
     _timers(consume t)
     if _report_interval > 0 then
-      let t2 = Timer(TriggerReport(this, _time_limit > 0),
+      let t2 = Timer(TriggerReport(this, _report_interval > 0),
         _report_interval, _report_interval)
       _timers(consume t2)
     end
-    let term = SignalHandler(TermHandler(this, _time_limit > 0), Sig.term())
-    SignalHandler(TermHandler(this, _time_limit > 0), Sig.int())
-    SignalHandler(TermHandler(this, _time_limit > 0), Sig.hup())
+    let term = SignalHandler(TermHandler(this, _report_interval > 0), Sig.term())
+    SignalHandler(TermHandler(this, _report_interval > 0), Sig.int())
+    SignalHandler(TermHandler(this, _report_interval > 0), Sig.hup())
     if _time_limit > 0 then
-      let t3 = Timer(TriggerTerm(term, _time_limit > 0), _time_limit, 0)
+      let t3 = Timer(TriggerTerm(term, _report_interval > 0), _time_limit, 0)
       _timers(consume t3)
     end
 
@@ -206,13 +206,13 @@ actor Sender
 
   be report(final_report: Bool, verbose: Bool) =>
     if verbose then
-      @printf[I32]("i %lu\n".cstring(), _bytes_sent)
+      @printf[I32]("i %s %lu\n".cstring(), _Time(), _bytes_sent)
     end
     _all_bytes_sent = _all_bytes_sent + _bytes_sent
     _bytes_sent = 0
     if final_report then
       if verbose then
-        @printf[I32]("f %lu\n".cstring(), _all_bytes_sent)
+        @printf[I32]("f %s %lu\n".cstring(), _Time(), _all_bytes_sent)
       end
       @exit[None](I32(0))
     end
@@ -240,24 +240,24 @@ class Notifier is TCPConnectionNotify
     _throttle_messages = throttle_messages
 
   fun ref connect_failed(conn: TCPConnection ref) =>
-    @printf[I32]("* unable to connect\n".cstring())
+    @printf[I32]("* %s unable to connect\n".cstring(), _Time())
     @exit[None](I32(0))
 
   fun ref closed(conn: TCPConnection ref) =>
     if _verbose then
-      @printf[I32]("* closed\n".cstring())
+      @printf[I32]("* %s closed\n".cstring(), _Time())
     end
     _sender.report(true, _verbose)
 
   fun ref throttled(conn: TCPConnection ref) =>
     if _throttle_messages then
-      @printf[I32]("* throttled\n".cstring())
+      @printf[I32]("* %s throttled\n".cstring(), _Time())
     end
     _sender.throttled()
 
   fun ref unthrottled(conn: TCPConnection ref) =>
     if _throttle_messages then
-      @printf[I32]("* unthrottled\n".cstring())
+      @printf[I32]("* %s unthrottled\n".cstring(), _Time())
     end
     _sender.unthrottled()
 
@@ -327,7 +327,7 @@ class TriggerTerm is TimerNotify
 
   fun ref apply(timer: Timer, count: U64): Bool =>
     if _verbose then
-      @printf[I32]("* time-limit\n".cstring())
+      @printf[I32]("* %s time-limit\n".cstring(), _Time())
     end
     _term.raise()
     false
@@ -342,7 +342,15 @@ class TermHandler is SignalNotify
 
   fun ref apply(count: U32): Bool =>
     if _verbose then
-      @printf[I32]("* term-handler\n".cstring())
+      @printf[I32]("* %s term-handler\n".cstring(), _Time())
     end
     _sender.report(true, _verbose)
     false
+
+class _Time
+  fun apply(): Pointer[U8] =>
+    (let sec, let nsec) = Time.now()
+    let max: U32 = 50
+    let s = @pony_alloc[Pointer[U8]](@pony_ctx[Pointer[None] iso](), max.usize())
+    @snprintf[I32](s, max, "%lu.%06lu".cstring(), sec, nsec / 1000)
+    s
