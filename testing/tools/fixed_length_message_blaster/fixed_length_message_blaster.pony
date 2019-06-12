@@ -13,6 +13,7 @@ actor Main
 
   new create(env: Env) =>
     _env = env
+    let usage = "usage: $0 --host host:port --file /path/to/file --msg-size N --batch-size N [--report-interval nsec] [--usec-interval usec]"
 
     try
       var h_arg: (Array[String] | None) = None
@@ -23,8 +24,12 @@ actor Main
       var u_arg: U64 = 1000
 
       var options = Options(env.args)
+      if env.args.size() == 1 then
+        _startup_error(usage)
+      end
 
       options
+        .add("help", None, None)
         .add("host", "h", StringArgument)
         .add("file", "f", StringArgument)
         .add("batch-size", "b", I64Argument)
@@ -34,6 +39,8 @@ actor Main
 
       for option in options do
         match option
+        | ("help", _) =>
+          _startup_error(usage)
         | ("host", let arg: String) =>
           h_arg = arg.split(":")
         | ("file", let arg: String) =>
@@ -50,10 +57,10 @@ actor Main
       end
 
       if h_arg is None then
-        _args_error("Must supply required '--host' argument")
+        _args_error("Must supply required '--host' argument\n" + usage)
       else
         if (h_arg as Array[String]).size() != 2 then
-          _args_error("'--host' argument should be in format: '127.0.0.1:7669")
+          _args_error("'--host' argument should be in format: '127.0.0.1:7669\n" + usage)
         end
       end
 
@@ -64,15 +71,15 @@ actor Main
           _args_error("Error opening file " + fp)
         end
       else
-        _args_error("Must supply required '--file' argument")
+        _args_error("Must supply required '--file' argument\n" + usage)
       end
 
       if b_arg is None then
-        _args_error("Must supply required '--batch-size' argument")
+        _args_error("Must supply required '--batch-size' argument\n" + usage)
       end
 
       if m_arg is None then
-        _args_error("Must supply required '--msg-size' argument")
+        _args_error("Must supply required '--msg-size' argument\n" + usage)
       end
 
       if _required_args_are_present then
