@@ -13,7 +13,7 @@ actor Main
 
   new create(env: Env) =>
     _env = env
-    let usage = "usage: $0 --host host:port --file /path/to/file --msg-size N --batch-size N [--report-interval nsec] [--usec-interval usec]"
+    let usage = "usage: $0 --host host:port --file /path/to/file --msg-size N --batch-size N [--report-interval usec] [--usec-interval usec]"
 
     try
       var h_arg: (Array[String] | None) = None
@@ -50,7 +50,7 @@ actor Main
         | ("msg-size", let arg: I64) =>
           m_arg = arg.usize()
         | ("report-interval", let arg: I64) =>
-          r_arg = arg.u64()
+          r_arg = arg.u64() * 1000
         | ("usec-interval", let arg: I64) =>
           u_arg = arg.u64()
         end
