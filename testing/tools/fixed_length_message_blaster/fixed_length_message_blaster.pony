@@ -143,7 +143,7 @@ actor Sender
   let _usec_interval: U64
   let _report_interval: U64
   let _time_limit: U64
-  var _throttled: Bool = false
+  var _throttled: Bool = true
   var _count_while_throttled: USize = 0
   var _bytes_sent: USize = 0
   var _all_bytes_sent: USize = 0
@@ -223,6 +223,8 @@ actor Sender
   be unthrottled() =>
     _throttled = false
     if _count_while_throttled > 0 then
+      // We only send one extra, no matter how many send messages
+      // arrived while we were throttled.
       _send()
     end
 
@@ -239,9 +241,21 @@ class Notifier is TCPConnectionNotify
     _verbose = verbose
     _throttle_messages = throttle_messages
 
+  fun ref connecting(conn: TCPConnection ref, count: U32) =>
+    if _verbose then
+      @printf[I32]("* %s connecting %d\n".cstring(), _Time(), count)
+    end
+
+  fun ref connected(conn: TCPConnection ref) =>
+    if _verbose then
+      @printf[I32]("* %s connected\n".cstring(), _Time())
+    end
+    // The Sender starts throttled
+    _sender.unthrottled()
+
   fun ref connect_failed(conn: TCPConnection ref) =>
     @printf[I32]("* %s unable to connect\n".cstring(), _Time())
-    @exit[None](I32(0))
+    @exit[None](I32(1))
 
   fun ref closed(conn: TCPConnection ref) =>
     if _verbose then
