@@ -56,7 +56,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
 
   var _phase: StepPhase = _InitialStepPhase
 
-  var _consumer_sender: TestableConsumerSender = DummyConsumerSender
+  var _consumer_sender: TestableConsumerSender
 
   // _routes contains one route per Consumer
   let _routes: SetIs[Consumer] = _routes.create()
@@ -95,15 +95,18 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     _auth = auth
     _worker_name = worker_name
     _runner = consume runner
-    match _runner
-    | let r: RollbackableRunner => r.set_step_id(id)
-    end
     _metrics_reporter = consume metrics_reporter
     _event_log = event_log
     _recovery_replayer = recovery_replayer
-    _recovery_replayer.register_step(this)
     _id = id
+    // We must set this up first so we can pass a ref to ConsumerSender
+    _consumer_sender = FailingConsumerSender(_id)
+    _consumer_sender = ConsumerSender(_id, this, _metrics_reporter.clone())
 
+    match _runner
+    | let r: RollbackableRunner => r.set_step_id(id)
+    end
+    _recovery_replayer.register_step(this)
     for (worker, boundary) in outgoing_boundaries.pairs() do
       _outgoing_boundaries(worker) = boundary
     end
@@ -131,8 +134,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       @printf[I32]("===Step %s created===\n".cstring(),
         _id.string().cstring())
     end
-
-    _consumer_sender = ConsumerSender(_id, this, _metrics_reporter.clone())
 
   //
   // Application startup lifecycle event

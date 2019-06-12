@@ -42,7 +42,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/network"
 use "wallaroo/core/partitioning"
 use "wallaroo/core/recovery"
-use "wallaroo/core/router_registry"
+use "wallaroo/core/registries"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
@@ -191,11 +191,15 @@ actor ConnectorSourceCoordinator[In: Any val] is
     for i in Range(0, _limit) do
       let source_name = _worker_name + _pipeline_name + i.string()
       let source_id = try _routing_id_gen(source_name)? else Fail(); 0 end
+      let runner = _runner_builder(_router_registry, _event_log, _auth,
+        _metrics_reporter.clone() where router = _target_router,
+        partitioner_builder = _partitioner_builder)
+      let notify = ConnectorSourceNotify[In](source_id, consume runner,
+        notify_parameters, this, _is_recovering)
       let source = ConnectorSource[In](source_id, _auth, this,
-         _runner_builder, _partitioner_builder, notify_parameters, _event_log,
-         _router, _target_router, SourceTCPHandlerBuilder,
+        consume notify, _event_log, _router, SourceTCPHandlerBuilder,
         _outgoing_boundary_builders, _layout_initializer,
-        _metrics_reporter.clone(), _router_registry, _is_recovering)
+        _metrics_reporter.clone(), _router_registry, _router_registry)
       source.mute(this)
 
       _router_registry.register_source(source, source_id)

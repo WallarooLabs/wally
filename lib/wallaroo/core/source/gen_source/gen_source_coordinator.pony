@@ -41,7 +41,7 @@ use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/partitioning"
 use "wallaroo/core/recovery"
-use "wallaroo/core/router_registry"
+use "wallaroo/core/registries"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
@@ -130,10 +130,13 @@ actor GenSourceCoordinator[In: Any val] is SourceCoordinator
 
     let source_id = try rb.u128_le()? else Fail(); 0 end
 
+    let runner = _runner_builder(_router_registry, _event_log, _auth,
+      _metrics_reporter.clone(), None, _target_router, _partitioner_builder)
+
     let source = GenSource[In](source_id, _auth, _pipeline_name,
-      _runner_builder, _partitioner_builder, _router, _target_router,
-      _generator, _event_log, _outgoing_boundary_builders, _layout_initializer,
-      _metrics_reporter.clone(), _router_registry)
+      consume runner, _router, _generator, _event_log,
+      _outgoing_boundary_builders, _layout_initializer,
+      _metrics_reporter.clone(), _router_registry, _router_registry)
 
     source.mute(this)
     _router_registry.register_source(source, source_id)

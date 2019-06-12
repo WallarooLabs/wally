@@ -41,7 +41,7 @@ actor _LateDataPolicyTests is TestList
     test(_PlaceInOldestWindowDoesntAutomaticallyTrigger)
 
 class iso _LateDataIgnoredUnderDrop is UnitTest
-  fun name(): String => "windows/late_data/_LateDataIgnoredUnderDrop"
+  fun name(): String => "windows/late_data/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // First message starts window
@@ -72,7 +72,7 @@ class iso _LateDataIgnoredUnderDrop is UnitTest
 
 class iso _LateDataTriggersOwnWindowUnderFirePerMessage is UnitTest
   fun name(): String =>
-    "windows/late_data/_LateDataTriggersOwnWindowUnderFirePerMessage"
+    "windows/late_data/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // First message starts window
@@ -107,7 +107,7 @@ class iso _LateDataTriggersOwnWindowUnderFirePerMessage is UnitTest
 
 class iso _LateDataTriggersNewWindowUnderFirePerMessage is UnitTest
   fun name(): String =>
-    "windows/late_data/_LateDataTriggersNewWindowUnderFirePerMessage"
+    "windows/late_data/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // First message starts window
@@ -143,7 +143,7 @@ class iso _LateDataTriggersNewWindowUnderFirePerMessage is UnitTest
 
 class iso _FirePerMessageUsesEventTimeAsOutputTsForLateData is UnitTest
   fun name(): String =>
-    "windows/_FirePerMessageUsesEventTimeAsOutputTsForLateData"
+    "windows/late_data/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -170,7 +170,8 @@ class iso _FirePerMessageUsesEventTimeAsOutputTsForLateData is UnitTest
     h.assert_eq[U64](res2._2, Seconds(50))
 
 class iso _PlaceInOldestWindowOneWindow is UnitTest
-  fun name(): String => "windows/late_data/_PlaceInOldestWindowOneWindow"
+  fun name(): String =>
+    "windows/late_data/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // First message starts window (ensure there is only one window?)
@@ -201,7 +202,8 @@ class iso _PlaceInOldestWindowOneWindow is UnitTest
     h.assert_array_eq[USize](res_array(0)?, [1; 2; 3])
 
 class iso _PlaceInOldestWindowTwoWindows is UnitTest
-  fun name(): String => "windows/late_data/_PlaceInOldestWindowTwoWindows"
+  fun name(): String =>
+    "windows/late_data/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // First message starts window
@@ -237,7 +239,7 @@ class iso _PlaceInOldestWindowTwoWindows is UnitTest
 
 class iso _PlaceInOldestWindowDoesntAutomaticallyTrigger is UnitTest
   fun name(): String =>
-    "windows/late_data/_PlaceInOldestWindowDoesntAutomaticallyTrigger"
+    "windows/late_data/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // First message starts window

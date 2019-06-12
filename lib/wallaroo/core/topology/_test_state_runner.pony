@@ -38,9 +38,8 @@ actor _StateRunnerTests is TestList
     test(_KeyIsAddedWhenMessageForKeyIsReceivedAfterStateWasRemoved)
 
 class iso _KeyIsAddedWhenFirstMessageForKeyIsReceived is UnitTest
-  //!@ Can we statically access the class name with something like __loc()?
   fun name(): String =>
-    "topology/state_runner/_KeyIsAddedWhenFirstMessageForKeyIsReceived"
+    "topology/state_runner/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -66,9 +65,8 @@ class iso _KeyIsAddedWhenFirstMessageForKeyIsReceived is UnitTest
     h.long_test(1_000_000_000)
 
 class iso _KeyIsRemovedWhenStateIsRemoved is UnitTest
-  //!@ Can we statically access the class name with something like __loc()?
   fun name(): String =>
-    "topology/state_runner/_KeyIsRemovedWhenStateIsRemoved"
+    "topology/state_runner/"  + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -95,10 +93,8 @@ class iso _KeyIsRemovedWhenStateIsRemoved is UnitTest
 
 class iso _KeyIsAddedWhenMessageForKeyIsReceivedAfterStateWasRemoved
   is UnitTest
-  //!@ Can we statically access the class name with something like __loc()?
   fun name(): String =>
-    "topology/state_runner/" +
-      "_KeyIsAddedWhenMessageForKeyIsReceivedAfterStateWasRemoved"
+    "topology/state_runner/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // given

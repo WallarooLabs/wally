@@ -39,7 +39,7 @@ use "wallaroo/core/data_receiver"
 use "wallaroo/core/cluster_manager"
 use "wallaroo/core/network"
 use "wallaroo/core/recovery"
-use "wallaroo/core/router_registry"
+use "wallaroo/core/registries"
 use "wallaroo/core/checkpoint"
 
 

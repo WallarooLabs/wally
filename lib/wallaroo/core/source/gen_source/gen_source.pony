@@ -43,7 +43,7 @@ use "wallaroo/core/invariant"
 use "wallaroo/core/metrics"
 use "wallaroo/core/partitioning"
 use "wallaroo/core/recovery"
-use "wallaroo/core/router_registry"
+use "wallaroo/core/registries"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
@@ -80,7 +80,7 @@ actor GenSource[V: Any val] is Source
   var _router: Router
 
   let _routes: SetIs[Consumer] = _routes.create()
-  var _consumer_sender: TestableConsumerSender = DummyConsumerSender
+  var _consumer_sender: TestableConsumerSender
   // _outputs keeps track of all output targets by step id. There might be
   // duplicate consumers in this map (unlike _routes) since there might be
   // multiple target step ids over a boundary
@@ -99,7 +99,8 @@ actor GenSource[V: Any val] is Source
   var _disposed: Bool = false
   let _muted_by: SetIs[Any tag] = _muted_by.create()
 
-  let _router_registry: RouterRegistry
+  let _source_registry: SourceRegistry
+  let _disposable_registry: DisposableRegistry
 
   let _event_log: EventLog
 
@@ -115,12 +116,13 @@ actor GenSource[V: Any val] is Source
   let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
 
   new create(source_id: RoutingId, auth: AmbientAuth, pipeline_name: String,
-    runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
-    router': Router, target_router: Router,
+    runner: Runner iso, router: Router,
     generator_builder: GenSourceGeneratorBuilder[V], event_log: EventLog,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
-    metrics_reporter': MetricsReporter iso, router_registry: RouterRegistry)
+    metrics_reporter': MetricsReporter iso,
+    source_registry: SourceRegistry,
+    disposable_registry: DisposableRegistry)
   =>
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"
@@ -134,11 +136,16 @@ actor GenSource[V: Any val] is Source
     _metrics_reporter = consume metrics_reporter'
 
     _layout_initializer = layout_initializer
-    _router_registry = router_registry
+    _source_registry = source_registry
+    _disposable_registry = disposable_registry
 
-    _runner = runner_builder(_router_registry, event_log, auth,
-      _metrics_reporter.clone(), None, target_router, partitioner_builder)
-    _router = router'
+    _runner = consume runner
+    _router = router
+
+    // We must set this up first so we can pass a ref to ConsumerSender
+    _consumer_sender = FailingConsumerSender(_source_id)
+    _consumer_sender = ConsumerSender(_source_id, this,
+      _metrics_reporter.clone())
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
@@ -148,7 +155,7 @@ actor GenSource[V: Any val] is Source
           let new_boundary =
             builder.build_and_initialize(_string_id_gen(boundary_id_string)?,
               target_worker_name, _layout_initializer)
-          router_registry.register_disposable(new_boundary)
+          disposable_registry.register_disposable(new_boundary)
           _outgoing_boundaries(target_worker_name) = new_boundary
         else
           Fail()
@@ -156,22 +163,15 @@ actor GenSource[V: Any val] is Source
       end
     end
 
-    _router = router'
-    _update_router(router')
+    _update_router(router)
 
     // register resilient with event log
     _event_log.register_resilient(_source_id, this)
-
-    _consumer_sender = ConsumerSender(_source_id, this,
-      _metrics_reporter.clone())
 
     _mute()
     ifdef "resilience" then
       _mute_local()
     end
-
-  fun ref metrics_reporter(): MetricsReporter =>
-    _metrics_reporter
 
   be next_message() =>
     if not _muted and not _disposed then
@@ -236,18 +236,18 @@ actor GenSource[V: Any val] is Source
       _consumer_sender.register_producer(id, c)
     end
 
-  be update_router(router': Router) =>
-    _update_router(router')
+  be update_router(router: Router) =>
+    _update_router(router)
 
-  fun ref _update_router(router': Router) =>
+  fun ref _update_router(router: Router) =>
     let new_router =
-      match router'
+      match router
       | let pr: StatePartitionRouter =>
         pr.update_boundaries(_auth, _outgoing_boundaries)
       | let spr: StatelessPartitionRouter =>
         spr.update_boundaries(_outgoing_boundaries)
       else
-        router'
+        router
       end
 
     let old_router = _router
@@ -346,7 +346,7 @@ actor GenSource[V: Any val] is Source
           let boundary =
             builder.build_and_initialize(_string_id_gen(boundary_id_string)?,
               target_worker_name, _layout_initializer)
-          _router_registry.register_disposable(boundary)
+          _disposable_registry.register_disposable(boundary)
           _outgoing_boundaries(target_worker_name) = boundary
           _routes.set(boundary)
         else
@@ -407,7 +407,7 @@ actor GenSource[V: Any val] is Source
     - Close the connection gracefully.
     """
     if not _disposed then
-      _router_registry.unregister_source(this, _source_id)
+      _source_registry.unregister_source(this, _source_id)
       _event_log.unregister_resilient(_source_id, this)
       _unregister_all_outputs()
       @printf[I32]("Shutting down GenSource\n".cstring())

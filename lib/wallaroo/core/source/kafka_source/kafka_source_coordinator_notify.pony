@@ -21,7 +21,7 @@ use "wallaroo_labs/mort"
 use "wallaroo/core/common"
 use "wallaroo/core/partitioning"
 use "wallaroo/core/metrics"
-use "wallaroo/core/router_registry"
+use "wallaroo/core/registries"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 

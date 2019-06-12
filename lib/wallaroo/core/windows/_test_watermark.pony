@@ -32,7 +32,8 @@ actor _WatermarkTests is TestList
     test(_TestStageWatermarks)
 
 class iso _TestTimeoutTriggerWatermark is UnitTest
-  fun name(): String => "watermarks/_TestTimeoutTriggerWatermark"
+  fun name(): String =>
+    "watermarks/" + __loc.type_name()
 
   fun apply(h: TestHelper) =>
     // given
@@ -52,7 +53,8 @@ class iso _TestTimeoutTriggerWatermark is UnitTest
 
 
 class iso _TestStageWatermarks is UnitTest
-  fun name(): String => "watermarks/_TestStageWatermarks"
+  fun name(): String =>
+    "watermarks/" + __loc.type_name()
 
   fun apply(h: TestHelper) =>
     // Upstream Ids

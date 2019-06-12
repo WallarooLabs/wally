@@ -28,7 +28,7 @@ use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/metrics"
 use "wallaroo/core/recovery"
-use "wallaroo/core/router_registry"
+use "wallaroo/core/registries"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
@@ -43,7 +43,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     DeterministicSourceIdGenerator
   var _router: Router
   let _routes: SetIs[Consumer] = _routes.create()
-  var _consumer_sender: TestableConsumerSender = DummyConsumerSender
+  var _consumer_sender: TestableConsumerSender
   // _outputs keeps track of all output targets by step id. There might be
   // duplicate consumers in this map (unlike _routes) since there might be
   // multiple target step ids over a boundary
@@ -122,6 +122,12 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
     _layout_initializer = layout_initializer
     _router_registry = router_registry
+    _router = router'
+
+    // We must set this up first so we can pass a ref to ConsumerSender
+    _consumer_sender = FailingConsumerSender(_source_id)
+    _consumer_sender = ConsumerSender(_source_id, this,
+      _metrics_reporter.clone())
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       try
@@ -137,7 +143,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       end
     end
 
-    _router = router'
     _update_router(router')
 
     _notify.update_boundaries(_outgoing_boundaries)
@@ -146,9 +151,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     ifdef "resilience" then
       _mute_local()
     end
-
-    _consumer_sender = ConsumerSender(_source_id, this,
-      _metrics_reporter.clone())
 
   be first_checkpoint_complete() =>
     _unmute_local()
