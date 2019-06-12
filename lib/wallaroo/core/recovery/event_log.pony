@@ -26,7 +26,7 @@ use "wallaroo/core/messages"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 use "wallaroo/core/barrier"
-use "wallaroo/core/router_registry"
+use "wallaroo/core/registries"
 use "wallaroo/core/checkpoint"
 use "wallaroo_labs/mort"
 

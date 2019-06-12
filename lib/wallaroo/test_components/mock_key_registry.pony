@@ -1,7 +1,7 @@
 use "ponytest"
 use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
-use "wallaroo/core/key_registry"
+use "wallaroo/core/registries"
 use "wallaroo_labs/string_set"
 
 

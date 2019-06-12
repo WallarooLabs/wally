@@ -30,7 +30,6 @@ use "wallaroo/core/data_channel"
 use "wallaroo/core/data_receiver"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
-use "wallaroo/core/key_registry"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/network"
@@ -53,7 +52,8 @@ trait tag WorldStopperAndResumer
     recover Array[WorkerName] end)
   be resume_the_world(initiator: WorkerName)
 
-actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
+actor RouterRegistry is (KeyRegistry & SourceRegistry & DisposableRegistry &
+  WorldStopperAndResumer)
   let _self: RouterRegistry tag = this
 
   let _id: RoutingId
@@ -148,11 +148,6 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
   // TODO: Move management of this list to Autoscale class
   var _leaving_workers: Array[WorkerName] val =
     recover Array[WorkerName] end
-
-  // Used as a proxy for RouterRegistry when muting and unmuting sources
-  // and data channel.
-  // TODO: Probably change mute()/unmute() interface so we don't need this
-  let _dummy_consumer: DummyConsumer = DummyConsumer
 
   var _stop_the_world_pause: U64
 
@@ -271,7 +266,7 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
     _source_ids(digestof source) = source_id
 
     if not _stop_the_world_in_process and _application_ready_to_work then
-      source.unmute(_dummy_consumer)
+      source.unmute(this)
     end
     _connections.register_disposable(source)
     _connections.notify_cluster_of_new_source(source_id)
@@ -775,7 +770,7 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
       @printf[I32]("RouterRegistry muting any local sources.\n".cstring())
     end
     for source in _sources.values() do
-      source.mute(_dummy_consumer)
+      source.mute(this)
     end
 
   fun _resume_all_local() =>
@@ -786,7 +781,7 @@ actor RouterRegistry is (KeyRegistry & WorldStopperAndResumer)
       @printf[I32]("RouterRegistry unmuting any local sources.\n".cstring())
     end
     for source in _sources.values() do
-      source.unmute(_dummy_consumer)
+      source.unmute(this)
     end
 
   fun _resume_all_remote() =>

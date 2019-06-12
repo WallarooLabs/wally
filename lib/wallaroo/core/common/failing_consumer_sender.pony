@@ -29,26 +29,36 @@ use "wallaroo/core/recovery"
 use "wallaroo/core/checkpoint"
 use "wallaroo_labs/mort"
 
-class DummyConsumerSender is TestableConsumerSender
+class FailingConsumerSender is TestableConsumerSender
+  let _id: RoutingId
+
+  new create(producer_id: RoutingId) =>
+    _id = producer_id
+
+  fun _invalid_call() =>
+    @printf[I32]("FailingConsumerSender: Invalid call on Producer %s\n"
+      .cstring(), _id.string().cstring())
+
   fun ref send[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
     watermark_ts: U64, msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     consumer: Consumer)
   =>
-    None
+    _invalid_call(); Fail()
 
   fun ref forward(delivery_msg: DeliveryMsg, pipeline_time_spent: U64,
     latest_ts: U64, metrics_id: U16, metric_name: String,
     worker_ingress_ts: U64, boundary: OutgoingBoundary)
   =>
-    None
+    _invalid_call(); Fail()
 
   fun ref register_producer(consumer_id: RoutingId, consumer: Consumer) =>
-    None
+    _invalid_call(); Fail()
 
   fun ref unregister_producer(consumer_id: RoutingId, consumer: Consumer) =>
-    None
+    _invalid_call(); Fail()
 
   fun ref update_output_watermark(w: U64): (U64, U64) =>
+    _invalid_call(); Fail()
     (0, 0)

@@ -51,8 +51,7 @@ actor _EphemeralWindowTests is TestList
 
 class iso _FirstMessageForOpenWindowIsPlacedInWindow is UnitTest
   fun name(): String =>
-    "windows/ephemeral_windows/" +
-      "_FirstMessageForOpenWindowIsPlacedInWindow"
+    "windows/ephemeral_windows/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -74,8 +73,7 @@ class iso _FirstMessageForOpenWindowIsPlacedInWindow is UnitTest
 
 class iso _MessageBeforeTriggerPointForOpenWindowIsPlacedInWindow is UnitTest
   fun name(): String =>
-    "windows/ephemeral_windows/" +
-      "_MessageBeforeTriggerPointForOpenWindowIsPlacedInWindow"
+    "windows/ephemeral_windows/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -98,8 +96,7 @@ class iso _MessageBeforeTriggerPointForOpenWindowIsPlacedInWindow is UnitTest
 class iso _FirstMessageAfterTriggerPointIsPlacedInWindowAndWindowIsTriggered
   is UnitTest
   fun name(): String =>
-    "windows/ephemeral_windows/" +
-      "_FirstMessageAfterTriggerPointIsPlacedInWindowAndWindowIsTriggered"
+    "windows/ephemeral_windows/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -122,8 +119,7 @@ class iso _FirstMessageAfterTriggerPointIsPlacedInWindowAndWindowIsTriggered
 class iso _MessageForExistingButTriggeredWindowIsTreatedAsDropLateData
   is UnitTest
   fun name(): String =>
-    "windows/ephemeral_windows/" +
-      "_MessageForExistingButTriggeredWindowIsTreatedAsDropLateExisting"
+    "windows/ephemeral_windows/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -146,8 +142,7 @@ class iso _MessageForExistingButTriggeredWindowIsTreatedAsDropLateData
 class iso _MessageForExistingButTriggeredWindowIsTreatedAsFirePerMessageLateData
   is UnitTest
   fun name(): String =>
-    "windows/ephemeral_windows/" +
-      "_MessageForExistingButTriggeredWindowIsTreatedAsFirePerMessageLateData"
+    "windows/ephemeral_windows/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -171,8 +166,7 @@ class iso _MessageForExistingButTriggeredWindowIsTreatedAsFirePerMessageLateData
 
 class iso _KeyIsRetainedForFirstMessage is UnitTest
   fun name(): String =>
-    "windows/ephemeral_windows/" +
-      "_KeyIsRetainedForFirstMessage"
+    "windows/ephemeral_windows/" + __loc.type_name()
 
   fun apply(h: TestHelper) =>
     // given
@@ -192,8 +186,7 @@ class iso _KeyIsRetainedForFirstMessage is UnitTest
 
 class iso _KeyIsRetainedForMessageBeforeTriggerPoint is UnitTest
   fun name(): String =>
-    "windows/ephemeral_windows/" +
-      "_KeyIsRetainedForMessageBeforeTriggerPoint"
+    "windows/ephemeral_windows/" + __loc.type_name()
 
   fun apply(h: TestHelper) =>
     // given
@@ -214,8 +207,7 @@ class iso _KeyIsRetainedForMessageBeforeTriggerPoint is UnitTest
 
 class iso _KeyIsRetainedForTriggeredWindowBeforeRemovePoint is UnitTest
   fun name(): String =>
-    "windows/ephemeral_windows/" +
-      "_KeyIsRetainedForTriggeredWindowBeforeRemovePoint"
+    "windows/ephemeral_windows/" + __loc.type_name()
 
   fun apply(h: TestHelper) =>
     // given
@@ -237,8 +229,7 @@ class iso _KeyIsRetainedForTriggeredWindowBeforeRemovePoint is UnitTest
 
 class iso _KeyIsNotRetainedForTriggeredWindowAfterRemovePoint is UnitTest
   fun name(): String =>
-    "windows/ephemeral_windows/" +
-      "_KeyIsNotRetainedForTriggeredWindowAfterRemovePoint"
+    "windows/ephemeral_windows/" + __loc.type_name()
 
   fun apply(h: TestHelper) =>
     // given
@@ -260,8 +251,7 @@ class iso _KeyIsNotRetainedForTriggeredWindowAfterRemovePoint is UnitTest
 
 class iso _OnTimeoutBeforeTriggerPointDoesNothing is UnitTest
   fun name(): String =>
-    "windows/ephemeral_windows/" +
-      "_OnTimeoutBeforeTriggerPointDoesNothing"
+    "windows/ephemeral_windows/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -285,8 +275,7 @@ class iso _OnTimeoutBeforeTriggerPointDoesNothing is UnitTest
 class iso _OnTimeoutNonTriggeredWindowAfterTriggerPointTriggersWindow
   is UnitTest
   fun name(): String =>
-    "windows/ephemeral_windows/" +
-      "_OnTimeoutNonTriggeredWindowAfterTriggerPointTriggersWindow"
+    "windows/ephemeral_windows/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -311,8 +300,7 @@ class iso _OnTimeoutNonTriggeredWindowAfterTriggerPointTriggersWindow
 class iso _OnTimeoutTriggeredWindowAfterTriggerPointDoesNothing
   is UnitTest
   fun name(): String =>
-    "windows/ephemeral_windows/" +
-      "_OnTimeoutTriggeredWindowAfterTriggerPointDoesNothing"
+    "windows/ephemeral_windows/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -337,8 +325,7 @@ class iso _OnTimeoutTriggeredWindowAfterTriggerPointDoesNothing
 class iso _OnTimeoutNonTriggeredWindowAfterRemovePointTriggersWindowAndRemoves
   is UnitTest
   fun name(): String =>
-    "windows/ephemeral_windows/" +
-      "_OnTimeoutNonTriggeredWindowAfterRemovePointTriggersWindowAndRemoves"
+    "windows/ephemeral_windows/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // given
@@ -363,8 +350,7 @@ class iso _OnTimeoutNonTriggeredWindowAfterRemovePointTriggersWindowAndRemoves
 class iso _OnTimeoutTriggeredWindowAfterRemovePointRemoves
   is UnitTest
   fun name(): String =>
-    "windows/ephemeral_windows/" +
-      "_OnTimeoutTriggeredWindowAfterRemovePointRemoves"
+    "windows/ephemeral_windows/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // given

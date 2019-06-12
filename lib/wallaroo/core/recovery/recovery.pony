@@ -25,7 +25,7 @@ use "wallaroo/core/messages"
 use "wallaroo/core/barrier"
 use "wallaroo/core/data_receiver"
 use "wallaroo/core/network"
-use "wallaroo/core/router_registry"
+use "wallaroo/core/registries"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
 

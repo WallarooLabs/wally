@@ -41,7 +41,7 @@ actor _TestStepBarrierProtocol is TestList
     test(_QueuedBarriersAreSentWhenCompletedLater)
 
 class iso _ForwardDataMessagesIfNoBarrier is UnitTest
-  fun name(): String => "step/barrier_protocol/_ForwardDataMessagesIfNoBarrier"
+  fun name(): String => "step/barrier_protocol/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // Send in data messages to identity computation step
@@ -53,7 +53,8 @@ class iso _ForwardDataMessagesIfNoBarrier is UnitTest
     let auth = h.env.root as AmbientAuth
     let expected: Array[(USize | BarrierToken)] val =
       recover [1; 2; 3; 4; 5; 6; 7; 8; 9; 10] end
-    let oc = TestOutputCollector[USize](h, expected, test_finished_msg)
+    let oc = TestOutputCollector[USize](h, test_finished_msg where
+      expected_values = expected)
     let step = TestOutputCollectorStepBuilder[USize](h.env, auth, oc)
     let upstream1 = DummyProducer
     let upstream1_id: RoutingId = 1
@@ -69,17 +70,18 @@ class iso _ForwardDataMessagesIfNoBarrier is UnitTest
       upstream1)
     TestStepSender[USize].send_seq(inputs2, key, step, upstream2_id,
       upstream2)
-    TestStepSender[USize].send(test_finished_msg, key, step, upstream1_id,
-      upstream1)
 
     // then
-    // TestOutputCollector checks against expected
+    // Send last test_finished_message to trigger TestOutputCollector check
+    // against expected.
+    TestStepSender[USize].send(test_finished_msg, key, step, upstream1_id,
+      upstream1)
 
     h.long_test(1_000_000_000)
 
 class iso _DontForwardDataMessagesIfNotAllBarriers is UnitTest
   fun name(): String =>
-    "step/barrier_protocol/_DontForwardDataMessagesIfNotAllBarriers"
+    "step/barrier_protocol/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // Send barrier from upstream1 but not from upstream2
@@ -95,7 +97,8 @@ class iso _DontForwardDataMessagesIfNotAllBarriers is UnitTest
     let token = TestBarrierToken(1)
     let expected: Array[(USize | BarrierToken)] val =
       recover [6; 7; 8; 9; 10] end
-    let oc = TestOutputCollector[USize](h, expected, test_finished_msg)
+    let oc = TestOutputCollector[USize](h, test_finished_msg where
+      expected_values = expected)
     let step = TestOutputCollectorStepBuilder[USize](h.env, auth, oc)
     let upstream1 = DummyProducer
     let upstream1_id: RoutingId = 1
@@ -112,21 +115,21 @@ class iso _DontForwardDataMessagesIfNotAllBarriers is UnitTest
       upstream1)
     TestStepSender[USize].send_seq(inputs2, key, step, upstream2_id,
       upstream2)
+
+    // then
+    // Send last test_finished_message to trigger TestOutputCollector check
+    // against expected.
     // We have to send this from upstream2 or it won't arrive at our output
     // collector downstream.
     TestStepSender[USize].send(test_finished_msg, key, step, upstream2_id,
       upstream2)
-
-    // then
-    // TestOutputCollector checks against expected
 
     h.long_test(1_000_000_000)
 
 class iso _ForwardDataMessagesFromBlockedUpstreamAfterFinalBarrierArrives
   is UnitTest
   fun name(): String =>
-    "step/barrier_protocol/" +
-      "_ForwardDataMessagesFromBlockedUpstreamAfterFinalBarrierArrives"
+    "step/barrier_protocol/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // Send barrier from upstream1 but not from upstream2
@@ -146,7 +149,8 @@ class iso _ForwardDataMessagesFromBlockedUpstreamAfterFinalBarrierArrives
     // messages)
     let expected: Array[(USize | BarrierToken)] val =
         recover [6; 7; 8; 9; 10; token; 1; 2; 3; 4; 5] end
-    let oc = TestOutputCollector[USize](h, expected, test_finished_msg)
+    let oc = TestOutputCollector[USize](h, test_finished_msg where
+      expected_values = expected)
     let step = TestOutputCollectorStepBuilder[USize](h.env, auth, oc)
     let upstream1 = DummyProducer
     let upstream1_id: RoutingId = 1
@@ -164,19 +168,20 @@ class iso _ForwardDataMessagesFromBlockedUpstreamAfterFinalBarrierArrives
     TestStepSender[USize].send_seq(inputs2, key, step, upstream2_id,
       upstream2)
     TestStepSender[USize].send_barrier(step, token, upstream2_id, upstream2)
-    // We can send this from upstream1 because both upstreams should be
-    // unblocked after both barriers arrive.
+
+    // then
+    // Send last test_finished_message to trigger TestOutputCollector check
+    // against expected. We can send this from upstream1 because both
+    // upstreams should be unblocked after both barriers arrive.
     TestStepSender[USize].send(test_finished_msg, key, step, upstream1_id,
       upstream1)
 
-    // then
-    // TestOutputCollector checks against expected
 
     h.long_test(1_000_000_000)
 
 class iso _QueuedBarriersAreSentWhenCompletedLater is UnitTest
   fun name(): String =>
-    "step/barrier_protocol/_QueuedBarriersAreSentWhenCompletedLater"
+    "step/barrier_protocol/" + __loc.type_name()
 
   fun apply(h: TestHelper) ? =>
     // Send barrier from upstream1 but not from upstream2
@@ -197,7 +202,8 @@ class iso _QueuedBarriersAreSentWhenCompletedLater is UnitTest
     // messages)
     let expected: Array[(USize | BarrierToken)] val =
         recover [1; 2; token1; 3; token2; 4] end
-    let oc = TestOutputCollector[USize](h, expected, test_finished_msg)
+    let oc = TestOutputCollector[USize](h, test_finished_msg where
+      expected_values = expected)
     let step = TestOutputCollectorStepBuilder[USize](h.env, auth, oc)
     let upstream1 = DummyProducer
     let upstream1_id: RoutingId = 1
@@ -227,12 +233,11 @@ class iso _QueuedBarriersAreSentWhenCompletedLater is UnitTest
     TestStepSender[USize].send_seq(inputs2b, key, step, upstream2_id,
       upstream2)
 
-    // We can send this from upstream1 because both upstreams should be
-    // unblocked after both barriers arrive.
+    // then
+    // Send last test_finished_message to trigger TestOutputCollector check
+    // against expected. We can send this from upstream1 because both
+    // upstreams should be unblocked after both barriers arrive.
     TestStepSender[USize].send(test_finished_msg, key, step, upstream1_id,
       upstream1)
-
-    // then
-    // TestOutputCollector checks against expected
 
     h.long_test(1_000_000_000)

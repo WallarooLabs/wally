@@ -1,6 +1,6 @@
 /*
 
-Copyright 2018 The Wallaroo Authors.
+Copyright 2019 The Wallaroo Authors.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -16,19 +16,10 @@ Copyright 2018 The Wallaroo Authors.
 
 */
 
-use "ponytest"
-use "promises"
-use "wallaroo/core/aggregations"
+
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
-use "wallaroo/core/state"
-use "wallaroo/core/topology"
-use "wallaroo_labs/time"
 
 
-actor Main is TestList
-  new create(env: Env) => PonyTest(env, this)
-  new make() => None
-  fun tag tests(test: PonyTest) =>
-    _TestStepBarrierProtocol.make().tests(test)
-    _TestStepRegistration.make().tests(test)
-    _TestStepSeqIdGenerator.make().tests(test)
+trait tag DisposableRegistry
+  be register_disposable(disposable: DisposableActor)

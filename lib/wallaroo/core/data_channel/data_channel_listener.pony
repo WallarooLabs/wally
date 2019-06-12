@@ -31,7 +31,7 @@ use "collections"
 use "net"
 use "wallaroo/core/boundary"
 use "wallaroo/core/data_receiver"
-use "wallaroo/core/router_registry"
+use "wallaroo/core/registries"
 use "wallaroo/core/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,

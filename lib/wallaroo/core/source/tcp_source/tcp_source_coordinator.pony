@@ -42,7 +42,7 @@ use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/partitioning"
 use "wallaroo/core/recovery"
-use "wallaroo/core/router_registry"
+use "wallaroo/core/registries"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
@@ -171,7 +171,7 @@ actor TCPSourceCoordinator[In: Any val] is SourceCoordinator
         consume notify, _event_log, _router,
         SourceTCPHandlerBuilder,
         _outgoing_boundary_builders, _layout_initializer,
-        _metrics_reporter.clone(), _router_registry)
+        _metrics_reporter.clone(), _router_registry, _router_registry)
       source.mute(this)
 
       _router_registry.register_source(source, source_id)

@@ -43,7 +43,7 @@ use "wallaroo/core/invariant"
 use "wallaroo/core/metrics"
 use "wallaroo/core/partitioning"
 use "wallaroo/core/recovery"
-use "wallaroo/core/router_registry"
+use "wallaroo/core/registries"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/tcp_actor"
@@ -66,7 +66,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     DeterministicSourceIdGenerator
   var _router: Router
   let _routes: SetIs[Consumer] = _routes.create()
-  var _consumer_sender: TestableConsumerSender = DummyConsumerSender
+  var _consumer_sender: TestableConsumerSender
   // _outputs keeps track of all output targets by step id. There might be
   // duplicate consumers in this map (unlike _routes) since there might be
   // multiple target step ids over a boundary
@@ -91,7 +91,8 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
   var _disposed: Bool = false
   let _muted_by: SetIs[Any tag] = _muted_by.create()
 
-  let _router_registry: RouterRegistry
+  let _source_registry: SourceRegistry
+  let _disposable_registry: DisposableRegistry
 
   let _event_log: EventLog
 
@@ -106,14 +107,14 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
 
   new create(source_id: RoutingId, auth: AmbientAuth,
     listen: ConnectorSourceCoordinator[In],
-    runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
-    notify_parameters: ConnectorSourceNotifyParameters[In],
-    event_log: EventLog, router': Router, target_router: Router,
+    notify: ConnectorSourceNotify[In] iso,
+    event_log: EventLog, router: Router,
     tcp_handler_builder: TestableTCPHandlerBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
-    metrics_reporter': MetricsReporter iso, router_registry: RouterRegistry,
-    is_recovering: Bool)
+    metrics_reporter': MetricsReporter iso,
+    source_registry: SourceRegistry,
+    disposable_registry: DisposableRegistry)
   =>
     """
     A new connection accepted on a server.
@@ -124,13 +125,15 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     _tcp_handler_builder = tcp_handler_builder
     _metrics_reporter = consume metrics_reporter'
     _listen = listen
-    let runner = runner_builder(router_registry, event_log, _auth,
-      _metrics_reporter.clone() where router = target_router,
-        partitioner_builder = partitioner_builder)
-    _notify = ConnectorSourceNotify[In](source_id, consume runner,
-      notify_parameters, _listen, is_recovering)
+    _notify = consume notify
     _layout_initializer = layout_initializer
-    _router_registry = router_registry
+    _source_registry = source_registry
+    _disposable_registry = disposable_registry
+    _router = router
+    // We must set this up first so we can pass a ref to ConsumerSender
+    _consumer_sender = FailingConsumerSender(_source_id)
+    _consumer_sender = ConsumerSender(_source_id, this,
+      _metrics_reporter.clone())
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
@@ -140,7 +143,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
           let new_boundary =
             builder.build_and_initialize(_string_id_gen(boundary_id_string)?,
               target_worker_name, _layout_initializer)
-          router_registry.register_disposable(new_boundary)
+          disposable_registry.register_disposable(new_boundary)
           _outgoing_boundaries(target_worker_name) = new_boundary
         else
           Fail()
@@ -148,8 +151,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
       end
     end
 
-    _router = router'
-    _update_router(router')
+    _update_router(router)
 
     _notify.update_boundaries(_outgoing_boundaries)
 
@@ -165,9 +167,6 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
       @printf[I32]("===ConnectorSource %s created===\n".cstring(),
         _source_id.string().cstring())
     end
-
-    _consumer_sender = ConsumerSender(_source_id, this,
-      _metrics_reporter.clone())
 
   be accept(fd: U32, init_size: USize = 64, max_size: USize = 16384) =>
     """
@@ -194,18 +193,18 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
   fun ref metrics_reporter(): MetricsReporter =>
     _metrics_reporter
 
-  be update_router(router': Router) =>
-    _update_router(router')
+  be update_router(router: Router) =>
+    _update_router(router)
 
-  fun ref _update_router(router': Router) =>
+  fun ref _update_router(router: Router) =>
     let new_router =
-      match router'
+      match router
       | let pr: StatePartitionRouter =>
         pr.update_boundaries(_auth, _outgoing_boundaries)
       | let spr: StatelessPartitionRouter =>
         spr.update_boundaries(_outgoing_boundaries)
       else
-        router'
+        router
       end
 
     let old_router = _router
@@ -306,7 +305,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
           let boundary =
             builder.build_and_initialize(_string_id_gen(boundary_id_string)?,
               target_worker_name, _layout_initializer)
-          _router_registry.register_disposable(boundary)
+          _disposable_registry.register_disposable(boundary)
           _outgoing_boundaries(target_worker_name) = boundary
           _routes.set(boundary)
         else
@@ -368,7 +367,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     - Close the connection gracefully.
     """
     if not _disposed then
-      _router_registry.unregister_source(this, _source_id)
+      _source_registry.unregister_source(this, _source_id)
       _event_log.unregister_resilient(_source_id, this)
       _unregister_all_outputs()
       @printf[I32]("Shutting down ConnectorSource\n".cstring())

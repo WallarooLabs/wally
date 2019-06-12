@@ -201,7 +201,7 @@ class ConnectorSourceNotify[In: Any val]
   // policies
   var _watermark_ts: U64 = 0
 
-  new create(source_id': RoutingId, runner: Runner iso,
+  new iso create(source_id': RoutingId, runner: Runner iso,
     parameters: ConnectorSourceNotifyParameters[In],
     coordinator': ConnectorSourceCoordinator[In], is_recovering: Bool)
   =>
