@@ -13,7 +13,7 @@ actor Main
 
   new create(env: Env) =>
     _env = env
-    let usage = "usage: $0 --host host:port --file /path/to/file --msg-size N --batch-size N [--report-interval usec] [--time-limit usec] [--throttle-messages] [--usec-interval usec=1000]"
+    let usage = "usage: $0 --host host:port --file /path/to/file --msg-size N --batch-size N [--report-interval usec] [--time-limit usec] [--throttled-messages] [--usec-interval usec=1000]"
 
     try
       var h_arg: (Array[String] | None) = None
@@ -38,7 +38,7 @@ actor Main
         .add("msg-size", "m", I64Argument)
         .add("report-interval", "r", I64Argument)
         .add("time-limit", "t", I64Argument)
-        .add("throttle-messages", None, None)
+        .add("throttled-messages", None, None)
         .add("usec-interval", "u", I64Argument)
 
       for option in options do
@@ -57,7 +57,7 @@ actor Main
           r_arg = arg.u64() * 1000
         | ("time-limit", let arg: I64) =>
           t_arg = arg.u64() * 1000
-        | ("throttle-messages", _) =>
+        | ("throttled-messages", _) =>
           thr_arg = true
         | ("usec-interval", let arg: I64) =>
           u_arg = arg.u64()
@@ -103,7 +103,7 @@ actor Main
         let batches = match OpenFile(file_path)
         | let f: File =>
           if (f.size() % msg_size) != 0 then
-            _startup_error("Files doesn't contain " + msg_size.string() + " byte messages")
+            _startup_error("File doesn't contain " + msg_size.string() + " byte messages")
           end
 
           ChunkData(f, msg_size, batch_size)
@@ -130,7 +130,7 @@ actor Main
     _required_args_are_present = false
 
   fun _startup_error(msg: String) =>
-    _env.err.print(msg)
+    @printf[I32]((msg + "\n").cstring())
 
    @exit[None](U8(1))
 
@@ -147,6 +147,8 @@ actor Sender
   var _count_while_throttled: USize = 0
   var _bytes_sent: USize = 0
   var _all_bytes_sent: USize = 0
+  var _start_sec: I64 = 0
+  var _start_nsec: I64 = 0
 
   new create(ambient: AmbientAuth,
     err: OutStream,
@@ -211,8 +213,14 @@ actor Sender
     _all_bytes_sent = _all_bytes_sent + _bytes_sent
     _bytes_sent = 0
     if final_report then
+      (let end_sec, let end_nsec) = Time.now()
+      let elapsed_usec = ((end_sec - _start_sec) * 1000000) +
+                         ((end_nsec/1000)-(_start_nsec/1000))
       if verbose then
-        @printf[I32]("f %s %lu\n".cstring(), _Time(), _all_bytes_sent)
+        let mbytes_sec = (_all_bytes_sent.f64()/(1024*1024)) / (elapsed_usec.f64()/1000000)
+        @printf[I32]("f %s %lu bytes %ld usec %.3f MB/sec %.f Mbit/sec \n".cstring(),
+          _Time(), _all_bytes_sent, elapsed_usec,
+          mbytes_sec, mbytes_sec * 8)
       end
       @exit[None](I32(0))
     end
@@ -221,6 +229,10 @@ actor Sender
     _throttled = true
 
   be unthrottled() =>
+    // We started throttled and with _start_sec == 0.
+    if _start_sec == 0 then
+      (_start_sec, _start_nsec) = Time.now()
+    end
     _throttled = false
     if _count_while_throttled > 0 then
       // We only send one extra, no matter how many send messages
