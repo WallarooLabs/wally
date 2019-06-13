@@ -10,10 +10,15 @@ use "wallaroo_labs/options"
 actor Main
   let _env: Env
   var _required_args_are_present: Bool = true
+  let _timers: Timers = Timers
+  let _senders: Array[Sender] = _senders.create()
+  var _signal_received: Bool = false
 
   new create(env: Env) =>
     _env = env
-    let usage = "usage: $0 --host host:port --file /path/to/file --msg-size N --batch-size N [--report-interval usec] [--time-limit usec] [--throttled-messages] [--catch_up] [--msec-interval usec=1000]"
+    let usage = "usage: $0 --host host:port --file /path/to/file --msg-size N --batch-size N [--report-interval usec] [--time-limit usec] [--throttled-messages] [--catch_up] [--msec-interval default=1000]\n" +
+    "--msg-size 0 => use file size as message size\n" +
+    "--file may be list of comma-separate files, msg-size must be 0"
 
     try
       var h_arg: (Array[String] | None) = None
@@ -79,7 +84,9 @@ actor Main
       match f_arg
       | let fp: String =>
         let path = FilePath(env.root as AmbientAuth, fp)?
-        if not path.exists() then
+        if fp.split(",").size() > 1 then
+          None // defer file path processing to later
+        elseif not path.exists() then
           _args_error("Error opening file " + fp)
         end
       else
@@ -95,41 +102,51 @@ actor Main
       end
 
       if _required_args_are_present then
-        let batch_size = b_arg as USize
-        let msg_size = m_arg as USize
-        let host = h_arg as Array[String]
-        let catch_up = c_arg
-        let file_path = FilePath(env.root as AmbientAuth, f_arg as String)?
-        let msec_interval = i_arg
-        let report_interval = r_arg
-        let time_limit = t_arg
-        let throttle_messages = thr_arg
+        for file in (f_arg as String).split(",").values() do
+          let batch_size = b_arg as USize
+          let msg_size = m_arg as USize
+          let host = h_arg as Array[String]
+          let catch_up = c_arg
+          let file_path = FilePath(env.root as AmbientAuth, file)?
+          let msec_interval = i_arg
+          let report_interval = r_arg
+          let time_limit = t_arg
+          let throttle_messages = thr_arg
 
-        let batches = match OpenFile(file_path)
-        | let f: File =>
-          if (f.size() % msg_size) != 0 then
-            _startup_error("File doesn't contain " + msg_size.string() + " byte messages")
+          let batches = match OpenFile(file_path)
+          | let f: File =>
+            if (msg_size > 0) and ((f.size() % msg_size) != 0) then
+              _startup_error("File doesn't contain " + msg_size.string() + " byte messages")
+            end
+
+            ChunkData(f, msg_size, batch_size)
+          else
+            _startup_error("Unable to open data file for reading")
+            recover val Array[Array[U8] val] end
           end
 
-          ChunkData(f, msg_size, batch_size)
-        else
-          _startup_error("Unable to open data file for reading")
-          recover val Array[Array[U8] val] end
-        end
-
-        try
           let nsec_interval = if msec_interval == 0 then
             500
           else
             msec_interval * 1_000_000
           end
 
-          let sender = Sender(env.root as AmbientAuth, env.err,
-            host(0)?, host(1)?, batches, nsec_interval,
-            report_interval, time_limit, throttle_messages, catch_up)
-          sender.start()
-        else
-          env.err.print("Unable to send")
+          try
+            let sender = Sender(env.root as AmbientAuth, env.err,
+              host(0)?, host(1)?, batches, nsec_interval,
+              report_interval, throttle_messages, catch_up)
+            sender.start()
+            _senders.push(sender)
+          else
+            env.err.print("Unable to send")
+          end
+          let term = SignalHandler(TermHandler(this, report_interval > 0), Sig.term())
+          SignalHandler(TermHandler(this, report_interval > 0), Sig.int())
+          SignalHandler(TermHandler(this, report_interval > 0), Sig.hup())
+          if time_limit > 0 then
+            let t3 = Timer(TriggerTerm(this, report_interval > 0), time_limit, 0)
+            _timers(consume t3)
+          end
         end
       end
     else
@@ -142,8 +159,18 @@ actor Main
 
   fun _startup_error(msg: String) =>
     @printf[I32]((msg + "\n").cstring())
+    @exit[None](U8(1))
 
-   @exit[None](U8(1))
+  be got_signal(verbose: Bool) =>
+    // Don't trigger per-sender reports here because they'll automatically
+    // happen via closed().
+    if not _signal_received then
+      _signal_received = true
+      for sender in _senders.values() do
+         sender.dispose()
+      end
+      _timers.dispose()
+    end
 
 actor Sender
   let _err: OutStream
@@ -153,7 +180,6 @@ actor Sender
   let _timers: Timers = Timers
   let _nsec_interval: U64
   let _report_interval: U64
-  let _time_limit: U64
   var _throttled: Bool = true
   var _count_while_throttled: USize = 0
   var _bytes_sent: USize = 0
@@ -166,6 +192,7 @@ actor Sender
   let _ambient: AmbientAuth
   let _host: String
   let _port: String
+  var _disposed: Bool = false
 
   new create(ambient: AmbientAuth,
     err: OutStream,
@@ -174,7 +201,6 @@ actor Sender
     data_chunks: Array[Array[U8] val] val,
     nsec_interval: U64,
     report_interval: U64,
-    time_limit: U64,
     throttle_messages: Bool,
     catch_up: Bool)
   =>
@@ -184,7 +210,6 @@ actor Sender
     _err = err
     _nsec_interval = nsec_interval
     _report_interval = report_interval
-    _time_limit = time_limit
     _catch_up = catch_up
     _throttle_messages = throttle_messages
     _ambient = ambient
@@ -192,8 +217,6 @@ actor Sender
     _port = port
 
   be start() =>
-    //@printf[I32]("Sender: nsec_interval = %lu\n".cstring(), _nsec_interval)
-    //@printf[I32]("Sender: report_interval = %lu\n".cstring(), _report_interval)
     _start_count = _start_count + 1
     if _start_count == 1 then
       let t = Timer(TriggerSend(this), 0, _nsec_interval)
@@ -203,23 +226,15 @@ actor Sender
           _report_interval, _report_interval)
         _timers(consume t2)
       end
-      let term = SignalHandler(TermHandler(this, _report_interval > 0), Sig.term())
-      SignalHandler(TermHandler(this, _report_interval > 0), Sig.int())
-      SignalHandler(TermHandler(this, _report_interval > 0), Sig.hup())
-      if _time_limit > 0 then
-        let t3 = Timer(TriggerTerm(term, _report_interval > 0), _time_limit, 0)
-        _timers(consume t3)
-      end
-    end
-    if _start_count > 1 then
-      let notifier = Notifier(_err, this, _report_interval > 0, _throttle_messages)
-      _tcp = TCPConnection(_ambient, consume notifier, _host, _port)
     end
 
   be send() =>
     _send()
 
   fun ref _send() =>
+    if _disposed then
+      return
+    end
     if not _throttled then
       _count_while_throttled = 0
       try
@@ -244,16 +259,18 @@ actor Sender
     _all_bytes_sent = _all_bytes_sent + _bytes_sent
     _bytes_sent = 0
     if final_report then
+      _tcp.dispose()
+      _timers.dispose()
+
       (let end_sec, let end_nsec) = Time.now()
       let elapsed_usec = ((end_sec - _start_sec) * 1000000) +
                          ((end_nsec/1000)-(_start_nsec/1000))
       if verbose then
         let mbytes_sec = (_all_bytes_sent.f64()/(1024*1024)) / (elapsed_usec.f64()/1000000)
-        @printf[I32]("f %s %lu bytes %ld usec %.3f MB/sec %.f Mbit/sec \n".cstring(),
+        @printf[I32]("f %s %lu bytes %ld usec %.3f MB/sec %.3f Mbit/sec \n".cstring(),
           _Time(), _all_bytes_sent, elapsed_usec,
           mbytes_sec, mbytes_sec * 8)
       end
-      @exit[None](I32(0))
     end
 
   be throttled() =>
@@ -279,6 +296,12 @@ actor Sender
         _send()
       end
     end
+
+  be dispose() =>
+     @printf[I32]("Sender dispose\n".cstring())
+    _tcp.dispose()
+    _timers.dispose()
+    _disposed = true
 
 class Notifier is TCPConnectionNotify
   let _err: OutStream
@@ -314,11 +337,10 @@ class Notifier is TCPConnectionNotify
     if _verbose then
       @printf[I32]("* %s closed\n".cstring(), _Time())
     end
-    _sender.report(false, _verbose)
+    _sender.report(true, _verbose)
     throttled(conn)
     conn.dispose()
     @sleep[None](U32(1))
-    _sender.start()
 
   fun ref throttled(conn: TCPConnection ref) =>
     if _throttle_messages then
@@ -334,9 +356,10 @@ class Notifier is TCPConnectionNotify
 
 primitive ChunkData
   fun apply(f: File,
-    msg_size: USize,
+    msg_size': USize,
     batch_size: USize) : Array[Array[U8] val]  val
   =>
+    let msg_size = if msg_size' > 0 then msg_size' else f.size() end
     let bytes_in_file = f.size()
     let msgs_in_file = bytes_in_file / msg_size
     let file_data: Array[U8] val = f.read(bytes_in_file)
@@ -389,33 +412,33 @@ class TriggerReport is TimerNotify
     true
 
 class TriggerTerm is TimerNotify
-  let _term: SignalHandler tag
+  let _main: Main
   let _verbose: Bool
 
-  new iso create(term: SignalHandler tag, verbose: Bool) =>
-    _term = term
+  new iso create(main: Main, verbose: Bool) =>
+    _main = main
     _verbose = verbose
 
   fun ref apply(timer: Timer, count: U64): Bool =>
     if _verbose then
       @printf[I32]("* %s time-limit\n".cstring(), _Time())
     end
-    _term.raise()
+    _main.got_signal(_verbose)
     false
 
 class TermHandler is SignalNotify
-  let _sender: Sender
+  let _main: Main
   let _verbose: Bool
 
-  new iso create(sender: Sender, verbose: Bool) =>
-    _sender = sender
+  new iso create(main: Main, verbose: Bool) =>
+    _main = main
     _verbose = verbose
 
   fun ref apply(count: U32): Bool =>
     if _verbose then
       @printf[I32]("* %s term-handler\n".cstring(), _Time())
     end
-    _sender.report(true, _verbose)
+    _main.got_signal(_verbose)
     false
 
 class _Time
