@@ -44,7 +44,7 @@ actor Main
         | ("listen", let arg: String) => l_arg = arg.split(":")
         | ("no-write", None) => output_mode = NoWrite
         | ("framed", None) => input_mode = Framed
-        | ("buffer-size", let arg: I64) => arg.usize()
+        | ("buffer-size", let arg: I64) => buffer_size = arg.usize()
         | let err: ParseError =>
           err.report(env.err)
           usage(env.out)
