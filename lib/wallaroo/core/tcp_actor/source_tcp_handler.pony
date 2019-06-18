@@ -3,7 +3,6 @@ use "collections"
 use "net"
 use "wallaroo_labs/mort"
 
-
 class val SourceTCPHandlerBuilder
   fun apply(tcp_actor: TCPActor ref): SourceTCPHandler =>
     @printf[I32](("Currently you must build a SourceTCPHandler using " +
@@ -213,7 +212,11 @@ class SourceTCPHandler is TestableTCPHandler
     A `received` call on the notifier must contain exactly `qty` bytes. If
     `qty` is zero, the call can contain any amount of data.
     """
-    _expect = qty
+    if qty <= _max_size then
+      _expect = qty
+    else
+      Fail()
+    end
 
   fun ref set_nodelay(state: Bool) =>
     """
