@@ -178,6 +178,7 @@ class MultiClientStreamView(object):
                     # sleep after a full round on all keys produces no value
                     time.sleep(0.001)
                 else:
+                    time.sleep(0.001)
                     return None
             # implicit:  continue
 

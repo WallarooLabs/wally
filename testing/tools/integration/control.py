@@ -143,20 +143,22 @@ class SinkAwaitValue(StoppableThread):
         view = self.sink.view(blocking=False)
         msgs = 0
         while not self.stopped():
-            msg = next(view)
-            processed = self.func(msg) if msg is not None else None
-            if processed:
-                msgs += 1
-                if processed in self.values:
-                    self.values.discard(processed)
-                    logging.debug("{} matched on value {!r}."
-                                   .format(self.name,
-                                           processed))
             if not self.values:
                 self.stop()
                 logging.debug("SinkAwait complete with remaining values: {}"
                         .format(self.values))
                 break
+            msg = next(view)
+            if msg is not None:
+                msgs += 1
+                processed = self.func(msg)
+                if processed in self.values:
+                    self.values.discard(processed)
+                    logging.debug("{} matched on value {!r}."
+                                   .format(self.name,
+                                           processed))
+            else:
+                time.sleep(0.001)
             if time.time() - started > self.timeout:
                 self.error = TimeoutError('{}: has timed out after {} seconds'
                                           ', with {} messages. before '
