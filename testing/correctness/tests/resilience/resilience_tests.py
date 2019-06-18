@@ -75,7 +75,7 @@ RESILIENCE_TEST_NAME_FMT = 'test_resilience_{api}_{source_type}_{source_number}_
 # Resilience Tests
 ##################
 
-SOURCE_TYPES = ['gensource', 'alo']
+SOURCE_TYPES = ['alo']
 SOURCE_NAME = 'Detector'
 SOURCE_NUMBERS = [1]
 

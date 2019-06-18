@@ -56,7 +56,7 @@ AUTOSCALE_TEST_NAME_FMT = 'test_autoscale_{api}_{source_type}_{source_number}_{o
 #################
 
 OPS = [Grow(1), Grow(4), Shrink(1), Shrink(4)]
-SOURCE_TYPES = ['tcp', 'gensource', 'alo']
+SOURCE_TYPES = ['tcp', 'alo']
 SOURCE_NAME = 'Detector'
 SOURCE_NUMBERS = [1]
 
