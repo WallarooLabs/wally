@@ -99,7 +99,7 @@ class val ConnectorSourceConfig[In: Any val] is SourceConfig
 
   new val create(source_name: SourceName, handler': FramedSourceHandler[In] val,
     host: String, service: String, cookie: String,
-    max_credits: U32, refill_credits: U32, parallelism': USize = 10)
+    max_credits: U32, refill_credits: U32, parallelism': USize = 256)
   =>
     handler = handler'
     parallelism = parallelism'
@@ -107,7 +107,7 @@ class val ConnectorSourceConfig[In: Any val] is SourceConfig
       service, cookie, max_credits, refill_credits)
 
   new val from_options(handler': FramedSourceHandler[In] val,
-    opts: ConnectorSourceConfigOptions, parallelism': USize = 10)
+    opts: ConnectorSourceConfigOptions, parallelism': USize = 256)
   =>
     handler = handler'
     parallelism = parallelism'
