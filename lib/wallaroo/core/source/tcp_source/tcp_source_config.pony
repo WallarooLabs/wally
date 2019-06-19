@@ -88,7 +88,7 @@ class val TCPSourceConfig[In: Any val] is SourceConfig
 
   new val create(source_name': SourceName,
     handler': FramedSourceHandler[In] val, host': String, service': String,
-    valid': Bool, parallelism': USize = 256)
+    valid': Bool, parallelism': USize = 50)
   =>
     handler = handler'
     parallelism = parallelism'
@@ -96,7 +96,7 @@ class val TCPSourceConfig[In: Any val] is SourceConfig
       service', valid')
 
   new val from_options(handler': FramedSourceHandler[In] val,
-    opts: TCPSourceConfigOptions, parallelism': USize = 256)
+    opts: TCPSourceConfigOptions, parallelism': USize = 50)
   =>
     handler = handler'
     parallelism = parallelism'
