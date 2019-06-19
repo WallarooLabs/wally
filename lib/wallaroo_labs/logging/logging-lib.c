@@ -32,34 +32,71 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sys/time.h>
 #include <ctype.h>
 
-#define FMT_BUF_SIZE 1024
+#define FMT_BUF_SIZE  1024
+#define MAX_SEVERITY  8
+#define MAX_CATEGORY  32
 
-int printf(const char *fmt, ...)
+static int _labels_initialized = 0;
+static char *_severity_labels[MAX_SEVERITY+1];
+static char *_category_labels[MAX_CATEGORY+1];
+
+static int _w_now(char *dst, int dst_size)
 {
-  char fmt2[FMT_BUF_SIZE];
-  int fmt2_len;
   struct timeval tv;
-  va_list ap;
-  int ret;
 
   gettimeofday(&tv, NULL);
 #ifdef  __APPLE__  
-  snprintf(fmt2, sizeof(fmt2), "%ld.%06d ", tv.tv_sec, tv.tv_usec);
+  return snprintf(dst, dst_size, "%ld.%06d", tv.tv_sec, tv.tv_usec);
 #else
-  snprintf(fmt2, sizeof(fmt2), "%ld.%06lu ", tv.tv_sec, tv.tv_usec);
+  return snprintf(dst, dst_size, "%ld.%06lu", tv.tv_sec, tv.tv_usec);
 #endif
+}
 
-  va_start(ap, fmt);
-  fmt2_len = strlen(fmt2);
-  if (strlen(fmt) > (sizeof(fmt2) - fmt2_len)) {
+static int _w_vprintf(const char *fmt, va_list ap)
+{
+  char fmt2[FMT_BUF_SIZE];
+  int fmt2_len;
+  int ret;
+
+  fmt2_len = _w_now(fmt2, sizeof(fmt2));
+  if (strlen(fmt) > (sizeof(fmt2) - fmt2_len - 1 /*,*/)) {
     /* Our static buffer isn't big enough, so call vprintf() as is. */
     ret = vprintf(fmt, ap);
   } else {
-    memcpy(fmt2 + fmt2_len, fmt, strlen(fmt));
+    fmt2[fmt2_len] = ',';
+    memcpy(fmt2 + fmt2_len + 1, fmt, strlen(fmt));
     ret = vprintf(fmt2, ap);
   }
   va_end(ap);
   return ret;
+}
+
+int printf(const char *fmt, ...)
+{
+  va_list ap;
+
+  va_start(ap, fmt);
+  return _w_vprintf(fmt, ap);
+  // va_end() already done
+}
+
+int l(char severity, char category, const char *fmt, ...)
+{
+  char fmt2[FMT_BUF_SIZE];
+  va_list ap;
+
+  va_start(ap, fmt);
+  snprintf(fmt2, sizeof(fmt2), "%d,%d,%s", severity, category, fmt);
+  return _w_vprintf(fmt2, ap);
+}
+
+void set_severity(char severity, char *label)
+{
+  if (! _labels_initialized) {
+    _w_initialize_labels();
+    _labels_initialized = 1;
+  }
+
 }
 
 #ifdef MAIN

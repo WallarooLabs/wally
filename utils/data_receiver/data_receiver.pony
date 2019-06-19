@@ -29,6 +29,7 @@ actor Main
     var input_mode: InputMode = Streaming
 
     @printf[I32]("SLF: Hello, world!\n".cstring()) // For demo purposes only
+    @l[I32](U8(42), U8(43), "SLF: Hello, %s!\n".cstring(), "everything".cstring()) // For demo purposes only
     try
       var options = Options(env.args)
 
