@@ -16,11 +16,11 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := false
 
 # `true`/`false` to enable/disable generate pony related targets (build/test/clean) for pony sources in this directory
 # otherwise targets only get created if there are pony sources (*.pony) in this directory.
-$(abspath $(lastword $(MAKEFILE_LIST)))_PONY_TARGET := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_PONY_TARGET := false
 
 # `true`/`false` to enable/disable generate final file build target using ponyc command for the pony build target so
 # it can be overridden manually
-$(abspath $(lastword $(MAKEFILE_LIST)))_PONYC_TARGET := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_PONYC_TARGET := false
 
 # `true`/`false` to enable/disable generate exs related targets (build/test/clean) for elixir sources in this directory
 # otherwise targets only get created if there are elixir sources (*.exs) in this directory.
@@ -49,6 +49,9 @@ $(LOGGING_LIB_A): $(LOGGING_LIB_OBJ)
 	ar rvs $@ $<
 $(LOGGING_LIB_OBJ): $(LOGGING_LIB_DIR)logging-lib.c
 	cc -g -o $@ -c $<
+
+unit-tests-lib-wallaroo_labs-logging-all:
+integration-tests-lib-wallaroo_labs-logging-all:
 
 # The rule below will trigger a "overriding commands" warning when
 # there is a Pony source file in this directory.  Instead, there'source
