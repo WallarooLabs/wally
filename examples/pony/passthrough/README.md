@@ -1,7 +1,6 @@
-# Alphabet
+# Passthrough
 
-This is an example application that will count the number of "votes" sent for
-each letter of the alphabet and send out the previous count for that letter at the end of each update.
+This is an example application that will passthrough the input messages as-is.
 
 ## Prerequisites
 
@@ -13,7 +12,7 @@ See [Wallaroo Environment Setup Instructions](https://docs.wallaroolabs.com/pyth
 
 ## Building
 
-Build Alphabet with
+Build passthrough with
 
 ```bash
 make
@@ -30,9 +29,9 @@ cd data_gen
 
 This will create a `votes.msg` file in your current working directory.
 
-## Running Alphabet
+## Running Passthrough
 
-You will need five separate shells to run this application. Open each shell and go to the `examples/pony/alphabet` directory.
+You will need five separate shells to run this application. Open each shell and go to the `examples/pony/passthrough` directory.
 
 ### Shell 1: Metrics
 
@@ -71,11 +70,11 @@ data_receiver --listen 127.0.0.1:7002 --no-write \
   --ponythreads=1 --ponynoblock
 ```
 
-### Shell 3: Alphabet
+### Shell 3: Passthrough
 Start the application
 
 ```bash
-./alphabet --in "Alphabet Votes"@127.0.0.1:7010 --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
+./passthrough --in "InputBlobs"@127.0.0.1:7010 --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:12500 --data 127.0.0.1:12501 --external 127.0.0.1:5050 \
   --cluster-initializer --ponynoblock --ponythreads=1
 ```

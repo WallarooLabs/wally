@@ -1,6 +1,6 @@
 /*
 
-Copyright 2017 The Wallaroo Authors.
+Copyright 2019 The Wallaroo Authors.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -34,7 +34,8 @@ actor Main
       let pipeline = recover val
           let inputs = Wallaroo.source[InputBlob]("Input",
                 TCPSourceConfig[InputBlob].from_options(InputBlobDecoder,
-                  TCPSourceConfigCLIParser("InputBlobs", env.args)?))
+                  TCPSourceConfigCLIParser("InputBlobs", env.args)?
+                  where parallelism' = 64))
 
           inputs
             .to_sink(TCPSinkConfig[InputBlob].from_options(
@@ -66,21 +67,3 @@ primitive InputBlobEncoder
     wb.write(t)
     wb.u32_be(0) // fill out the header that was stripped in Decode
     wb.done()
-    /*
-    try
-      wb.u64_be(t.read_u64(0)?.bswap()) //8
-      wb.u64_be(0) //16
-      wb.u128_be(0) // 32
-      wb.u128_be(0) // 48
-      wb.u128_be(0) // 64
-      wb.u128_be(0) // 80
-      wb.u128_be(0) // 96
-      wb.u128_be(0) // 112
-      wb.u128_be(0) // 128
-      wb.done()
-    else
-      Fail()
-      []
-    end
-
-*/
