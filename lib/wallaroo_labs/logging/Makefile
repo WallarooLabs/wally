@@ -50,9 +50,6 @@ $(LOGGING_LIB_A): $(LOGGING_LIB_OBJ)
 $(LOGGING_LIB_OBJ): $(LOGGING_LIB_DIR)logging-lib.c
 	cc -g -o $@ -c $<
 
-unit-tests-lib-wallaroo_labs-logging-all:
-integration-tests-lib-wallaroo_labs-logging-all:
-
 # The rule below will trigger a "overriding commands" warning when
 # there is a Pony source file in this directory.  Instead, there'source
 # a special "rm -f" command in rules.mk to delete the obj & lib files.
