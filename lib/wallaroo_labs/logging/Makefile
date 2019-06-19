@@ -1,17 +1,18 @@
+# include root makefile
+ifndef ROOT_MAKEFILE_MK
+include ../../../Makefile
+endif
+
 # prevent rules from being evaluated/included multiple times
 ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
 $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
-ROOT_MAKEFILE_MK := 1
-ROOT_MAKEFILE := $(lastword $(MAKEFILE_LIST))
-ROOT_MAKEFILE_PATH := $(dir $(ROOT_MAKEFILE))
-rules_mk_path := $(ROOT_MAKEFILE_PATH)/rules.mk
 
 # The following are control variables that determine what logic from `rules.mk` is enabled
 
 # `true`/`false` to enable/disable the actual unit test command so it can be overridden (the targets are still created)
 # applies to both the pony and elixir test targets
-$(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := false
 
 # `true`/`false` to enable/disable generate pony related targets (build/test/clean) for pony sources in this directory
 # otherwise targets only get created if there are pony sources (*.pony) in this directory.
@@ -23,33 +24,37 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_PONYC_TARGET := true
 
 # `true`/`false` to enable/disable generate exs related targets (build/test/clean) for elixir sources in this directory
 # otherwise targets only get created if there are elixir sources (*.exs) in this directory.
-$(abspath $(lastword $(MAKEFILE_LIST)))_EXS_TARGET := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_EXS_TARGET := false
 
 # `true`/`false` to enable/disable generate docker related targets (build/push) for a Dockerfile in this directory
 # otherwise targets only get created if there is a Dockerfile in this directory
-$(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
 
 # `true`/`false` to enable/disable recursing into Makefiles of subdirectories if they exist
 # (and by recursion every makefile in the tree that is referenced)
-$(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
+
+
+LOGGING_LIB_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # standard rules generation makefile
 include $(rules_mk_path)
 
-#LOGGING_LIB_DIR=$(wallaroo_path)/utils/logging-lib
-#LOGGING_LIB_OBJ=$(LOGGING_LIB_DIR)/logging-lib.o
-#LOGGING_LIB_A=$(LOGGING_LIB_DIR)/logging-lib.a
-#
-#$(LOGGING_LIB_DIR): $(LOGGING_LIB_A)
-#$(LOGGING_LIB_A): $(LOGGING_LIB_OBJ)
-#	ar rvs $@ $<
-#$(LOGGING_LIB_OBJ): $(LOGGING_LIB_DIR)/logging-lib.c
-#	cc -g -o $@ -c $<
-#
-#clean:
-#	rm -f $(LOGGING_LIB_DIR)/*.o $(LOGGING_LIB_DIR)/*.a
+LOGGING_LIB_DIR=$(LOGGING_LIB_PATH)
+LOGGING_LIB_OBJ=$(LOGGING_LIB_DIR)wallaroo-logging.o
+LOGGING_LIB_A=$(LOGGING_LIB_DIR)libwallaroo-logging.a
+
+build-lib-wallaroo_labs-logging: $(LOGGING_LIB_A)
+$(LOGGING_LIB_A): $(LOGGING_LIB_OBJ)
+	ar rvs $@ $<
+$(LOGGING_LIB_OBJ): $(LOGGING_LIB_DIR)logging-lib.c
+	cc -g -o $@ -c $<
+
+# The rule below will trigger a "overriding commands" warning when
+# there is a Pony source file in this directory.  Instead, there'source
+# a special "rm -f" command in rules.mk to delete the obj & lib files.
+#clean-lib-wallaroo_labs-logging:
+#	$(QUIET)rm -f $(LOGGING_LIB_DIR)/*.o $(LOGGING_LIB_DIR)/*.a
 
 # end of prevent rules from being evaluated/included multiple times
 endif
-
-

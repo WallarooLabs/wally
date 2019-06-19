@@ -18,6 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "net"
 use "wallaroo_labs/bytes"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/options"
 
 actor Main
@@ -27,6 +28,7 @@ actor Main
     var output_mode: OutputMode = Write
     var input_mode: InputMode = Streaming
 
+    @printf[I32]("SLF: Hello, world!\n".cstring()) // For demo purposes only
     try
       var options = Options(env.args)
 
