@@ -36,19 +36,6 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
 # standard rules generation makefile
 include $(rules_mk_path)
 
-#LOGGING_LIB_DIR=$(wallaroo_path)/utils/logging-lib
-#LOGGING_LIB_OBJ=$(LOGGING_LIB_DIR)/logging-lib.o
-#LOGGING_LIB_A=$(LOGGING_LIB_DIR)/logging-lib.a
-#
-#$(LOGGING_LIB_DIR): $(LOGGING_LIB_A)
-#$(LOGGING_LIB_A): $(LOGGING_LIB_OBJ)
-#	ar rvs $@ $<
-#$(LOGGING_LIB_OBJ): $(LOGGING_LIB_DIR)/logging-lib.c
-#	cc -g -o $@ -c $<
-#
-#clean:
-#	rm -f $(LOGGING_LIB_DIR)/*.o $(LOGGING_LIB_DIR)/*.a
-
 # end of prevent rules from being evaluated/included multiple times
 endif
 
