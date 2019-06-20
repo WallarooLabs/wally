@@ -52,10 +52,10 @@ actor Main
     @printf[I32]("SLF: critical enabled = false? res = %s\n".cstring(),
       @le[Bool](Log.crit(), cat_mumble).string().cstring())
 
-    Log.set_categories(false)
+    Log.set_categories()
     @l[I32](Log.emerg(), Log.c_source_migration(), "Visible migration event".cstring())
 
-    @w_process_category_overrides[None]()
+    Log.set_thresholds(false, true)
     let aa: Array[(U8, U8)] = [ (7,20); (2,20); (7, 21); (2, 21)]
     for (sev, cat) in aa.values() do
       let b = @le[Bool](sev, cat)

@@ -30,7 +30,8 @@ primitive Log
   fun notice(): U8 => U8(5)
   fun info(): U8   => U8(6)
   fun debug(): U8  => U8(7)
-  fun max_severity() => debug()
+  fun max_severity(): U8 => debug()
+  fun default_severity(): U8 => info()
 
   // categories
   // Don't use category 0
@@ -39,21 +40,27 @@ primitive Log
   fun c_2pc(): U8              => U8(3)
   fun c_dos_client(): U8       => U8(4)
 
-  fun category_map(): Array[(U8, String)] =>
+  fun category_map(): Array[(U8, U8, String)] =>
     [
-      (c_checkpoint(),       "CHECKPOINT")
-      (c_source_migration(), "SOURCE_MIGRATION")
-      (c_2pc(),              "2PC")
-      (c_dos_client(),       "DOS_CLIENT")
+      (default_severity(), c_checkpoint(),       "CHECKPOINT")
+      (default_severity(), c_source_migration(), "SOURCE_MIGRATION")
+      (default_severity(), c_2pc(),              "2PC")
+      (default_severity(), c_dos_client(),       "DOS_CLIENT")
     ]
 
-  fun set_categories(do_overrides: Bool) =>
-    // These are Wallaroo defaults
-    for (cat, label) in category_map().values() do
-      @w_set_category[None](cat, label.cstring())
+  fun set_categories() =>
+    for (severity, category, label) in category_map().values() do
+      @w_severity_cat_threshold[None](severity, category)
     end
 
-    // Process any overries
+  fun set_thresholds(do_defaults: Bool = true, do_overrides: Bool = true) =>
+    if do_defaults then
+      @w_severity_threshold[None](default_severity())
+      for (severity, category, label) in category_map().values() do
+        @w_severity_cat_threshold[None](severity, category)
+      end
+    end
+
     if do_overrides then
       @w_process_category_overrides[None]()
     end
