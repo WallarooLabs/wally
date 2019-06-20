@@ -131,7 +131,8 @@ def cluster_status_query(addr):
         return json.loads(stdout)
     except Exception as err:
         e = ObservabilityResponseError("Failed to deserialize observability"
-                                      " response:\n{!r}".format(stdout))
+                                      " response from {!r}:\n{!r}"
+                                      .format(stdout, addr))
         logging.error(e)
         raise
 
