@@ -40,6 +40,10 @@ static int _labels_initialized = 0;
 static char *_severity_labels[MAX_SEVERITY+1];
 static char *_category_labels[MAX_CATEGORY+1];
 
+/*****************************/
+/* Internal static functions */
+/*****************************/
+
 static int _w_now(char *dst, int dst_size)
 {
   struct timeval tv;
@@ -59,17 +63,38 @@ static int _w_vprintf(const char *fmt, va_list ap)
   int ret;
 
   fmt2_len = _w_now(fmt2, sizeof(fmt2));
-  if (strlen(fmt) > (sizeof(fmt2) - fmt2_len - 1 /*,*/)) {
+  if (strlen(fmt) > (sizeof(fmt2) - fmt2_len - 2 /* , & NUL */)) {
     /* Our static buffer isn't big enough, so call vprintf() as is. */
     ret = vprintf(fmt, ap);
   } else {
     fmt2[fmt2_len] = ',';
-    memcpy(fmt2 + fmt2_len + 1, fmt, strlen(fmt));
+    memcpy(fmt2 + fmt2_len + 1, fmt, strlen(fmt) + 1);
     ret = vprintf(fmt2, ap);
   }
   va_end(ap);
   return ret;
 }
+
+static void _w_initialize_labels()
+{
+  int i;
+  char buf[16];
+
+  for (i = 0; i < MAX_SEVERITY; i++) {
+    snprintf(buf, sizeof(buf), "sev-%d", i);
+    _severity_labels[i] = strdup(buf);
+  }
+  for (i = 0; i < MAX_CATEGORY; i++) {
+    snprintf(buf, sizeof(buf), "cat-%d", i);
+    _category_labels[i] = strdup(buf);
+  }
+  _labels_initialized = 1;
+}
+
+
+/********************/
+/* Public functions */
+/********************/
 
 int printf(const char *fmt, ...)
 {
@@ -85,18 +110,34 @@ int l(char severity, char category, const char *fmt, ...)
   char fmt2[FMT_BUF_SIZE];
   va_list ap;
 
+  if (! _labels_initialized) {
+    _w_initialize_labels();
+  }
   va_start(ap, fmt);
-  snprintf(fmt2, sizeof(fmt2), "%d,%d,%s", severity, category, fmt);
+  int qq =
+  snprintf(fmt2, sizeof(fmt2), "%s,%s,%s",
+    _severity_labels[severity], _category_labels[category], fmt);
   return _w_vprintf(fmt2, ap);
 }
 
-void set_severity(char severity, char *label)
+void w_set_severity(char severity, char *label)
 {
   if (! _labels_initialized) {
     _w_initialize_labels();
-    _labels_initialized = 1;
   }
+  if (severity < MAX_SEVERITY) {
+    _severity_labels[severity] = strdup(label);
+  }
+}
 
+void w_set_category(char category, char *label)
+{
+  if (! _labels_initialized) {
+    _w_initialize_labels();
+  }
+  if (category < MAX_CATEGORY) {
+    _category_labels[category] = strdup(label);
+  }
 }
 
 #ifdef MAIN
