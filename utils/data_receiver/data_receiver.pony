@@ -45,11 +45,11 @@ actor Main
     @l[I32](sev_alert, cat_mumble, "SLF: visible!\n".cstring()) // For demo purposes only
     @l[I32](sev_crit, cat_mumble, "SLF: this one should be filtered out\n".cstring()) // For demo purposes only
 
-    @printf[I32]("SLF: emergency enabled = 1? res = %s\n".cstring(),
+    @printf[I32]("SLF: emergency enabled = true? res = %s\n".cstring(),
       @le[Bool](sev_emergency, cat_mumble).string().cstring())
-    @printf[I32]("SLF: alert enabled = 1? res = %s\n".cstring(),
+    @printf[I32]("SLF: alert enabled = true? res = %s\n".cstring(),
       @le[Bool](sev_alert, cat_mumble).string().cstring())
-    @printf[I32]("SLF: critical enabled = 0? res = %s\n".cstring(),
+    @printf[I32]("SLF: critical enabled = false? res = %s\n".cstring(),
       @le[Bool](sev_crit, cat_mumble).string().cstring())
 
     try

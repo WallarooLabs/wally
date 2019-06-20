@@ -83,11 +83,11 @@ static void _w_initialize_labels()
   int i;
   char buf[16];
 
-  for (i = 0; i < MAX_SEVERITY; i++) {
+  for (i = 0; i < MAX_SEVERITY+1; i++) {
     snprintf(buf, sizeof(buf), "sev-%d", i);
     _severity_labels[i] = strdup(buf);
   }
-  for (i = 0; i < MAX_CATEGORY; i++) {
+  for (i = 0; i < MAX_CATEGORY+1; i++) {
     snprintf(buf, sizeof(buf), "cat-%d", i);
     _category_labels[i] = strdup(buf);
     _cat2sev_threshold[i] = MAX_SEVERITY;
@@ -109,6 +109,16 @@ int printf(const char *fmt, ...)
   // va_end() already done
 }
 
+/*
+** le(), is logging enabled for a (severity, category) tuple
+**
+** severity - numeric severity from 0 to MAX_SEVERITY
+** category - application category number from 0 to MAX_CATEGORY
+**
+** Return value: true if logging is enabled for this tuple,
+**               otherwise false
+*/
+
 unsigned char le(unsigned char severity, unsigned char category)
 {
   if (severity > _cat2sev_threshold[category]) {
@@ -116,6 +126,17 @@ unsigned char le(unsigned char severity, unsigned char category)
   }
   return 1;
 }
+
+/*
+** l(), the severity + category + format + variable-args logging function.
+**
+** severity - numeric severity from 0 to MAX_SEVERITY
+** category - application category number from 0 to MAX_CATEGORY
+** fmt - snprintf(3)-style formatting string
+** 0 or or arguments - snprintf(3)-style arguments
+**
+** Return value: # of bytes written
+*/
 
 int l(unsigned char severity, unsigned char category, const char *fmt, ...)
 {
@@ -136,6 +157,12 @@ int l(unsigned char severity, unsigned char category, const char *fmt, ...)
 }
 
 
+/*
+** w_set_severity(), set the formatted label for a severity number
+**
+** severity - numeric severity from 0 to MAX_SEVERITY
+*/
+
 void w_set_severity(unsigned char severity, char *label)
 {
   if (! _labels_initialized) {
@@ -145,6 +172,12 @@ void w_set_severity(unsigned char severity, char *label)
     _severity_labels[severity] = strdup(label);
   }
 }
+
+/*
+** w_set_category(), set the formatted label for a category number
+**
+** category - application category number from 0 to MAX_CATEGORY
+*/
 
 void w_set_category(unsigned char category, char *label)
 {
@@ -156,14 +189,36 @@ void w_set_category(unsigned char category, char *label)
   }
 }
 
+/*
+** w_set_severity_threshold(), set the severity threshold for all categories
+**
+** severity - numeric severity from 0 to MAX_SEVERITY
+*/
+
 void w_severity_threshold(unsigned char severity)
 {
   int i;
 
-  if (severity < MAX_SEVERITY) {
+  if (severity < MAX_SEVERITY+1) {
     for (i = 0; i < MAX_CATEGORY+1; i++) {
       _cat2sev_threshold[i] = severity;
     }
+  }
+}
+
+/*
+** w_set_severity_cat_threshold(), set the severity threshold for a category
+**
+** severity - numeric severity from 0 to MAX_SEVERITY
+** category - application category number from 0 to MAX_CATEGORY
+*/
+
+void w_severity_cat_threshold(unsigned char severity, unsigned char category)
+{
+  int i;
+
+  if (severity < MAX_SEVERITY+1 && category < MAX_CATEGORY+1) {
+    _cat2sev_threshold[category] = severity;
   }
 }
 
