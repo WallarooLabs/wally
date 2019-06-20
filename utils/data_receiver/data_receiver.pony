@@ -28,14 +28,30 @@ actor Main
     var output_mode: OutputMode = Write
     var input_mode: InputMode = Streaming
 
+    let sev_emergency = U8(0)
+    let sev_alert = U8(1)
+    let sev_crit = U8(2)
+    let sev_error = U8(3)
+    let cat_mumble = U8(40)
+
     @printf[I32]("SLF: Hello, world!\n".cstring()) // For demo purposes only
-    @l[I32](U8(2), U8(3), "SLF: Hello, %s!\n".cstring(), "everything".cstring()) // For demo purposes only
-    @w_set_severity[None](U8(2), "2-severity-yo".cstring())
-    @w_set_category[None](U8(3), "my-3-cat-cat".cstring())
-    @l[I32](U8(2), U8(3), "SLF: Hello, %s!\n".cstring(), "everything".cstring()) // For demo purposes only
-    @w_severity_threshold[None](U8(1))
-    @l[I32](U8(2), U8(3), "SLF: this one should be filtered out\n".cstring()) // For demo purposes only
-    @l[I32](U8(1), U8(3), "SLF: visible!\n".cstring()) // For demo purposes only
+    @l[I32](sev_crit, cat_mumble, "SLF: Hello, %s!\n".cstring(), "everything".cstring()) // For demo purposes only
+    @w_set_severity[None](sev_crit, "2-severity-yo".cstring())
+    @w_set_category[None](cat_mumble, "my-mumble-cat".cstring())
+    @l[I32](sev_crit, cat_mumble, "SLF: Hello, %s!\n".cstring(), "everything".cstring()) // For demo purposes only
+
+    @w_severity_threshold[None](sev_alert)
+    @l[I32](sev_emergency, cat_mumble, "SLF: visible!\n".cstring()) // For demo purposes only
+    @l[I32](sev_alert, cat_mumble, "SLF: visible!\n".cstring()) // For demo purposes only
+    @l[I32](sev_crit, cat_mumble, "SLF: this one should be filtered out\n".cstring()) // For demo purposes only
+
+    @printf[I32]("SLF: emergency enabled = 1? res = %s\n".cstring(),
+      @le[Bool](sev_emergency, cat_mumble).string().cstring())
+    @printf[I32]("SLF: alert enabled = 1? res = %s\n".cstring(),
+      @le[Bool](sev_alert, cat_mumble).string().cstring())
+    @printf[I32]("SLF: critical enabled = 0? res = %s\n".cstring(),
+      @le[Bool](sev_crit, cat_mumble).string().cstring())
+
     try
       var options = Options(env.args)
 

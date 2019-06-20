@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define FMT_BUF_SIZE  1024
 #define MAX_SEVERITY  8
-#define MAX_CATEGORY  32
+#define MAX_CATEGORY  64
 
 static int _labels_initialized = 0;
 
@@ -109,6 +109,14 @@ int printf(const char *fmt, ...)
   // va_end() already done
 }
 
+unsigned char le(unsigned char severity, unsigned char category)
+{
+  if (severity > _cat2sev_threshold[category]) {
+    return 0;
+  }
+  return 1;
+}
+
 int l(unsigned char severity, unsigned char category, const char *fmt, ...)
 {
   char fmt2[FMT_BUF_SIZE];
@@ -126,6 +134,7 @@ int l(unsigned char severity, unsigned char category, const char *fmt, ...)
     _severity_labels[severity], _category_labels[category], fmt);
   return _w_vprintf(fmt2, ap);
 }
+
 
 void w_set_severity(unsigned char severity, char *label)
 {
@@ -147,11 +156,11 @@ void w_set_category(unsigned char category, char *label)
   }
 }
 
-void w_severity_threshold(char severity)
+void w_severity_threshold(unsigned char severity)
 {
   int i;
 
-  if (severity >= 0 && severity < MAX_SEVERITY) {
+  if (severity < MAX_SEVERITY) {
     for (i = 0; i < MAX_CATEGORY+1; i++) {
       _cat2sev_threshold[i] = severity;
     }
