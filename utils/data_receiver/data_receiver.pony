@@ -21,6 +21,8 @@ use "wallaroo_labs/bytes"
 use "wallaroo_labs/logging"
 use "wallaroo_labs/options"
 
+use @l[I32](severity: U8, category: U8, fmt: Pointer[U8] tag, ...)
+
 actor Main
   new create(env: Env) =>
     var required_args_are_present = true
