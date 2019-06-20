@@ -37,8 +37,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MAX_CATEGORY  32
 
 static int _labels_initialized = 0;
+
 static char *_severity_labels[MAX_SEVERITY+1];
 static char *_category_labels[MAX_CATEGORY+1];
+
+static int _cat2sev_threshold[MAX_CATEGORY+1];
 
 /*****************************/
 /* Internal static functions */
@@ -87,6 +90,7 @@ static void _w_initialize_labels()
   for (i = 0; i < MAX_CATEGORY; i++) {
     snprintf(buf, sizeof(buf), "cat-%d", i);
     _category_labels[i] = strdup(buf);
+    _cat2sev_threshold[i] = MAX_SEVERITY;
   }
   _labels_initialized = 1;
 }
@@ -105,38 +109,52 @@ int printf(const char *fmt, ...)
   // va_end() already done
 }
 
-int l(char severity, char category, const char *fmt, ...)
+int l(unsigned char severity, unsigned char category, const char *fmt, ...)
 {
   char fmt2[FMT_BUF_SIZE];
   va_list ap;
 
+  if (severity > _cat2sev_threshold[category]) {
+    return 0;
+  }
   if (! _labels_initialized) {
     _w_initialize_labels();
   }
+
   va_start(ap, fmt);
-  int qq =
   snprintf(fmt2, sizeof(fmt2), "%s,%s,%s",
     _severity_labels[severity], _category_labels[category], fmt);
   return _w_vprintf(fmt2, ap);
 }
 
-void w_set_severity(char severity, char *label)
+void w_set_severity(unsigned char severity, char *label)
 {
   if (! _labels_initialized) {
     _w_initialize_labels();
   }
-  if (severity < MAX_SEVERITY) {
+  if (severity < MAX_SEVERITY+1) {
     _severity_labels[severity] = strdup(label);
   }
 }
 
-void w_set_category(char category, char *label)
+void w_set_category(unsigned char category, char *label)
 {
   if (! _labels_initialized) {
     _w_initialize_labels();
   }
-  if (category < MAX_CATEGORY) {
+  if (category < MAX_CATEGORY+1) {
     _category_labels[category] = strdup(label);
+  }
+}
+
+void w_severity_threshold(char severity)
+{
+  int i;
+
+  if (severity >= 0 && severity < MAX_SEVERITY) {
+    for (i = 0; i < MAX_CATEGORY+1; i++) {
+      _cat2sev_threshold[i] = severity;
+    }
   }
 }
 

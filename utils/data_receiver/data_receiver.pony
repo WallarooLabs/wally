@@ -33,6 +33,9 @@ actor Main
     @w_set_severity[None](U8(2), "2-severity-yo".cstring())
     @w_set_category[None](U8(3), "my-3-cat-cat".cstring())
     @l[I32](U8(2), U8(3), "SLF: Hello, %s!\n".cstring(), "everything".cstring()) // For demo purposes only
+    @w_severity_threshold[None](U8(1))
+    @l[I32](U8(2), U8(3), "SLF: this one should be filtered out\n".cstring()) // For demo purposes only
+    @l[I32](U8(1), U8(3), "SLF: visible!\n".cstring()) // For demo purposes only
     try
       var options = Options(env.args)
 
