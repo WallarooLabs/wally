@@ -151,7 +151,7 @@ int l(unsigned char severity, unsigned char category, const char *fmt, ...)
   }
 
   va_start(ap, fmt);
-  snprintf(fmt2, sizeof(fmt2), "%s,%s,%s",
+  snprintf(fmt2, sizeof(fmt2), "%s,%s,%s\n",
     _severity_labels[severity], _category_labels[category], fmt);
   return _w_vprintf(fmt2, ap);
 }
