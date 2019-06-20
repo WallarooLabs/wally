@@ -25,13 +25,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-#include <ctype.h>
 
+#define ENV_BUF_SIZE  1024
 #define FMT_BUF_SIZE  1024
 #define MAX_SEVERITY  8
 #define MAX_CATEGORY  64
@@ -219,6 +220,52 @@ void w_severity_cat_threshold(unsigned char severity, unsigned char category)
 
   if (severity < MAX_SEVERITY+1 && category < MAX_CATEGORY+1) {
     _cat2sev_threshold[category] = severity;
+  }
+}
+
+/*
+** w_process_category_overrides, process any env var overrides
+**
+** If the environment variable WALLAROO_THRESHOLDS exists, then
+** parse that string and apply a set of overrides to the
+** _cat2sev_thresholds.
+**
+** The string should contain a list of zero or more
+** category.severity pairs, e.g, "22.5" for category 23 and
+** severity 5 (which corresponds to Log.notice()).  The string
+** "*" can be used to specify all categories.
+**
+** Items in the list are separated by commas and are processed
+** in order.  The "*" for all categories, if used, probably ought
+** to be first in the list.  For example, "*.1,22.5,3.7,4.0".
+*/
+
+void w_process_category_overrides()
+{
+  char *env = getenv("WALLAROO_THRESHOLDS");
+  char buf[ENV_BUF_SIZE];
+  char *p = buf, *start, *saveptr, *dot;
+  unsigned char severity, category;
+  int i;
+
+  if (env != NULL) {
+    if (strlen(env) < sizeof(buf) - 1) {
+      strcpy(buf, env);
+
+      for (start = strtok_r(buf, ",", &saveptr);
+           start != NULL;
+           start = strtok_r(NULL, ",", &saveptr)) {
+        if ((dot = strchr(start, '.')) != NULL) {
+          *dot = '\0';
+          severity = atoi(dot + 1);
+          if (*start == '*') {
+            w_severity_threshold(severity);
+          } else if ((category = atoi(start)) > 0) {
+            w_severity_cat_threshold(severity, category);
+          }
+        }
+      }
+    }
   }
 }
 

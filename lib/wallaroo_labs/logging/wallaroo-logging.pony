@@ -33,10 +33,11 @@ primitive Log
   fun max_severity() => debug()
 
   // categories
-  fun c_checkpoint(): U8       => U8(0)
-  fun c_source_migration(): U8 => U8(1)
-  fun c_2pc(): U8              => U8(2)
-  fun c_dos_client(): U8       => U8(3)
+  // Don't use category 0
+  fun c_checkpoint(): U8       => U8(1)
+  fun c_source_migration(): U8 => U8(2)
+  fun c_2pc(): U8              => U8(3)
+  fun c_dos_client(): U8       => U8(4)
 
   fun category_map(): Array[(U8, String)] =>
     [
@@ -46,7 +47,13 @@ primitive Log
       (c_dos_client(),       "DOS_CLIENT")
     ]
 
-  fun set_categories() =>
+  fun set_categories(do_overrides: Bool) =>
+    // These are Wallaroo defaults
     for (cat, label) in category_map().values() do
       @w_set_category[None](cat, label.cstring())
+    end
+
+    // Process any overries
+    if do_overrides then
+      @w_process_category_overrides[None]()
     end
