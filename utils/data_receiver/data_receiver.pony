@@ -21,7 +21,7 @@ use "wallaroo_labs/bytes"
 use "wallaroo_labs/logging"
 use "wallaroo_labs/options"
 
-use @l[I32](severity: U8, category: U8, fmt: Pointer[U8] tag, ...)
+use @logf[I32](severity: U8, category: U8, fmt: Pointer[U8] tag, ...)
 
 actor Main
   new create(env: Env) =>
@@ -37,15 +37,15 @@ actor Main
     let cat_mumble = U8(40)
 
     @printf[I32]("SLF: Hello, world!\n".cstring()) // For demo purposes only
-    @l[I32](Log.crit(), cat_mumble, "SLF: Hello, %s\n".cstring(), "everything".cstring()) // For demo purposes only
+    @logf(Log.crit(), cat_mumble, "SLF: Hello, %s\n".cstring(), "everything".cstring()) // For demo purposes only
     @w_set_severity[None](Log.crit(), "2-severity-yo".cstring())
     @w_set_category[None](cat_mumble, "my-mumble-cat".cstring())
-    @l[I32](Log.crit(), cat_mumble, "SLF: Hello, %s!".cstring(), "everything".cstring()) // For demo purposes only
+    @logf(Log.crit(), cat_mumble, "SLF: Hello, %s!".cstring(), "everything".cstring()) // For demo purposes only
 
     @w_severity_threshold[None](Log.alert())
-    @l[I32](Log.emerg(), cat_mumble, "SLF: visible!".cstring()) // For demo purposes only
-    @l[I32](Log.alert(), cat_mumble, "SLF: visible!".cstring()) // For demo purposes only
-    @l[I32](Log.crit(), cat_mumble, "SLF: this one should be filtered out".cstring()) // For demo purposes only
+    @logf(Log.emerg(), cat_mumble, "SLF: visible!".cstring()) // For demo purposes only
+    @logf(Log.alert(), cat_mumble, "SLF: visible!".cstring()) // For demo purposes only
+    @logf(Log.crit(), cat_mumble, "SLF: this one should be filtered out".cstring()) // For demo purposes only
 
     @printf[I32]("SLF: emergency enabled = true? res = %s\n".cstring(),
       @le[Bool](Log.emerg(), cat_mumble).string().cstring())
@@ -55,7 +55,7 @@ actor Main
       @le[Bool](Log.crit(), cat_mumble).string().cstring())
 
     Log.set_categories()
-    @l[I32](Log.emerg(), Log.c_source_migration(), "Visible migration event".cstring())
+    @logf(Log.emerg(), Log.c_source_migration(), "Visible migration event".cstring())
 
     Log.set_thresholds(false, true)
     let aa: Array[(U8, U8)] = [ (7,20); (2,20); (7, 21); (2, 21)]

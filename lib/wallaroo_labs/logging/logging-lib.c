@@ -129,7 +129,7 @@ unsigned char le(unsigned char severity, unsigned char category)
 }
 
 /*
-** l(), the severity + category + format + variable-args logging function.
+** logf(), the severity + category + format + variable-args logging function.
 **
 ** severity - numeric severity from 0 to MAX_SEVERITY
 ** category - application category number from 0 to MAX_CATEGORY
@@ -139,7 +139,7 @@ unsigned char le(unsigned char severity, unsigned char category)
 ** Return value: # of bytes written
 */
 
-int l(unsigned char severity, unsigned char category, const char *fmt, ...)
+int logf(unsigned char severity, unsigned char category, const char *fmt, ...)
 {
   char fmt2[FMT_BUF_SIZE];
   va_list ap;
