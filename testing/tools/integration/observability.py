@@ -257,8 +257,7 @@ class ObservabilityNotifier(StoppableThread):
                 logging.log(1, "Try query")
                 query_result = self.query_func(*self.query_args)
             except Exception as err:
-                logging.log(1, "Query failed")
-                logging.log(1, err)
+                logging.debug("Query failed: {}".format(err))
                 # sleep and retry but only if timeout hasn't elapsed
                 if (time.time() - started) <= self.timeout:
                     time.sleep(self.period)
