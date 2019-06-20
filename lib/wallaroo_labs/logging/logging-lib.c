@@ -120,7 +120,7 @@ int printf(const char *fmt, ...)
 **               otherwise false
 */
 
-unsigned char le(unsigned char severity, unsigned char category)
+unsigned char log_enabled(unsigned char severity, unsigned char category)
 {
   if (severity > _cat2sev_threshold[category]) {
     return 0;
@@ -129,7 +129,7 @@ unsigned char le(unsigned char severity, unsigned char category)
 }
 
 /*
-** logf(), the severity + category + format + variable-args logging function.
+** l(), the severity + category + format + variable-args logging function.
 **
 ** severity - numeric severity from 0 to MAX_SEVERITY
 ** category - application category number from 0 to MAX_CATEGORY
@@ -139,7 +139,7 @@ unsigned char le(unsigned char severity, unsigned char category)
 ** Return value: # of bytes written
 */
 
-int logf(unsigned char severity, unsigned char category, const char *fmt, ...)
+int l(unsigned char severity, unsigned char category, const char *fmt, ...)
 {
   char fmt2[FMT_BUF_SIZE];
   va_list ap;

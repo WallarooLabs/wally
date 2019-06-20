@@ -35,14 +35,14 @@ primitive Log
   fun default_severity(): U8 => info()
 
   // categories
-  fun c_none(): U8             => U8(0)
-  fun c_checkpoint(): U8       => U8(1)
-  fun c_source_migration(): U8 => U8(2)
-  fun c_2pc(): U8              => U8(3)
-  fun c_dos_client(): U8       => U8(4)
+  // fun none(): U8             => U8(0) // reuse 0 value from severity none()
+  fun checkpoint(): U8       => U8(1)
+  fun source_migration(): U8 => U8(2)
+  fun twopc(): U8            => U8(3)
+  fun dos_client(): U8       => U8(4)
 
   fun severity_map(): Array[(U8, String)] =>
-    [
+    [ // BEGIN severity_map
       (none(),  "NONE")
       (emerg(),  "EMERGENCY")
       (alert(),  "ALERT")
@@ -52,16 +52,16 @@ primitive Log
       (notice(), "NOTICE")
       (info(),   "INFO")
       (debug(),  "DEBUG")
-    ]
+    ] // END severity_map
 
   fun category_map(): Array[(U8, U8, String)] =>
-    [
-      (default_severity(), c_none(),             "none")
-      (default_severity(), c_checkpoint(),       "checkpoint")
-      (default_severity(), c_source_migration(), "source_migration")
-      (default_severity(), c_2pc(),              "2PC")
-      (default_severity(), c_dos_client(),       "DOS_client")
-    ]
+    [ // BEGIN category_map
+      (default_severity(), none(),             "none")
+      (default_severity(), checkpoint(),       "checkpoint")
+      (default_severity(), source_migration(), "source_migration")
+      (default_severity(), twopc(),            "2PC")
+      (default_severity(), dos_client(),       "DOS_client")
+    ] // END category_map
 
   fun set_defaults() =>
     set_severities()
