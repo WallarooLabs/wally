@@ -28,29 +28,32 @@ actor Main
     var output_mode: OutputMode = Write
     var input_mode: InputMode = Streaming
 
-    let sev_emergency = U8(0)
-    let sev_alert = U8(1)
-    let sev_crit = U8(2)
-    let sev_error = U8(3)
+    // let Log.emerg = U8(0)
+    // let Log.alert = U8(1)
+    // let Log.crit = U8(2)
+    // let Log.err = U8(3)
     let cat_mumble = U8(40)
 
     @printf[I32]("SLF: Hello, world!\n".cstring()) // For demo purposes only
-    @l[I32](sev_crit, cat_mumble, "SLF: Hello, %s!\n".cstring(), "everything".cstring()) // For demo purposes only
-    @w_set_severity[None](sev_crit, "2-severity-yo".cstring())
+    @l[I32](Log.crit(), cat_mumble, "SLF: Hello, %s!\n".cstring(), "everything".cstring()) // For demo purposes only
+    @w_set_severity[None](Log.crit(), "2-severity-yo".cstring())
     @w_set_category[None](cat_mumble, "my-mumble-cat".cstring())
-    @l[I32](sev_crit, cat_mumble, "SLF: Hello, %s!\n".cstring(), "everything".cstring()) // For demo purposes only
+    @l[I32](Log.crit(), cat_mumble, "SLF: Hello, %s!\n".cstring(), "everything".cstring()) // For demo purposes only
 
-    @w_severity_threshold[None](sev_alert)
-    @l[I32](sev_emergency, cat_mumble, "SLF: visible!\n".cstring()) // For demo purposes only
-    @l[I32](sev_alert, cat_mumble, "SLF: visible!\n".cstring()) // For demo purposes only
-    @l[I32](sev_crit, cat_mumble, "SLF: this one should be filtered out\n".cstring()) // For demo purposes only
+    @w_severity_threshold[None](Log.alert())
+    @l[I32](Log.emerg(), cat_mumble, "SLF: visible!\n".cstring()) // For demo purposes only
+    @l[I32](Log.alert(), cat_mumble, "SLF: visible!\n".cstring()) // For demo purposes only
+    @l[I32](Log.crit(), cat_mumble, "SLF: this one should be filtered out\n".cstring()) // For demo purposes only
 
     @printf[I32]("SLF: emergency enabled = true? res = %s\n".cstring(),
-      @le[Bool](sev_emergency, cat_mumble).string().cstring())
+      @le[Bool](Log.emerg(), cat_mumble).string().cstring())
     @printf[I32]("SLF: alert enabled = true? res = %s\n".cstring(),
-      @le[Bool](sev_alert, cat_mumble).string().cstring())
+      @le[Bool](Log.alert(), cat_mumble).string().cstring())
     @printf[I32]("SLF: critical enabled = false? res = %s\n".cstring(),
-      @le[Bool](sev_crit, cat_mumble).string().cstring())
+      @le[Bool](Log.crit(), cat_mumble).string().cstring())
+
+    Log.set_categories()
+    @l[I32](Log.emerg(), Log.c_source_migration(), "Visible migration event\n".cstring())
 
     try
       var options = Options(env.args)
