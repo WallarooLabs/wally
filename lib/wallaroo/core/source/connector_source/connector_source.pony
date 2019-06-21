@@ -49,8 +49,11 @@ use "wallaroo/core/source"
 use "wallaroo/core/tcp_actor"
 use "wallaroo/core/topology"
 use cwm = "wallaroo_labs/connector_wire_messages"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 
+use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag, ...)
+use @ll[I32](sev_cat: U16, fmt: Pointer[U8] tag, ...)
 
 actor ConnectorSource[In: Any val] is (Source & TCPActor)
   """
@@ -164,7 +167,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     end
 
     ifdef "identify_routing_ids" then
-      @printf[I32]("===ConnectorSource %s created===\n".cstring(),
+      @l(Log.info(), Log.conn_source(), "===ConnectorSource %s created===\n".cstring(),
         _source_id.string().cstring())
     end
 
@@ -337,7 +340,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
       _outgoing_boundaries.remove(worker)?
     else
       ifdef debug then
-        @printf[I32]("ConnectorSource couldn't find boundary to %s to disconnect\n"
+        @l(Log.debug(), Log.conn_source(), "ConnectorSource couldn't find boundary to %s to disconnect\n"
           .cstring(), worker.cstring())
       end
     end
@@ -370,7 +373,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
       _source_registry.unregister_source(this, _source_id)
       _event_log.unregister_resilient(_source_id, this)
       _unregister_all_outputs()
-      @printf[I32]("Shutting down ConnectorSource\n".cstring())
+      @l(Log.info(), Log.conn_source(), "Shutting down ConnectorSource\n".cstring())
       for b in _outgoing_boundaries.values() do
         b.dispose()
       end
@@ -397,7 +400,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
         | let ob: OutgoingBoundary => b_count = b_count + 1
         end
       end
-      @printf[I32]("ConnectorSource %s has %s boundaries.\n".cstring(),
+      @l(Log.info(), Log.conn_source(), "ConnectorSource %s has %s boundaries.\n".cstring(),
         _source_id.string().cstring(), b_count.string().cstring())
     end
 
@@ -417,7 +420,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
   be initiate_barrier(token: BarrierToken) =>
     if not _disposed then
       ifdef "checkpoint_trace" then
-        @printf[I32]("ConnectorSource received initiate_barrier %s\n"
+        @l(Log.debug(), Log.conn_source(), "ConnectorSource received initiate_barrier %s\n"
           .cstring(), token.string().cstring())
       end
       _initiate_barrier(token)
@@ -445,7 +448,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
     ifdef "checkpoint_trace" then
-      @printf[I32]("Checkpoint %s complete at ConnectorSource %s\n".cstring(),
+      @l(Log.debug(), Log.conn_source(), "Checkpoint %s complete at ConnectorSource %s\n".cstring(),
         checkpoint_id.string().cstring(), _source_id.string().cstring())
     end
     _notify.checkpoint_complete(this, checkpoint_id)
@@ -477,7 +480,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
       end
     end
     ifdef "trace" then
-      @printf[I32]("TRACE: %s.%s my source_id = %s, payload.size = %d\n".cstring(),
+      @l(Log.debug(), Log.conn_source(), "TRACE: %s.%s my source_id = %s, payload.size = %d\n".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring(),
         _source_id.string().cstring(), p.size())
     end
@@ -514,7 +517,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     _notify.stream_notify_result(this, session_id', success, stream)
 
   be begin_shrink() =>
-    @printf[I32]("ConnectorSource %s beginning shrink migration.\n"
+    @l(Log.info(), Log.conn_source(), "ConnectorSource %s beginning shrink migration.\n"
       .cstring(), _source_id.string().cstring())
     _notify.shrink(this)
 
@@ -523,7 +526,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     Send a RESTART message with the (host,service) data that the connector
     should reconnect to.
     """
-    @printf[I32](("ConnectorSource %s completed shrink migration with " +
+    @l(Log.info(), Log.conn_source(), ("ConnectorSource %s completed shrink migration with " +
       "new address: (%s, %s).\n").cstring(),
       _source_id.string().cstring(),
       host.cstring(),
@@ -539,14 +542,14 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
   ///////////////
   fun ref _mute() =>
     ifdef debug then
-      @printf[I32]("Muting ConnectorSource\n".cstring())
+      @l(Log.debug(), Log.conn_source(), "Muting ConnectorSource\n".cstring())
     end
     _muted = true
     _tcp_handler.mute()
 
   fun ref _unmute() =>
     ifdef debug then
-      @printf[I32]("Unmuting ConnectorSource\n".cstring())
+      @l(Log.debug(), Log.conn_source(), "Unmuting ConnectorSource\n".cstring())
     end
     _muted = false
     _tcp_handler.unmute()

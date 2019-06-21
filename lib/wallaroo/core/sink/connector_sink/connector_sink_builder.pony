@@ -26,6 +26,7 @@ use "wallaroo/core/sink"
 use "wallaroo/core/barrier"
 use "wallaroo/core/recovery"
 use "wallaroo/core/checkpoint"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 
 primitive ConnectorSinkConfigCLIParser
@@ -135,7 +136,8 @@ class val ConnectorSinkBuilder
     barrier_coordinator: BarrierCoordinator, checkpoint_initiator: CheckpointInitiator,
     recovering: Bool, worker_name: WorkerName, auth: AmbientAuth): Sink
   =>
-    @printf[I32](("ConnectorSinkBuilder: Connecting to sink at " + _host + ":" + _service + "\n")
+    @l(Log.info(), Log.conn_sink(),
+      ("ConnectorSinkBuilder: Connecting to sink at " + _host + ":" + _service + "\n")
       .cstring())
 
     let id: RoutingId = RoutingIdGenerator()

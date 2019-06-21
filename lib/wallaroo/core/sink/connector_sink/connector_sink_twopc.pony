@@ -41,6 +41,9 @@ class ConnectorSink2PC
   var current_offset: USize = 0
   var current_txn_end_offset: USize = 0
   let stream_name: String
+  let _2pc_debug: U16 = Log.make_sev_cat(Log.debug(), Log.twopc())
+  let _2pc_info: U16 = Log.make_sev_cat(Log.info(), Log.twopc())
+  let _2pc_err: U16 = Log.make_sev_cat(Log.err(), Log.twopc())
 
   new create(stream_name': String) =>
     stream_name = stream_name'
@@ -53,8 +56,8 @@ class ConnectorSink2PC
     txn_id = ""
     barrier_token = CheckpointBarrierToken(0)
     ifdef "checkpoint_trace" then
-      @printf[I32]("2PC: reset 2PC state\n".cstring())
-      @printf[I32]("2PC: set 2PC state => %d\n".cstring(), state())
+      @ll(_twopc_debug, "2PC: reset 2PC state\n".cstring())
+      @ll(_twopc_debug, "2PC: set 2PC state => %d\n".cstring(), state())
     end
 
   fun state_is_start(): Bool =>
@@ -72,19 +75,19 @@ class ConnectorSink2PC
   fun ref set_state_commit() =>
     state = cp.TwoPCFsm2Commit
     ifdef "checkpoint_trace" then
-      @printf[I32]("2PC: set 2PC state => %d\n".cstring(), state())
+      @ll(_twopc_debug, "2PC: set 2PC state => %d\n".cstring(), state())
     end
 
   fun ref set_state_commit_fast() =>
     state = cp.TwoPCFsm2CommitFast
     ifdef "checkpoint_trace" then
-      @printf[I32]("2PC: set 2PC state => %d\n".cstring(), state())
+      @ll(_twopc_debug, "2PC: set 2PC state => %d\n".cstring(), state())
     end
 
   fun ref set_state_abort() =>
     state = cp.TwoPCFsm2Abort
     ifdef "checkpoint_trace" then
-      @printf[I32]("2PC: set 2PC state => %d\n".cstring(), state())
+      @ll(_twopc_debug, "2PC: set 2PC state => %d\n".cstring(), state())
     end
 
   fun ref preemptive_txn_abort(sbt: CheckpointBarrierToken) =>
@@ -107,7 +110,7 @@ class ConnectorSink2PC
       barrier_token = sbt
       current_txn_end_offset = current_offset
     else
-      @printf[I32]("2PC: ERROR: _twopc.state = %d\n".cstring(), state())
+      @ll(_twopc_err, "2PC: ERROR: _twopc.state = %d\n".cstring(), state())
       Fail()
     end
 
@@ -131,7 +134,7 @@ class ConnectorSink2PC
         // catch up, we'll be in this case, which is ok.
         None
       else
-        @printf[I32]("2PC: DBG: _twopc.state = %s,\n".cstring(), state().string().cstring())
+        @ll(_twopc_err, "2PC: DBG: _twopc.state = %s,\n".cstring(), state().string().cstring())
         Fail()
       end
     end
@@ -153,7 +156,7 @@ class ConnectorSink2PC
     txn_id_at_close = txn_id
     barrier_token_at_close = barrier_token
     ifdef "checkpoint_trace" then
-      @printf[I32]("2PC: DBG: hard_close: state = %s, txn_id_at_close = %s, barrier_token_at_close = %s\n".cstring(), state().string().cstring(), txn_id_at_close.cstring(), barrier_token_at_close.string().cstring())
+      @ll(_twopc_debug, "2PC: DBG: hard_close: state = %s, txn_id_at_close = %s, barrier_token_at_close = %s\n".cstring(), state().string().cstring(), txn_id_at_close.cstring(), barrier_token_at_close.string().cstring())
     end
     // Do not reset_state() here.  Wait (typically) until 2PC intro is done.
 
@@ -172,7 +175,7 @@ class ConnectorSink2PC
       sink.abort_decision("TCP connection closed during 2PC",
         txn_id_at_close, barrier_token_at_close)
       ifdef "checkpoint_trace" then
-        @printf[I32]("2PC: Wallaroo local abort for txn_id %s barrier %s\n".cstring(), txn_id_at_close.cstring(), barrier_token_at_close.string().cstring())
+        @ll(_twopc_debug, "2PC: Wallaroo local abort for txn_id %s barrier %s\n".cstring(), txn_id_at_close.cstring(), barrier_token_at_close.string().cstring())
       end
 
       // SLF TODO: if we disconnected, then that txn will be aborted
@@ -189,11 +192,11 @@ class ConnectorSink2PC
 
   fun ref twopc_phase1_reply(txn_id': String, commit: Bool): Bool =>
     if not state_is_1precommit() then
-      @printf[I32]("2PC: ERROR: twopc_reply: _twopc.state = %d\n".cstring(), state())
+      @ll(_twopc_err, "2PC: ERROR: twopc_reply: _twopc.state = %d\n".cstring(), state())
       Fail()
     end
     if txn_id' != txn_id then
-      @printf[I32]("2PC: ERROR: twopc_reply: txn_id %s != %s\n".cstring(),
+      @ll(_twopc_err, "2PC: ERROR: twopc_reply: txn_id %s != %s\n".cstring(),
         txn_id'.cstring(), txn_id.cstring())
       Fail()
     end
@@ -204,7 +207,7 @@ class ConnectorSink2PC
       // the status of the global Wallaroo checkpoint protocol.
       set_state_commit()
       ifdef "checkpoint_trace" then
-        @printf[I32]("2PC: txn_id %s was %s\n".cstring(), txn_id'.cstring(), commit.string().cstring())
+        @ll(_twopc_debug, "2PC: txn_id %s was %s\n".cstring(), txn_id'.cstring(), commit.string().cstring())
       end
       true
     else
@@ -222,5 +225,5 @@ class ConnectorSink2PC
        Fail()
     end
     ifdef "checkpoint_trace" then
-      @printf[I32]("2PC: sent phase 2 commit=%s for txn_id %s\n".cstring(), commit.string().cstring(), txn_id.cstring())
+      @ll(_twopc_debug, "2PC: sent phase 2 commit=%s for txn_id %s\n".cstring(), commit.string().cstring(), txn_id.cstring())
     end
