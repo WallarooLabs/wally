@@ -57,6 +57,8 @@ primitive Log
   fun dos_client(): LogCategory       => LogCategory(4)
   fun tcp_sink(): LogCategory         => LogCategory(5)
   fun conn_sink(): LogCategory        => LogCategory(6)
+  fun tcp_source(): LogCategory       => LogCategory(7)
+  fun conn_source(): LogCategory      => LogCategory(8)
 
   fun severity_map(): Array[(LogSeverity, String)] =>
     [ // BEGIN severity_map
@@ -80,6 +82,8 @@ primitive Log
       (default_severity(), dos_client(),       "DOSClient")
       (default_severity(), tcp_sink(),         "TCPSink")
       (default_severity(), conn_sink(),        "ConnectorSink")
+      (default_severity(), tcp_source(),         "TCPSource")
+      (default_severity(), conn_source(),        "ConnectorSource")
     ] // END category_map
 
   fun set_defaults() =>
