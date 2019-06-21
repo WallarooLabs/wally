@@ -21,9 +21,10 @@ use "wallaroo_labs/bytes"
 use "wallaroo_labs/logging"
 use "wallaroo_labs/options"
 
-use @l[I32](severity: U8, category: U8, fmt: Pointer[U8] tag, ...)
+use @log_enabled[Bool](severity: LogSeverity, category: LogCategory)
+use @ll_enabled[Bool](sev_cat: U16)
+use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag, ...)
 use @ll[I32](sev_cat: U16, fmt: Pointer[U8] tag, ...)
-use @log_enabled[Bool](severity: U8, category: U8)
 
 actor Main
   new create(env: Env) =>

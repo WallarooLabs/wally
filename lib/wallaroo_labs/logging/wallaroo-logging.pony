@@ -22,42 +22,45 @@ use "lib:wallaroo-logging"
 
 // C FFI prototypes for cut-and-paste into your Pony source, as needed
 use @printf[I32](fmt: Pointer[U8] tag, ...)
-use @log_enabled[Bool](severity: U8, category: U8)
+use @log_enabled[Bool](severity: LogSeverity, category: LogCategory)
 use @ll_enabled[Bool](sev_cat: U16)
-use @l[I32](severity: U8, category: U8, fmt: Pointer[U8] tag, ...)
+use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag, ...)
 use @ll[I32](sev_cat: U16, fmt: Pointer[U8] tag, ...)
-use @w_set_severity_label[None](severity: U8, label: Pointer[U8] tag)
-use @w_set_category_label[None](category: U8, label: Pointer[U8] tag)
-use @w_set_severity_threshold[None](severity: U8)
-use @w_set_severity_cat_threshold[None](severity: U8, category: U8)
+use @w_set_severity_label[None](severity: LogSeverity, label: Pointer[U8] tag)
+use @w_set_category_label[None](category: LogCategory, label: Pointer[U8] tag)
+use @w_set_severity_threshold[None](severity: LogSeverity)
+use @w_set_severity_cat_threshold[None](severity: LogSeverity, category: LogCategory)
 use @w_process_category_overrides[None]()
+
+type LogCategory is U8
+type LogSeverity is U8
 
 primitive Log
   // severity levels
-  fun none(): U8   => U8(0)
-  fun emerg(): U8  => U8(1)
-  fun alert(): U8  => U8(2)
-  fun crit(): U8   => U8(3)
-  fun err(): U8    => U8(4)
-  fun warn(): U8   => U8(5)
-  fun notice(): U8 => U8(6)
-  fun info(): U8   => U8(7)
-  fun debug(): U8  => U8(8)
-  fun max_severity(): U8 => debug()
-  fun default_severity(): U8 => info()
+  fun no_sev(): LogSeverity   => LogSeverity(0)
+  fun emerg(): LogSeverity  => LogSeverity(1)
+  fun alert(): LogSeverity  => LogSeverity(2)
+  fun crit(): LogSeverity   => LogSeverity(3)
+  fun err(): LogSeverity    => LogSeverity(4)
+  fun warn(): LogSeverity   => LogSeverity(5)
+  fun notice(): LogSeverity => LogSeverity(6)
+  fun info(): LogSeverity   => LogSeverity(7)
+  fun debug(): LogSeverity  => LogSeverity(8)
+  fun max_severity(): LogSeverity => debug()
+  fun default_severity(): LogSeverity => info()
 
   // categories
-  // fun none(): U8             => U8(0) // reuse 0 value from severity none()
-  fun checkpoint(): U8       => U8(1)
-  fun source_migration(): U8 => U8(2)
-  fun twopc(): U8            => U8(3)
-  fun dos_client(): U8       => U8(4)
-  fun tcp_sink(): U8         => U8(5)
-  fun conn_sink(): U8        => U8(6)
+  fun no_cat(): LogCategory             => LogCategory(0)
+  fun checkpoint(): LogCategory       => LogCategory(1)
+  fun source_migration(): LogCategory => LogCategory(2)
+  fun twopc(): LogCategory            => LogCategory(3)
+  fun dos_client(): LogCategory       => LogCategory(4)
+  fun tcp_sink(): LogCategory         => LogCategory(5)
+  fun conn_sink(): LogCategory        => LogCategory(6)
 
-  fun severity_map(): Array[(U8, String)] =>
+  fun severity_map(): Array[(LogSeverity, String)] =>
     [ // BEGIN severity_map
-      (none(),  "NONE")
+      (no_sev(), "NONE")
       (emerg(),  "EMERGENCY")
       (alert(),  "ALERT")
       (crit(),   "CRITICAL")
@@ -68,9 +71,9 @@ primitive Log
       (debug(),  "DEBUG")
     ] // END severity_map
 
-  fun category_map(): Array[(U8, U8, String)] =>
+  fun category_map(): Array[(LogSeverity, LogCategory, String)] =>
     [ // BEGIN category_map
-      (default_severity(), none(),             "none")
+      (default_severity(), no_cat(),           "none")
       (default_severity(), checkpoint(),       "checkpoint")
       (default_severity(), source_migration(), "source-migration")
       (default_severity(), twopc(),            "2PC")
@@ -106,5 +109,5 @@ primitive Log
       @w_process_category_overrides[None]()
     end
 
-  fun make_sev_cat(severity: U8, category: U8): U16 =>
+  fun make_sev_cat(severity: LogSeverity, category: LogCategory): U16 =>
     severity.u16().shl(8) + category.u16()
