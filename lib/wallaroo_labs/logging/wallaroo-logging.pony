@@ -20,6 +20,18 @@ Copyright 2019 The Wallaroo Authors.
 // in the libwallaroo-logging.a library.
 use "lib:wallaroo-logging"
 
+// C FFI prototypes for cut-and-paste into your Pony source, as needed
+use @printf[I32](fmt: Pointer[U8] tag, ...)
+use @log_enabled[Bool](severity: U8, category: U8)
+use @ll_enabled[Bool](sev_cat: U16)
+use @l[I32](severity: U8, category: U8, fmt: Pointer[U8] tag, ...)
+use @ll[I32](sev_cat: U16, fmt: Pointer[U8] tag, ...)
+use @w_set_severity_label[None](severity: U8, label: Pointer[U8] tag)
+use @w_set_category_label[None](category: U8, label: Pointer[U8] tag)
+use @w_set_severity_threshold[None](severity: U8)
+use @w_set_severity_cat_threshold[None](severity: U8, category: U8)
+use @w_process_category_overrides[None]()
+
 primitive Log
   // severity levels
   fun none(): U8   => U8(0)
@@ -40,6 +52,8 @@ primitive Log
   fun source_migration(): U8 => U8(2)
   fun twopc(): U8            => U8(3)
   fun dos_client(): U8       => U8(4)
+  fun tcp_sink(): U8         => U8(5)
+  fun conn_sink(): U8        => U8(6)
 
   fun severity_map(): Array[(U8, String)] =>
     [ // BEGIN severity_map
@@ -58,31 +72,33 @@ primitive Log
     [ // BEGIN category_map
       (default_severity(), none(),             "none")
       (default_severity(), checkpoint(),       "checkpoint")
-      (default_severity(), source_migration(), "source_migration")
+      (default_severity(), source_migration(), "source-migration")
       (default_severity(), twopc(),            "2PC")
-      (default_severity(), dos_client(),       "DOS_client")
+      (default_severity(), dos_client(),       "DOSClient")
+      (default_severity(), tcp_sink(),         "TCPSink")
+      (default_severity(), conn_sink(),        "ConnectorSink")
     ] // END category_map
 
   fun set_defaults() =>
-    set_severities()
-    set_categories()
+    set_severity_labels()
+    set_category_labels()
     set_thresholds()
 
-  fun set_severities() =>
+  fun set_severity_labels() =>
     for (severity, label) in severity_map().values() do
-      @w_set_severity[None](severity, label.cstring())
+      @w_set_severity_label(severity, label.cstring())
     end
 
-  fun set_categories() =>
+  fun set_category_labels() =>
     for (severity, category, label) in category_map().values() do
-      @w_set_category[None](category, label.cstring())
+      @w_set_category_label(category, label.cstring())
     end
 
   fun set_thresholds(do_defaults: Bool = true, do_overrides: Bool = true) =>
     if do_defaults then
-      @w_severity_threshold[None](default_severity())
+      @w_set_severity_threshold(default_severity())
       for (severity, category, label) in category_map().values() do
-        @w_severity_cat_threshold[None](severity, category)
+        @w_set_severity_cat_threshold(severity, category)
       end
     end
 

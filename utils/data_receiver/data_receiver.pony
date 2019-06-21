@@ -40,11 +40,11 @@ actor Main
 
     @printf[I32]("SLF: Hello, world!\n".cstring()) // For demo purposes only
     @l(Log.crit(), cat_mumble, "SLF: Hello, %s\n".cstring(), "everything".cstring()) // For demo purposes only
-    @w_set_severity[None](Log.crit(), "2-severity-yo".cstring())
-    @w_set_category[None](cat_mumble, "my-mumble-cat".cstring())
+    @w_set_severity_label[None](Log.crit(), "2-severity-yo".cstring())
+    @w_set_category_label[None](cat_mumble, "my-mumble-cat".cstring())
     @l(Log.crit(), cat_mumble, "SLF: Hello, %s!".cstring(), "everything".cstring()) // For demo purposes only
 
-    @w_severity_threshold[None](Log.alert())
+    @w_set_severity_threshold[None](Log.alert())
     @l(Log.emerg(), cat_mumble, "SLF: visible!".cstring()) // For demo purposes only
     @l(Log.alert(), cat_mumble, "SLF: visible!".cstring()) // For demo purposes only
     @l(Log.crit(), cat_mumble, "SLF: this one should be filtered out".cstring()) // For demo purposes only
@@ -56,7 +56,7 @@ actor Main
     @printf[I32]("SLF: critical enabled = false? res = %s\n".cstring(),
       @log_enabled(Log.crit(), cat_mumble).string().cstring())
 
-    Log.set_categories()
+    Log.set_category_labels()
     @l(Log.emerg(), Log.source_migration(), "Visible migration event".cstring())
     let emerg_s_mig = Log.make_sev_cat(Log.emerg(), Log.source_migration())
     @ll(emerg_s_mig, "ll-visible migration event".cstring())

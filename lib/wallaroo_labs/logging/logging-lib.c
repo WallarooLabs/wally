@@ -222,12 +222,12 @@ int ll(unsigned short sev_cat, const char *fmt, ...)
 }
 
 /*
-** w_set_severity(), set the formatted label for a severity number
+** w_set_severity_label(), set the formatted label for a severity number
 **
 ** severity - numeric severity from 0 to MAX_SEVERITY
 */
 
-void w_set_severity(unsigned char severity, char *label)
+void w_set_severity_label(unsigned char severity, char *label)
 {
   if (! _labels_initialized) {
     _w_initialize_labels();
@@ -238,12 +238,12 @@ void w_set_severity(unsigned char severity, char *label)
 }
 
 /*
-** w_set_category(), set the formatted label for a category number
+** w_set_category_label(), set the formatted label for a category number
 **
 ** category - application category number from 0 to MAX_CATEGORY
 */
 
-void w_set_category(unsigned char category, char *label)
+void w_set_category_label(unsigned char category, char *label)
 {
   if (! _labels_initialized) {
     _w_initialize_labels();
@@ -259,7 +259,7 @@ void w_set_category(unsigned char category, char *label)
 ** severity - numeric severity from 0 to MAX_SEVERITY
 */
 
-void w_severity_threshold(unsigned char severity)
+void w_set_severity_threshold(unsigned char severity)
 {
   int i;
 
@@ -277,7 +277,7 @@ void w_severity_threshold(unsigned char severity)
 ** category - application category number from 0 to MAX_CATEGORY
 */
 
-void w_severity_cat_threshold(unsigned char severity, unsigned char category)
+void w_set_severity_cat_threshold(unsigned char severity, unsigned char category)
 {
   int i;
 
@@ -322,9 +322,9 @@ void w_process_category_overrides()
           *dot = '\0';
           severity = atoi(dot + 1);
           if (*start == '*') {
-            w_severity_threshold(severity);
+            w_set_severity_threshold(severity);
           } else if ((category = atoi(start)) > 0) {
-            w_severity_cat_threshold(severity, category);
+            w_set_severity_cat_threshold(severity, category);
           }
         }
       }
