@@ -24,6 +24,7 @@ use "wallaroo/core/common"
 use "wallaroo/core/partitioning"
 use "wallaroo/core/data_receiver"
 use "wallaroo/core/recovery"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
@@ -31,6 +32,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
+// use @ll[I32](sev_cat: U16, fmt: Pointer[U8] tag, ...)
 
 class TCPSourceNotify[In: Any val]
   let _source_id: RoutingId
@@ -44,6 +46,9 @@ class TCPSourceNotify[In: Any val]
   var _router: Router
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
+  let _debug: U16 = Log.make_sev_cat(Log.debug(), Log.tcp_source())
+  let _info: U16 = Log.make_sev_cat(Log.info(), Log.tcp_source())
+  let _err: U16 = Log.make_sev_cat(Log.err(), Log.tcp_source())
 
   // Watermark
   var _watermark_ts: U64 = 0
@@ -83,7 +88,7 @@ class TCPSourceNotify[In: Any val]
       var latest_metrics_id: U16 = 1
 
       ifdef "trace" then
-        @printf[I32](("Rcvd msg at " + _pipeline_name + " source\n").cstring())
+        @ll(_debug, "Rcvd msg at %s source".cstring(), _pipeline_name.cstring())
       end
       let ingest_ts = WallClock.nanoseconds()
       (let is_finished, let last_ts) =
@@ -93,7 +98,7 @@ class TCPSourceNotify[In: Any val]
               _handler.decode(consume data)?
             else
               ifdef debug then
-                @printf[I32]("Error decoding message at source\n".cstring())
+                @ll(_err, "Error decoding message at source".cstring())
               end
               error
             end
@@ -104,8 +109,7 @@ class TCPSourceNotify[In: Any val]
           latest_metrics_id = latest_metrics_id + 1
 
           ifdef "trace" then
-            @printf[I32](("Msg decoded at " + _pipeline_name +
-              " source\n").cstring())
+            @ll(_debug, "Msg decoded at %s source".cstring(), _pipeline_name.cstring())
           end
           let event_ts = _handler.event_time_ns(decoded)
           _watermark_ts = _watermark_ts.max(event_ts)
@@ -119,8 +123,7 @@ class TCPSourceNotify[In: Any val]
             (true, ingest_ts)
           end
         else
-          @printf[I32](("Unable to decode message at " + _pipeline_name +
-            " source\n").cstring())
+          @ll(_err, "Unable to decode message at %s source".cstring(), _pipeline_name.cstring())
           ifdef debug then
             Fail()
           end
@@ -161,16 +164,16 @@ class TCPSourceNotify[In: Any val]
       _router = p_router.update_boundaries(_auth, obs)
     else
       ifdef "trace" then
-        @printf[I32](("FramedSourceNotify doesn't have StatePartitionRouter." +
-          " Updating boundaries is a noop for this kind of Source.\n")
+        @ll(_debug, ("FramedSourceNotify doesn't have StatePartitionRouter." +
+          " Updating boundaries is a noop for this kind of Source.")
           .cstring())
       end
     end
 
   fun ref accepted(source: TCPSource[In] ref) =>
-    @printf[I32]((_source_name + ": accepted a connection\n").cstring())
+    @ll(_info, "%s: accepted a connection".cstring(), _source_name.cstring())
     _header = true
     source.expect(_header_size)
 
   fun ref closed(source: TCPSource[In] ref) =>
-    @printf[I32]("TCPSource connection closed\n".cstring())
+    @ll(_info, "%s: connection closed\n".cstring(), _source_name.cstring())
