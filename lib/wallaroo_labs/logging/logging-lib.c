@@ -96,6 +96,22 @@ static void _w_initialize_labels()
   _labels_initialized = 1;
 }
 
+static int _w_l(unsigned char severity, unsigned char category,
+  const char *fmt, va_list ap)
+{
+  char fmt2[FMT_BUF_SIZE];
+
+  if (severity > _cat2sev_threshold[category]) {
+    return 0;
+  }
+  if (! _labels_initialized) {
+    _w_initialize_labels();
+  }
+
+  snprintf(fmt2, sizeof(fmt2), "%s,%s,%s\n",
+    _severity_labels[severity], _category_labels[category], fmt);
+  return _w_vprintf(fmt2, ap);
+}
 
 /********************/
 /* Public functions */
@@ -111,7 +127,7 @@ int printf(const char *fmt, ...)
 }
 
 /*
-** le(), is logging enabled for a (severity, category) tuple
+** log_enabled(), is logging enabled for a (severity, category) tuple
 **
 ** severity - numeric severity from 0 to MAX_SEVERITY
 ** category - application category number from 0 to MAX_CATEGORY
@@ -122,6 +138,28 @@ int printf(const char *fmt, ...)
 
 unsigned char log_enabled(unsigned char severity, unsigned char category)
 {
+  if (severity > _cat2sev_threshold[category]) {
+    return 0;
+  }
+  return 1;
+}
+
+/*
+** ll_enabled(), is logging enabled for an unsigned short severity+category
+**
+** sev_cat: a mix of:
+**     severity - numeric severity, bits 8-15
+**     category - application category number, bits 0-7
+**
+** Return value: true if logging is enabled for this tuple,
+**               otherwise false
+*/
+
+unsigned char ll_enabled(unsigned short sev_cat)
+{
+  unsigned char severity = sev_cat & 0xFF;
+  unsigned char category = (sev_cat >> 8) & 0xFF;
+
   if (severity > _cat2sev_threshold[category]) {
     return 0;
   }
@@ -141,7 +179,6 @@ unsigned char log_enabled(unsigned char severity, unsigned char category)
 
 int l(unsigned char severity, unsigned char category, const char *fmt, ...)
 {
-  char fmt2[FMT_BUF_SIZE];
   va_list ap;
 
   if (severity > _cat2sev_threshold[category]) {
@@ -152,11 +189,37 @@ int l(unsigned char severity, unsigned char category, const char *fmt, ...)
   }
 
   va_start(ap, fmt);
-  snprintf(fmt2, sizeof(fmt2), "%s,%s,%s\n",
-    _severity_labels[severity], _category_labels[category], fmt);
-  return _w_vprintf(fmt2, ap);
+  return _w_l(severity, category, fmt, ap);
 }
 
+/*
+** ll(), the severity + category + format + variable-args logging function.
+**
+** sev_cat: a mix of:
+**     severity - numeric severity, bits 8-15
+**     category - application category number, bits 0-7
+** fmt - snprintf(3)-style formatting string
+** 0 or or arguments - snprintf(3)-style arguments
+**
+** Return value: # of bytes written
+*/
+
+int ll(unsigned short sev_cat, const char *fmt, ...)
+{
+  unsigned char severity = sev_cat & 0xFF;
+  unsigned char category = (sev_cat >> 8) & 0xFF;
+  va_list ap;
+
+  if (severity > _cat2sev_threshold[category]) {
+    return 0;
+  }
+  if (! _labels_initialized) {
+    _w_initialize_labels();
+  }
+
+  va_start(ap, fmt);
+  return _w_l(severity, category, fmt, ap);
+}
 
 /*
 ** w_set_severity(), set the formatted label for a severity number

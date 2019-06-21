@@ -89,3 +89,6 @@ primitive Log
     if do_overrides then
       @w_process_category_overrides[None]()
     end
+
+  fun make_sev_cat(severity: U8, category: U8): U16 =>
+    severity.u16().shl(8) + category.u16()

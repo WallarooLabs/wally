@@ -22,6 +22,7 @@ use "wallaroo_labs/logging"
 use "wallaroo_labs/options"
 
 use @l[I32](severity: U8, category: U8, fmt: Pointer[U8] tag, ...)
+use @ll[I32](sev_cat: U16, fmt: Pointer[U8] tag, ...)
 use @log_enabled[Bool](severity: U8, category: U8)
 
 actor Main
@@ -57,6 +58,8 @@ actor Main
 
     Log.set_categories()
     @l(Log.emerg(), Log.source_migration(), "Visible migration event".cstring())
+    let emerg_s_mig = Log.make_sev_cat(Log.emerg(), Log.source_migration())
+    @ll(emerg_s_mig, "ll-visible migration event".cstring())
 
     // @l(Log.source_migration_info(), "Visible migration event".cstring())
     // @l(Log.emerg(), Log.source_migration(), "Visible migration event".cstring())
