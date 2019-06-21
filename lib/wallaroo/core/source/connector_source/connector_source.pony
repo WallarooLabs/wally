@@ -419,10 +419,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
   //////////////
   be initiate_barrier(token: BarrierToken) =>
     if not _disposed then
-      ifdef "checkpoint_trace" then
-        @l(Log.debug(), Log.conn_source(), "ConnectorSource received initiate_barrier %s\n"
-          .cstring(), token.string().cstring())
-      end
+      @l(Log.debug(), Log.conn_source(), "ConnectorSource received initiate_barrier %s\n".cstring(), token.string().cstring())
       _initiate_barrier(token)
     end
 
@@ -447,10 +444,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     end
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
-    ifdef "checkpoint_trace" then
-      @l(Log.debug(), Log.conn_source(), "Checkpoint %s complete at ConnectorSource %s\n".cstring(),
-        checkpoint_id.string().cstring(), _source_id.string().cstring())
-    end
+    @l(Log.debug(), Log.conn_source(), "Checkpoint %s complete at ConnectorSource %s\n".cstring(), checkpoint_id.string().cstring(), _source_id.string().cstring())
     _notify.checkpoint_complete(this, checkpoint_id)
 
   //////////////

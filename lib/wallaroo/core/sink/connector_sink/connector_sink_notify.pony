@@ -205,9 +205,7 @@ class ConnectorSinkNotify
     if _connected and (not _throttled) then
       data
     else
-      ifdef "checkpoint_trace" then
-        @ll(_conn_debug, "Sink sentv: not connected or throttled: buffering\n".cstring())
-      end
+      @ll(_conn_debug, "Sink sentv: not connected or throttled: buffering\n".cstring())
       for d in data.values() do
         twopc_reconnect_buffer.push(d)
       end
@@ -229,20 +227,14 @@ class ConnectorSinkNotify
       @ll(_conn_info, ("ConnectorSink is no longer experiencing" +
         " back pressure, connected = %s\n").cstring(),
       _connected.string().cstring())
-      ifdef "checkpoint_trace" then
-        try @ll(_2pc_debug, "DBGDBG: unthrottled: buffer check, FSM state = %d\n".cstring(), (conn as ConnectorSink ref).get_2pc_state()) else Fail() end
-        @ll(_2pc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s current txn=%s.\n".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_txn_id_current.cstring())
-      end
+      try @ll(_2pc_debug, "DBGDBG: unthrottled: buffer check, FSM state = %d\n".cstring(), (conn as ConnectorSink ref).get_2pc_state()) else Fail() end
+      @ll(_2pc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s current txn=%s.\n".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_txn_id_current.cstring())
       if twopc_current_txn_aborted then
-        ifdef "checkpoint_trace" then
-          @ll(_2pc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s discard %d items\n".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_reconnect_buffer.size())
-        end
+        @ll(_2pc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s discard %d items\n".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_reconnect_buffer.size())
         None
       else
         for d in twopc_reconnect_buffer.values() do
-          ifdef "checkpoint_trace" then
-            @ll(_2pc_debug, "DBG: unthrottled: writing buffered %d bytes\n".cstring(), d.size())
-          end
+          @ll(_2pc_debug, "DBG: unthrottled: writing buffered %d bytes\n".cstring(), d.size())
           try (conn as ConnectorSink ref)._write_final(d, None) else Fail() end
         end
       end
@@ -284,9 +276,7 @@ class ConnectorSinkNotify
       _error_and_close(conn, "Bad FSM State: C" + _fsm_state().string())
     | let m: cp.NotifyAckMsg =>
       if _fsm_state is cp.ConnectorProtoFsmStreaming then
-        ifdef "checkpoint_trace" then
-          @ll(_conn_debug, "NotifyAck: success %s stream_id %d p-o-r %lu\n".cstring(), m.success.string().cstring(), m.stream_id, m.point_of_ref)
-        end
+        @ll(_conn_debug, "NotifyAck: success %s stream_id %d p-o-r %lu\n".cstring(), m.success.string().cstring(), m.stream_id, m.point_of_ref)
         // We are going to ignore the point of reference sent to us by
         // the connector sink.  We assume that we know best, and if our
         // point of reference is earlier, then we'll send some duplicates
@@ -300,9 +290,7 @@ class ConnectorSinkNotify
         _error_and_close(conn, "Bad FSM State: Ea" + _fsm_state().string())
         return
       end
-      ifdef "checkpoint_trace" then
-        @ll(_2pc_debug, "2PC: GOT MessageMsg\n".cstring())
-      end
+      @ll(_2pc_debug, "2PC: GOT MessageMsg\n".cstring())
       try
         let inner = cp.TwoPCFrame.decode(m.message as Array[U8] val)?
         match inner
@@ -315,10 +303,8 @@ class ConnectorSinkNotify
             @ll(_2pc_err, "2PC: bad rtag match: %lu != %lu\n".cstring(), mi.rtag, _rtag)
             Fail()
           end
-          ifdef "checkpoint_trace" then
-            @ll(_conn_debug, "TRACE: uncommitted txns = %d\n".cstring(),
+          @ll(_conn_debug, "TRACE: uncommitted txns = %d\n".cstring(),
               mi.txn_ids.size())
-          end
           twopc_uncommitted_list = mi.txn_ids
           // twopc_current_txn_aborted is used by unthrottled()
           twopc_current_txn_aborted = process_uncommitted_list(
@@ -343,9 +329,7 @@ class ConnectorSinkNotify
           end
           try (conn as ConnectorSink ref).twopc_intro_done() else Fail() end
         | let mi: cp.TwoPCReplyMsg =>
-          ifdef "checkpoint_trace" then
-            @ll(_2pc_debug, "2PC: reply for txn_id %s was %s\n".cstring(), mi.txn_id.cstring(), mi.commit.string().cstring())
-          end
+          @ll(_2pc_debug, "2PC: reply for txn_id %s was %s\n".cstring(), mi.txn_id.cstring(), mi.commit.string().cstring())
           try (conn as ConnectorSink ref).twopc_phase1_reply(
             mi.txn_id, mi.commit)
           else Fail() end
@@ -403,9 +387,7 @@ class ConnectorSinkNotify
         _error_and_close(conn, "Bad FSM State: F" + _fsm_state().string())
       end
     | let m: cp.RestartMsg =>
-      ifdef "checkpoint_trace" then
-        @ll(_conn_debug, "TRACE: got restart message, closing connection\n".cstring())
-      end
+      @ll(_conn_debug, "TRACE: got restart message, closing connection\n".cstring())
       conn.close()
     end
 
@@ -424,18 +406,12 @@ class ConnectorSinkNotify
     | (let last_committed: String, let uncommitted: Array[String] val) =>
       var current_txn_aborted: Bool = false
 
-      ifdef "checkpoint_trace" then
-        @ll(_2pc_debug, "2PC: process_uncommitted_list processing %d items, last_committed = %s\n".cstring(), uncommitted.size(), last_committed.cstring())
-      end
+      @ll(_2pc_debug, "2PC: process_uncommitted_list processing %d items, last_committed = %s\n".cstring(), uncommitted.size(), last_committed.cstring())
       for txn_id in uncommitted.values() do
         let do_commit = if txn_id == last_committed then true else false end
-        ifdef "checkpoint_trace" then
-          @ll(_2pc_debug, "2PC: uncommitted txn_id %s commit=%s\n".cstring(), txn_id.cstring(), do_commit.string().cstring())
-        end
+        @ll(_2pc_debug, "2PC: uncommitted txn_id %s commit=%s\n".cstring(), txn_id.cstring(), do_commit.string().cstring())
         if not do_commit and (txn_id == twopc_txn_id_current) then
-          ifdef "checkpoint_trace" then
-            @ll(_2pc_debug, "2PC: current txn_id %s was aborted\n".cstring(), twopc_txn_id_current.cstring())
-          end
+          @ll(_2pc_debug, "2PC: current txn_id %s was aborted\n".cstring(), twopc_txn_id_current.cstring())
           current_txn_aborted = true
         end
         let p2 = cp.TwoPCEncode.phase2(txn_id, do_commit)
@@ -450,9 +426,7 @@ class ConnectorSinkNotify
       twopc_uncommitted_list = []
       current_txn_aborted
     else
-      ifdef "checkpoint_trace" then
-        @ll(_2pc_debug, "2PC: process_uncommitted_list waiting\n".cstring())
-      end
+      @ll(_2pc_debug, "2PC: process_uncommitted_list waiting\n".cstring())
       false
     end
 
@@ -483,9 +457,7 @@ class ConnectorSinkNotify
       // are starting for the first time.  There is no prior committed
       // txn_id.
       twopc_txn_id_last_committed = ""
-      ifdef "checkpoint_trace" then
-        try @ll(_2pc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.\n".cstring(), (twopc_txn_id_last_committed as String).cstring()) else Fail() end
-      end
+      try @ll(_2pc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.\n".cstring(), (twopc_txn_id_last_committed as String).cstring()) else Fail() end
       process_uncommitted_list(conn)
     end
 

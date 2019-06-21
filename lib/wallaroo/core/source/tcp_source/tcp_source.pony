@@ -420,10 +420,7 @@ actor TCPSource[In: Any val] is (Source & TCPActor)
   // BARRIER
   //////////////
   be initiate_barrier(token: BarrierToken) =>
-    ifdef "checkpoint_trace" then
-      @l(Log.debug(), Log.conn_source(), "TCPSource received initiate_barrier %s\n".cstring(),
-        token.string().cstring())
-    end
+    @l(Log.debug(), Log.conn_source(), "TCPSource received initiate_barrier %s\n".cstring(), token.string().cstring())
     if not _disposed then
       _initiate_barrier(token)
     end
@@ -448,10 +445,7 @@ actor TCPSource[In: Any val] is (Source & TCPActor)
     end
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
-    ifdef "checkpoint_trace" then
-      @l(Log.debug(), Log.conn_source(), "Checkpoint %s complete at TCPSource %s\n".cstring(),
-        checkpoint_id.string().cstring(), _source_id.string().cstring())
-    end
+    @l(Log.debug(), Log.conn_source(), "Checkpoint %s complete at TCPSource %s\n".cstring(), checkpoint_id.string().cstring(), _source_id.string().cstring())
     None
 
   //////////////

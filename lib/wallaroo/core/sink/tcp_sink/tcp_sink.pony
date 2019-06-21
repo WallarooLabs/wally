@@ -327,10 +327,7 @@ actor TCPSink is Sink
   be receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    ifdef "checkpoint_trace" then
-      @l(Log.debug(), Log.tcp_sink(), "Receive barrier %s at TCPSink %s\n".cstring(),
-        barrier_token.string().cstring(), _sink_id.string().cstring())
-    end
+    @l(Log.debug(), Log.tcp_sink(), "Receive barrier %s at TCPSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
     process_barrier(input_id, producer, barrier_token)
 
   fun ref receive_new_barrier(input_id: RoutingId, producer: Producer,
@@ -353,10 +350,7 @@ actor TCPSink is Sink
       barrier_token)
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
-    ifdef "checkpoint_trace" then
-      @l(Log.debug(), Log.tcp_sink(), "Barrier %s complete at TCPSink %s\n".cstring(),
-        barrier_token.string().cstring(), _sink_id.string().cstring())
-    end
+    @l(Log.debug(), Log.tcp_sink(), "Barrier %s complete at TCPSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
     _barrier_coordinator.ack_barrier(this, barrier_token)
     match barrier_token
     | let sbt: CheckpointBarrierToken =>

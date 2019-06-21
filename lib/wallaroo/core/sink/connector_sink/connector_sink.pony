@@ -409,9 +409,7 @@ actor ConnectorSink is Sink
   fun ref abort_decision(reason: String, txn_id: String,
     barrier_token: CheckpointBarrierToken)
   =>
-    ifdef "checkpoint_trace" then
-      @ll(_2pc_debug, "2PC: abort_decision: txn_id %s %s\n".cstring(), txn_id.cstring(), reason.cstring())
-    end
+    @ll(_2pc_debug, "2PC: abort_decision: txn_id %s %s\n".cstring(), txn_id.cstring(), reason.cstring())
 
     _twopc.set_state_abort()
     _barrier_coordinator.abort_barrier(barrier_token)
@@ -439,9 +437,7 @@ actor ConnectorSink is Sink
     receive one), at which point we can unblock all inputs and
     continue.
     """
-    ifdef "checkpoint_trace" then
-      @ll(_conn_debug, "Receive barrier %s at ConnectorSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
-    end
+    @ll(_conn_debug, "Receive barrier %s at ConnectorSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
     process_barrier(input_id, producer, barrier_token)
 
   fun ref receive_new_barrier(input_id: RoutingId, producer: Producer,
@@ -470,9 +466,7 @@ actor ConnectorSink is Sink
     propagation or processing by other actors in this worker or in
     any other worker.
     """
-    ifdef "checkpoint_trace" then
-      @ll(_conn_debug, "Barrier %s complete at ConnectorSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
-    end
+    @ll(_conn_debug, "Barrier %s complete at ConnectorSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
     var ack_now = true
     match barrier_token
     | let sbt: CheckpointBarrierToken =>
@@ -483,9 +477,7 @@ actor ConnectorSink is Sink
         // messages to us will block the senders.  However, the nature
         // of backpressure may change over time as the runtime's
         // backpressure system changes.
-        ifdef "checkpoint_trace" then
-          @ll(_2pc_debug, "2PC: preemptive abort: connector sink not fully connected\n".cstring())
-        end
+        @ll(_2pc_debug, "2PC: preemptive abort: connector sink not fully connected\n".cstring())
         abort_decision("connector sink not fully connected",
           _twopc.txn_id, _twopc.barrier_token)
         _twopc.preemptive_txn_abort(sbt)
@@ -499,16 +491,12 @@ actor ConnectorSink is Sink
         // If no data has been processed by the sink since the last
         // checkpoint, then don't bother with 2PC, return early.
         _barrier_coordinator.ack_barrier(this, sbt)
-        ifdef "checkpoint_trace" then
-          @ll(_2pc_debug, "2PC: no data written during this checkpoint interval, skipping 2PC round\n".cstring())
-        end
+        @ll(_2pc_debug, "2PC: no data written during this checkpoint interval, skipping 2PC round\n".cstring())
         return
 
       | let msg: cp.MessageMsg =>
         _notify.send_msg(this, msg)
-        ifdef "checkpoint_trace" then
-          @ll(_2pc_debug, "2PC: sent phase 1 for txn_id %s\n".cstring(), _twopc.txn_id.cstring())
-        end
+        @ll(_2pc_debug, "2PC: sent phase 1 for txn_id %s\n".cstring(), _twopc.txn_id.cstring())
       end
 
       // As a 2PC participant as a Wallaroo *sink*, we cannot
@@ -534,27 +522,21 @@ actor ConnectorSink is Sink
     end
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
-    ifdef "checkpoint_trace" then
-      @ll(_2pc_debug, "2PC: Checkpoint complete %d at ConnectorSink %s\n".cstring(), checkpoint_id, _sink_id.string().cstring())
-    end
+    @ll(_2pc_debug, "2PC: Checkpoint complete %d at ConnectorSink %s\n".cstring(), checkpoint_id, _sink_id.string().cstring())
 
     let cpoint_id = ifdef "test_disconnect_at_5" then "5" else "" end
     let drop_phase2_msg = try if _twopc.txn_id.split("=")(1)? == cpoint_id then true else false end else false end
 
     _twopc.checkpoint_complete(this, drop_phase2_msg)
 
-    ifdef "checkpoint_trace" then
-      try @ll(_2pc_debug, "2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d _notify.twopc_txn_id_last_committed %s\n".cstring(), _twopc.last_offset, (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
-    end
+    try @ll(_2pc_debug, "2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d _notify.twopc_txn_id_last_committed %s\n".cstring(), _twopc.last_offset, (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
 
     if _twopc.txn_id == "" then
       @ll(_2pc_err, "Error: checkpoint_complete() with empty _twopc.txn_id = %s.\n".cstring(), _twopc.txn_id.cstring())
       Fail()
     else
       _notify.twopc_txn_id_last_committed = _twopc.txn_id
-      ifdef "checkpoint_trace" then
-        try @ll(_2pc_debug, "2PC: DBGDBG: twopc_txn_id_last_committed = %s.\n".cstring(), (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
-      end
+      try @ll(_2pc_debug, "2PC: DBGDBG: twopc_txn_id_last_committed = %s.\n".cstring(), (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
     end
     _twopc.reset_state()
 
@@ -601,9 +583,7 @@ actor ConnectorSink is Sink
       Fail()
     end
 
-    ifdef "checkpoint_trace" then
-      @ll(_2pc_debug, "2PC: Checkpoint state %s at ConnectorSink %s, txn-id %s\n".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring(), _twopc.txn_id.cstring())
-    end
+    @ll(_2pc_debug, "2PC: Checkpoint state %s at ConnectorSink %s, txn-id %s\n".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring(), _twopc.txn_id.cstring())
 
     let wb: Writer = wb.create()
     wb.u64_be(_twopc.current_offset.u64())
@@ -614,9 +594,7 @@ actor ConnectorSink is Sink
       consume bs)
 
   be prepare_for_rollback() =>
-    ifdef "checkpoint_trace" then
-      @ll(_conn_debug, "Prepare for checkpoint rollback at ConnectorSink %s\n".cstring(), _sink_id.string().cstring())
-    end
+    @ll(_conn_debug, "Prepare for checkpoint rollback at ConnectorSink %s\n".cstring(), _sink_id.string().cstring())
     // Don't call _use_normal_processor() here
 
   fun ref finish_preparing_for_rollback() =>
@@ -631,10 +609,8 @@ actor ConnectorSink is Sink
     We may need to re-send phase2=commit for this checkpoint_id.
     (But that's async from our point of view, beware tricksy bugs....)
     """
-    ifdef "checkpoint_trace" then
-      @ll(_conn_debug, "Rollback to %s at ConnectorSink %s\n".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring())
-      @ll(_2pc_debug, "2PC: Rollback: twopc_state %d txn_id %s.\n".cstring(), _twopc.state(), _twopc.txn_id.cstring())
-    end
+    @ll(_conn_debug, "Rollback to %s at ConnectorSink %s\n".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring())
+    @ll(_2pc_debug, "2PC: Rollback: twopc_state %d txn_id %s.\n".cstring(), _twopc.state(), _twopc.txn_id.cstring())
 
     if _twopc.txn_id != "" then
       // Phase 1 decision was abort + we haven't been disconnected.
@@ -660,15 +636,11 @@ actor ConnectorSink is Sink
     // commit status: commit for checkpoint_id, all greater are invalid.
     _notify.twopc_txn_id_last_committed =
       _twopc.make_txn_id_string(checkpoint_id)
-    ifdef "checkpoint_trace" then
-      try @ll(_2pc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.\n".cstring(), (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
-    end
+    try @ll(_2pc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.\n".cstring(), (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
     _notify.twopc_current_txn_aborted = _notify.process_uncommitted_list(this)
 
-    ifdef "checkpoint_trace" then
-      @ll(_2pc_debug, "DBGDBG: 2PC: twopc_current_txn_aborted = %s.\n".cstring(), _notify.twopc_current_txn_aborted.string().cstring())
-      @ll(_2pc_debug, "2PC: Rollback: _twopc.last_offset %lu _twopc.current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s\n".cstring(), _twopc.last_offset, _twopc.current_offset, _notify.acked_point_of_ref, try (_notify.twopc_txn_id_last_committed as String).cstring() else "<<<None>>>".string() end, _sink_id.string().cstring())
-    end
+    @ll(_2pc_debug, "DBGDBG: 2PC: twopc_current_txn_aborted = %s.\n".cstring(), _notify.twopc_current_txn_aborted.string().cstring())
+    @ll(_2pc_debug, "2PC: Rollback: _twopc.last_offset %lu _twopc.current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s\n".cstring(), _twopc.last_offset, _twopc.current_offset, _notify.acked_point_of_ref, try (_notify.twopc_txn_id_last_committed as String).cstring() else "<<<None>>>".string() end, _sink_id.string().cstring())
 
     event_log.ack_rollback(_sink_id)
 
