@@ -335,7 +335,7 @@ endef
 define ponyc-goal
 # include dependencies for already compiled executables
 -include $(abspath $(1:%/=%))/$(notdir $(abspath $(1:%/=%))).d
-$(abspath $(1:%/=%))/$(notdir $(abspath $(1:%/=%))):
+$(abspath $(1:%/=%))/$(notdir $(abspath $(1:%/=%))): $(LOGGING_LIB_A)
 	$$(call PONYC,$(abspath $(1:%/=%)))
 endef
 

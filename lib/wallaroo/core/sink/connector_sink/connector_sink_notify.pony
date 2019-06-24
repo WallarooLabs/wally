@@ -26,7 +26,7 @@ use cp = "wallaroo_labs/connector_protocol"
 use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 
-use @ll[I32](sev_cat: U16, fmt: Pointer[U8] tag, ...)
+// use @ll[I32](sev_cat: U16, fmt: Pointer[U8] tag, ...)
 
 
 class ConnectorSinkNotify
@@ -45,12 +45,12 @@ class ConnectorSinkNotify
   var acked_point_of_ref: cp.MessageId = 0
   var message_id: cp.MessageId = acked_point_of_ref
   var _connection_count: USize = 0
-  let _conn_debug = Log.make_sev_cat(Log.debug(), Log.conn_sink())
-  let _conn_info = Log.make_sev_cat(Log.info(), Log.conn_sink())
-  let _conn_err = Log.make_sev_cat(Log.err(), Log.conn_sink())
-  let _2pc_debug = Log.make_sev_cat(Log.debug(), Log.twopc())
-  let _2pc_info = Log.make_sev_cat(Log.info(), Log.twopc())
-  let _2pc_err = Log.make_sev_cat(Log.err(), Log.twopc())
+  let _conn_debug: U16 = Log.make_sev_cat(Log.debug(), Log.conn_sink())
+  let _conn_info: U16 = Log.make_sev_cat(Log.info(), Log.conn_sink())
+  let _conn_err: U16 = Log.make_sev_cat(Log.err(), Log.conn_sink())
+  let _twopc_debug: U16 = Log.make_sev_cat(Log.debug(), Log.twopc())
+  let _twopc_info: U16 = Log.make_sev_cat(Log.info(), Log.twopc())
+  let _twopc_err: U16 = Log.make_sev_cat(Log.err(), Log.twopc())
 
   // 2PC
   var _rtag: U64 = 77777
@@ -227,14 +227,14 @@ class ConnectorSinkNotify
       @ll(_conn_info, ("ConnectorSink is no longer experiencing" +
         " back pressure, connected = %s\n").cstring(),
       _connected.string().cstring())
-      try @ll(_2pc_debug, "DBGDBG: unthrottled: buffer check, FSM state = %d\n".cstring(), (conn as ConnectorSink ref).get_2pc_state()) else Fail() end
-      @ll(_2pc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s current txn=%s.\n".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_txn_id_current.cstring())
+      try @ll(_twopc_debug, "DBGDBG: unthrottled: buffer check, FSM state = %d\n".cstring(), (conn as ConnectorSink ref).get_twopc_state()) else Fail() end
+      @ll(_twopc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s current txn=%s.\n".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_txn_id_current.cstring())
       if twopc_current_txn_aborted then
-        @ll(_2pc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s discard %d items\n".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_reconnect_buffer.size())
+        @ll(_twopc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s discard %d items\n".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_reconnect_buffer.size())
         None
       else
         for d in twopc_reconnect_buffer.values() do
-          @ll(_2pc_debug, "DBG: unthrottled: writing buffered %d bytes\n".cstring(), d.size())
+          @ll(_twopc_debug, "DBG: unthrottled: writing buffered %d bytes\n".cstring(), d.size())
           try (conn as ConnectorSink ref)._write_final(d, None) else Fail() end
         end
       end
@@ -290,7 +290,7 @@ class ConnectorSinkNotify
         _error_and_close(conn, "Bad FSM State: Ea" + _fsm_state().string())
         return
       end
-      @ll(_2pc_debug, "2PC: GOT MessageMsg\n".cstring())
+      @ll(_twopc_debug, "2PC: GOT MessageMsg\n".cstring())
       try
         let inner = cp.TwoPCFrame.decode(m.message as Array[U8] val)?
         match inner
@@ -300,7 +300,7 @@ class ConnectorSinkNotify
           // have already started a new round of 2PC ... so our new
           // round's txn_id may be in the txn_id's list.
           if mi.rtag != _rtag then
-            @ll(_2pc_err, "2PC: bad rtag match: %lu != %lu\n".cstring(), mi.rtag, _rtag)
+            @ll(_twopc_err, "2PC: bad rtag match: %lu != %lu\n".cstring(), mi.rtag, _rtag)
             Fail()
           end
           @ll(_conn_debug, "TRACE: uncommitted txns = %d\n".cstring(),
@@ -329,7 +329,7 @@ class ConnectorSinkNotify
           end
           try (conn as ConnectorSink ref).twopc_intro_done() else Fail() end
         | let mi: cp.TwoPCReplyMsg =>
-          @ll(_2pc_debug, "2PC: reply for txn_id %s was %s\n".cstring(), mi.txn_id.cstring(), mi.commit.string().cstring())
+          @ll(_twopc_debug, "2PC: reply for txn_id %s was %s\n".cstring(), mi.txn_id.cstring(), mi.commit.string().cstring())
           try (conn as ConnectorSink ref).twopc_phase1_reply(
             mi.txn_id, mi.commit)
           else Fail() end
@@ -406,12 +406,12 @@ class ConnectorSinkNotify
     | (let last_committed: String, let uncommitted: Array[String] val) =>
       var current_txn_aborted: Bool = false
 
-      @ll(_2pc_debug, "2PC: process_uncommitted_list processing %d items, last_committed = %s\n".cstring(), uncommitted.size(), last_committed.cstring())
+      @ll(_twopc_debug, "2PC: process_uncommitted_list processing %d items, last_committed = %s\n".cstring(), uncommitted.size(), last_committed.cstring())
       for txn_id in uncommitted.values() do
         let do_commit = if txn_id == last_committed then true else false end
-        @ll(_2pc_debug, "2PC: uncommitted txn_id %s commit=%s\n".cstring(), txn_id.cstring(), do_commit.string().cstring())
+        @ll(_twopc_debug, "2PC: uncommitted txn_id %s commit=%s\n".cstring(), txn_id.cstring(), do_commit.string().cstring())
         if not do_commit and (txn_id == twopc_txn_id_current) then
-          @ll(_2pc_debug, "2PC: current txn_id %s was aborted\n".cstring(), twopc_txn_id_current.cstring())
+          @ll(_twopc_debug, "2PC: current txn_id %s was aborted\n".cstring(), twopc_txn_id_current.cstring())
           current_txn_aborted = true
         end
         let p2 = cp.TwoPCEncode.phase2(txn_id, do_commit)
@@ -426,7 +426,7 @@ class ConnectorSinkNotify
       twopc_uncommitted_list = []
       current_txn_aborted
     else
-      @ll(_2pc_debug, "2PC: process_uncommitted_list waiting\n".cstring())
+      @ll(_twopc_debug, "2PC: process_uncommitted_list waiting\n".cstring())
       false
     end
 
@@ -457,7 +457,7 @@ class ConnectorSinkNotify
       // are starting for the first time.  There is no prior committed
       // txn_id.
       twopc_txn_id_last_committed = ""
-      try @ll(_2pc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.\n".cstring(), (twopc_txn_id_last_committed as String).cstring()) else Fail() end
+      try @ll(_twopc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.\n".cstring(), (twopc_txn_id_last_committed as String).cstring()) else Fail() end
       process_uncommitted_list(conn)
     end
 

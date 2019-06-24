@@ -34,10 +34,6 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
 # (and by recursion every makefile in the tree that is referenced)
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
 
-# Boilerplate for Pony source: use "lib:wallaroo-logging"
-# This dep must appear prior to include $(rules_mk_path)
-build-utils-data_receiver: $(LOGGING_LIB_A)
-
 # standard rules generation makefile
 include $(rules_mk_path)
 

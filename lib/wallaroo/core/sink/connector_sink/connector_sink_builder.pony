@@ -29,6 +29,8 @@ use "wallaroo/core/checkpoint"
 use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 
+use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag, ...)
+
 primitive ConnectorSinkConfigCLIParser
   fun apply(args: Array[String] val): Array[ConnectorSinkConfigOptions] val ?
   =>

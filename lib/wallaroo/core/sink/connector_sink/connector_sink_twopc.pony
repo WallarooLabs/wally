@@ -28,6 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 use "wallaroo/core/barrier"
 use "wallaroo/core/checkpoint"
 use cp = "wallaroo_labs/connector_protocol"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 
 class ConnectorSink2PC
@@ -41,9 +42,9 @@ class ConnectorSink2PC
   var current_offset: USize = 0
   var current_txn_end_offset: USize = 0
   let stream_name: String
-  let _2pc_debug: U16 = Log.make_sev_cat(Log.debug(), Log.twopc())
-  let _2pc_info: U16 = Log.make_sev_cat(Log.info(), Log.twopc())
-  let _2pc_err: U16 = Log.make_sev_cat(Log.err(), Log.twopc())
+  let _twopc_debug: U16 = Log.make_sev_cat(Log.debug(), Log.twopc())
+  let _twopc_info: U16 = Log.make_sev_cat(Log.info(), Log.twopc())
+  let _twopc_err: U16 = Log.make_sev_cat(Log.err(), Log.twopc())
 
   new create(stream_name': String) =>
     stream_name = stream_name'
