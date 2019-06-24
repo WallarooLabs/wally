@@ -78,7 +78,7 @@ $(MACHIDA3_BUILD)/machida3: EXTRA_PONYCFLAGS= --output=$(MACHIDA3_BUILD) --path=
 else
 $(MACHIDA3_BUILD)/machida3: EXTRA_PONYCFLAGS= --output=$(MACHIDA3_BUILD) --path=$(MACHIDA3_BUILD) --linker '$(CC) $(PYTHON3_LIBS)'
 endif
-$(MACHIDA3_BUILD)/machida3: $(MACHIDA3_BUILD)/libpython-wallaroo.a $(LOGGING_LIB_A)
+$(MACHIDA3_BUILD)/machida3: $(MACHIDA3_BUILD)/libpython-wallaroo.a $(logging_lib_a)
 	$(call PONYC,$(abspath $(MACHIDA3_PATH:%/=%)))
 
 $(MACHIDA3_BUILD)/libpython-wallaroo.a: $(MACHIDA3_BUILD)/python-wallaroo.o

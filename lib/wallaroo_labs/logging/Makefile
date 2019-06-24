@@ -40,21 +40,17 @@ LOGGING_LIB_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
-LOGGING_LIB_DIR=$(LOGGING_LIB_PATH)
-LOGGING_LIB_OBJ=$(LOGGING_LIB_DIR)wallaroo-logging.o
-LOGGING_LIB_A=$(LOGGING_LIB_DIR)libwallaroo-logging.a
-
-build-lib-wallaroo_labs-logging: $(LOGGING_LIB_A)
-$(LOGGING_LIB_A): $(LOGGING_LIB_OBJ)
+build-lib-wallaroo_labs-logging: $(logging_lib_a)
+$(logging_lib_a): $(logging_lib_obj)
 	ar rvs $@ $<
-$(LOGGING_LIB_OBJ): $(LOGGING_LIB_DIR)logging-lib.c
+$(logging_lib_obj): $(logging_lib_path)/logging-lib.c
 	cc -g -o $@ -c $<
 
 # The rule below will trigger a "overriding commands" warning when
 # there is a Pony source file in this directory.  Instead, there'source
 # a special "rm -f" command in rules.mk to delete the obj & lib files.
 #clean-lib-wallaroo_labs-logging:
-#	$(QUIET)rm -f $(LOGGING_LIB_DIR)/*.o $(LOGGING_LIB_DIR)/*.a
+#	$(QUIET)rm -f $(logging_lib_path)/*.o $(logging_lib_path)/*.a
 
 # end of prevent rules from being evaluated/included multiple times
 endif

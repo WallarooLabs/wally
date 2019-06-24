@@ -48,6 +48,9 @@ wallaroo_python_path := $(wallaroo_path)/machida/lib
 machida_bin_path := $(wallaroo_path)/machida/build
 machida3_bin_path := $(wallaroo_path)/machida3/build
 external_sender_bin_path := $(integration_path)/external_sender
+logging_lib_path := $(wallaroo_lib)/wallaroo_labs/logging
+logging_lib_obj := $(logging_lib_path)/wallaroo-logging.o
+logging_lib_a := $(logging_lib_path)/libwallaroo-logging.a
 
 EMPTY :=
 SPACE := $(EMPTY) $(EMPTY)
@@ -266,7 +269,7 @@ ifneq ($(arch),native)
 endif
 
 # function call for compiling with ponyc and generating dependency info
-PONYC_LOGGING_LIB_FLAGS = --path $(LOGGING_LIB_DIR)
+PONYC_LOGGING_LIB_FLAGS = --path $(logging_lib_path)
 define PONYC
   $(QUIET)cd $(1) && $(ponyc_docker_args) $(PONYSTABLE) fetch \
     $(if $(filter $(ponyc_docker_args),docker),$(quote))
@@ -335,7 +338,7 @@ endef
 define ponyc-goal
 # include dependencies for already compiled executables
 -include $(abspath $(1:%/=%))/$(notdir $(abspath $(1:%/=%))).d
-$(abspath $(1:%/=%))/$(notdir $(abspath $(1:%/=%))): $(LOGGING_LIB_A)
+$(abspath $(1:%/=%))/$(notdir $(abspath $(1:%/=%))): $(logging_lib_a)
 	$$(call PONYC,$(abspath $(1:%/=%)))
 endef
 
@@ -748,7 +751,7 @@ clean: clean-$(ROOT_TARGET_SUFFIX) ## Clean all projects (pony & monhub) and cle
 	$(QUIET)rm -f $(abs_wallaroo_dir)/AppRun $(abs_wallaroo_dir)/metrics_ui.desktop $(abs_wallaroo_dir)/metrics_ui.png
 	$(QUIET)rm -f lib/wallaroo/wallaroo lib/wallaroo/wallaroo.o
 	$(QUIET)rm -f sent.txt received.txt
-	$(QUIET)rm -f $(LOGGING_LIB_OBJ) $(LOGGING_LIB_A)
+	$(QUIET)rm -f $(logging_lib_obj) $(logging_lib_a)
 	$(QUIET)echo 'Done cleaning.'
 
 list: ## List all targets (including automagically generated ones)

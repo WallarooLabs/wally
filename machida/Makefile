@@ -74,7 +74,7 @@ machida_build: $(MACHIDA_BUILD)/machida
 
 -include $(MACHIDA_PATH)/machida.d
 $(MACHIDA_BUILD)/machida: EXTRA_PONYCFLAGS= --output=$(MACHIDA_BUILD) --path=$(MACHIDA_BUILD)
-$(MACHIDA_BUILD)/machida: $(MACHIDA_BUILD)/libpython-wallaroo.a $(LOGGING_LIB_A)
+$(MACHIDA_BUILD)/machida: $(MACHIDA_BUILD)/libpython-wallaroo.a $(logging_lib_a)
 	$(call PONYC,$(abspath $(MACHIDA_PATH:%/=%)))
 
 $(MACHIDA_BUILD)/libpython-wallaroo.a: $(MACHIDA_BUILD)/python-wallaroo.o
