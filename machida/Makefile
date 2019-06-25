@@ -53,7 +53,8 @@ WALLAROO_LIB =  $(wallaroo_path)/lib
 # with our own custom rules. This allows the top level commands like
 # "make test" to work.
 build-machida: machida_build
-unit-tests-machida: build-machida
+## The unit tests in this dir are Python only and do not require a machida executable
+## unit-tests-machida: build-machida
 unit-tests-machida: wallaroo_unit_tests
 clean-machida: machida_clean
 
