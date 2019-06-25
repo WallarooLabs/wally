@@ -361,8 +361,12 @@ test-pony-all: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
-unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): $(abs_wallaroo_dir)/LICENSE ## dummy dep
 ifneq ($($(ABS_PREV_MAKEFILE)_UNIT_TEST_COMMAND),false)
+## If a have a real unit test to run here, then build it first
+unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+## Here is the default of how we run the unit test
+unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))):
 	cd $(abspath $(1:%/=%)) && ./$(notdir $(abspath $(1:%/=%)))
 endif
 integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
@@ -415,7 +419,7 @@ test-monhub-all: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
-unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): $(abs_wallaroo_dir)/LICENSE ## dummy dep
 integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 ifneq ($($(ABS_PREV_MAKEFILE)_UNIT_TEST_COMMAND),false)

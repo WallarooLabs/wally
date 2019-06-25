@@ -41,7 +41,6 @@ restart_without_resilience_tests : CUSTOM_PYTHONPATH = $(SEQUENCE_WINDOW_PYTHON_
 include $(rules_mk_path)
 
 
-build-testing-correctness-tests-restart_without_resilience: build-testing-correctness-apps-sequence_window
 build-testing-correctness-tests-restart_without_resilience: build-machida
 build-testing-correctness-tests-restart_without_resilience: build-machida3
 integration-tests-testing-correctness-tests-restart_without_resilience: build-testing-correctness-tests-restart_without_resilience
