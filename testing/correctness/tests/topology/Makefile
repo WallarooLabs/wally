@@ -12,7 +12,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
 # `true`/`false` to enable/disable the actual unit test command so it can be overridden (the targets are still created)
 # applies to both the pony and elixir test targets
-$(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := false
+$(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := true
 
 # `true`/`false` to enable/disable generate pony related targets (build/test/clean) for pony sources in this directory
 # otherwise targets only get created if there are pony sources (*.pony) in this directory.

@@ -40,6 +40,7 @@ LIB_WALLAROO_LABS_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
+unit-tests-lib-wallaroo_labs: build-lib-wallaroo_labs
 unit-tests-lib-wallaroo_labs: lib_wallaroo_labs_test
 
 lib_wallaroo_labs_test:
