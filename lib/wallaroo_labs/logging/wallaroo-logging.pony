@@ -22,7 +22,7 @@ use "lib:wallaroo-logging"
 
 // C FFI prototypes for cut-and-paste into your Pony source, as needed
 use @printf[I32](fmt: Pointer[U8] tag, ...)
-use @log_enabled[Bool](severity: LogSeverity, category: LogCategory)
+use @l_enabled[Bool](severity: LogSeverity, category: LogCategory)
 use @ll_enabled[Bool](sev_cat: U16)
 use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag, ...)
 use @ll[I32](sev_cat: U16, fmt: Pointer[U8] tag, ...)
@@ -50,7 +50,7 @@ primitive Log
   fun default_severity(): LogSeverity => info()
 
   // categories
-  fun no_cat(): LogCategory             => LogCategory(0)
+  fun no_cat(): LogCategory           => LogCategory(0)
   fun checkpoint(): LogCategory       => LogCategory(1)
   fun source_migration(): LogCategory => LogCategory(2)
   fun twopc(): LogCategory            => LogCategory(3)
@@ -59,6 +59,7 @@ primitive Log
   fun conn_sink(): LogCategory        => LogCategory(6)
   fun tcp_source(): LogCategory       => LogCategory(7)
   fun conn_source(): LogCategory      => LogCategory(8)
+  fun max_category(): LogCategory     => LogCategory(40)
 
   fun severity_map(): Array[(LogSeverity, String)] =>
     [ // BEGIN severity_map

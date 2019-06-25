@@ -36,6 +36,7 @@ use queue = "queue"
 use weighted = "weighted"
 use query = "query"
 use cwm = "connector_wire_messages"
+use logging = "logging"
 
 actor Main is TestList
   new create(env: Env) =>
@@ -55,3 +56,4 @@ actor Main is TestList
     weighted.Main.make().tests(test)
     query.Main.make().tests(test)
     cwm.Main.make().tests(test)
+    logging.Main.make().tests(test)
