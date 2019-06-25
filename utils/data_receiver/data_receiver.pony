@@ -18,13 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "net"
 use "wallaroo_labs/bytes"
-use "wallaroo_labs/logging"
 use "wallaroo_labs/options"
-
-use @log_enabled[Bool](severity: LogSeverity, category: LogCategory)
-use @ll_enabled[Bool](sev_cat: U16)
-use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag, ...)
-use @ll[I32](sev_cat: U16, fmt: Pointer[U8] tag, ...)
 
 actor Main
   new create(env: Env) =>
@@ -32,46 +26,6 @@ actor Main
     var l_arg: (Array[String] | None) = None
     var output_mode: OutputMode = Write
     var input_mode: InputMode = Streaming
-
-    // let Log.emerg = U8(0)
-    // let Log.alert = U8(1)
-    // let Log.crit = U8(2)
-    // let Log.err = U8(3)
-    let cat_mumble = U8(40)
-
-    @printf[I32]("SLF: Hello, world!\n".cstring()) // For demo purposes only
-    @l(Log.crit(), cat_mumble, "SLF: Hello, %s\n".cstring(), "everything".cstring()) // For demo purposes only
-    @w_set_severity_label[None](Log.crit(), "2-severity-yo".cstring())
-    @w_set_category_label[None](cat_mumble, "my-mumble-cat".cstring())
-    @l(Log.crit(), cat_mumble, "SLF: Hello, %s!".cstring(), "everything".cstring()) // For demo purposes only
-
-    @w_set_severity_threshold[None](Log.alert())
-    @l(Log.emerg(), cat_mumble, "SLF: visible!".cstring()) // For demo purposes only
-    @l(Log.alert(), cat_mumble, "SLF: visible!".cstring()) // For demo purposes only
-    @l(Log.crit(), cat_mumble, "SLF: this one should be filtered out".cstring()) // For demo purposes only
-
-    @printf[I32]("SLF: emergency enabled = true? res = %s\n".cstring(),
-      @log_enabled(Log.emerg(), cat_mumble).string().cstring())
-    @printf[I32]("SLF: alert enabled = true? res = %s\n".cstring(),
-      @log_enabled(Log.alert(), cat_mumble).string().cstring())
-    @printf[I32]("SLF: critical enabled = false? res = %s\n".cstring(),
-      @log_enabled(Log.crit(), cat_mumble).string().cstring())
-
-    Log.set_category_labels()
-    @l(Log.emerg(), Log.source_migration(), "Visible migration event".cstring())
-    let emerg_s_mig = Log.make_sev_cat(Log.emerg(), Log.source_migration())
-    @ll(emerg_s_mig, "ll-visible migration event".cstring())
-
-    // @l(Log.source_migration_info(), "Visible migration event".cstring())
-    // @l(Log.emerg(), Log.source_migration(), "Visible migration event".cstring())
-
-
-    Log.set_thresholds(false, true)
-    let aa: Array[(U8, U8)] = [ (7,20); (2,20); (7, 21); (2, 21)]
-    for (sev, cat) in aa.values() do
-      @printf[I32]("SLF: enabled sev=%d,cat=%d? res = %s\n".cstring(),
-        sev, cat, @log_enabled(sev, cat).string().cstring())
-    end
 
     try
       var options = Options(env.args)

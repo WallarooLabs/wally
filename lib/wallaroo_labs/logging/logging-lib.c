@@ -127,16 +127,20 @@ int printf(const char *fmt, ...)
 }
 
 /*
-** log_enabled(), is logging enabled for a (severity, category) tuple
+** l_enabled(), is logging enabled for a (severity, category) tuple
 **
 ** severity - numeric severity from 0 to MAX_SEVERITY
 ** category - application category number from 0 to MAX_CATEGORY
+**
+** NOTE: In the interest of maximum speed, we only check severity threshold.
+**       It's strongly recommended that labels and thresholds be set prior
+**       to calling this function.
 **
 ** Return value: true if logging is enabled for this tuple,
 **               otherwise false
 */
 
-unsigned char log_enabled(unsigned char severity, unsigned char category)
+unsigned char l_enabled(unsigned char severity, unsigned char category)
 {
   if (severity > _cat2sev_threshold[category]) {
     return 0;
@@ -151,14 +155,18 @@ unsigned char log_enabled(unsigned char severity, unsigned char category)
 **     severity - numeric severity, bits 8-15
 **     category - application category number, bits 0-7
 **
+** NOTE: In the interest of maximum speed, we only check severity threshold.
+**       It's strongly recommended that labels and thresholds be set prior
+**       to calling this function.
+**
 ** Return value: true if logging is enabled for this tuple,
 **               otherwise false
 */
 
 unsigned char ll_enabled(unsigned short sev_cat)
 {
-  unsigned char severity = sev_cat & 0xFF;
-  unsigned char category = (sev_cat >> 8) & 0xFF;
+  unsigned char severity = (sev_cat >> 8) & 0xFF;
+  unsigned char category = sev_cat & 0xFF;
 
   if (severity > _cat2sev_threshold[category]) {
     return 0;
@@ -173,6 +181,11 @@ unsigned char ll_enabled(unsigned short sev_cat)
 ** category - application category number from 0 to MAX_CATEGORY
 ** fmt - snprintf(3)-style formatting string
 ** 0 or or arguments - snprintf(3)-style arguments
+**
+** NOTE: In the interest of maximum speed, we check severity threshold
+**       first and only afterward check if the labels/default threshold/etc
+**       have been initialized.  It's strongly recommended that labels
+**       and thresholds be set prior to calling this function.
 **
 ** Return value: # of bytes written
 */
@@ -201,13 +214,18 @@ int l(unsigned char severity, unsigned char category, const char *fmt, ...)
 ** fmt - snprintf(3)-style formatting string
 ** 0 or or arguments - snprintf(3)-style arguments
 **
+** NOTE: In the interest of maximum speed, we check severity threshold
+**       first and only afterward check if the labels/default threshold/etc
+**       have been initialized.  It's strongly recommended that labels
+**       and thresholds be set prior to calling this function.
+**
 ** Return value: # of bytes written
 */
 
 int ll(unsigned short sev_cat, const char *fmt, ...)
 {
-  unsigned char severity = sev_cat & 0xFF;
-  unsigned char category = (sev_cat >> 8) & 0xFF;
+  unsigned char severity = (sev_cat >> 8) & 0xFF;
+  unsigned char category = sev_cat & 0xFF;
   va_list ap;
 
   if (severity > _cat2sev_threshold[category]) {
@@ -263,6 +281,9 @@ void w_set_severity_threshold(unsigned char severity)
 {
   int i;
 
+  if (! _labels_initialized) {
+    _w_initialize_labels();
+  }
   if (severity < MAX_SEVERITY+1) {
     for (i = 0; i < MAX_CATEGORY+1; i++) {
       _cat2sev_threshold[i] = severity;
@@ -281,6 +302,9 @@ void w_set_severity_cat_threshold(unsigned char severity, unsigned char category
 {
   int i;
 
+  if (! _labels_initialized) {
+    _w_initialize_labels();
+  }
   if (severity < MAX_SEVERITY+1 && category < MAX_CATEGORY+1) {
     _cat2sev_threshold[category] = severity;
   }
@@ -311,6 +335,9 @@ void w_process_category_overrides()
   unsigned char severity, category;
   int i;
 
+  if (! _labels_initialized) {
+    _w_initialize_labels();
+  }
   if (env != NULL) {
     if (strlen(env) < sizeof(buf) - 1) {
       strcpy(buf, env);
