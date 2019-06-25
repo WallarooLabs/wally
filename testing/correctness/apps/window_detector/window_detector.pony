@@ -39,6 +39,7 @@ use "wallaroo/core/windows"
 
 // wallaroo/lib/wallaroo_labs
 use "wallaroo_labs/bytes"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
 
@@ -65,6 +66,7 @@ type WindowPolicy is (Drop | FirePerMessage | PlaceInOldestWindow)
 
 actor Main
   new create(env: Env) =>
+    Log.set_defaults()
 
     try
       // Add options:

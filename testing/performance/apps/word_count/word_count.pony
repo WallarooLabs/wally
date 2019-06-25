@@ -26,6 +26,7 @@ use "net"
 use "serialise"
 use "wallaroo_labs/bytes"
 use "wallaroo"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
 use "wallaroo/core/common"
@@ -38,6 +39,7 @@ use "wallaroo/core/topology"
 
 actor Main
   new create(env: Env) =>
+    Log.set_defaults()
     try
       let pipeline = recover val
         let lines = Wallaroo.source[String]("Word Count",

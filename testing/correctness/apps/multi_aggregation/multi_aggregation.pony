@@ -23,6 +23,7 @@ use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/state"
 use "wallaroo/core/topology"
 use "wallaroo/core/windows"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
 
@@ -31,6 +32,7 @@ type NanosecondsSinceEpoch is U64
 
 actor Main
   new create(env: Env) =>
+    Log.set_defaults()
     try
       let pipeline = recover val
         let events = Wallaroo.source[Event]("Multi_Aggregations",
