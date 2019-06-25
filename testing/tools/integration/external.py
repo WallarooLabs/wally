@@ -60,7 +60,7 @@ def setup_resilience_path(res_dir):
 
 def create_resilience_dir(res_dir):
     try:
-        os.mkdir(res_dir)
+        os.makedirs(res_dir)
     except Exception as e:
         logging.exception('Warning: mkdir %s failed: %s' % (res_dir, e))
 

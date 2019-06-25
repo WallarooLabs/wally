@@ -18,7 +18,10 @@ from collections import Counter
 import datetime
 import pickle
 import struct
-import inspect
+try:
+    from inspect import getfullargspec
+except ImportError:
+    from inspect import getargspec as getfullargspec
 import sys
 
 
@@ -178,7 +181,7 @@ def _validate_arity_compatability(name, obj, arity):
         print("\nAPI_Error: Expected a callable object but got a {0} for {1}"
               .format(obj, name))
         raise WallarooParameterError()
-    spec = inspect.getargspec(obj)
+    spec = getfullargspec(obj)
     upper_bound = len(spec.args)
     lower_bound = upper_bound - (len(spec.defaults) if spec.defaults else 0)
     if arity > upper_bound or arity < lower_bound:
