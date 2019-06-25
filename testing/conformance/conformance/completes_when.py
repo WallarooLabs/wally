@@ -21,3 +21,11 @@ def data_in_sink_contains(data, timeout=30, sink=-1):
                            sink=sink)
         return True
     return data_in_sink_contains_func
+
+
+def data_in_sink_count_is(expected, timeout=30, sink=-1, allow_more=False):
+    def data_in_sink_count_is_func(context):
+        context.sink_expect(expected, timeout=timeout, sink=sink,
+                            allow_more=allow_more)
+        return True
+    return data_in_sink_count_is_func

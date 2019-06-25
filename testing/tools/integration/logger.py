@@ -73,3 +73,16 @@ def add_in_memory_log_stream(name='', level=None, fmt=None):
     sh.setFormatter(formatter)
     logging.root.addHandler(sh)
     return log_stream
+
+
+def add_file_logger(filepath, name='', level=logging.DEBUG, fmt=None):
+    logging.root.setLevel(0)
+    if not fmt:
+        if name:
+            fmt = DEFAULT_LOG_FMT_NAME
+        else:
+            fmt = DEFAULT_LOG_FMT
+    file_handler = logging.FileHandler(filepath)
+    file_handler.setLevel(level)
+    file_handler.setFormatter(logging.Formatter(fmt))
+    logging.root.addHandler(file_handler)

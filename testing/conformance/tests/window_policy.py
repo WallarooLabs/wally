@@ -1,3 +1,17 @@
+# Copyright 2019 The Wallaroo Authors.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+#  implied. See the License for the specific language governing
+#  permissions and limitations under the License.
+
 import logging
 import time
 
@@ -7,9 +21,10 @@ import time
 import conformance
 
 # Test specific imports
-from conformance.applications import WindowDetector
+from conformance.applications.window import WindowDetector
 from conformance.completes_when import data_in_sink_contains
 
+from integration import clear_current_test
 
 # input
 out_of_order_ts = [{'ts': 1000000000, 'key': 'key', 'value': 2},
@@ -23,8 +38,9 @@ out_of_order_ts_drop = [2, 3, 4, 5]
 out_of_order_ts_firepermessage = [1, 2, 3, 4, 5]
 
 
+@clear_current_test
 def test_drop_policy():
-    conf = {'window-late-data-policy': 'drop'}
+    conf = {'command_parameters': {'window-late-data-policy': 'drop'}}
 
     # boiler plate test execution entry point
     with WindowDetector(config=conf) as test:
@@ -43,8 +59,10 @@ def test_drop_policy():
             .format(out_of_order_ts_drop, output))
 
 
+@clear_current_test
 def test_firepermessage_policy():
-    conf = {'window-late-data-policy': 'fire-per-message'}
+    conf = {'command_parameters':
+        {'window-late-data-policy': 'fire-per-message'}}
 
     # boiler plate test execution entry point
     with WindowDetector(config=conf) as test:

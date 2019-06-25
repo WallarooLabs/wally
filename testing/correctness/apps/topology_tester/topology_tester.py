@@ -64,7 +64,7 @@ def application_setup(args):
     pargs, _ = parser.parse_known_args(args)
 
     app_name = "topology test"
-    pipe_name = "topology test pipeline"
+    pipe_name = "topology_tester"
 
     print("Using TCP Source")
     in_name, in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]

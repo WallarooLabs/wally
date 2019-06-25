@@ -7,11 +7,12 @@ endif
 ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
 $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
+
 # The following are control variables that determine what logic from `rules.mk` is enabled
 
 # `true`/`false` to enable/disable the actual unit test command so it can be overridden (the targets are still created)
 # applies to both the pony and elixir test targets
-$(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := false
+$(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := true
 
 # `true`/`false` to enable/disable generate pony related targets (build/test/clean) for pony sources in this directory
 # otherwise targets only get created if there are pony sources (*.pony) in this directory.
@@ -33,27 +34,19 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
 # (and by recursion every makefile in the tree that is referenced)
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
-RESILIENCE_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-resilience_tests : CUSTOM_PATH = $(MULTI_PARTITION_DETECTOR_PATH):$(MULTI_PART_VALIDATOR_PATH):$(CLUSTER_SHRINKER_PATH)
-resilience_tests : CUSTOM_PYTHONPATH = $(MULTI_PARTITION_DETECTOR_PATH):$(WINDOW_DETECTOR_PATH)
+
+TOPOLOGY_TESTER_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
 
 # standard rules generation makefile
 include $(rules_mk_path)
 
-build-testing-correctness-tests-resilience: build-testing-correctness-apps-multi_partition_detector
-build-testing-correctness-tests-resilience: build-utils-cluster_shrinker
-build-testing-correctness-tests-resilience: build-machida
-build-testing-correctness-tests-resilience: build-machida3
-integration-tests-testing-correctness-tests-resilience: build-testing-correctness-tests-resilience
-integration-tests-testing-correctness-tests-resilience: resilience_tests
+unit-tests-testing-correctness-apps-topology_tester: topology_tester_python_unit_tests
 
-ifeq ($(resilience),on)
-resilience_tests:
-	cd $(RESILIENCE_PATH) && \
-	python3 -m pytest -c $(integration_path)/pytest.ini resilience_tests.py $(pytest_exp)
-else
-resilience_tests:
-	$(QUIET)printf "reseilience tests not run.\nRun make with 'resilience=on' to run this test.\n"
-endif
+topology_tester_python_unit_tests:
+	cd $(TOPOLOGY_TESTER_PATH) && \
+		python2 -m pytest -c $(integration_path)/pytest.ini components.py && \
+		python3 -m pytest -c $(integration_path)/pytest.ini components.py
 
+# end of prevent rules from being evaluated/included multiple times
 endif

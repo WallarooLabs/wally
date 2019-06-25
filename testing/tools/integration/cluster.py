@@ -16,11 +16,13 @@
 from collections import namedtuple
 import datetime
 import logging
+import os
 import shlex
+import shutil
+import subprocess
 import tempfile
 import threading
 import time
-import subprocess
 
 
 from .control import (CrashChecker,
@@ -45,9 +47,12 @@ from .errors import (ClusterError,
 
 from .external import (clean_resilience_path,
                       get_port_values,
+                      makedirs_if_not_exists,
                       send_rotate_command,
                       send_shrink_command,
-                      setup_resilience_path)
+                      setup_resilience_path,
+                      strftime,
+                      STRFTIME_FMT)
 
 from .logger import INFO2
 
@@ -115,14 +120,16 @@ class Runner(threading.Thread):
     `get_output` may be used to get the entire output text up to the present,
     as well as after the runner has been stopped via `stop()`.
     """
-    def __init__(self, command, name, control=None, data=None, external=None):
+    def __init__(self, command, name, control=None, data=None, external=None,
+            log_dir=None):
         super(Runner, self).__init__()
         self.daemon = True
         self.command = ' '.join(v.strip('\\').strip() for v in
                                   command.splitlines())
         self.cmd_args = shlex.split(self.command)
         self.error = None
-        self._file = tempfile.NamedTemporaryFile()
+        self._file = tempfile.NamedTemporaryFile(mode='ab', dir=log_dir,
+                prefix='{}.'.format(name), suffix='.log', delete=False)
         self.p = None
         self.pid = None
         self._returncode = None
@@ -131,6 +138,7 @@ class Runner(threading.Thread):
         self.control = control
         self.data = data
         self.external = external
+        self.log_dir = log_dir
         self.start_time = None
 
     def run(self):
@@ -226,7 +234,8 @@ class Runner(threading.Thread):
     def respawn(self):
         logging.log(1, "respawn()")
         return Runner(self.command, self.name, control=self.control,
-                      data=self.data, external=self.external)
+                      data=self.data, external=self.external,
+                      log_dir=self.log_dir)
 
 
 BASE_COMMAND = r'''{command} \
@@ -270,7 +279,8 @@ LOG_ROTATION = r'''--log-rotation'''
 
 def start_runners(runners, command, source_addrs, sink_addrs, metrics_addr,
                   res_dir, workers, worker_addrs=[], log_rotation=False,
-                  alt_block=None, alt_func=lambda x: False, spikes={}):
+                  alt_block=None, alt_func=lambda x: False, spikes={},
+                  log_dir=None):
     cmd_stub = BASE_COMMAND.format(command=command,
                                    out_block=(
                                        OUT_BLOCK.format(outputs=','.join(
@@ -313,7 +323,8 @@ def start_runners(runners, command, source_addrs, sink_addrs, metrics_addr,
                           name='initializer',
                           control=worker_addrs[0][0],
                           data=worker_addrs[0][1],
-                          external=worker_addrs[0][2]))
+                          external=worker_addrs[0][2],
+                          log_dir=log_dir))
     for x in range(1, workers):
         if x in spikes:
             logging.info("Enabling spike for worker{}".format(x))
@@ -343,7 +354,8 @@ def start_runners(runners, command, source_addrs, sink_addrs, metrics_addr,
                               name='worker{}'.format(x),
                               control=worker_addrs[x][0],
                               data=worker_addrs[x][1],
-                              external=worker_addrs[x][2]))
+                              external=worker_addrs[x][2],
+                              log_dir=log_dir))
 
     # start the workers, 50ms apart
     for idx, r in enumerate(runners):
@@ -380,7 +392,8 @@ def add_runner(worker_id, runners, command, source_addrs, sink_addrs, metrics_ad
                control_addr, res_dir, workers,
                my_control_addr, my_data_addr, my_external_addr,
                log_rotation=False,
-               alt_block=None, alt_func=lambda x: False, spikes={}):
+               alt_block=None, alt_func=lambda x: False, spikes={},
+               log_dir=None):
     cmd_stub = BASE_COMMAND.format(command=command,
                                    out_block=(
                                        OUT_BLOCK.format(outputs=','.join(
@@ -430,7 +443,8 @@ def add_runner(worker_id, runners, command, source_addrs, sink_addrs, metrics_ad
                     name='worker{}'.format(worker_id),
                     control=my_control_addr,
                     data=my_data_addr,
-                    external=my_external_addr)
+                    external=my_external_addr,
+                    log_dir=log_dir)
     runners.append(runner)
 
     # start the new worker
@@ -471,10 +485,12 @@ SinkData = namedtuple('SinkData',
 
 
 class Cluster(object):
+    base_log_dir = '/tmp/wallaroo_test_errors/current_test'
+
     def __init__(self, command, host='127.0.0.1', sources=[], workers=1,
             sinks=1, sink_mode='framed', split_streams=False,
             worker_join_timeout=30,
-            is_ready_timeout=30, res_dir=None, log_rotation=False,
+            is_ready_timeout=60, res_dir=None, log_rotation=False,
             persistent_data={}):
         # Create attributes
         self._finalized = False
@@ -503,6 +519,8 @@ class Cluster(object):
             self.res_dir = res_dir
         self.ops = []
         self.persistent_data = persistent_data
+        self.log_dir = self.base_log_dir
+        makedirs_if_not_exists(self.log_dir)
         # Run a continuous crash in a background thread
         self._stoppables = set()
         self.crash_checker = CrashChecker(self)
@@ -549,7 +567,8 @@ class Cluster(object):
             start_runners(self.workers, self.command, self.source_addrs,
                           self.sink_addrs,
                           self.metrics_addr, self.res_dir, workers,
-                          worker_addrs, self.log_rotation)
+                          worker_addrs, self.log_rotation,
+                          log_dir = self.log_dir)
             self.runners.extend(self.workers)
             self._worker_id_counter = len(self.workers)
 
@@ -658,7 +677,8 @@ class Cluster(object):
                 my_control_addr=worker_addrs[x][0],
                 my_data_addr=worker_addrs[x][1],
                 my_external_addr=worker_addrs[x][2],
-                log_rotation=self.log_rotation)
+                log_rotation=self.log_rotation,
+                log_dir=self.log_dir)
             self._worker_id_counter += 1
             runners.append(runner)
             self.runners.append(runner)

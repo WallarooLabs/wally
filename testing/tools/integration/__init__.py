@@ -14,72 +14,53 @@
 
 
 """
+Clear out previous test run temp data
 """
 
-from .cluster import (add_runner,
-                     Cluster,
-                     ClusterError,
-                     Runner,
-                     RunnerData,
-                     runner_data_format,
-                     start_runners)
+import os
+import shutil
 
-from .control import (SinkAwaitValue,
-                     SinkExpect,
-                     TryUntilTimeout,
-                     WaitForClusterToResumeProcessing)
+from .external import makedirs_if_not_exists
+from .logger import add_file_logger
 
-from .end_points import (Metrics,
-                        MultiSequenceGenerator,
-                        Reader,
-                        Sender,
-                        Sink,
-                        files_generator,
-                        framed_file_generator,
-                        iter_generator,
-                        newline_file_generator,
-                        sequence_generator)
 
-from .errors import (AutoscaleError,
-                    CrashedWorkerError,
-                    DuplicateKeyError,
-                    ExpectationError,
-                    MigrationError,
-                    PipelineTestError,
-                    StopError,
-                    TimeoutError)
+BASE_LOG_DIR = '/tmp/wallaroo_test_errors/current_test'
+print("Clearing out {}".format(BASE_LOG_DIR))
+shutil.rmtree(BASE_LOG_DIR, True)
 
-from .external import (clean_resilience_path,
-                      create_resilience_dir,
-                      run_shell_cmd,
-                      get_port_values,
-                      is_address_available,
-                      setup_resilience_path)
+# Create the dir again
+makedirs_if_not_exists(BASE_LOG_DIR)
 
-from .integration import (json_keyval_extract,
-                          pipeline_test)
+# Add a file logger saving to it in DEBUG level
+log_file = 'test.log'
+log_path = os.path.join(BASE_LOG_DIR, log_file)
+add_file_logger(log_path)
 
-from .logger import (DEFAULT_LOG_FMT,
-                    INFO2,
-                    set_logging)
 
-from .metrics_parser import (MetricsData,
-                            MetricsParser,
-                            MetricsParseError)
+def _clean_base_log_dir():
+        # clean the current test log dir
+        for f in os.listdir(BASE_LOG_DIR):
+            if f == 'test.log':
+                with open(os.path.join(BASE_LOG_DIR, f), 'wb'):
+                    pass
+                continue
+            file_path = os.path.join(BASE_LOG_DIR, f)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
 
-from .observability import (cluster_status_query,
-                           get_func_name,
-                           multi_states_query,
-                           ObservabilityNotifier,
-                           ObservabilityResponseError,
-                           ObservabilityTimeoutError,
-                           partition_counts_query,
-                           partitions_query,
-                           state_entity_query)
 
-from .stoppable_thread import StoppableThread
-
-from .test_context import (get_caller_name,
-                           LoggingTestContext)
-
-from .typed_list import TypedList
+def clear_current_test(func):
+    def wrapper(*args, **kwargs):
+        # clean base log dir
+        _clean_base_log_dir()
+        # execute the wrapped function
+        with open(os.path.join(BASE_LOG_DIR, func.__name__), 'wt'):
+            pass
+        res = func(*args, **kwargs)
+        # clean base log dir again...
+        _clean_base_log_dir()
+        # return wrapped function's output
+        return res
+    return wrapper
