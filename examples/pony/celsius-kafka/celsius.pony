@@ -22,9 +22,11 @@ use "wallaroo/core/sink/kafka_sink"
 use "wallaroo/core/source"
 use "wallaroo/core/source/kafka_source"
 use "wallaroo/core/topology"
+use "wallaroo_labs/logging"
 
 actor Main
   new create(env: Env) =>
+    Log.set_defaults()
     let ksource_clip = KafkaSourceConfigCLIParser(env.out)
     let ksink_clip = KafkaSinkConfigCLIParser(env.out)
 

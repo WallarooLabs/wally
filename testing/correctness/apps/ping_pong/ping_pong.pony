@@ -35,6 +35,7 @@ use "options"
 use "serialise"
 use "wallaroo_labs/bytes"
 use "wallaroo"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
 use "wallaroo/core/sink/tcp_sink"
@@ -47,6 +48,7 @@ primitive Pong
 
 actor Main
   new create(env: Env) =>
+    Log.set_defaults()
     var app_type: (Ping | Pong | None) = None
     var options = Options(env.args, false)
 

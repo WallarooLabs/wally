@@ -26,11 +26,13 @@ use "wallaroo/core/source/gen_source"
 use "wallaroo/core/state"
 use "wallaroo/core/topology"
 use "wallaroo_labs/bytes"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 
 
 actor Main
   new create(env: Env) =>
+    Log.set_defaults()
     try
       var seq_offset: USize = 0
 

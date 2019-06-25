@@ -17,6 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/options"
 use "wallaroo_labs/thread_count"
@@ -30,6 +31,8 @@ use "lib:python-wallaroo"
 
 actor Main
   new create(env: Env) =>
+    Log.set_defaults()
+
     let pony_thread_count = ThreadCount()
 
     if pony_thread_count != 1 then
