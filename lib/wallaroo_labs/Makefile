@@ -43,7 +43,7 @@ include $(rules_mk_path)
 unit-tests-lib-wallaroo_labs: build-lib-wallaroo_labs
 unit-tests-lib-wallaroo_labs: lib_wallaroo_labs_test
 
-lib_wallaroo_labs_test:
+lib_wallaroo_labs_test: build-lib-wallaroo_labs
 	cd $(abspath $(LIB_WALLAROO_LABS_PATH:%/=%)) && ./$(notdir $(abspath $(LIB_WALLAROO_LABS_PATH:%/=%))) --sequential
 
 # end of prevent rules from being evaluated/included multiple times
