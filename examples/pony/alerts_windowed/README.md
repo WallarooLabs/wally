@@ -1,9 +1,33 @@
-# Alerts (stateless)
+# Alerts (windowed)
 
 ## About The Application
 
-This is an example of a stateless application that takes a transaction
-and sends an alert if its value is above or below a threshold.
+This is an example of a windowed application that takes transactions
+in sliding windows and sends an alert if its value is above or below 
+a threshold.
+
+## Prerequisites
+	
+- ponyc
+- pony-stable
+- Wallaroo
+        
+See [Wallaroo Environment Setup Instructions](https://docs.wallaroolabs.com/python-installation/).
+
+## Building
+
+Build Alerts (windowed) with
+```bash
+make
+```
+
+## alerts_windowed arguments
+
+In a shell, run the following to get help on arguments to the application:
+
+```bash
+./alerts_windowed --help
+```
 
 ### Input
 

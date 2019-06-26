@@ -6,6 +6,29 @@ This is an example of a stateful application that builds up worker
 local aggregations before sending the results downstream where they
 are tallied across workers.
 
+## Prerequisites
+	
+- ponyc
+- pony-stable
+- Wallaroo
+        
+See [Wallaroo Environment Setup Instructions](https://docs.wallaroolabs.com/python-installation/).
+
+## Building
+
+Build Alerts (local aggregations) with
+```bash
+make
+```
+
+## alerts_local_aggregations arguments
+
+In a shell, run the following to get help on arguments to the application:
+
+```bash
+./alerts_local_aggregations --help
+```
+
 ### Input
 
 For simplicity, we use a generator source that creates a stream of transaction

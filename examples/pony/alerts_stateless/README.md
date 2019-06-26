@@ -5,6 +5,30 @@
 This is an example of a stateless application that takes a transaction
 and sends an alert if its value is above or below a threshold.
 
+## Prerequisites
+
+- ponyc
+- pony-stable
+- Wallaroo
+
+See [Wallaroo Environment Setup Instructions](https://docs.wallaroolabs.com/python-installation/).
+
+## Building
+
+Build Alerts (stateless) with
+
+```bash
+make
+```
+
+## alerts_stateless arguments
+
+In a shell, run the following to get help on arguments to the application:
+
+```bash
+./alerts_stateless --help
+```
+
 ### Input
 
 For simplicity, we use a generator source that creates a stream of transaction
