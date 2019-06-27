@@ -101,7 +101,8 @@ static int _w_l(unsigned char severity, unsigned char category,
 {
   char fmt2[FMT_BUF_SIZE];
 
-  if (severity > _cat2sev_threshold[category]) {
+  if (severity > MAX_SEVERITY || category > MAX_CATEGORY ||
+      severity > _cat2sev_threshold[category]) {
     return 0;
   }
   if (! _labels_initialized) {
@@ -140,9 +141,13 @@ int printf(const char *fmt, ...)
 **               otherwise false
 */
 
-unsigned char l_enabled(unsigned char severity, unsigned char category)
+unsigned char l_enabled(unsigned short severity16, unsigned short category16)
 {
-  if (severity > _cat2sev_threshold[category]) {
+  unsigned char severity = severity16 & 0xFF;
+  unsigned char category = (category16 >> 8) & 0xFF;
+
+  if (severity > MAX_SEVERITY || category > MAX_CATEGORY ||
+      severity > _cat2sev_threshold[category]) {
     return 0;
   }
   return 1;
@@ -168,7 +173,8 @@ unsigned char ll_enabled(unsigned short sev_cat)
   unsigned char severity = sev_cat & 0xFF;
   unsigned char category = (sev_cat >> 8) & 0xFF;
 
-  if (severity > _cat2sev_threshold[category]) {
+  if (severity > MAX_SEVERITY || category > MAX_CATEGORY ||
+      severity > _cat2sev_threshold[category]) {
     return 0;
   }
   return 1;
@@ -190,11 +196,14 @@ unsigned char ll_enabled(unsigned short sev_cat)
 ** Return value: # of bytes written
 */
 
-int l(unsigned char severity, unsigned char category, const char *fmt, ...)
+int l(unsigned short severity16, unsigned short category16, const char *fmt, ...)
 {
+  unsigned char severity = severity16 & 0xFF;
+  unsigned char category = (category16 >> 8) & 0xFF;
   va_list ap;
 
-  if (severity > _cat2sev_threshold[category]) {
+  if (severity > MAX_SEVERITY || category > MAX_CATEGORY ||
+      severity > _cat2sev_threshold[category]) {
     return 0;
   }
   if (! _labels_initialized) {
@@ -228,7 +237,8 @@ int ll(unsigned short sev_cat, const char *fmt, ...)
   unsigned char category = (sev_cat >> 8) & 0xFF;
   va_list ap;
 
-  if (severity > _cat2sev_threshold[category]) {
+  if (severity > MAX_SEVERITY || category > MAX_CATEGORY ||
+      severity > _cat2sev_threshold[category]) {
     return 0;
   }
   if (! _labels_initialized) {
@@ -245,8 +255,10 @@ int ll(unsigned short sev_cat, const char *fmt, ...)
 ** severity - numeric severity from 0 to MAX_SEVERITY
 */
 
-void w_set_severity_label(unsigned char severity, char *label)
+void w_set_severity_label(unsigned short severity16, char *label)
 {
+  unsigned char severity = severity16 & 0xFF;
+
   if (! _labels_initialized) {
     _w_initialize_labels();
   }
@@ -261,8 +273,10 @@ void w_set_severity_label(unsigned char severity, char *label)
 ** category - application category number from 0 to MAX_CATEGORY
 */
 
-void w_set_category_label(unsigned char category, char *label)
+void w_set_category_label(unsigned short category16, char *label)
 {
+  unsigned char category = (category16 >> 8) & 0xFF;
+
   if (! _labels_initialized) {
     _w_initialize_labels();
   }
@@ -277,8 +291,9 @@ void w_set_category_label(unsigned char category, char *label)
 ** severity - numeric severity from 0 to MAX_SEVERITY
 */
 
-void w_set_severity_threshold(unsigned char severity)
+void w_set_severity_threshold(unsigned short severity16)
 {
+  unsigned char severity = severity16 & 0xFF;
   int i;
 
   if (! _labels_initialized) {
@@ -298,8 +313,10 @@ void w_set_severity_threshold(unsigned char severity)
 ** category - application category number from 0 to MAX_CATEGORY
 */
 
-void w_set_severity_cat_threshold(unsigned char severity, unsigned char category)
+void w_set_severity_cat_threshold(unsigned short severity16, unsigned short category16)
 {
+  unsigned char severity = severity16 & 0xFF;
+  unsigned char category = (category16 >> 8) & 0xFF;
   int i;
 
   if (! _labels_initialized) {

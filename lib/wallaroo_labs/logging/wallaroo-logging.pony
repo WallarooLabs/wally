@@ -32,8 +32,12 @@ use @w_set_severity_threshold[None](severity: LogSeverity)
 use @w_set_severity_cat_threshold[None](severity: LogSeverity, category: LogCategory)
 use @w_process_category_overrides[None]()
 
+// LogSeverity is a U16 which is the same size as the
+// combined severity + category, which is weird but
+// intentional.  For more details, see comments in
+// make_sev_cat() or the PR that added this file.
 type LogSeverity is U16
-type LogCategory is U8
+type LogCategory is U16
 
 primitive Log
   // severity levels
@@ -50,16 +54,17 @@ primitive Log
   fun default_severity(): LogSeverity => info()
 
   // categories
-  fun no_cat(): LogCategory           => LogCategory(0)
-  fun checkpoint(): LogCategory       => LogCategory(1)
-  fun source_migration(): LogCategory => LogCategory(2)
-  fun twopc(): LogCategory            => LogCategory(3)
-  fun dos_client(): LogCategory       => LogCategory(4)
-  fun tcp_sink(): LogCategory         => LogCategory(5)
-  fun conn_sink(): LogCategory        => LogCategory(6)
-  fun tcp_source(): LogCategory       => LogCategory(7)
-  fun conn_source(): LogCategory      => LogCategory(8)
-  fun max_category(): LogCategory     => LogCategory(40)
+  fun no_cat(): LogCategory           => LogCategory(0).shl(8)
+  fun checkpoint(): LogCategory       => LogCategory(1).shl(8)
+  fun source_migration(): LogCategory => LogCategory(2).shl(8)
+  fun twopc(): LogCategory            => LogCategory(3).shl(8)
+  fun dos_client(): LogCategory       => LogCategory(4).shl(8)
+  fun tcp_sink(): LogCategory         => LogCategory(5).shl(8)
+  fun conn_sink(): LogCategory        => LogCategory(6).shl(8)
+  fun tcp_source(): LogCategory       => LogCategory(7).shl(8)
+  fun conn_source(): LogCategory      => LogCategory(8).shl(8)
+  fun max_category(): LogCategory     => LogCategory(40).shl(8)
+  fun manual_category(n: U16): LogCategory  => LogCategory(n).shl(8)
 
   fun severity_map(): Array[(LogSeverity, String)] =>
     [ // BEGIN severity_map
@@ -118,4 +123,4 @@ primitive Log
     // Assume that users may not want to specify a category, so we put
     // the more important severity in bits 0-7 and put the category in
     // bits 8-15.
-    category.u16().shl(8) + severity.u16()
+    category + severity
