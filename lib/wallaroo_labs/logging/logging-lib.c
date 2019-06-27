@@ -165,8 +165,8 @@ unsigned char l_enabled(unsigned char severity, unsigned char category)
 
 unsigned char ll_enabled(unsigned short sev_cat)
 {
-  unsigned char severity = (sev_cat >> 8) & 0xFF;
-  unsigned char category = sev_cat & 0xFF;
+  unsigned char severity = sev_cat & 0xFF;
+  unsigned char category = (sev_cat >> 8) & 0xFF;
 
   if (severity > _cat2sev_threshold[category]) {
     return 0;
@@ -224,8 +224,8 @@ int l(unsigned char severity, unsigned char category, const char *fmt, ...)
 
 int ll(unsigned short sev_cat, const char *fmt, ...)
 {
-  unsigned char severity = (sev_cat >> 8) & 0xFF;
-  unsigned char category = sev_cat & 0xFF;
+  unsigned char severity = sev_cat & 0xFF;
+  unsigned char category = (sev_cat >> 8) & 0xFF;
   va_list ap;
 
   if (severity > _cat2sev_threshold[category]) {

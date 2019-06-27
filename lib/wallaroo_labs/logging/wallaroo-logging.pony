@@ -83,8 +83,8 @@ primitive Log
       (default_severity(), dos_client(),       "DOSClient")
       (default_severity(), tcp_sink(),         "TCPSink")
       (default_severity(), conn_sink(),        "ConnectorSink")
-      (default_severity(), tcp_source(),         "TCPSource")
-      (default_severity(), conn_source(),        "ConnectorSource")
+      (default_severity(), tcp_source(),       "TCPSource")
+      (default_severity(), conn_source(),      "ConnectorSource")
     ] // END category_map
 
   fun set_defaults() =>
@@ -115,4 +115,7 @@ primitive Log
     end
 
   fun make_sev_cat(severity: LogSeverity, category: LogCategory): U16 =>
-    severity.u16().shl(8) + category.u16()
+    // Assume that users may not want to specify a category, so we put
+    // the more important severity in bits 0-7 and put the category in
+    // bits 8-15.
+    category.u16().shl(8) + severity.u16()
