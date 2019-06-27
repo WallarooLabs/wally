@@ -41,10 +41,10 @@ class iso _TestFFI is UnitTest
     Log.set_defaults()
 
     // Make it obvious if the log level changes
-    h.assert_eq[U8](Log.info(), Log.default_severity())
+    h.assert_eq[U16](Log.info(), Log.default_severity())
 
     // Check for enabled sev+cat
-    for sev in Range[U8](0, Log.info()) do
+    for sev in Range[U16](0, Log.info()) do
       for cat in Range[U8](0, Log.max_category()) do
         h.assert_eq[Bool](true, @l_enabled(sev, cat))
         h.assert_eq[Bool](true, @ll_enabled(Log.make_sev_cat(sev, cat)))
@@ -52,7 +52,7 @@ class iso _TestFFI is UnitTest
     end
 
     // Check for disabled sev+cat
-    for sev in Range[U8](Log.info() + 1, Log.max_severity() + 1) do
+    for sev in Range[U16](Log.info() + 1, Log.max_severity() + 1) do
       for cat in Range[U8](0, Log.max_category()) do
         h.assert_eq[Bool](false, @l_enabled(sev, cat))
         h.assert_eq[Bool](false, @ll_enabled(Log.make_sev_cat(sev, cat)))

@@ -32,8 +32,8 @@ use @w_set_severity_threshold[None](severity: LogSeverity)
 use @w_set_severity_cat_threshold[None](severity: LogSeverity, category: LogCategory)
 use @w_process_category_overrides[None]()
 
+type LogSeverity is U16
 type LogCategory is U8
-type LogSeverity is U8
 
 primitive Log
   // severity levels

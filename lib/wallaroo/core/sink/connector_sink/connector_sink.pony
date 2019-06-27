@@ -108,7 +108,7 @@ actor ConnectorSink is Sink
   let _metrics_reporter: MetricsReporter
   var _initializer: (LocalTopologyInitializer | None) = None
   let _conn_debug: U16 = Log.make_sev_cat(Log.debug(), Log.conn_sink())
-  let _conn_info: U16 = Log.make_sev_cat(Log.info(), Log.conn_sink())
+  let _conn_info: U16 = Log.info()
   let _conn_err: U16 = Log.make_sev_cat(Log.err(), Log.conn_sink())
   let _twopc_debug: U16 = Log.make_sev_cat(Log.debug(), Log.twopc())
   let _twopc_info: U16 = Log.make_sev_cat(Log.info(), Log.twopc())
