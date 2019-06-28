@@ -181,7 +181,7 @@ class Queue[A: Any #alias]
 
   fun values(): QueueValues[A, this->Array[A]]^ =>
     """
-	Return a `QueueValues` iterator.
+    Return a `QueueValues` iterator.
     """
     QueueValues[A, this->Array[A]](_data, _front_ptr, _back_ptr)
 
