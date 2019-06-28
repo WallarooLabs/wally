@@ -65,6 +65,15 @@ jobs:
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
 
+  integration-tests-testing-correctness-tests-aloc_sink:
+    executor: wallaroo-ci
+    steps:
+      - checkout
+      - run: .circleci/clone_tracker.sh
+      - run: make integration-tests-testing-correctness-tests-aloc_sink debug=true resilience=on
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
+
   autoscale-tests-pony:
     executor: wallaroo-ci
     steps:
@@ -266,6 +275,10 @@ workflows:
             - unit-tests
 
       - integration-tests-testing-correctness-apps-with-resilience:
+          requires:
+            - unit-tests
+
+      - integration-tests-testing-correctness-tests-aloc_sink:
           requires:
             - unit-tests
 
