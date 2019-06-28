@@ -180,9 +180,9 @@ class Queue[A: Any #alias]
     end
 
   fun values(): QueueValues[A, this->Array[A]]^ =>
-	"""
+    """
 	Return a `QueueValues` iterator.
-	"""
+    """
     QueueValues[A, this->Array[A]](_data, _front_ptr, _back_ptr)
 
   fun pairs(): QueuePairs[A, this->Array[A]]^ =>
