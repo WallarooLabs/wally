@@ -93,21 +93,52 @@ primitive Log
     ] // END category_map
 
   fun set_defaults() =>
+    """
+    Set default severity labels, category labels, and default
+    severity threshold for use in all Wallaroo apps.  This function
+    should be called very early in a Wallaroo application's code,
+    before the first call to @l() or @ll().
+
+    """
     set_severity_labels()
     set_category_labels()
     set_thresholds()
 
   fun set_severity_labels() =>
+    """
+    Set syslog-style printable labels for all severity values.
+    """
     for (severity, label) in severity_map().values() do
       @w_set_severity_label(severity, label.cstring())
     end
 
   fun set_category_labels() =>
+    """
+    Set Wallaroo app subsystem labels for commonly-used categories.
+    """
     for (severity, category, label) in category_map().values() do
       @w_set_category_label(category, label.cstring())
     end
 
   fun set_thresholds(do_defaults: Bool = true, do_overrides: Bool = true) =>
+    """
+    Set the default and/or override logging severity thresholds for
+    Wallaroo app logging categories.  Default thresholds are specified
+    by the category_map() function.  Override thresholds are specified
+    by the environment variable WALLAROO_THRESHOLDS and parsed & set
+    by C FFI function @w_process_category_overrides().
+
+    WALLAROO_THRESHOLDS formatting:
+
+    ** The string should contain a list of zero or more
+    ** category.severity pairs, e.g, "22.6" for category 22 and
+    ** severity 6 (which corresponds to Log.notice()).  The string
+    ** "*" can be used to specify all categories.
+    **
+    ** Items in the list are separated by commas and are processed
+    ** in order.  The "*" for all categories, if used, probably ought
+    ** to be first in the list.  For example, "*.1,22.6,3.7,4.0".
+    """
     if do_defaults then
       @w_set_severity_threshold(default_severity())
       for (severity, category, label) in category_map().values() do
@@ -120,7 +151,13 @@ primitive Log
     end
 
   fun make_sev_cat(severity: LogSeverity, category: LogCategory): U16 =>
-    // Assume that users may not want to specify a category, so we put
-    // the more important severity in bits 0-7 and put the category in
-    // bits 8-15.
+    """
+    Merge together a severity and category into a single U16 for
+    use with the @ll() function.  (NOTE: The @l() function uses two
+    separate arguments to specify severity and category.)
+
+    Assume that users may not want to specify a category, so we put
+    the more important severity in bits 0-7 and put the category in
+    bits 8-15.
+    """
     category + severity

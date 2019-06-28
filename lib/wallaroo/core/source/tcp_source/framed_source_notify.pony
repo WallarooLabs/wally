@@ -32,8 +32,6 @@ use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
-// use @ll[I32](sev_cat: U16, fmt: Pointer[U8] tag, ...)
-
 class TCPSourceNotify[In: Any val]
   let _source_id: RoutingId
   let _auth: AmbientAuth

@@ -26,9 +26,6 @@ use cp = "wallaroo_labs/connector_protocol"
 use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 
-// use @ll[I32](sev_cat: U16, fmt: Pointer[U8] tag, ...)
-
-
 class ConnectorSinkNotify
   var _fsm_state: cp.ConnectorProtoFsmState = cp.ConnectorProtoFsmDisconnected
   var _header: Bool = true
