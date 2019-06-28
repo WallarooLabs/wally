@@ -185,7 +185,7 @@ unsigned char ll_enabled(unsigned short sev_cat)
 **
 ** severity - numeric severity from 0 to MAX_SEVERITY
 ** category - application category number from 0 to MAX_CATEGORY
-** fmt - snprintf(3)-style formatting string
+** fmt - snprintf(3)-style formatting string *without* trailing newline
 ** 0 or or arguments - snprintf(3)-style arguments
 **
 ** NOTE: In the interest of maximum speed, we check severity threshold
@@ -220,7 +220,7 @@ int l(unsigned short severity16, unsigned short category16, const char *fmt, ...
 ** sev_cat: a mix of:
 **     severity - numeric severity, bits 8-15
 **     category - application category number, bits 0-7
-** fmt - snprintf(3)-style formatting string
+** fmt - snprintf(3)-style formatting string *without* trailing newline
 ** 0 or or arguments - snprintf(3)-style arguments
 **
 ** NOTE: In the interest of maximum speed, we check severity threshold
