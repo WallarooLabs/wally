@@ -114,6 +114,11 @@ static int _w_l(unsigned char severity, unsigned char category,
   return _w_vprintf(fmt2, ap);
 }
 
+unsigned char _w_true()
+{
+  return 1;
+}
+
 /********************/
 /* Public functions */
 /********************/
