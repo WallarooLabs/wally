@@ -46,7 +46,11 @@ use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/tcp_actor"
 use "wallaroo/core/topology"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
+
+use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag, ...)
+use @ll[I32](sev_cat: U16, fmt: Pointer[U8] tag, ...)
 
 
 actor TCPSource[In: Any val] is (Source & TCPActor)
@@ -156,7 +160,7 @@ actor TCPSource[In: Any val] is (Source & TCPActor)
     end
 
     ifdef "identify_routing_ids" then
-      @printf[I32]("===TCPSource %s created===\n".cstring(),
+      @l(Log.info(), Log.conn_source(), "===TCPSource %s created===\n".cstring(),
         _source_id.string().cstring())
     end
 
@@ -327,7 +331,7 @@ actor TCPSource[In: Any val] is (Source & TCPActor)
       _outgoing_boundaries.remove(worker)?
     else
       ifdef debug then
-        @printf[I32]("TCPSource couldn't find boundary to %s to disconnect\n"
+        @l(Log.debug(), Log.conn_source(), "TCPSource couldn't find boundary to %s to disconnect\n"
           .cstring(), worker.cstring())
       end
     end
@@ -370,7 +374,7 @@ actor TCPSource[In: Any val] is (Source & TCPActor)
       _source_registry.unregister_source(this, _source_id)
       _event_log.unregister_resilient(_source_id, this)
       _unregister_all_outputs()
-      @printf[I32]("Shutting down TCPSource\n".cstring())
+      @l(Log.info(), Log.conn_source(), "Shutting down TCPSource\n".cstring())
       for b in _outgoing_boundaries.values() do
         b.dispose()
       end
@@ -397,14 +401,14 @@ actor TCPSource[In: Any val] is (Source & TCPActor)
         | let ob: OutgoingBoundary => b_count = b_count + 1
         end
       end
-      @printf[I32]("TCPSource %s has %s boundaries.\n".cstring(),
+      @l(Log.info(), Log.conn_source(), "TCPSource %s has %s boundaries.\n".cstring(),
         _source_id.string().cstring(), b_count.string().cstring())
     end
 
   be update_worker_data_service(worker: WorkerName,
     host: String, service: String)
   =>
-    @printf[I32]("SLF: TCPSource: update_worker_data_service: %s -> %s %s\n".cstring(), worker.cstring(), host.cstring(), service.cstring())
+    @l(Log.info(), Log.conn_source(), "SLF: TCPSource: update_worker_data_service: %s -> %s %s\n".cstring(), worker.cstring(), host.cstring(), service.cstring())
     try
       let b = _outgoing_boundaries(worker)?
       b.update_worker_data_service(worker, host, service)
@@ -416,10 +420,7 @@ actor TCPSource[In: Any val] is (Source & TCPActor)
   // BARRIER
   //////////////
   be initiate_barrier(token: BarrierToken) =>
-    ifdef "checkpoint_trace" then
-      @printf[I32]("TCPSource received initiate_barrier %s\n".cstring(),
-        token.string().cstring())
-    end
+    @l(Log.debug(), Log.conn_source(), "TCPSource received initiate_barrier %s\n".cstring(), token.string().cstring())
     if not _disposed then
       _initiate_barrier(token)
     end
@@ -444,10 +445,7 @@ actor TCPSource[In: Any val] is (Source & TCPActor)
     end
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
-    ifdef "checkpoint_trace" then
-      @printf[I32]("Checkpoint %s complete at TCPSource %s\n".cstring(),
-        checkpoint_id.string().cstring(), _source_id.string().cstring())
-    end
+    @l(Log.debug(), Log.conn_source(), "Checkpoint %s complete at TCPSource %s\n".cstring(), checkpoint_id.string().cstring(), _source_id.string().cstring())
     None
 
   //////////////
@@ -496,14 +494,14 @@ actor TCPSource[In: Any val] is (Source & TCPActor)
   ///////////////
   fun ref _mute() =>
     ifdef debug then
-      @printf[I32]("Muting TCPSource\n".cstring())
+      @l(Log.debug(), Log.conn_source(), "Muting TCPSource\n".cstring())
     end
     _muted = true
     _tcp_handler.mute()
 
   fun ref _unmute() =>
     ifdef debug then
-      @printf[I32]("Unmuting TCPSource\n".cstring())
+      @l(Log.debug(), Log.conn_source(), "Unmuting TCPSource\n".cstring())
     end
     _muted = false
     _tcp_handler.unmute()

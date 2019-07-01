@@ -26,10 +26,12 @@ use "wallaroo/core/source/gen_source"
 use "wallaroo/core/state"
 use "wallaroo/core/topology"
 use "wallaroo/core/windows"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/time"
 
 actor Main
   new create(env: Env) =>
+    Log.set_defaults()
     try
       let pipeline = recover val
         let transactions = Wallaroo.source[Transaction]("Alerts (windowed)",

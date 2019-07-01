@@ -22,9 +22,11 @@ use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
 use "wallaroo/core/source/gen_source"
 use "wallaroo/core/topology"
+use "wallaroo_labs/logging"
 
 actor Main
   new create(env: Env) =>
+    Log.set_defaults()
     try
       let pipeline = recover val
         let transactions = Wallaroo.source[Transaction]("Alerts (stateless)",

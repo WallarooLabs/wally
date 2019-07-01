@@ -45,6 +45,7 @@ use "wallaroo/core/network"
 use "wallaroo/core/recovery"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
 
@@ -55,6 +56,9 @@ use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
+
+use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag, ...)
+use @ll[I32](sev_cat: U16, fmt: Pointer[U8] tag, ...)
 
 
 actor TCPSink is Sink
@@ -175,7 +179,7 @@ actor TCPSink is Sink
     _mute_upstreams()
 
     ifdef "identify_routing_ids" then
-      @printf[I32]("===TCPSink %s created===\n".cstring(),
+      @l(Log.info(), Log.tcp_sink(), "===TCPSink %s created===\n".cstring(),
         _sink_id.string().cstring())
     end
 
@@ -201,7 +205,7 @@ actor TCPSink is Sink
     None
 
   fun ref _initial_connect() =>
-    @printf[I32]("TCPSink initializing connection to %s:%s\n".cstring(),
+    @l(Log.info(), Log.tcp_sink(), "TCPSink initializing connection to %s:%s\n".cstring(),
       _host.cstring(), _service.cstring())
     _connect_count = @pony_os_connect_tcp[U32](this,
       _host.cstring(), _service.cstring(),
@@ -232,7 +236,7 @@ actor TCPSink is Sink
     end
 
     ifdef "trace" then
-      @printf[I32]("Rcvd msg at TCPSink\n".cstring())
+      @l(Log.debug(), Log.tcp_sink(), "Rcvd msg at TCPSink\n".cstring())
     end
     try
       let encoded = _encoder.encode[D](data, _wb)?
@@ -270,7 +274,7 @@ actor TCPSink is Sink
     to be sent but any writes that arrive after this will be
     silently discarded and not acknowleged.
     """
-    @printf[I32]("Shutting down TCPSink\n".cstring())
+    @l(Log.info(), Log.tcp_sink(), "Shutting down TCPSink\n".cstring())
     _no_more_reconnect = true
     _timers.dispose()
     close()
@@ -323,10 +327,7 @@ actor TCPSink is Sink
   be receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    ifdef "checkpoint_trace" then
-      @printf[I32]("Receive barrier %s at TCPSink %s\n".cstring(),
-        barrier_token.string().cstring(), _sink_id.string().cstring())
-    end
+    @l(Log.debug(), Log.tcp_sink(), "Receive barrier %s at TCPSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
     process_barrier(input_id, producer, barrier_token)
 
   fun ref receive_new_barrier(input_id: RoutingId, producer: Producer,
@@ -349,10 +350,7 @@ actor TCPSink is Sink
       barrier_token)
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
-    ifdef "checkpoint_trace" then
-      @printf[I32]("Barrier %s complete at TCPSink %s\n".cstring(),
-        barrier_token.string().cstring(), _sink_id.string().cstring())
-    end
+    @l(Log.debug(), Log.tcp_sink(), "Barrier %s complete at TCPSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
     _barrier_coordinator.ack_barrier(this, barrier_token)
     match barrier_token
     | let sbt: CheckpointBarrierToken =>
@@ -447,7 +445,7 @@ actor TCPSink is Sink
             _notify_connecting()
           end
         elseif not _connected and _closed then
-          @printf[I32]("Reconnection asio event\n".cstring())
+          @l(Log.info(), Log.tcp_sink(), "Reconnection asio event\n".cstring())
           if @pony_os_connected[Bool](fd) then
             // The connection was successful, make it ours.
             _fd = fd
@@ -881,7 +879,7 @@ actor TCPSink is Sink
 
   fun ref _schedule_reconnect() =>
     if (_host != "") and (_service != "") and not _no_more_reconnect then
-      @printf[I32]("RE-Connecting TCPSink to %s:%s\n".cstring(),
+      @l(Log.info(), Log.tcp_sink(), "RE-Connecting TCPSink to %s:%s\n".cstring(),
                    _host.cstring(), _service.cstring())
       let timer = Timer(PauseBeforeReconnectTCPSink(this), _reconnect_pause)
       _timers(consume timer)
@@ -972,14 +970,14 @@ class TCPSinkNotify is WallarooOutgoingNetworkActorNotify
     None
 
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
-    @printf[I32]("TCPSink connected\n".cstring())
+    @l(Log.info(), Log.tcp_sink(), "TCPSink connected\n".cstring())
 
 
   fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
-    @printf[I32]("TCPSink connection closed\n".cstring())
+    @l(Log.info(), Log.tcp_sink(), "TCPSink connection closed\n".cstring())
 
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
-    @printf[I32]("TCPSink connection failed\n".cstring())
+    @l(Log.info(), Log.tcp_sink(), "TCPSink connection failed\n".cstring())
 
   fun ref sentv(conn: WallarooOutgoingNetworkActor ref,
     data: ByteSeqIter): ByteSeqIter
@@ -995,10 +993,10 @@ class TCPSinkNotify is WallarooOutgoingNetworkActorNotify
     qty
 
   fun ref throttled(conn: WallarooOutgoingNetworkActor ref) =>
-    @printf[I32]("TCPSink is experiencing back pressure\n".cstring())
+    @l(Log.info(), Log.tcp_sink(), "TCPSink is experiencing back pressure\n".cstring())
 
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
-    @printf[I32](("TCPSink is no longer experiencing" +
+    @l(Log.info(), Log.tcp_sink(), ("TCPSink is no longer experiencing" +
       " back pressure\n").cstring())
 
 class PauseBeforeReconnectTCPSink is TimerNotify

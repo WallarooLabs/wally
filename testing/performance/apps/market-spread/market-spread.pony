@@ -78,6 +78,7 @@ use "wallaroo_labs/new_fix"
 use "wallaroo_labs/options"
 use "wallaroo_labs/time"
 use "wallaroo"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo/core/common"
 use "wallaroo/core/metrics"
@@ -89,6 +90,7 @@ use "wallaroo/core/topology"
 
 actor Main
   new create(env: Env) =>
+    Log.set_defaults()
     try
       let pipeline = recover val
         let orders = Wallaroo.source[FixOrderMessage val]("Orders",

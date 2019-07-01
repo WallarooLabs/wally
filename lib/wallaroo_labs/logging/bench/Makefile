@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../../Makefile
+include ../../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times
@@ -24,18 +24,25 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_PONYC_TARGET := true
 
 # `true`/`false` to enable/disable generate exs related targets (build/test/clean) for elixir sources in this directory
 # otherwise targets only get created if there are elixir sources (*.exs) in this directory.
-$(abspath $(lastword $(MAKEFILE_LIST)))_EXS_TARGET := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_EXS_TARGET := false
 
 # `true`/`false` to enable/disable generate docker related targets (build/push) for a Dockerfile in this directory
 # otherwise targets only get created if there is a Dockerfile in this directory
-$(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
 
 # `true`/`false` to enable/disable recursing into Makefiles of subdirectories if they exist
 # (and by recursion every makefile in the tree that is referenced)
-$(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 # standard rules generation makefile
 include $(rules_mk_path)
+
+LOGGING_BENCH_PATH = $(LOGGING_LIB_PATH)/bench/
+
+build-lib-wallaroo_labs-logging-bench-bench: $(logging_lib_a)
+build-lib-wallaroo_labs-logging-bench-all: build-lib-wallaroo_labs-logging-bench-bench
+build-lib-wallaroo_labs-logging-bench-bench: $(LOGGING_BENCH_PATH)main.pony
+	$(call PONYC,$(abspath $(LOGGING_BENCH_PATH:%/=%)))
 
 # end of prevent rules from being evaluated/included multiple times
 endif

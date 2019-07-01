@@ -34,8 +34,10 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 use "wallaroo_labs/bytes"
 use cwm = "wallaroo_labs/connector_wire_messages"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
+
 
 type _ProtoFsmState is (_ProtoFsmConnected | _ProtoFsmHandshake |
                         _ProtoFsmStreaming | _ProtoFsmError |
@@ -169,6 +171,9 @@ class ConnectorSourceNotify[In: Any val]
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
   var _coordinator: ConnectorSourceCoordinator[In]
+  let _conn_debug: U16 = Log.make_sev_cat(Log.debug(), Log.conn_source())
+  let _conn_info: U16 = Log.make_sev_cat(Log.info(), Log.conn_source())
+  let _conn_err: U16 = Log.make_sev_cat(Log.err(), Log.conn_source())
 
   // Barrier/checkpoint id tracking
   var _barrier_checkpoint_id: CheckpointId = 0
@@ -224,7 +229,7 @@ class ConnectorSourceNotify[In: Any val]
     _coordinator = coordinator'
 
     ifdef "trace" then
-      @printf[I32]("%s: max_credits = %lu, refill_credits = %lu\n".cstring(),
+      @ll(_conn_debug, "%s: max_credits = %lu, refill_credits = %lu\n".cstring(),
       __loc.type_name().cstring(), _max_credits, _refill_credits)
     end
 
@@ -250,7 +255,7 @@ class ConnectorSourceNotify[In: Any val]
       true
     else
       ifdef "trace" then
-        @printf[I32](("Rcvd msg at " + _pipeline_name + " source\n").cstring())
+        @ll(_conn_debug, ("Rcvd msg at " + _pipeline_name + " source\n").cstring())
       end
       _metrics_reporter.pipeline_ingest(_pipeline_name, _source_name)
       let ingest_ts = WallClock.nanoseconds()
@@ -289,28 +294,28 @@ class ConnectorSourceNotify[In: Any val]
     let data': Array[U8] val = consume data
     try
       ifdef "trace" then
-        @printf[I32]("TRACE: decode data: %s\n".cstring(), _print_array[U8](
+        @ll(_conn_debug, "TRACE: decode data: %s\n".cstring(), _print_array[U8](
           data').cstring())
       end
       let connector_msg = cwm.Frame.decode(data')?
       match connector_msg
       | let m: cwm.HelloMsg =>
         ifdef "trace" then
-          @printf[I32]("TRACE: got HelloMsg\n".cstring())
+          @ll(_conn_debug, "TRACE: got HelloMsg\n".cstring())
         end
         if _fsm_state isnt _ProtoFsmConnected then
-          @printf[I32]("ERROR: %s.received_connector_msg: state is %d\n"
+          @ll(_conn_err, "%s.received_connector_msg: state is %d\n"
             .cstring(), __loc.type_name().cstring(), _fsm_state())
           Fail()
         end
 
         if m.version != "0.0.1" then
-          @printf[I32]("ERROR: %s.received_connector_msg: unknown protocol version %s\n".cstring(),
+          @ll(_conn_err, "%s.received_connector_msg: unknown protocol version %s\n".cstring(),
             __loc.type_name().cstring(), m.version.cstring())
           return _to_error_state(source, "Unknown protocol version")
         end
         if m.cookie != _cookie then
-          @printf[I32]("ERROR: %s.received_connector_msg: bad cookie %s\n"
+          @ll(_conn_err, "%s.received_connector_msg: bad cookie %s\n"
             .cstring(), __loc.type_name().cstring(), m.cookie.cstring())
           return _to_error_state(source, "Bad cookie")
         end
@@ -330,19 +335,19 @@ class ConnectorSourceNotify[In: Any val]
 
       | let m: cwm.OkMsg =>
         ifdef "trace" then
-          @printf[I32]("TRACE: got OkMsg\n".cstring())
+          @ll(_conn_debug, "TRACE: got OkMsg\n".cstring())
         end
         return _to_error_state(source, "Invalid message: ok")
 
       | let m: cwm.ErrorMsg =>
-        @printf[I32]("Received ERROR msg from client: %s\n".cstring(),
+        @ll(_conn_info, "Received ERROR msg from client: %s\n".cstring(),
           m.message.cstring())
         source.close()
         return false
 
       | let m: cwm.NotifyMsg =>
         ifdef "trace" then
-          @printf[I32]("TRACE: got NotifyMsg: %lu %s %lu\n".cstring(),
+          @ll(_conn_debug, "TRACE: got NotifyMsg: %lu %s %lu\n".cstring(),
             m.stream_id, m.stream_name.cstring(), m.point_of_ref)
         end
         if _fsm_state isnt _ProtoFsmStreaming then
@@ -363,7 +368,7 @@ class ConnectorSourceNotify[In: Any val]
 
       | let m: cwm.NotifyAckMsg =>
         ifdef "trace" then
-          @printf[I32]("TRACE: got NotifyAckMsg\n".cstring())
+          @ll(_conn_debug, "TRACE: got NotifyAckMsg\n".cstring())
         end
         return _to_error_state(source, "Invalid message: notify_ack")
 
@@ -396,7 +401,7 @@ class ConnectorSourceNotify[In: Any val]
 
             if cwm.Eos.is_set(m.flags) then
               // Process EOS
-              @printf[I32](("ConnectorSource[%s] received EOS for stream_id"
+              @ll(_conn_info, ("ConnectorSource[%s] received EOS for stream_id"
                 + " %s. Last_acked: %s, last_seen :%s\n").cstring(),
                 _source_name.string().cstring(),
                 m.stream_id.string().cstring(),
@@ -405,10 +410,10 @@ class ConnectorSourceNotify[In: Any val]
               // 1. remove state from _active_streams
               try
                 _active_streams.remove(m.stream_id)?
-                @printf[I32]("Successfully removed %s from _active\n"
+                @ll(_conn_info, "Successfully removed %s from _active\n"
                   .cstring(), m.stream_id.string().cstring())
               else
-                @printf[I32](("Something went wrong trying to remove %s " +
+                @ll(_conn_info, ("Something went wrong trying to remove %s " +
                   "from _active\n").cstring(),
                   m.stream_id.string().cstring())
                 error
@@ -448,7 +453,7 @@ class ConnectorSourceNotify[In: Any val]
                 end
 
                 ifdef "trace" then
-                  @printf[I32](("Msg decoded at " + _pipeline_name +
+                  @ll(_conn_debug, ("Msg decoded at " + _pipeline_name +
                     " source\n").cstring())
                 end
 
@@ -471,7 +476,7 @@ class ConnectorSourceNotify[In: Any val]
                   // TODO [post-source-migration] revisit this error message
                   return _to_error_state(source, "No message bytes and BOUNDARY not set")
                 end
-                @printf[I32](("Unable to decode message at " + _pipeline_name +
+                @ll(_conn_err, ("Unable to decode message at " + _pipeline_name +
                   " source\n").cstring())
                 ifdef debug then
                   Fail()
@@ -486,22 +491,22 @@ class ConnectorSourceNotify[In: Any val]
 
       | let m: cwm.AckMsg =>
         ifdef "trace" then
-          @printf[I32]("TRACE: got AckMsg\n".cstring())
+          @ll(_conn_debug, "TRACE: got AckMsg\n".cstring())
         end
         return _to_error_state(source, "Invalid message: ack")
 
       | let m: cwm.RestartMsg =>
         ifdef "trace" then
-          @printf[I32]("TRACE: got RestartMsg\n".cstring())
+          @ll(_conn_debug, "TRACE: got RestartMsg\n".cstring())
         end
         return _to_error_state(source, "Invalid message: restart")
 
       end
     else
-      @printf[I32](("Unable to decode message at " + _pipeline_name +
+      @ll(_conn_err, ("Unable to decode message at " + _pipeline_name +
         " source\n").cstring())
       ifdef debug then
-        @printf[I32]("Message bytes: %s\n".cstring(),
+        @ll(_conn_debug, "Message bytes: %s\n".cstring(),
           _print_array[U8](data').cstring())
         Fail()
       end
@@ -611,7 +616,7 @@ class ConnectorSourceNotify[In: Any val]
       _router = p_router.update_boundaries(_auth, obs)
     else
       ifdef "trace" then
-        @printf[I32](("FramedSourceNotify doesn't have StatePartitionRouter." +
+        @ll(_conn_debug, ("FramedSourceNotify doesn't have StatePartitionRouter." +
           " Updating boundaries is a noop for this kind of Source.\n")
           .cstring())
       end
@@ -621,10 +626,10 @@ class ConnectorSourceNotify[In: Any val]
   // Connection State Management
   //////////////////////////////
   fun ref accepted(source: ConnectorSource[In] ref, session_id: RoutingId) =>
-    @printf[I32]((_source_name + ": accepted a connection 0x%lx\n").cstring(),
+    @ll(_conn_info, (_source_name + ": accepted a connection 0x%lx\n").cstring(),
       source)
     if _fsm_state isnt _ProtoFsmDisconnected then
-      @printf[I32]("ERROR: %s.connected: state is %d\n".cstring(),
+      @ll(_conn_err, "%s.connected: state is %d\n".cstring(),
         __loc.type_name().cstring(), _fsm_state())
       Fail()
     end
@@ -639,7 +644,7 @@ class ConnectorSourceNotify[In: Any val]
     source.expect(_header_size)
 
   fun ref closed(source: ConnectorSource[In] ref) =>
-    @printf[I32]("ConnectorSource connection closed 0x%lx\n".cstring(), source)
+    @ll(_conn_info, "ConnectorSource connection closed 0x%lx\n".cstring(), source)
     _session_active = false
     _fsm_state = _ProtoFsmDisconnected
     // TODO [post-source-migration] When the SourceCoordinator actors are added
@@ -662,12 +667,12 @@ class ConnectorSourceNotify[In: Any val]
     _clear_and_relinquish_all()
 
   fun ref throttled(source: ConnectorSource[In] ref) =>
-    @printf[I32]("%s.throttled: %s Experiencing backpressure!\n".cstring(),
+    @ll(_conn_info, "%s.throttled: %s Experiencing backpressure!\n".cstring(),
       __loc.type_name().cstring(), _pipeline_name.cstring())
     Backpressure.apply(_auth) // TODO: appropriate?
 
   fun ref unthrottled(source: ConnectorSource[In] ref) =>
-    @printf[I32]("%s.unthrottled: %s Releasing backpressure!\n".cstring(),
+    @ll(_conn_info, "%s.unthrottled: %s Releasing backpressure!\n".cstring(),
       __loc.type_name().cstring(), _pipeline_name.cstring())
     Backpressure.release(_auth) // TODO: appropriate?
 
@@ -725,7 +730,7 @@ class ConnectorSourceNotify[In: Any val]
       _clear_streams()
       _prep_for_rollback = true
       ifdef "trace" then
-        @printf[I32]("TRACE: %s.%s\n".cstring(), __loc.type_name().cstring(),
+        @ll(_conn_debug, "TRACE: %s.%s\n".cstring(), __loc.type_name().cstring(),
           __loc.method_name().cstring())
       end
     end
@@ -733,7 +738,7 @@ class ConnectorSourceNotify[In: Any val]
   fun ref rollback(source: ConnectorSource[In] ref,
     checkpoint_id: CheckpointId, payload: ByteSeq val)
   =>
-    @printf[I32]("ConnectorSource[%s] is rolling back to checkpoint_id %s\n"
+    @ll(_conn_info, "ConnectorSource[%s] is rolling back to checkpoint_id %s\n"
       .cstring(), _source_name.cstring(), checkpoint_id.string().cstring())
     _barrier_checkpoint_id = checkpoint_id
 
@@ -769,7 +774,7 @@ class ConnectorSourceNotify[In: Any val]
         for s_map in [_active_streams ; _pending_close].values() do
           for s in s_map.values() do
             ifdef debug then
-              @printf[I32]("%s ::: Updating stream_id %s last acked to %s\n"
+              @ll(_conn_debug, "%s ::: Updating stream_id %s last acked to %s\n"
                 .cstring(), WallClock.seconds().string().cstring(),
                 s.id.string().cstring(), s.last_seen.string().cstring())
             end
@@ -786,7 +791,7 @@ class ConnectorSourceNotify[In: Any val]
     if not _prep_for_rollback then
       ifdef debug then
         if checkpoint_id != _barrier_checkpoint_id then
-          @printf[I32](("ConnectorSourceNotify: Checkpoint complete for id " +
+          @ll(_conn_debug, ("ConnectorSourceNotify: Checkpoint complete for id " +
             " %s but expected %s\n").cstring(),
             checkpoint_id.string().cstring(),
             _barrier_checkpoint_id.string().cstring())
@@ -819,7 +824,7 @@ class ConnectorSourceNotify[In: Any val]
   fun ref _process_acks_for_pending_close(source: ConnectorSource[In] ref) =>
     for (stream_id, s) in _pending_close.pairs() do
       ifdef debug then
-        @printf[I32]("%s ::: Processing ack for %s at %s\n".cstring(),
+        @ll(_conn_debug, "%s ::: Processing ack for %s at %s\n".cstring(),
           WallClock.seconds().string().cstring(),
           stream_id.string().cstring(), s.last_acked.string().cstring())
       end
@@ -829,7 +834,7 @@ class ConnectorSourceNotify[In: Any val]
         _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
       else
         ifdef debug then
-          @printf[I32]("Stream_id %s is not ready to close.\n".cstring(),
+          @ll(_conn_debug, "Stream_id %s is not ready to close.\n".cstring(),
             stream_id.string().cstring())
         end
       end
@@ -847,12 +852,12 @@ class ConnectorSourceNotify[In: Any val]
     _pending_relinquish.clear()
 
     if streams.size() > 0 then
-      @printf[I32]("ConnectorSource relinquishing %s streams\n".cstring(),
+      @ll(_conn_info, "ConnectorSource relinquishing %s streams\n".cstring(),
         streams.size().string().cstring())
       _coordinator.streams_relinquish(source_id, consume streams)
     else
       if _fsm_state is _ProtoFsmShrinking then
-        @printf[I32]("ConnectorSource shrinking %s streams\n".cstring(),
+        @ll(_conn_info, "ConnectorSource shrinking %s streams\n".cstring(),
           streams.size().string().cstring())
         _coordinator.streams_relinquish(source_id, consume streams)
       end
@@ -897,7 +902,7 @@ class ConnectorSourceNotify[In: Any val]
     session_id: RoutingId, success: Bool, stream: StreamTuple)
   =>
     ifdef "trace" then
-      @printf[I32]("%s ::: stream_notify_result(%s, %s, StreamTuple(%s, %s, %s))\n".cstring(),
+      @ll(_conn_debug, "%s ::: stream_notify_result(%s, %s, StreamTuple(%s, %s, %s))\n".cstring(),
         WallClock.seconds().string().cstring(),
         session_id.string().cstring(),
         success.string().cstring(),
@@ -907,7 +912,7 @@ class ConnectorSourceNotify[In: Any val]
     end
     if (session_id != _session_id) or (not _session_active) then
       ifdef debug then
-        @printf[I32]("Notify request session_id is old. Rejecting result\n"
+        @ll(_conn_debug, "Notify request session_id is old. Rejecting result\n"
           .cstring())
       end
       // This is a reply from a query that we'd sent in a prior TCP
@@ -933,7 +938,7 @@ class ConnectorSourceNotify[In: Any val]
     stream_id: StreamId, point_of_reference: PointOfReference)
   =>
     ifdef debug then
-      @printf[I32]("%s ::: send_notify_ack(%s, %s, %s)\n".cstring(),
+      @ll(_conn_debug, "%s ::: send_notify_ack(%s, %s, %s)\n".cstring(),
         WallClock.seconds().string().cstring(), success.string().cstring(),
         stream_id.string().cstring(), point_of_reference.string().cstring())
     end
@@ -956,7 +961,7 @@ class ConnectorSourceNotify[In: Any val]
     let acks = recover iso Array[(StreamId, PointOfReference)] end
     for v in _pending_acks.values() do
       ifdef "trace" then
-        @printf[I32]("%s ::: Acking stream_id %s to por %s\n".cstring(),
+        @ll(_conn_debug, "%s ::: Acking stream_id %s to por %s\n".cstring(),
           WallClock.seconds().string().cstring(),
           v._1.string().cstring(),
           v._2.string().cstring())
@@ -967,14 +972,14 @@ class ConnectorSourceNotify[In: Any val]
     // only send acks if there are new credits or new acks to send
     if (new_credits > 0) or (acks.size() > 0) then
       // !TODO!: Is this too noisy?
-      @printf[I32]("Sending acks for %s streams\n".cstring(),
+      @ll(_conn_info, "Sending acks for %s streams\n".cstring(),
         _pending_acks.size().string().cstring())
       _send_reply(source, cwm.AckMsg(new_credits, consume acks))
     end
     _credits = _credits + new_credits
 
   fun ref send_restart(source: ConnectorSource[In] ref) =>
-    @printf[I32]("Sending RESTART(%s:%s)\n".cstring(),
+    @ll(_conn_info, "Sending RESTART(%s:%s)\n".cstring(),
       host.cstring(), service.cstring())
     _send_reply(source, cwm.RestartMsg(host + ":" + service))
     _clear_and_relinquish_all()
