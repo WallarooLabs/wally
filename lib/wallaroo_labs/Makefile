@@ -12,7 +12,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
 # `true`/`false` to enable/disable the actual unit test command so it can be overridden (the targets are still created)
 # applies to both the pony and elixir test targets
-$(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := false
+$(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := true
 
 # `true`/`false` to enable/disable generate pony related targets (build/test/clean) for pony sources in this directory
 # otherwise targets only get created if there are pony sources (*.pony) in this directory.
@@ -40,9 +40,10 @@ LIB_WALLAROO_LABS_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
+unit-tests-lib-wallaroo_labs: build-lib-wallaroo_labs
 unit-tests-lib-wallaroo_labs: lib_wallaroo_labs_test
 
-lib_wallaroo_labs_test:
+lib_wallaroo_labs_test: build-lib-wallaroo_labs
 	cd $(abspath $(LIB_WALLAROO_LABS_PATH:%/=%)) && ./$(notdir $(abspath $(LIB_WALLAROO_LABS_PATH:%/=%))) --sequential
 
 # end of prevent rules from being evaluated/included multiple times

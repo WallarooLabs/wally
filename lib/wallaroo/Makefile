@@ -40,9 +40,10 @@ LIB_WALLAROO_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
+unit-tests-lib-wallaroo: build-lib-wallaroo
 unit-tests-lib-wallaroo: lib_wallaroo_test
 
-lib_wallaroo_test:
+lib_wallaroo_test: build-lib-wallaroo
 	cd $(abspath $(LIB_WALLAROO_PATH:%/=%)) && ./$(notdir $(abspath $(LIB_WALLAROO_PATH:%/=%))) --sequential
 
 # end of prevent rules from being evaluated/included multiple times
