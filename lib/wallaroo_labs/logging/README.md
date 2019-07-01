@@ -45,7 +45,7 @@ two argument style:
 ```
 
 Log a message at `info` severity for the `checkpoint` category in the
-one argument style
+one argument style:
 
 ```
 // without var
@@ -54,6 +54,17 @@ one argument style
 // with var
 let info = Log.make_sev_crit(Log.info(), Log.checkpoint())
 @ll(info, "Hello, lucky %d".cstring(), 7)
+```
+
+Log a message at `info` severity without a category in the
+one argument style:
+
+```
+@ll(Log.info(), "Hello, lucky %d".cstring(), 7)
+
+// Equivalent to
+@ll(Log.make_sev_crit(Log.info(), Log.none()), "Hello, lucky %d".cstring(), 7)
+
 ```
 
 If message formatting is expensive, then Pony code may wish to check
