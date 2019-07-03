@@ -106,7 +106,7 @@ class ConnectorSinkNotify
     let list_u = TwoPCEncode.list_uncommitted(_rtag)
     try
       let list_u_msg =
-        cwm.MessageMsg(0, cwm.Ephemeral(), 0, 0, None, [list_u])?
+        cwm.MessageMsg(0, cwm.Ephemeral(), 0, 0, None, list_u)?
       send_msg(conn, list_u_msg)
     else
       Fail()
@@ -415,7 +415,7 @@ class ConnectorSinkNotify
         let p2 = TwoPCEncode.phase2(txn_id, do_commit)
         try
           let p2_msg =
-            cwm.MessageMsg(0, cwm.Ephemeral(), 0, 0, None, [p2])?
+            cwm.MessageMsg(0, cwm.Ephemeral(), 0, 0, None, p2)?
           send_msg(conn, p2_msg)
         else
           Fail()

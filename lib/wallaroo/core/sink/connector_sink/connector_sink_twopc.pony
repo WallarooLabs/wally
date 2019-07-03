@@ -112,7 +112,7 @@ class ConnectorSink2PC
       [(1, last_offset.u64(), current_offset.u64())]
     let bs = TwoPCEncode.phase1(txn_id, where_list)
     try
-      cwm.MessageMsg(0, cwm.Ephemeral(), 0, 0, None, [bs])?
+      cwm.MessageMsg(0, cwm.Ephemeral(), 0, 0, None, bs)?
      else
       Fail()
     end
@@ -205,9 +205,9 @@ class ConnectorSink2PC
 
   fun send_phase2(sink: ConnectorSink ref, commit: Bool)
   =>
-    let b: Array[U8] val = TwoPCEncode.phase2(txn_id, commit)
+    let bs: Array[U8] val = TwoPCEncode.phase2(txn_id, commit)
     try
-      let msg: cwm.MessageMsg = cwm.MessageMsg(0, cwm.Ephemeral(), 0, 0, None, [b])?
+      let msg: cwm.MessageMsg = cwm.MessageMsg(0, cwm.Ephemeral(), 0, 0, None, bs)?
        sink.send_msg(sink, msg)
      else
        Fail()

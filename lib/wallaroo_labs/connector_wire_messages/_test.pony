@@ -308,8 +308,8 @@ class iso _TestEosMessageMsg is UnitTest
     let encoded = Frame.encode(a)
     let m = Frame.decode(encoded)?
     let b = m as EosMessageMsg
-    h.assert_eq[U32](a.stream_id, sid)
-    h.assert_eq[U32](b.stream_id, sid)
+    h.assert_eq[U64](a.stream_id, sid)
+    h.assert_eq[U64](b.stream_id, sid)
 
 class iso _TestAckMsg is UnitTest
   fun name(): String => "connector_wire_messages/_TestAckMsg"

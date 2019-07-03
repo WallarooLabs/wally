@@ -326,7 +326,7 @@ class MessageMsg is MessageTrait
   let message_id: (MessageId | None)
   let event_time: (EventTimeType | None)
   let key: (KeyBytes | None)
-  let message: (MessageBytes | None)
+  let message: (MessageBytes | ByteSeqIter | None)
 
   new create(
     stream_id': StreamId,
@@ -334,7 +334,7 @@ class MessageMsg is MessageTrait
     message_id': (MessageId | None) = None,
     event_time': (EventTimeType | None) = None,
     key': (KeyBytes | None) = None,
-    message': (MessageBytes | None) = None) ?
+    message': (MessageBytes | ByteSeqIter | None) = None) ?
   =>
     stream_id = stream_id'
     flags = flags'
@@ -414,6 +414,7 @@ class MessageMsg is MessageTrait
     if not Boundary.is_set(flags) then
       match message
       | let mb: MessageBytes => wb.write(mb)
+      | let bs: ByteSeqIter => wb.writev(bs)
       end
     end
     wb
