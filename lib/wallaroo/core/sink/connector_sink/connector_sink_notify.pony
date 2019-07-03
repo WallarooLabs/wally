@@ -82,6 +82,7 @@ class ConnectorSinkNotify
 
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
     @ll(_conn_info, "ConnectorSink connected".cstring())
+    @printf[I32]("ConnectorSink connected".cstring())
     _header = true
     _connected = true
     _throttled = false
@@ -137,6 +138,7 @@ class ConnectorSinkNotify
     us to abort in phase 1 in the next round of 2PC.
     """
     @ll(_conn_info, "ConnectorSink connection closed, throttling".cstring())
+    @printf[I32]("ConnectorSink connection closed, throttling".cstring())
     _connected = false
     _throttled = false
     twopc_intro_done = false
@@ -145,9 +147,11 @@ class ConnectorSinkNotify
 
   fun ref dispose() =>
     @ll(_conn_info, "ConnectorSink connection dispose".cstring())
+    @printf[I32]("ConnectorSink connection dispose".cstring())
 
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
     @ll(_conn_info, "ConnectorSink connection failed".cstring())
+    @printf[I32]("ConnectorSink connection failed".cstring())
 
   fun ref expect(conn: WallarooOutgoingNetworkActor ref, qty: USize): USize =>
     qty
@@ -204,6 +208,7 @@ class ConnectorSinkNotify
       data
     else
       @ll(_conn_debug, "Sink sentv: not connected or throttled: buffering".cstring())
+      @printf[I32]("Sink sentv: not connected or throttled: buffering".cstring())
       for d in data.values() do
         twopc_reconnect_buffer.push(d)
       end
@@ -216,6 +221,8 @@ class ConnectorSinkNotify
       Backpressure.apply(_auth)
       @ll(_conn_info, ("ConnectorSink is experiencing back pressure, " +
         "connected = %s").cstring(), _connected.string().cstring())
+      @printf[I32](("ConnectorSink is experiencing back pressure, " +
+        "connected = %s").cstring(), _connected.string().cstring())
     end
 
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
@@ -223,6 +230,9 @@ class ConnectorSinkNotify
       _throttled = false
       Backpressure.release(_auth)
       @ll(_conn_info, ("ConnectorSink is no longer experiencing" +
+        " back pressure, connected = %s").cstring(),
+      _connected.string().cstring())
+      @printf[I32](("ConnectorSink is no longer experiencing" +
         " back pressure, connected = %s").cstring(),
       _connected.string().cstring())
       try @ll(_twopc_debug, "DBGDBG: unthrottled: buffer check, FSM state = %d".cstring(), (conn as ConnectorSink ref).get_twopc_state()) else Fail() end
@@ -275,6 +285,7 @@ class ConnectorSinkNotify
     | let m: cwm.NotifyAckMsg =>
       if _fsm_state is ConnectorProtoFsmStreaming then
         @ll(_conn_debug, "NotifyAck: success %s stream_id %d p-o-r %lu".cstring(), m.success.string().cstring(), m.stream_id, m.point_of_ref)
+        @printf[I32]("NotifyAck: success %s stream_id %d p-o-r %lu".cstring(), m.success.string().cstring(), m.stream_id, m.point_of_ref)
         // We are going to ignore the point of reference sent to us by
         // the connector sink.  We assume that we know best, and if our
         // point of reference is earlier, then we'll send some duplicates
@@ -289,6 +300,7 @@ class ConnectorSinkNotify
         return
       end
       @ll(_twopc_debug, "2PC: GOT MessageMsg".cstring())
+      @printf[I32]("2PC: GOT MessageMsg".cstring())
       try
         let inner = cwm.TwoPCFrame.decode(m.message as Array[U8] val)?
         match inner
@@ -302,6 +314,8 @@ class ConnectorSinkNotify
             Fail()
           end
           @ll(_conn_debug, "TRACE: uncommitted txns = %d".cstring(),
+              mi.txn_ids.size())
+          @printf[I32]("TRACE: uncommitted txns = %d".cstring(),
               mi.txn_ids.size())
           twopc_uncommitted_list = mi.txn_ids
           // twopc_current_txn_aborted is used by unthrottled()
@@ -328,6 +342,7 @@ class ConnectorSinkNotify
           try (conn as ConnectorSink ref).twopc_intro_done() else Fail() end
         | let mi: cwm.TwoPCReplyMsg =>
           @ll(_twopc_debug, "2PC: reply for txn_id %s was %s".cstring(), mi.txn_id.cstring(), mi.commit.string().cstring())
+          @printf[I32]("2PC: reply for txn_id %s was %s".cstring(), mi.txn_id.cstring(), mi.commit.string().cstring())
           try (conn as ConnectorSink ref).twopc_phase1_reply(
             mi.txn_id, mi.commit)
           else Fail() end
@@ -386,6 +401,7 @@ class ConnectorSinkNotify
       end
     | let m: cwm.RestartMsg =>
       @ll(_conn_debug, "TRACE: got restart message, closing connection".cstring())
+      @printf[I32]("TRACE: got restart message, closing connection".cstring())
       conn.close()
     end
 
@@ -405,6 +421,7 @@ class ConnectorSinkNotify
       var current_txn_aborted: Bool = false
 
       @ll(_twopc_debug, "2PC: process_uncommitted_list processing %d items, last_committed = %s".cstring(), uncommitted.size(), last_committed.cstring())
+      @printf[I32]("2PC: process_uncommitted_list processing %d items, last_committed = %s".cstring(), uncommitted.size(), last_committed.cstring())
       for txn_id in uncommitted.values() do
         let do_commit = if txn_id == last_committed then true else false end
         @ll(_twopc_debug, "2PC: uncommitted txn_id %s commit=%s".cstring(), txn_id.cstring(), do_commit.string().cstring())
@@ -425,6 +442,7 @@ class ConnectorSinkNotify
       current_txn_aborted
     else
       @ll(_twopc_debug, "2PC: process_uncommitted_list waiting".cstring())
+      @printf[I32]("2PC: process_uncommitted_list waiting".cstring())
       false
     end
 
@@ -456,6 +474,7 @@ class ConnectorSinkNotify
       // txn_id.
       twopc_txn_id_last_committed = ""
       try @ll(_twopc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.".cstring(), (twopc_txn_id_last_committed as String).cstring()) else Fail() end
+      try @printf[I32]("DBGDBG: 2PC: twopc_txn_id_last_committed = %s.".cstring(), (twopc_txn_id_last_committed as String).cstring()) else Fail() end
       process_uncommitted_list(conn)
     end
 

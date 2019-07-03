@@ -531,7 +531,7 @@ def test_message():
             with pytest.raises(Exception) as e_info:
                 M.test_flags_allowed(f, message_id, event_time, None, message)
 
-       elif fv & M.UnstableReference == M.UnstableReference:
+        elif fv & M.UnstableReference == M.UnstableReference:
             # message_id cannot be None
             # EventTime and Key are optional
             # message can't be None
