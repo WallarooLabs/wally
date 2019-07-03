@@ -33,6 +33,7 @@ actor Main is TestList
     test(_TestNotifyMsg)
     test(_TestNotifyAckMsg)
     test(_TestMessageMsg)
+    test(_TestEosMessageMsg)
     test(_TestAckMsg)
     test(_TestRestartMsg)
 
@@ -61,17 +62,6 @@ class iso _TestBitFlags is UnitTest
     h.assert_false(Boundary == 1)
     h.assert_true(Boundary.is_set(3))
     h.assert_false(Boundary.is_set(4))
-
-    // test Eos: Value 4
-    h.assert_eq[U8](Eos(), 4)
-    h.assert_eq[U8](Eos(4), 4)
-    h.assert_eq[U8](Eos.clear(5), 1)
-    h.assert_true(Eos.eq(4))
-    h.assert_false(Eos.eq(5))
-    h.assert_true(Eos == 4)
-    h.assert_false(Eos == 1)
-    h.assert_true(Eos.is_set(5))
-    h.assert_false(Eos.is_set(3))
 
    // test UnstableReference: Value 8
     h.assert_eq[U8](UnstableReference(), 8)
@@ -207,10 +197,10 @@ class iso _TestMessageMsg is UnitTest
     """
     Allowed flag combinations
         1 2 4   8   16  32
-        E B Eo  Un  Et  K
-    E   x   x       x   x
-    B     x x       x
-    Eo      x   x   x   x
+        E B --  Un  Et  K
+    E   x           x   x
+    B     x         x
+    --                   
     Un          x   x   x
     Et              x   x
     K                   x
@@ -225,26 +215,14 @@ class iso _TestMessageMsg is UnitTest
         [
           // Ephemeral
           1
-          1 or 4
           1 or 16
           1 or 32
-          1 or 4 or 16
-          1 or 4 or 32
-          1 or 4 or 16 or 32
+          1 or or 16
+          1 or or 32
+          1 or or 16 or 32
           // Boundary
           2
-          2 or 4
           2 or 16
-          2 or 4 or 16
-          // EOS
-          4
-          4 or 8
-          4 or 16
-          4 or 32
-          4 or 8 or 16
-          4 or 8 or 32
-          4 or 8 or 16 or 32
-          // UnstableReference
           8
           8 or 16
           8 or 32
@@ -321,6 +299,21 @@ class iso _TestMessageMsg is UnitTest
         h.assert_true(b.message is None)
       end
     end
+
+class iso _TestEosMessageMsg is UnitTest
+  fun name(): String => "connector_wire_messages/_TestEosMessageMsg"
+
+  fun apply(h: TestHelper) ? =>
+    let sid: StreamId = 0x0000000077007700
+    let mid: MessageId = 10
+    let a = EosMessageMsg(sid, mid)
+    let encoded = Frame.encode(a)
+    let m = Frame.decode(encoded)?
+    let b = m as EosMessageMsg
+    h.assert_eq[U32](a.sid, sid)
+    h.assert_eq[U32](a.mid, mid)
+    h.assert_eq[U32](b.sid, sid)
+    h.assert_eq[U32](b.mid, mid)
 
 class iso _TestAckMsg is UnitTest
   fun name(): String => "connector_wire_messages/_TestAckMsg"

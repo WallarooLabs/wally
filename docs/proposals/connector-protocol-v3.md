@@ -1,6 +1,9 @@
-# Wallaroo Connector Protocol: source-only, async, credit based flow
+# Wallaroo Connector Protocol: async, credit based flow
 
-**STATUS: Accepted as draft, Under revision**
+**STATUS: version 3 draft**
+
+TODO: Fix up any text errors & inconsistencies not directly related to
+      simplifying epic work
 
 This protocol provides a method for source connectors to transmit streams of messages to Wallaroo over a reliable transport like TCP/IP. The protocol does not require that any specific mechanism or party initiate the connection, thought a particular implementation may further specify this.
 
@@ -64,7 +67,7 @@ This document uses Erlang code to describe the frame format and content. You don
 -define(NOTIFY, 3).
 -define(NOTIFY_ACK, 4).
 -define(MESSAGE, 5).
-
+-define(EOS_MESSAGE, 8).
 -define(ACK, 6).
 -define(RESTART, 7).
 ```
@@ -74,7 +77,6 @@ Message bit-flags:
 ```erlang
 -define(EPHEMERAL, 1).
 -define(BOUNDARY, 2).
--define(EOS, 4).
 -define(UNSTABLE_REFERENCE, 8).
 -define(EVENT_TIME, 16).
 -define(KEY, 32).
@@ -251,6 +253,7 @@ notify_ack(StreamId, NotifySuccess, PointOfRef) ->
     Message :: iodata().
 message(Flags, StreamId, MessageId, EventTime, Key, Message) ->
     frame([
+        ?MESSAGE,
         u16(Flags),
         u64(StreamId),
         if Flags band ?EPHEMERAL /= 0 then
@@ -273,6 +276,17 @@ message(Flags, StreamId, MessageId, EventTime, Key, Message) ->
         else
             Message
         end
+    ]).
+
+-spec eos_message(StreamId) -> frame()
+  when
+    StreamId :: non_neg_integer(),
+    MessageId :: non_neg_integer().
+eos_message(StreamId, MessageId) ->
+    frame([
+        ?EOS_MESSAGE,
+        u64(StreamId),
+        u64(MessageId)
     ]).
 
 ack(Credits, MessageAcks) ->
@@ -440,26 +454,36 @@ In the notify-sent state, the following actions are valid:
             * Next state is closed
     * NOTE: The point of reference in this ACK may differ from the point of reference sent by the connector in the NOTIFY message.  The connector must use the point of reference given in the NOTIFY_ACK message.
     * The connector must not send MESSAGE for any stream id before the connector receives a successful NOTIFY_ACK for the stream id.
-- RESTART: Worker -> Connector (next state is terminated)
+    * the next state is open
+- RESTART: Worker -> Connector
     * worker is requesting that all streams be reprocessed
+    * the next state is terminated
 
 In the open state, the following actions are valid:
 
 - MESSAGE: Connector -> Worker (production of stream data)
-    * if the EOS flag is set the next state is closed
+    * the next state is open
+- EOS_MESSAGE: Connector -> Worker (production of stream data)
+    * message_id = 0 if the stream has been using ephemeral messages
+    * the next state is closed
 - ACK: Worker -> Connector
-    * the are not 1-1 with MESSAGE frames
-- RESTART: Worker -> Connector (next state is terminated)
+    * these are not 1-1 with MESSAGE frames
+    * the next state is open
+- RESTART: Worker -> Connector
     * worker is requesting that all streams be reprocessed
+    * the next state is terminated
 
 In the closed state, the following actions are valid:
 
-- NOTIFY: Connector -> Worker (next state is open)
+- NOTIFY: Connector -> Worker
     * reopens the stream
-- RESTART: Worker -> Connector (next state is terminated)
+    * the next state is open
+- RESTART: Worker -> Connector
     * worker is requesting that all streams be reprocessed
+    * the next state is terminated
 - ACK: Worker -> Connector
     * these can arrive asynchronously and should be processed accordingly
+    * the next state is closed
 
 In the terminated state, no actions are valid: the worker will close the session and ignore any messages received after the RESTART has been sent.
 
@@ -571,7 +595,7 @@ listener
   -> update local registry
 ```
 
-#### Simplified EOS
+#### Simplified EOS_MESSAGE
 
 ```
 notifier

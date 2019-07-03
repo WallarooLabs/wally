@@ -78,6 +78,9 @@ class AsyncServer(asynchat.async_chat, object):
         elif isinstance(msg, cwm.Message):
             # no response, just print
             self.handle_message(msg)
+        elif isinstance(msg, cwm.EosMessage):
+            # no response, just print
+            self.handle_eos_message(msg)
         elif isinstance(msg, cwm.Error):
             # Got error message from worker
             # close the connection and pass msg to the error handler
@@ -89,15 +92,21 @@ class AsyncServer(asynchat.async_chat, object):
             self.write(msg)
 
     def handle_message(self, msg):
-        # send an ack every 100 messages
         print("{} received message: {}".format(self.name, msg))
         if msg.message_id:
             self._streams[msg.stream_id][2] = msg.message_id
-        if msg.flags & cwm.Message.Eos:
-            # ack eos
-            print("NH: acking eos for {}".format(msg))
-            self.write(cwm.Ack(credits = 1,
-                               acks= [(msg.stream_id, self._streams[msg.stream_id][2])]))
+
+    def handle_eos_message(self, msg):
+        print("{} received EOS message: {}".format(self.name, msg))
+        # ack eos
+        print("NH: acking eos for {}".format(msg))
+        if (msg.message_id != 0) and
+           (self._streams[msg.stream_id][2] != msg.message_id):
+            raise Exception("Bad MessageID for StreamID {}: expected {} "+
+                            "got {}".format(msg.stream_id,
+                                _streams[msg.stream_id][2], msg.message_id))
+        self.write(cwm.Ack(credits = 1,
+                           acks= [(msg.stream_id, self._streams[msg.stream_id][2])]))
 
     def write(self, msg):
         print("{} write {}".format(self.name, msg))

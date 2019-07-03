@@ -47,7 +47,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/sink"
 use "wallaroo/core/topology"
 use "wallaroo_labs/bytes"
-use cp = "wallaroo_labs/connector_protocol"
+use cwm = "wallaroo_labs/connector_wire_messages"
 use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
@@ -307,7 +307,7 @@ actor ConnectorSink is Sink
         try
           let w1: Writer = w1.create()
           let msg = _notify.make_message(encoded1)?
-          let bs = cp.Frame.encode(msg, w1)
+          let bs = cwm.Frame.encode(msg, w1)
           Bytes.length_encode(bs)
         else
           Fail()
@@ -414,7 +414,7 @@ actor ConnectorSink is Sink
     _twopc.set_state_abort()
     _barrier_coordinator.abort_barrier(barrier_token)
 
-  fun send_msg(sink: ConnectorSink ref, msg: cp.Message) =>
+  fun send_msg(sink: ConnectorSink ref, msg: cwm.Message) =>
     _notify.send_msg(sink, msg)
 
   fun ref twopc_intro_done() =>
@@ -494,7 +494,7 @@ actor ConnectorSink is Sink
         @ll(_twopc_debug, "2PC: no data written during this checkpoint interval, skipping 2PC round\n".cstring())
         return
 
-      | let msg: cp.MessageMsg =>
+      | let msg: cwm.MessageMsg =>
         _notify.send_msg(this, msg)
         @ll(_twopc_debug, "2PC: sent phase 1 for txn_id %s\n".cstring(), _twopc.txn_id.cstring())
       end

@@ -42,12 +42,6 @@ primitive Boundary is BitFlags
   fun eq(other: Flags): Bool => other == 2
   fun is_set(other: Flags): Bool => other.op_and(2) == 2
 
-primitive Eos is BitFlags
-  fun apply(value: Flags = 0): Flags => value.op_or(4)
-  fun clear(other: Flags): Flags => other.op_and(Flags(4).op_not())
-  fun eq(other: Flags): Bool => other == 4
-  fun is_set(other: Flags): Bool => other.op_and(4) == 4
-
 primitive UnstableReference is BitFlags
   fun apply(value: Flags = 0): Flags => value.op_or(8)
   fun clear(other: Flags): Flags => other.op_and(Flags(8).op_not())
@@ -70,10 +64,10 @@ primitive FlagsAllowed
   fun apply(f: Flags): Bool =>
   """
   Allowed flag combinations
-      E B Eo  Un  Et  K
-  E   x   x       x   x
-  B     x x       x
-  Eo      x   x   x   x
+      E B --  Un  Et  K
+  E   x           x   x
+  B     x         x
+  --                   
   Un          x   x   x
   Et              x   x
   K                   x
@@ -108,6 +102,7 @@ primitive FrameTag
     | 5 => MessageMsg.decode(consume rb)?
     | 6 => AckMsg.decode(consume rb)?
     | 7 => RestartMsg.decode(consume rb)?
+    | 8 => EosMessageMsg.decode(consume rb)?
     else
       error
     end
@@ -122,6 +117,7 @@ primitive FrameTag
     | let m: MessageMsg => 5
     | let m: AckMsg => 6
     | let m: RestartMsg => 7
+    | let m: EosMessageMsg => 8
     end
 
 // Framing
@@ -421,6 +417,25 @@ class MessageMsg is MessageTrait
     end
     wb
 
+class EosMessageMsg is MessageTrait
+  let stream_id: StreamId
+  let message_id: MessageId
+
+  new create(
+    stream_id': StreamId,
+    message_id': MessageId)
+  =>
+    stream_id = stream_id'
+    message_id = message_id'
+
+  new decode(rb: Reader) ? =>
+    stream_id = rb.u64_be()?
+    message_id = rb.u64_be()?
+
+  fun encode(wb: Writer = Writer): Writer =>
+    wb.u64_be(stream_id)
+    wb.u64_be(message_id)
+
 class AckMsg is MessageTrait
   let credits: U32
   let credit_list: Array[(StreamId, PointOfRef)] val
@@ -462,3 +477,177 @@ class RestartMsg is MessageTrait
   new decode(rb: Reader) ? =>
     let a_size = rb.u32_be()?.usize()
     address = String.from_array(rb.block(a_size)?)
+
+// 2PC messages
+
+type TwoPCMessage is ( ListUncommittedMsg |
+                       ReplyUncommittedMsg |
+                       TwoPCPhase1Msg |
+                       TwoPCReplyMsg |
+                       TwoPCPhase2Msg)
+
+primitive TwoPCFrame
+  fun encode(msg: TwoPCMessage, wb: Writer = Writer): Array[U8] val =>
+    let encoded = msg.encode()
+    wb.u8(TwoPCFrameTag(msg))
+    wb.writev(encoded.done())
+    let bs: Array[ByteSeq val] val = wb.done()
+    recover
+      let a = Array[U8]
+      for b in bs.values() do
+        a.append(b)
+      end
+      a
+    end
+
+  fun decode(data: Array[U8] val): TwoPCMessage ? =>
+    // read length
+    let rb = Reader
+    rb.append(data)
+    TwoPCFrameTag.decode(consume rb)?
+
+primitive TwoPCFrameTag
+  fun decode(rb: Reader): TwoPCMessage ? =>
+    let frame_tag = rb.u8()?
+    match frame_tag
+    | 201 => ListUncommittedMsg.decode(rb)?
+    | 202 => ReplyUncommittedMsg.decode(consume rb)?
+    | 203 => TwoPCPhase1Msg.decode(consume rb)?
+    | 204 => TwoPCReplyMsg.decode(consume rb)?
+    | 205 => TwoPCPhase2Msg.decode(consume rb)?
+    else
+      error
+    end
+
+  fun apply(msg: TwoPCMessage): U8 =>
+    match msg
+    | let m: ListUncommittedMsg => 201
+    | let m: ReplyUncommittedMsg => 202
+    | let m: TwoPCPhase1Msg => 203
+    | let m: TwoPCReplyMsg => 204
+    | let m: TwoPCPhase2Msg => 205
+    end
+
+class ListUncommittedMsg is MessageTrait
+  let rtag: U64
+
+  new create(rtag': U64) =>
+    rtag = rtag'
+
+  new decode(rb: Reader)? =>
+    let rtag' = rb.u64_be()?
+    rtag = rtag'
+
+  fun encode(wb: Writer = Writer): Writer =>
+    wb.u64_be(rtag)
+    wb
+
+class ReplyUncommittedMsg is MessageTrait
+  let rtag: U64
+  let txn_ids: Array[String] val
+
+  new create(rtag': U64, txn_ids': Array[String val] val) =>
+    rtag = rtag'
+    txn_ids = txn_ids'
+
+  new decode(rb: Reader)? =>
+    let rtag' = rb.u64_be()?
+    let a_len = rb.u32_be()?
+    let txn_ids' = recover trn Array[String] end
+    for i in col.Range[U32](0, a_len) do
+      let length = rb.u16_be()?.usize()
+      txn_ids'.push(String.from_array(rb.block(length)?))
+    end
+    rtag = rtag'
+    txn_ids = consume txn_ids'
+
+  fun encode(wb: Writer = Writer): Writer =>
+    wb.u64_be(rtag)
+    wb.u32_be(txn_ids.size().u32())
+    for txn_id in txn_ids.values() do
+      wb.u16_be(txn_id.size().u16())
+      wb.write(txn_id)
+    end
+    wb
+
+type WhereList is Array[(U64, U64, U64)]
+
+class TwoPCPhase1Msg is MessageTrait
+  var txn_id: String = ""
+  var where_list: WhereList
+
+  new create(txn_id': String, where_list': WhereList) =>
+    txn_id = txn_id'
+    where_list = where_list'
+
+  new decode(rb: Reader)? =>
+    var length = rb.u16_be()?.usize()
+    let txn_id' = String.from_array(rb.block(length)?)
+    let where_list' = recover trn WhereList end
+    length = rb.u32_be()?.usize()
+    for i in col.Range[USize](0, length) do
+      let stream_id = rb.u64_be()?
+      let start_por = rb.u64_be()?
+      let end_por = rb.u64_be()?
+      where_list'.push((stream_id, start_por, end_por))
+    end
+    txn_id = txn_id'
+    where_list = consume where_list'
+
+  fun encode(wb: Writer = Writer): Writer =>
+    wb.u16_be(txn_id.size().u16())
+    wb.write(txn_id)
+    wb.u32_be(where_list.size().u32())
+    for (stream_id, start_por, end_por) in where_list.values() do
+      wb.u64_be(stream_id)
+      wb.u64_be(start_por)
+      wb.u64_be(end_por)
+    end
+    wb
+
+class TwoPCReplyMsg is MessageTrait
+  var txn_id: String = ""
+  var commit: Bool = false
+
+  new create(txn_id': String, commit': Bool) =>
+    txn_id = txn_id'
+    commit = commit'
+
+  new decode(rb: Reader)? =>
+    (let txn_id', let commit') = _P.decode_phase2r(rb)?
+    txn_id = txn_id'
+    commit = commit'
+
+  fun encode(wb: Writer = Writer): Writer =>
+    _P.encode_phase2r(txn_id, commit, wb)
+
+class TwoPCPhase2Msg is MessageTrait
+  var txn_id: String = ""
+  var commit: Bool = false
+
+  new create(txn_id': String, commit': Bool) =>
+    txn_id = txn_id'
+    commit = commit'
+
+  new decode(rb: Reader)? =>
+    (let txn_id', let commit') = _P.decode_phase2r(rb)?
+    txn_id = txn_id'
+    commit = commit'
+
+  fun encode(wb: Writer = Writer): Writer =>
+    _P.encode_phase2r(txn_id, commit, wb)
+
+primitive _P
+  fun decode_phase2r(rb: Reader): (String, Bool)?
+  =>
+    let length = rb.u16_be()?.usize()
+    let txn_id' = String.from_array(rb.block(length)?)
+    let commit' = if rb.u8()? == 0 then false else true end
+    (txn_id', commit')
+
+  fun encode_phase2r(txn_id: String, commit: Bool, wb: Writer): Writer
+  =>
+    wb.u16_be(txn_id.size().u16())
+    wb.write(txn_id)
+    if commit then wb.u8(1) else wb.u8(0) end
+    wb

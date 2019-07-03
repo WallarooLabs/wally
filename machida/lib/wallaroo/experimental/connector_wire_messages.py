@@ -318,7 +318,6 @@ class Message(object):
     """
     Ephemeral = 1
     Boundary = 2
-    Eos = 4
     UnstableReference = 8
     EventTime = 16
     Key = 32
@@ -400,10 +399,10 @@ class Message(object):
                            key=None, message=None):
         """
         Allowed flag combinations
-            E B Eo  Un  Et  K
-        E   x   x       x   x
-        B     x x       x
-        Eo      x   x   x   x
+            E B --  Un  Et  K
+        E   x           x   x
+        B     x         x
+        --                   
         Un          x   x   x
         Et              x   x
         K                   x
@@ -434,7 +433,6 @@ class Message(object):
         else:
             assert(event_time is None)
 
-
 def test_message():
     from itertools import chain, product
     from functools import reduce
@@ -447,22 +445,22 @@ def test_message():
     message = 'hello world'.encode()
     """
     Allowed flag combinations
-        E B Eo  Un  Et  K
-    E   x   x       x   x
-    B     x x       x
-    Eo      x   x   x   x
+        E B --  Un  Et  K
+    E   x           x   x
+    B     x         x
+    --                   
     Un          x   x   x
     Et              x   x
     K                   x
     """
     flags = [M.Ephemeral, M.Boundary,
-             M.Eos, M.UnstableReference,
+             M.UnstableReference,
              M.EventTime, M.Key]
     matrix = [
-        # E  B  Eo Un Et K
+        # E  B  -- Un Et K
         [ 1, 0, 1, 0, 1, 1 ], # E
         [ 0, 1, 1, 0, 1, 0 ], # B
-        [ 0, 0, 1, 1, 1, 1 ], # Eos
+        [ 0, 0, 0, 0, 0, 0 ], # --
         [ 0, 0, 0, 1, 1, 1 ], # Un
         [ 0, 0, 0, 0, 1, 1 ], # Et
         [ 0, 0, 0, 0, 0, 1 ]] # K
@@ -520,57 +518,23 @@ def test_message():
         elif fv & M.Boundary == M.Boundary:
             # Raise if unstable reference
             if fv & M.UnstableReference == M.UnstableReference:
-                f = fv | M.EventTime | M.Eos
+                f = fv | M.EventTime
                 with pytest.raises(Exception) as e_info:
                     M.test_flags_allowed(f, message_id, event_time, None, None)
             # raise if key
             if fv & M.Key == M.Key:
-                f = fv | M.EventTime | M.Eos
+                f = fv | M.EventTime
                 with pytest.raises(Exception) as e_info:
                     M.test_flags_allowed(f, message_id, event_time, key, None)
             # raise if message is not None
-            f = fv | M.EventTime | M.Eos
+            f = fv | M.EventTime
             with pytest.raises(Exception) as e_info:
                 M.test_flags_allowed(f, message_id, event_time, None, message)
 
-        elif fv & M.Eos == M.Eos:
-            # UnstableReference, EventTime, and Key are all allowed, but not
-            # required
-            # Both Key and EventTime
-            if ((fv & M.EventTime == M.EventTime) and
-                (fv & M.Key == M.Key)):
-                M.test_flags_allowed(fv, message_id, event_time, key, message)
-                with pytest.raises(Exception) as e_info:
-                    M.test_flags_allowed(fv, message_id, event_time, None, message)
-                with pytest.raises(Exception) as e_info:
-                    M.test_flags_allowed(fv, message_id, None, key, message)
-                with pytest.raises(Exception) as e_info:
-                    M.test_flags_allowed(fv, message_id, None, None, message)
-            # Only EventTime
-            elif fv & M.EventTime == M.EventTime:
-                M.test_flags_allowed(fv, message_id, event_time, None, message)
-                with pytest.raises(Exception) as e_info:
-                    M.test_flags_allowed(fv, message_id, None, None, message)
-                with pytest.raises(Exception) as e_info:
-                    M.test_flags_allowed(fv, message_id, None, key, message)
-            # Only Key
-            elif fv & M.Key == M.Key:
-                M.test_flags_allowed(fv, message_id, None, key, message)
-                with pytest.raises(Exception) as e_info:
-                    M.test_flags_allowed(fv, message_id, event_time, None, message)
-                with pytest.raises(Exception) as e_info:
-                    M.test_flags_allowed(fv, message_id, None, None, message)
-            # Neither Key nor EventTime
-            else:
-                M.test_flags_allowed(fv, message_id, None, None, message)
-            # Fail if message_id is missing, because not ephemeral
-            f = fv | M.EventTime | M.Key
-            with pytest.raises(Exception) as e_info:
-                M.test_flags_allowed(fv, None, event_time, key, message)
-        elif fv & M.UnstableReference == M.UnstableReference:
+       elif fv & M.UnstableReference == M.UnstableReference:
             # message_id cannot be None
             # EventTime and Key are optional
-            # message can't be None (Eos+UnstableRef case already tested above)
+            # message can't be None
 
             # Both Key and EventTime
             if ((fv & M.EventTime == M.EventTime) and
@@ -615,25 +579,12 @@ def test_message():
     combs = [
           # Ephemeral
           1,
-          1 | 4,
           1 | 16,
           1 | 32,
-          1 | 4 | 16,
-          1 | 4 | 32,
-          1 | 4 | 16 | 32,
+          1 | 16 | 32,
           # Boundary
           2,
-          2 | 4,
           2 | 16,
-          2 | 4 | 16,
-          # EOS
-          4,
-          4 | 8,
-          4 | 16,
-          4 | 32,
-          4 | 8 | 16,
-          4 | 8 | 32,
-          4 | 8 | 16 | 32,
           # UnstableReference
           8,
           8 | 16,
@@ -684,6 +635,48 @@ def test_message():
         # Test that all messages frame encode/decode correctly
         _test_frame_encode_decode(msg)
 
+
+class EosMessage(object):
+    """
+    Message(stream_id: int)
+    """
+    def __init__(self, stream_id, message_id):
+        self.stream_id = stream_id
+        self.message_id = message_id
+
+    def __str__(self):
+        return ("EosMessage(stream_id={!r},message_id={!r})".format(
+                    self.stream_id, self.message_id))
+
+    def __eq__(self, other):
+        return (self.stream_id == other.stream_id and
+                self.message_id == other.message_id)
+
+    def encode(self):
+        sid = struct.pack('>Q', self.stream_id)
+        mid = struct.pack('>Q', self.message_id)
+        return b''.join((sid, mid))
+
+    @classmethod
+    def decode(cls, bs):
+        reader = StringIO(bs)
+        stream_id = struct.unpack('>Q', reader.read(8))
+        message_id = struct.unpack('>Q', reader.read(8))
+        return cls(stream_id, message_id)
+
+def test_eos_message():
+    from itertools import chain, product
+    from functools import reduce
+    import pytest
+    stream_id = 123
+
+    encoded = msg.encode()
+    assert(len(encoded) == (
+            8 + 1))
+
+    decoded = Message.decode(encoded)
+    assert(isinstance(decoded, EosMessage))
+    assert(decoded.stream_id == msg.stream_id)
 
 class Ack(object):
     """
