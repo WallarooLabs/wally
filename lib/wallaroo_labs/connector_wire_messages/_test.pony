@@ -217,12 +217,11 @@ class iso _TestMessageMsg is UnitTest
           1
           1 or 16
           1 or 32
-          1 or or 16
-          1 or or 32
-          1 or or 16 or 32
+          1 or 16 or 32
           // Boundary
           2
           2 or 16
+          // Unstable reference
           8
           8 or 16
           8 or 32
@@ -309,8 +308,8 @@ class iso _TestEosMessageMsg is UnitTest
     let encoded = Frame.encode(a)
     let m = Frame.decode(encoded)?
     let b = m as EosMessageMsg
-    h.assert_eq[U32](a.sid, sid)
-    h.assert_eq[U32](b.sid, sid)
+    h.assert_eq[U32](a.stream_id, sid)
+    h.assert_eq[U32](b.stream_id, sid)
 
 class iso _TestAckMsg is UnitTest
   fun name(): String => "connector_wire_messages/_TestAckMsg"

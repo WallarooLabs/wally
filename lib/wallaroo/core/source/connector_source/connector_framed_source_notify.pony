@@ -373,38 +373,40 @@ class ConnectorSourceNotify[In: Any val]
         return _to_error_state(source, "Invalid message: notify_ack")
 
       | let m: cwm.EosMessageMsg =>
-        @ll(_conn_info, ("ConnectorSource[%s] received EOS for stream_id"
-          + " %s. Last_acked: %s, last_seen :%s\n").cstring(),
-          _source_name.string().cstring(),
-          m.stream_id.string().cstring(),
-          s.last_acked.string().cstring(),
-          s.last_seen.string().cstring())
-        // 1. remove state from _active_streams
         try
+          let s = _active_streams(m.stream_id)?
+          @ll(_conn_info, ("ConnectorSource[%s] received EOS for stream_id"
+            + " %s. Last_acked: %s, last_seen :%s\n").cstring(),
+            _source_name.string().cstring(),
+            m.stream_id.string().cstring(),
+            s.last_acked.string().cstring(),
+            s.last_seen.string().cstring())
+
+          // 1. remove state from _active_streams
           _active_streams.remove(m.stream_id)?
           @ll(_conn_info, "Successfully removed %s from _active\n"
             .cstring(), m.stream_id.string().cstring())
+          // 2. add state to _pending_close
+          ifdef "resilience" then
+            // Set the first barrier we can close this stream on
+            // to the current barrier id + 1
+            // This prevents premature stream closure without checkpointing
+            // and acking the last_seen value after an EOS
+            s.close_on_or_after = _barrier_checkpoint_id + 1
+            _pending_close.update(m.stream_id, s)
+          else
+            // respond immediately
+            _send_reply(source, cwm.AckMsg(0, [(s.id, s.last_seen)]))
+            _coordinator.streams_relinquish(source_id,
+              [StreamTuple(s.id, s.name, s.last_seen)])
+          end
+          return _continue_perhaps(source)
         else
           @ll(_conn_info, ("Something went wrong trying to remove %s " +
             "from _active\n").cstring(),
             m.stream_id.string().cstring())
           error
         end
-        // 2. add state to _pending_close
-        ifdef "resilience" then
-          // Set the first barrier we can close this stream on
-          // to the current barrier id + 1
-          // This prevents premature stream closure without checkpointing
-          // and acking the last_seen value after an EOS
-          s.close_on_or_after = _barrier_checkpoint_id + 1
-          _pending_close.update(m.stream_id, s)
-        else
-          // respond immediately
-          _send_reply(source, cwm.AckMsg(0, [(s.id, s.last_seen)]))
-          _coordinator.streams_relinquish(source_id,
-            [StreamTuple(s.id, s.name, s.last_seen)])
-        end
-        return _continue_perhaps(source)
 
       | let m: cwm.MessageMsg =>
         // check that we're in state that allows processing messages

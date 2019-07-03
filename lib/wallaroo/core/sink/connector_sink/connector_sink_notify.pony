@@ -22,12 +22,13 @@ use "net"
 use "wallaroo/core/common"
 use "wallaroo/core/network"
 use "wallaroo_labs/bytes"
+use "wallaroo_labs/connector_protocol"
 use cwm = "wallaroo_labs/connector_wire_messages"
 use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 
 class ConnectorSinkNotify
-  var _fsm_state: cwm.ConnectorProtoFsmState = cwm.ConnectorProtoFsmDisconnected
+  var _fsm_state: ConnectorProtoFsmState = ConnectorProtoFsmDisconnected
   var _header: Bool = true
   var _connected: Bool = false
   var _throttled: Bool = false
@@ -102,7 +103,7 @@ class ConnectorSinkNotify
     // have been waiting for a phase 2 message.  We need to discover
     // their txn_id strings and abort/commit them.
     _rtag = _rtag + 1
-    let list_u = cwm.TwoPCEncode.list_uncommitted(_rtag)
+    let list_u = TwoPCEncode.list_uncommitted(_rtag)
     try
       let list_u_msg =
         cwm.MessageMsg(0, cwm.Ephemeral(), 0, 0, None, [list_u])?
@@ -116,7 +117,7 @@ class ConnectorSinkNotify
     // send to it.  Thus, we should not send any Wallaroo app messages
     // to the sink until we get a ReplyUncommittedMsg response.
 
-    _fsm_state = cwm.ConnectorProtoFsmHandshake
+    _fsm_state = ConnectorProtoFsmHandshake
 
   fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
     """
@@ -253,8 +254,8 @@ class ConnectorSinkNotify
     | let m: cwm.HelloMsg =>
       Fail()
     | let m: cwm.OkMsg =>
-      if _fsm_state is cwm.ConnectorProtoFsmHandshake then
-        _fsm_state = cwm.ConnectorProtoFsmStreaming
+      if _fsm_state is ConnectorProtoFsmHandshake then
+        _fsm_state = ConnectorProtoFsmStreaming
 
         credits = m.initial_credits
         if credits < 2 then
@@ -272,7 +273,7 @@ class ConnectorSinkNotify
     | let m: cwm.NotifyMsg =>
       _error_and_close(conn, "Bad FSM State: C" + _fsm_state().string())
     | let m: cwm.NotifyAckMsg =>
-      if _fsm_state is cwm.ConnectorProtoFsmStreaming then
+      if _fsm_state is ConnectorProtoFsmStreaming then
         @ll(_conn_debug, "NotifyAck: success %s stream_id %d p-o-r %lu\n".cstring(), m.success.string().cstring(), m.stream_id, m.point_of_ref)
         // We are going to ignore the point of reference sent to us by
         // the connector sink.  We assume that we know best, and if our
@@ -338,7 +339,7 @@ class ConnectorSinkNotify
         return
       end
     | let m: cwm.AckMsg =>
-      if _fsm_state is cwm.ConnectorProtoFsmStreaming then
+      if _fsm_state is ConnectorProtoFsmStreaming then
         // NOTE: we aren't actually using credits
         credits = credits + m.credits
         for (s_id, p_o_r) in m.credit_list.values() do
@@ -411,7 +412,7 @@ class ConnectorSinkNotify
           @ll(_twopc_debug, "2PC: current txn_id %s was aborted\n".cstring(), twopc_txn_id_current.cstring())
           current_txn_aborted = true
         end
-        let p2 = cwm.TwoPCEncode.phase2(txn_id, do_commit)
+        let p2 = TwoPCEncode.phase2(txn_id, do_commit)
         try
           let p2_msg =
             cwm.MessageMsg(0, cwm.Ephemeral(), 0, 0, None, [p2])?

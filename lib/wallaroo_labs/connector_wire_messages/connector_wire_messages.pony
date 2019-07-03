@@ -141,6 +141,7 @@ type Message is ( HelloMsg |
                   NotifyMsg |
                   NotifyAckMsg |
                   MessageMsg |
+                  EosMessageMsg |
                   AckMsg |
                   RestartMsg)
 
@@ -430,6 +431,7 @@ class EosMessageMsg is MessageTrait
 
   fun encode(wb: Writer = Writer): Writer =>
     wb.u64_be(stream_id)
+    wb
 
 class AckMsg is MessageTrait
   let credits: U32
