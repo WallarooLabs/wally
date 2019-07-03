@@ -91,7 +91,7 @@ if os.environ.get('USE_FAKE_S3', '') == 'on':
     sink_args.append('fake-s3')
     sink_args.append('wallaroo-s3-sink-test')
     sink_args.append('/')
-sink = subprocess.Popen(sink_args)
+sink = subprocess.Popen(sink_args, stderr=1)
 
 print("Ensuring connectors are initialized")
 time.sleep(1)

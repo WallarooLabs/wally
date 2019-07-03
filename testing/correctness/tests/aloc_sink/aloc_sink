@@ -239,7 +239,7 @@ class AsyncServer(asynchat.async_chat, object):
             # As of 2019-03-04, Wallaroo's connector sink is not managing
             # credits and will rely solely on TCP backpressure for its
             # own backpressure signalling.
-            ok = cwm.Ok(500, self._streams.values(), [])
+            ok = cwm.Ok(500)
             self.write(ok)
         elif isinstance(msg, cwm.Notify):
             if msg.stream_id != 1:
@@ -262,6 +262,8 @@ class AsyncServer(asynchat.async_chat, object):
             self.write(notify_ack)
         elif isinstance(msg, cwm.Message):
             self.handle_message(msg)
+        elif isinstance(msg, cwm.EosMessage):
+            self.handle_eos_message(msg)
         elif isinstance(msg, cwm.Error):
             # Got error message from worker
             # close the connection and pass msg to the error handler
@@ -271,6 +273,12 @@ class AsyncServer(asynchat.async_chat, object):
         else:
             # write the original message back
             self.write(msg)
+
+    def handle_eos_message(self, msg):
+        # ack eos
+        logging.debug("NH: acking eos for {}".format(msg))
+        self.write(cwm.Ack(credits = 1,
+                           acks= [(msg.stream_id, self._streams[msg.stream_id][2])]))
 
     def handle_message(self, msg):
         if msg.stream_id == 0:
@@ -285,7 +293,7 @@ class AsyncServer(asynchat.async_chat, object):
             # DEBUG only: uncommitted.append("doesnt.exist.txn.aborting-wont-hurt.-----0-0")
             reply = cwm.ReplyUncommitted(msg2.rtag, uncommitted)
             reply_bytes = cwm.TwoPCFrame.encode(reply)
-            msg = cwm.Message(0, cwm.Message.Ephemeral, None, None, None, reply_bytes)
+            msg = cwm.Message(0, 0, 0, None, reply_bytes)
             self.write(msg)
             logging.debug('2PC: ListUncommitted resp: {}'.format(reply))
 
@@ -362,7 +370,7 @@ class AsyncServer(asynchat.async_chat, object):
 
             reply = cwm.TwoPCReply(str(msg2.txn_id).encode('utf-8'), success)
             reply_bytes = cwm.TwoPCFrame.encode(reply)
-            msg = cwm.Message(0, cwm.Message.Ephemeral, None, None, None, reply_bytes)
+            msg = cwm.Message(0, 0, 0, None, reply_bytes)
             self.write(msg)
 
             self._txn_commit_next = True
@@ -453,12 +461,6 @@ class AsyncServer(asynchat.async_chat, object):
         else:
             logging.critical('message has no message_id')
             sys.exit(66)
-
-        if msg.flags & cwm.Message.Eos:
-            # ack eos
-            logging.debug("NH: acking eos for {}".format(msg))
-            self.write(cwm.Ack(credits = 1,
-                               acks= [(msg.stream_id, self._streams[msg.stream_id][2])]))
 
     def write(self, msg):
         logging.debug("write {}".format(msg))

@@ -326,10 +326,8 @@ class ConnectorSourceNotify[In: Any val]
         // by this connector's one & only pipeline as defined by the
         // app's pipeline definition.
 
-        // process Hello: reply immediately with an Ok(credits, [], [])
-        // reset _credits to _max_credits
         _credits = _max_credits
-        _send_reply(source, cwm.OkMsg(_credits, [], []))
+        _send_reply(source, cwm.OkMsg(_credits))
         _fsm_state = _ProtoFsmStreaming
         return _continue_perhaps(source)
 
@@ -372,13 +370,46 @@ class ConnectorSourceNotify[In: Any val]
         end
         return _to_error_state(source, "Invalid message: notify_ack")
 
+      | let m: cwm.EosMessageMsg =>
+        try
+          let s = _active_streams(m.stream_id)?
+          @ll(_conn_info, ("ConnectorSource[%s] received EOS for stream_id"
+            + " %s. Last_acked: %s, last_seen :%s\n").cstring(),
+            _source_name.string().cstring(),
+            m.stream_id.string().cstring(),
+            s.last_acked.string().cstring(),
+            s.last_seen.string().cstring())
+
+          // 1. remove state from _active_streams
+          _active_streams.remove(m.stream_id)?
+          @ll(_conn_info, "Successfully removed %s from _active\n"
+            .cstring(), m.stream_id.string().cstring())
+          // 2. add state to _pending_close
+          ifdef "resilience" then
+            // Set the first barrier we can close this stream on
+            // to the current barrier id + 1
+            // This prevents premature stream closure without checkpointing
+            // and acking the last_seen value after an EOS
+            s.close_on_or_after = _barrier_checkpoint_id + 1
+            _pending_close.update(m.stream_id, s)
+          else
+            // respond immediately
+            _send_reply(source, cwm.AckMsg(0, [(s.id, s.last_seen)]))
+            _coordinator.streams_relinquish(source_id,
+              [StreamTuple(s.id, s.name, s.last_seen)])
+          end
+          return _continue_perhaps(source)
+        else
+          @ll(_conn_info, ("Something went wrong trying to remove %s " +
+            "from _active\n").cstring(),
+            m.stream_id.string().cstring())
+          error
+        end
+
       | let m: cwm.MessageMsg =>
         // check that we're in state that allows processing messages
         if _fsm_state isnt _ProtoFsmStreaming then
           return _to_error_state(source, "Bad protocol FSM state")
-        end
-        if not cwm.FlagsAllowed(m.flags) then
-          return _to_error_state(source, "Bad MessageMsg flags")
         end
 
         // try to process message
@@ -388,101 +419,57 @@ class ConnectorSourceNotify[In: Any val]
         else
           try
             let s = _active_streams(m.stream_id)?
-            let msg_id = try
-              m.message_id as cwm.MessageId
-            else
-              0
-            end
+            let msg_id = m.message_id
 
             if (msg_id > 0) and (msg_id <= s.last_seen) then
               // skip processing of an already seen message
               return _continue_perhaps(source)
             end
 
-            if cwm.Eos.is_set(m.flags) then
-              // Process EOS
-              @ll(_conn_info, ("ConnectorSource[%s] received EOS for stream_id"
-                + " %s. Last_acked: %s, last_seen :%s\n").cstring(),
-                _source_name.string().cstring(),
-                m.stream_id.string().cstring(),
-                s.last_acked.string().cstring(),
-                s.last_seen.string().cstring())
-              // 1. remove state from _active_streams
-              try
-                _active_streams.remove(m.stream_id)?
-                @ll(_conn_info, "Successfully removed %s from _active\n"
-                  .cstring(), m.stream_id.string().cstring())
-              else
-                @ll(_conn_info, ("Something went wrong trying to remove %s " +
-                  "from _active\n").cstring(),
-                  m.stream_id.string().cstring())
-                error
+            try
+              // get bytes content of message
+              let bytes = match (m.message as cwm.MessageBytes)
+              | let str: String      => str.array()
+              | let b: Array[U8] val => b
               end
-              // 2. add state to _pending_close
-              ifdef "resilience" then
-                // Set the first barrier we can close this stream on
-                // to the current barrier id + 1
-                // This prevents premature stream closure without checkpointing
-                // and acking the last_seen value after an EOS
-                s.close_on_or_after = _barrier_checkpoint_id + 1
-                _pending_close.update(m.stream_id, s)
+
+              // decode bytes using handler, if bytes not None
+              let decoded = if bytes.size() == 0 then
+                None
               else
-                // respond immediately
-                _send_reply(source, cwm.AckMsg(0, [(s.id, s.last_seen)]))
-                _coordinator.streams_relinquish(source_id,
-                  [StreamTuple(s.id, s.name, s.last_seen)])
+                _handler.decode(bytes)?
               end
-              return _continue_perhaps(source)
-            elseif cwm.Boundary.is_set(m.flags) then
-              // TODO [post-source-migration] what's supposed to happen here?
-              return _continue_perhaps(source)
-            else // not an EOS and not a boundary
-              // process message
-              try
-                // get bytes content of message
-                let bytes = match (m.message as cwm.MessageBytes)
-                | let str: String      => str.array()
-                | let b: Array[U8] val => b
-                end
 
-                // decode bytes using handler, if bytes not None
-                let decoded = if bytes.size() == 0 then
-                  None
-                else
-                  _handler.decode(bytes)?
-                end
-
-                ifdef "trace" then
-                  @ll(_conn_debug, ("Msg decoded at " + _pipeline_name +
-                    " source\n").cstring())
-                end
-
-                // get message key
-                let key =
-                  match m.key
-                  | let k: Key =>
-                    k
-                  else
-                    ""
-                  end
-
-                // process message
-                return _run_and_subsequent_activity(latest_metrics_id,
-                  ingest_ts, pipeline_time_spent, key, source, consumer_sender,
-                  decoded, s, m.message_id, m.flags)
-              else
-                // _handler.decode(bytes) failed
-                if m.message is None then
-                  // TODO [post-source-migration] revisit this error message
-                  return _to_error_state(source, "No message bytes and BOUNDARY not set")
-                end
-                @ll(_conn_err, ("Unable to decode message at " + _pipeline_name +
+              ifdef "trace" then
+                @ll(_conn_debug, ("Msg decoded at " + _pipeline_name +
                   " source\n").cstring())
-                ifdef debug then
-                  Fail()
-                end
-                return _to_error_state(source, "Unable to decode message")
               end
+
+              // get message key
+              let key =
+                match m.key
+                | let k: Key =>
+                  k
+                else
+                  ""
+                end
+
+              // process message
+              return _run_and_subsequent_activity(latest_metrics_id,
+                ingest_ts, pipeline_time_spent, key, source, consumer_sender,
+                decoded, s, m.message_id)
+            else
+              // _handler.decode(bytes) failed
+              if m.message is None then
+                // TODO [post-source-migration] revisit this error message
+                return _to_error_state(source, "No message bytes and BOUNDARY not set")
+              end
+              @ll(_conn_err, ("Unable to decode message at " + _pipeline_name +
+                " source\n").cstring())
+              ifdef debug then
+                Fail()
+              end
+              return _to_error_state(source, "Unable to decode message")
             end
           else
             return _to_error_state(source, "Unknown StreamId")
@@ -522,8 +509,7 @@ class ConnectorSourceNotify[In: Any val]
     consumer_sender: TestableConsumerSender,
     decoded: (In val| None val),
     s: _StreamState,
-    message_id: (cwm.MessageId|None),
-    flags: cwm.Flags): Bool
+    message_id: (cwm.MessageId|None)): Bool
    =>
     let decode_end_ts = WallClock.nanoseconds()
     _metrics_reporter.step_metric(_pipeline_name,
@@ -566,10 +552,7 @@ class ConnectorSourceNotify[In: Any val]
 
     match message_id
     | let m_id: PointOfReference =>
-      if not (cwm.Ephemeral.is_set(flags) or
-        cwm.UnstableReference.is_set(flags)) then
-        s.last_seen = m_id
-      end
+      s.last_seen = m_id
     end
 
     if is_finished then

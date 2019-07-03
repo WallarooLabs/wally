@@ -22,16 +22,17 @@ use "net"
 use "wallaroo/core/common"
 use "wallaroo/core/network"
 use "wallaroo_labs/bytes"
-use cp = "wallaroo_labs/connector_protocol"
+use "wallaroo_labs/connector_protocol"
+use cwm = "wallaroo_labs/connector_wire_messages"
 use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 
 class ConnectorSinkNotify
-  var _fsm_state: cp.ConnectorProtoFsmState = cp.ConnectorProtoFsmDisconnected
+  var _fsm_state: ConnectorProtoFsmState = ConnectorProtoFsmDisconnected
   var _header: Bool = true
   var _connected: Bool = false
   var _throttled: Bool = false
-  let _stream_id: cp.StreamId = 1
+  let _stream_id: cwm.StreamId = 1
   let _sink_id: RoutingId
   let _worker_name: WorkerName
   let _protocol_version: String
@@ -39,8 +40,8 @@ class ConnectorSinkNotify
   let _auth: ApplyReleaseBackpressureAuth
   let stream_name: String
   var credits: U32 = 0
-  var acked_point_of_ref: cp.MessageId = 0
-  var message_id: cp.MessageId = acked_point_of_ref
+  var acked_point_of_ref: cwm.MessageId = 0
+  var message_id: cwm.MessageId = acked_point_of_ref
   var _connection_count: USize = 0
   let _conn_debug: U16 = Log.make_sev_cat(Log.debug(), Log.conn_sink())
   let _conn_info: U16 = Log.make_sev_cat(Log.info(), Log.conn_sink())
@@ -80,7 +81,7 @@ class ConnectorSinkNotify
     None
 
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
-    @ll(_conn_info, "ConnectorSink connected\n".cstring())
+    @ll(_conn_info, "ConnectorSink connected".cstring())
     _header = true
     _connected = true
     _throttled = false
@@ -94,7 +95,7 @@ class ConnectorSinkNotify
 
     // TODO: configure connector v2 program string
     // TODO: configure connector v2 instance_name string
-    let hello = cp.HelloMsg(_protocol_version, _cookie,
+    let hello = cwm.HelloMsg(_protocol_version, _cookie,
       "a program", "an instance")
     send_msg(conn, hello)
 
@@ -102,21 +103,16 @@ class ConnectorSinkNotify
     // have been waiting for a phase 2 message.  We need to discover
     // their txn_id strings and abort/commit them.
     _rtag = _rtag + 1
-    let list_u = cp.TwoPCEncode.list_uncommitted(_rtag)
-    try
-      let list_u_msg =
-        cp.MessageMsg(0, cp.Ephemeral(), 0, 0, None, [list_u])?
-      send_msg(conn, list_u_msg)
-    else
-      Fail()
-    end
+    let list_u = TwoPCEncode.list_uncommitted(_rtag)
+    let list_u_msg = cwm.MessageMsg(0, 0, 0, None, list_u)
+    send_msg(conn, list_u_msg)
 
     // 2PC: We also don't know how much fine-grained control the sink
     // has for selectively aborting & committing the stuff that we
     // send to it.  Thus, we should not send any Wallaroo app messages
     // to the sink until we get a ReplyUncommittedMsg response.
 
-    _fsm_state = cp.ConnectorProtoFsmHandshake
+    _fsm_state = ConnectorProtoFsmHandshake
 
   fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
     """
@@ -135,7 +131,7 @@ class ConnectorSinkNotify
     is greater than 100), then the connector sink must tell
     us to abort in phase 1 in the next round of 2PC.
     """
-    @ll(_conn_info, "ConnectorSink connection closed, throttling\n".cstring())
+    @ll(_conn_info, "ConnectorSink connection closed, throttling".cstring())
     _connected = false
     _throttled = false
     twopc_intro_done = false
@@ -143,10 +139,10 @@ class ConnectorSinkNotify
     throttled(conn)
 
   fun ref dispose() =>
-    @ll(_conn_info, "ConnectorSink connection dispose\n".cstring())
+    @ll(_conn_info, "ConnectorSink connection dispose".cstring())
 
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
-    @ll(_conn_info, "ConnectorSink connection failed\n".cstring())
+    @ll(_conn_info, "ConnectorSink connection failed".cstring())
 
   fun ref expect(conn: WallarooOutgoingNetworkActor ref, qty: USize): USize =>
     qty
@@ -202,7 +198,7 @@ class ConnectorSinkNotify
     if _connected and (not _throttled) then
       data
     else
-      @ll(_conn_debug, "Sink sentv: not connected or throttled: buffering\n".cstring())
+      @ll(_conn_debug, "Sink sentv: not connected or throttled: buffering".cstring())
       for d in data.values() do
         twopc_reconnect_buffer.push(d)
       end
@@ -214,7 +210,7 @@ class ConnectorSinkNotify
       _throttled = true
       Backpressure.apply(_auth)
       @ll(_conn_info, ("ConnectorSink is experiencing back pressure, " +
-        "connected = %s\n").cstring(), _connected.string().cstring())
+        "connected = %s").cstring(), _connected.string().cstring())
     end
 
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
@@ -222,26 +218,26 @@ class ConnectorSinkNotify
       _throttled = false
       Backpressure.release(_auth)
       @ll(_conn_info, ("ConnectorSink is no longer experiencing" +
-        " back pressure, connected = %s\n").cstring(),
-      _connected.string().cstring())
-      try @ll(_twopc_debug, "DBGDBG: unthrottled: buffer check, FSM state = %d\n".cstring(), (conn as ConnectorSink ref).get_twopc_state()) else Fail() end
-      @ll(_twopc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s current txn=%s.\n".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_txn_id_current.cstring())
+        " back pressure, connected = %s").cstring(),
+        _connected.string().cstring())
+      try @ll(_twopc_debug, "DBGDBG: unthrottled: buffer check, FSM state = %d".cstring(), (conn as ConnectorSink ref).get_twopc_state()) else Fail() end
+      @ll(_twopc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s current txn=%s.".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_txn_id_current.cstring())
       if twopc_current_txn_aborted then
-        @ll(_twopc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s discard %d items\n".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_reconnect_buffer.size())
+        @ll(_twopc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s discard %d items".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_reconnect_buffer.size())
         None
       else
         for d in twopc_reconnect_buffer.values() do
-          @ll(_twopc_debug, "DBG: unthrottled: writing buffered %d bytes\n".cstring(), d.size())
+          @ll(_twopc_debug, "DBG: unthrottled: writing buffered %d bytes".cstring(), d.size())
           try (conn as ConnectorSink ref)._write_final(d, None) else Fail() end
         end
       end
       twopc_reconnect_buffer.clear()
     end
 
-  fun send_msg(conn: WallarooOutgoingNetworkActor ref, msg: cp.Message) =>
+  fun send_msg(conn: WallarooOutgoingNetworkActor ref, msg: cwm.Message) =>
     let w1: Writer = w1.create()
 
-    let bs = cp.Frame.encode(msg, w1)
+    let bs = cwm.Frame.encode(msg, w1)
     for item in Bytes.length_encode(bs).values() do
       try (conn as ConnectorSink ref)._write_final(item, None) else Fail() end
     end
@@ -249,31 +245,31 @@ class ConnectorSinkNotify
   fun ref _process_connector_sink_v2_data(
     conn: WallarooOutgoingNetworkActor ref, data: Array[U8] val): None ?
   =>
-    match cp.Frame.decode(data)?
-    | let m: cp.HelloMsg =>
+    match cwm.Frame.decode(data)?
+    | let m: cwm.HelloMsg =>
       Fail()
-    | let m: cp.OkMsg =>
-      if _fsm_state is cp.ConnectorProtoFsmHandshake then
-        _fsm_state = cp.ConnectorProtoFsmStreaming
+    | let m: cwm.OkMsg =>
+      if _fsm_state is ConnectorProtoFsmHandshake then
+        _fsm_state = ConnectorProtoFsmStreaming
 
         credits = m.initial_credits
         if credits < 2 then
           _error_and_close(conn, "HEY, too few credits: " + credits.string())
         else
-          let notify = cp.NotifyMsg(_stream_id, stream_name, message_id)
+          let notify = cwm.NotifyMsg(_stream_id, stream_name, message_id)
           send_msg(conn, notify)
           credits = credits - 1
         end
       else
         _error_and_close(conn, "Bad FSM State: A" + _fsm_state().string())
       end
-    | let m: cp.ErrorMsg =>
+    | let m: cwm.ErrorMsg =>
       _error_and_close(conn, "Bad FSM State: B" + _fsm_state().string())
-    | let m: cp.NotifyMsg =>
+    | let m: cwm.NotifyMsg =>
       _error_and_close(conn, "Bad FSM State: C" + _fsm_state().string())
-    | let m: cp.NotifyAckMsg =>
-      if _fsm_state is cp.ConnectorProtoFsmStreaming then
-        @ll(_conn_debug, "NotifyAck: success %s stream_id %d p-o-r %lu\n".cstring(), m.success.string().cstring(), m.stream_id, m.point_of_ref)
+    | let m: cwm.NotifyAckMsg =>
+      if _fsm_state is ConnectorProtoFsmStreaming then
+        @ll(_conn_debug, "NotifyAck: success %s stream_id %d p-o-r %lu".cstring(), m.success.string().cstring(), m.stream_id, m.point_of_ref)
         // We are going to ignore the point of reference sent to us by
         // the connector sink.  We assume that we know best, and if our
         // point of reference is earlier, then we'll send some duplicates
@@ -281,26 +277,26 @@ class ConnectorSinkNotify
       else
         _error_and_close(conn, "Bad FSM State: D" + _fsm_state().string())
       end
-    | let m: cp.MessageMsg =>
+    | let m: cwm.MessageMsg =>
       // 2PC messages are sent via MessageMsg on stream_id 0.
       if (m.stream_id != 0) or (m.message is None) then
         _error_and_close(conn, "Bad FSM State: Ea" + _fsm_state().string())
         return
       end
-      @ll(_twopc_debug, "2PC: GOT MessageMsg\n".cstring())
+      @ll(_twopc_debug, "2PC: GOT MessageMsg".cstring())
       try
-        let inner = cp.TwoPCFrame.decode(m.message as Array[U8] val)?
+        let inner = cwm.TwoPCFrame.decode(m.message as Array[U8] val)?
         match inner
-        | let mi: cp.ReplyUncommittedMsg =>
+        | let mi: cwm.ReplyUncommittedMsg =>
           // This is a reply to a ListUncommitted message that we sent
           // perhaps some time ago.  Meanwhile, it's possible that we
           // have already started a new round of 2PC ... so our new
           // round's txn_id may be in the txn_id's list.
           if mi.rtag != _rtag then
-            @ll(_twopc_err, "2PC: bad rtag match: %lu != %lu\n".cstring(), mi.rtag, _rtag)
+            @ll(_twopc_err, "2PC: bad rtag match: %lu != %lu".cstring(), mi.rtag, _rtag)
             Fail()
           end
-          @ll(_conn_debug, "TRACE: uncommitted txns = %d\n".cstring(),
+          @ll(_conn_debug, "TRACE: uncommitted txns = %d".cstring(),
               mi.txn_ids.size())
           twopc_uncommitted_list = mi.txn_ids
           // twopc_current_txn_aborted is used by unthrottled()
@@ -325,8 +321,8 @@ class ConnectorSinkNotify
             None
           end
           try (conn as ConnectorSink ref).twopc_intro_done() else Fail() end
-        | let mi: cp.TwoPCReplyMsg =>
-          @ll(_twopc_debug, "2PC: reply for txn_id %s was %s\n".cstring(), mi.txn_id.cstring(), mi.commit.string().cstring())
+        | let mi: cwm.TwoPCReplyMsg =>
+          @ll(_twopc_debug, "2PC: reply for txn_id %s was %s".cstring(), mi.txn_id.cstring(), mi.commit.string().cstring())
           try (conn as ConnectorSink ref).twopc_phase1_reply(
             mi.txn_id, mi.commit)
           else Fail() end
@@ -337,8 +333,8 @@ class ConnectorSinkNotify
         _error_and_close(conn, "Bad FSM State: Eb" + _fsm_state().string())
         return
       end
-    | let m: cp.AckMsg =>
-      if _fsm_state is cp.ConnectorProtoFsmStreaming then
+    | let m: cwm.AckMsg =>
+      if _fsm_state is ConnectorProtoFsmStreaming then
         // NOTE: we aren't actually using credits
         credits = credits + m.credits
         for (s_id, p_o_r) in m.credit_list.values() do
@@ -370,21 +366,21 @@ class ConnectorSinkNotify
               // ACKs.
               None
             elseif p_o_r < acked_point_of_ref then
-              @ll(_conn_err, "Error: Ack: stream-id %lu p_o_r %lu acked_point_of_ref %lu\n".cstring(), _stream_id, p_o_r, acked_point_of_ref)
+              @ll(_conn_err, "Error: Ack: stream-id %lu p_o_r %lu acked_point_of_ref %lu".cstring(), _stream_id, p_o_r, acked_point_of_ref)
               Fail()
             else
               acked_point_of_ref = p_o_r
             end
           else
-            @ll(_conn_err, "Ack: unknown stream_id %d\n".cstring(), s_id)
+            @ll(_conn_err, "Ack: unknown stream_id %d".cstring(), s_id)
             Fail()
           end
         end
       else
         _error_and_close(conn, "Bad FSM State: F" + _fsm_state().string())
       end
-    | let m: cp.RestartMsg =>
-      @ll(_conn_debug, "TRACE: got restart message, closing connection\n".cstring())
+    | let m: cwm.RestartMsg =>
+      @ll(_conn_debug, "TRACE: got restart message, closing connection".cstring())
       conn.close()
     end
 
@@ -403,27 +399,22 @@ class ConnectorSinkNotify
     | (let last_committed: String, let uncommitted: Array[String] val) =>
       var current_txn_aborted: Bool = false
 
-      @ll(_twopc_debug, "2PC: process_uncommitted_list processing %d items, last_committed = %s\n".cstring(), uncommitted.size(), last_committed.cstring())
+      @ll(_twopc_debug, "2PC: process_uncommitted_list processing %d items, last_committed = %s".cstring(), uncommitted.size(), last_committed.cstring())
       for txn_id in uncommitted.values() do
         let do_commit = if txn_id == last_committed then true else false end
-        @ll(_twopc_debug, "2PC: uncommitted txn_id %s commit=%s\n".cstring(), txn_id.cstring(), do_commit.string().cstring())
+        @ll(_twopc_debug, "2PC: uncommitted txn_id %s commit=%s".cstring(), txn_id.cstring(), do_commit.string().cstring())
         if not do_commit and (txn_id == twopc_txn_id_current) then
-          @ll(_twopc_debug, "2PC: current txn_id %s was aborted\n".cstring(), twopc_txn_id_current.cstring())
+          @ll(_twopc_debug, "2PC: current txn_id %s was aborted".cstring(), twopc_txn_id_current.cstring())
           current_txn_aborted = true
         end
-        let p2 = cp.TwoPCEncode.phase2(txn_id, do_commit)
-        try
-          let p2_msg =
-            cp.MessageMsg(0, cp.Ephemeral(), 0, 0, None, [p2])?
-          send_msg(conn, p2_msg)
-        else
-          Fail()
-        end
+        let p2 = TwoPCEncode.phase2(txn_id, do_commit)
+        let p2_msg = cwm.MessageMsg(0, 0, 0, None, p2)
+        send_msg(conn, p2_msg)
       end
       twopc_uncommitted_list = []
       current_txn_aborted
     else
-      @ll(_twopc_debug, "2PC: process_uncommitted_list waiting\n".cstring())
+      @ll(_twopc_debug, "2PC: process_uncommitted_list waiting".cstring())
       false
     end
 
@@ -431,22 +422,21 @@ class ConnectorSinkNotify
   fun ref _error_and_close(conn: WallarooOutgoingNetworkActor ref,
     msg: String)
   =>
-    send_msg(conn, cp.ErrorMsg(msg))
+    send_msg(conn, cwm.ErrorMsg(msg))
     conn.close()
 
   fun ref make_message(encoded1: Array[(String val | Array[U8 val] val)] val):
-    cp.MessageMsg ?
+    cwm.MessageMsg
   =>
-    let stream_id: cp.StreamId = 1
-    let flags: cp.Flags = 0
-    let event_time = None
+    let stream_id: cwm.StreamId = 1
+    let event_time: cwm.EventTimeType = 0
     let key = None
 
     let base_message_id = message_id
     for e in encoded1.values() do
       message_id = message_id + e.size().u64()
     end
-    cp.MessageMsg(stream_id, flags, base_message_id, event_time, key, encoded1)?
+    cwm.MessageMsg(stream_id, base_message_id, event_time, key, encoded1)
 
   fun ref application_ready_to_work(conn: ConnectorSink ref) =>
     if twopc_txn_id_last_committed is None then
@@ -454,7 +444,7 @@ class ConnectorSinkNotify
       // are starting for the first time.  There is no prior committed
       // txn_id.
       twopc_txn_id_last_committed = ""
-      try @ll(_twopc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.\n".cstring(), (twopc_txn_id_last_committed as String).cstring()) else Fail() end
+      try @ll(_twopc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.".cstring(), (twopc_txn_id_last_committed as String).cstring()) else Fail() end
       process_uncommitted_list(conn)
     end
 

@@ -252,7 +252,7 @@ class WaitForLogRotation(StoppableThread):
     """
     Wait for a log rotation to occuer on a set of filepath prefixes
     """
-    __base_name__ = 'WaitForLogRottion'
+    __base_name__ = 'WaitForLogRotation'
 
     def __init__(self, cluster, base_path, prefixes=[], log_suffix='.evlog',
                  timeout=90):
@@ -278,7 +278,7 @@ class WaitForLogRotation(StoppableThread):
             if self.notifier.is_alive():
                 self.notifier.stop()
                 self.stop()
-                self.error = TimeoutError("WaitForrLogRotation timed out after "
+                self.error = TimeoutError("WaitForLogRotation timed out after "
                 " {} seconds while waiting for {!r} to rotate"
                 .format(self.timeout, self.prefixes))
                 self.cluster.raise_from_error(self.error)
