@@ -419,22 +419,17 @@ class MessageMsg is MessageTrait
 
 class EosMessageMsg is MessageTrait
   let stream_id: StreamId
-  let message_id: MessageId
 
   new create(
-    stream_id': StreamId,
-    message_id': MessageId)
+    stream_id': StreamId)
   =>
     stream_id = stream_id'
-    message_id = message_id'
 
   new decode(rb: Reader) ? =>
     stream_id = rb.u64_be()?
-    message_id = rb.u64_be()?
 
   fun encode(wb: Writer = Writer): Writer =>
     wb.u64_be(stream_id)
-    wb.u64_be(message_id)
 
 class AckMsg is MessageTrait
   let credits: U32

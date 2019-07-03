@@ -215,9 +215,8 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                 # Add it to the set of sources pending closing
                 point_of_ref = source.point_of_ref()
                 self.pending_eos_ack[_id] = point_of_ref
-                # send end of stream
-                self.end_of_stream(stream_id = _id,
-                                   point_of_ref = point_of_ref)
+                # send end of stream/EOS message
+                self.end_of_stream(stream_id = _id) # aka EosMessage
 
     def _close_and_delete_source(self, source):
         key = self.get_id(source.name)

@@ -262,6 +262,8 @@ class AsyncServer(asynchat.async_chat, object):
             self.write(notify_ack)
         elif isinstance(msg, cwm.Message):
             self.handle_message(msg)
+        elif isinstance(msg, cwm.EosMessage):
+            self.handle_eos_message(msg)
         elif isinstance(msg, cwm.Error):
             # Got error message from worker
             # close the connection and pass msg to the error handler
@@ -271,6 +273,12 @@ class AsyncServer(asynchat.async_chat, object):
         else:
             # write the original message back
             self.write(msg)
+
+    def handle_eos_message(self, msg):
+        # ack eos
+        logging.debug("NH: acking eos for {}".format(msg))
+        self.write(cwm.Ack(credits = 1,
+                           acks= [(msg.stream_id, self._streams[msg.stream_id][2])]))
 
     def handle_message(self, msg):
         if msg.stream_id == 0:
@@ -453,12 +461,6 @@ class AsyncServer(asynchat.async_chat, object):
         else:
             logging.critical('message has no message_id')
             sys.exit(66)
-
-        if msg.flags & cwm.Message.Eos:
-            # ack eos
-            logging.debug("NH: acking eos for {}".format(msg))
-            self.write(cwm.Ack(credits = 1,
-                               acks= [(msg.stream_id, self._streams[msg.stream_id][2])]))
 
     def write(self, msg):
         logging.debug("write {}".format(msg))

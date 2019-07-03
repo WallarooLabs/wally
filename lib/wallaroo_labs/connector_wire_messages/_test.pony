@@ -305,15 +305,12 @@ class iso _TestEosMessageMsg is UnitTest
 
   fun apply(h: TestHelper) ? =>
     let sid: StreamId = 0x0000000077007700
-    let mid: MessageId = 10
-    let a = EosMessageMsg(sid, mid)
+    let a = EosMessageMsg(sid)
     let encoded = Frame.encode(a)
     let m = Frame.decode(encoded)?
     let b = m as EosMessageMsg
     h.assert_eq[U32](a.sid, sid)
-    h.assert_eq[U32](a.mid, mid)
     h.assert_eq[U32](b.sid, sid)
-    h.assert_eq[U32](b.mid, mid)
 
 class iso _TestAckMsg is UnitTest
   fun name(): String => "connector_wire_messages/_TestAckMsg"
