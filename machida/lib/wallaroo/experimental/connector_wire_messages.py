@@ -638,43 +638,40 @@ def test_message():
 
 class EosMessage(object):
     """
-    Message(stream_id: int)
+    EosMessage(stream_id: int)
     """
-    def __init__(self, stream_id, message_id):
+    def __init__(self, stream_id):
         self.stream_id = stream_id
-        self.message_id = message_id
 
     def __str__(self):
-        return ("EosMessage(stream_id={!r},message_id={!r})".format(
-                    self.stream_id, self.message_id))
+        return ("EosMessage(stream_id={!r})".format(self.stream_id))
 
     def __eq__(self, other):
-        return (self.stream_id == other.stream_id and
-                self.message_id == other.message_id)
+        return (self.stream_id == other.stream_id)
 
     def encode(self):
-        sid = struct.pack('>Q', self.stream_id)
-        mid = struct.pack('>Q', self.message_id)
-        return b''.join((sid, mid))
+        return struct.pack('>Q', self.stream_id)
 
     @classmethod
     def decode(cls, bs):
         reader = StringIO(bs)
-        stream_id = struct.unpack('>Q', reader.read(8))
-        message_id = struct.unpack('>Q', reader.read(8))
-        return cls(stream_id, message_id)
+        stream_id = struct.unpack('>Q', reader.read(8))[0]
+        return cls(stream_id)
 
 def test_eos_message():
     from itertools import chain, product
     from functools import reduce
     import pytest
-    stream_id = 123
+    stream_id = 0x2a2b2c3d2a2b2c3d
 
+    msg = EosMessage(stream_id)
+    assert(msg.stream_id == stream_id)
     encoded = msg.encode()
-    assert(len(encoded) == (
-            8 + 1))
+    print("len(ENCODED) = {}".format(len(encoded)))
+    print("ENCODED = {!r}<--.".format(encoded))
+    assert(len(encoded) == (8))
 
-    decoded = Message.decode(encoded)
+    decoded = EosMessage.decode(encoded)
     assert(isinstance(decoded, EosMessage))
     assert(decoded.stream_id == msg.stream_id)
 
@@ -779,7 +776,8 @@ class Frame(object):
                           (4, NotifyAck),
                           (5, Message),
                           (6, Ack),
-                          (7, Restart)]
+                          (7, Restart),
+                          (8, EosMessage)]
     _FRAME_TYPE_MAP = dict([(v, t) for v, t in _FRAME_TYPE_TUPLES] +
                            [(t, v) for v, t in _FRAME_TYPE_TUPLES])
 
