@@ -296,7 +296,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             self.handle_restart(msg)
         # messages that should only go connector->wallaroo
         # Notify, Hello, Message
-        elif isinstance(msg, (cwm.Hello, cwm.Message, cwm.Notify)):
+        elif isinstance(msg, (cwm.Hello, cwm.Message, cwm.EosMessage, cwm.Notify)):
             # send error to wallaroo then shutdown and raise a protocol
             # exception
             try:
@@ -485,13 +485,13 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             self._write(data)
             # use up 1 credit
             self.credits -= 1
-        elif isinstance(msg, cwm.Error):
+        elif isinstance(msg, (cwm.EosMessage, cwm.Error)):
             # write the message
             data = cwm.Frame.encode(msg)
             self._write(data)
         else:
-            raise ProtocolError("Can only send message types {{Hello, Notify, "
-                                "Message, Error}}. Received {}".format(msg))
+            raise ProtocolError("Can only send message types {{Notify, "
+                                "Message, EosMessage, Error}}. Received {}".format(msg))
 
     def _write(self, data):
         """
