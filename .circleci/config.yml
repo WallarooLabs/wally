@@ -2,7 +2,7 @@ version: 2.1
 executors:
   wallaroo-ci:
     docker:
-      - image: wallaroolabs/wallaroo-ci:2019.05.21.1
+      - image: wallaroolabs/wallaroo-ci:2019.06.09.1
   pony-changelog:
     docker:
       - image: ponylang/changelog-tool:release
