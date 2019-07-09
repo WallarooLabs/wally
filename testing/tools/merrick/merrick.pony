@@ -178,10 +178,11 @@ class FromWallarooNotify is TCPConnectionNotify
       try
 
         let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
-        conn.expect(expect)
+        conn.expect(expect)?
         _header = false
       else
         @printf[I32]("Blew up reading header from Wallaroo\n".cstring())
+        Fail()
       end
     else
       var data_copy: Array[U8 val] val = consume data
@@ -191,13 +192,21 @@ class FromWallarooNotify is TCPConnectionNotify
         end
       end
       _store.received(data_copy)
-      conn.expect(4)
+      try
+        conn.expect(4)?
+      else
+        Fail()
+      end
       _header = true
     end
     true
 
   fun ref accepted(conn: TCPConnection ref) =>
-    conn.expect(4)
+    try
+      conn.expect(4)?
+    else
+      Fail()
+    end
     _coordinator.connection_added(consume conn)
 
   fun ref connect_failed(conn: TCPConnection ref) =>
