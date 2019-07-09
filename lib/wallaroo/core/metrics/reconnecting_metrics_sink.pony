@@ -75,6 +75,13 @@ actor ReconnectingMetricsSink
   var _service: String
   var _from: String
 
+  let _asio_flags: U32 =
+    ifdef not windows then
+      AsioEvent.read_write_oneshot()
+    else
+      AsioEvent.read_write()
+    end
+
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
@@ -116,7 +123,7 @@ actor ReconnectingMetricsSink
     _from = from
     _connect_count = @pony_os_connect_tcp[U32](this,
       host.cstring(), service.cstring(),
-      from.cstring())
+      from.cstring(), _asio_flags)
     _notify_connecting()
 
   new ip4(host: String, service: String, application_name: String,
@@ -138,7 +145,7 @@ actor ReconnectingMetricsSink
     _from = from
     _connect_count = @pony_os_connect_tcp4[U32](this,
       host.cstring(), service.cstring(),
-      from.cstring())
+      from.cstring(), _asio_flags)
     _notify_connecting()
 
   new ip6(host: String, service: String, application_name: String,
@@ -160,7 +167,7 @@ actor ReconnectingMetricsSink
     _from = from
     _connect_count = @pony_os_connect_tcp6[U32](this,
       host.cstring(), service.cstring(),
-      from.cstring())
+      from.cstring(), _asio_flags)
     _notify_connecting()
 
   be queue(data: ByteSeq) =>
@@ -843,7 +850,7 @@ actor ReconnectingMetricsSink
     if not _connected then
       _connect_count = @pony_os_connect_tcp[U32](this,
         _host.cstring(), _service.cstring(),
-        _from.cstring())
+        _from.cstring(), _asio_flags)
     end
 
   fun ref _apply_backpressure() =>

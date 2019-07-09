@@ -19,6 +19,7 @@ Copyright 2018 The Wallaroo Authors.
 use "net"
 use "time"
 use "wallaroo/core/common"
+use "wallaroo_labs/mort"
 
 class ControlSenderConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
@@ -43,7 +44,11 @@ class ControlSenderConnectNotifier is TCPConnectionNotify
 
   fun ref connected(conn: TCPConnection ref) =>
     _tcp_conn_wrapper.connected(conn)
-    conn.expect(4)
+    try
+      conn.expect(4)?
+    else
+      Fail()
+    end
     _header = true
     @printf[I32]("ControlSenderConnectNotifier: connected to %s at %s:%s.\n"
       .cstring(), _target_worker.cstring(), _host.cstring(),

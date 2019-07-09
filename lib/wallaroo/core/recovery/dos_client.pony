@@ -452,7 +452,11 @@ class DOSnotify is TCPConnectionNotify
     _header = true
     conn.set_nodelay(true)
     conn.set_keepalive(10)
-    conn.expect(4)
+    try
+      conn.expect(4)?
+    else
+      Fail()
+    end
     _client.connected()
 
   fun ref received(
@@ -467,7 +471,7 @@ class DOSnotify is TCPConnectionNotify
       end
       try
         let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
-        conn.expect(expect)
+        conn.expect(expect)?
         ifdef "dos-verbose" then
           @printf[I32]("SOCK: %s 0x%lx received header, expect = %d\n".cstring(), _usedir_name.cstring(), _client, expect)
         end
@@ -475,7 +479,7 @@ class DOSnotify is TCPConnectionNotify
           _header = false
         else
           _client.response(recover [] end)
-          conn.expect(4)
+          conn.expect(4)?
           _header = true
         end
       else
@@ -488,7 +492,11 @@ class DOSnotify is TCPConnectionNotify
         @printf[I32]("SOCK: %s 0x%lx received payload size %d\n".cstring(), _usedir_name.cstring(), _client, data.size())
       end
       _client.response(consume data)
-      conn.expect(4)
+      try
+        conn.expect(4)?
+      else
+        Fail()
+      end
       _header = true
     end
     false

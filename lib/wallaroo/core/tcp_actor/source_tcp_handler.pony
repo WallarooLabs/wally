@@ -87,8 +87,14 @@ class SourceTCPHandler is TestableTCPHandler
 
   fun ref connect(host: String, service: String) =>
     if not _connected then
+      let asio_flags =
+        ifdef not windows then
+          AsioEvent.read_write_oneshot()
+        else
+          AsioEvent.read_write()
+        end
       _connect_count = @pony_os_connect_tcp[U32](_tcp_actor,
-        host.cstring(), service.cstring(), "".cstring())
+        host.cstring(), service.cstring(), "".cstring(), asio_flags)
       _notify_connecting()
     end
 
