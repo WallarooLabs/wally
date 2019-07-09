@@ -174,7 +174,11 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
 
   fun ref accepted(conn: TCPConnection ref) =>
     _connections.register_disposable(conn)
-    conn.expect(4)
+    try
+      conn.expect(4)?
+    else
+      Fail()
+    end
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool
@@ -182,7 +186,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     if _header then
       try
         let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
-        conn.expect(expect)
+        conn.expect(expect)?
         _header = false
       else
         @printf[I32]("Error reading header on control channel\n".cstring())
@@ -642,7 +646,11 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           "channel.\n").cstring())
       end
 
-      conn.expect(4)
+      try
+        conn.expect(4)?
+      else
+        Fail()
+      end
       _header = true
     end
     true
@@ -683,10 +691,10 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
       let cluster_join_msg =
         ChannelMsgEncoder.join_cluster(_worker_name, _worker_count, _auth)?
       conn.writev(cluster_join_msg)
+      conn.expect(4)?
     else
       Fail()
     end
-    conn.expect(4)
     _header = true
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
@@ -695,7 +703,7 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
     if _header then
       try
         let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
-        conn.expect(expect)
+        conn.expect(expect)?
         _header = false
       else
         @printf[I32]("Error reading header on control channel\n".cstring())
@@ -724,7 +732,11 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
         @printf[I32](("Incoming Channel Message type not handled by joining " +
           "control channel.\n").cstring())
       end
-      conn.expect(4)
+      try
+        conn.expect(4)?
+      else
+        Fail()
+      end
       _header = true
     end
     true

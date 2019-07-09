@@ -93,8 +93,12 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
     _local_topology_initializer = local_topology_initializer
 
   fun ref accepted(conn: TCPConnection ref) =>
-    conn.expect(4)
-    _connections.register_disposable(conn)
+    try
+      conn.expect(4)?
+      _connections.register_disposable(conn)
+    else
+      Fail()
+    end
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool
@@ -104,10 +108,10 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
         let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?)
           .usize()
         if expect > 0 then
-          conn.expect(expect)
+          conn.expect(expect)?
           _header = false
         else
-          conn.expect(4)
+          conn.expect(4)?
           _header = true
         end
       else
@@ -227,7 +231,11 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
           .cstring())
       end
 
-      conn.expect(4)
+      try
+        conn.expect(4)?
+      else
+        Fail()
+      end
       _header = true
     end
     true

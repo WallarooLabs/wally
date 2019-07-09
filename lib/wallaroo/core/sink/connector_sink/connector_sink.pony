@@ -156,6 +156,13 @@ actor ConnectorSink is Sink
   let _auth: ApplyReleaseBackpressureAuth
   var _from: String
 
+  let _asio_flags: U32 =
+    ifdef not windows then
+      AsioEvent.read_write_oneshot()
+    else
+      AsioEvent.read_write()
+    end
+
   // Producer (Resilience)
   let _timers: Timers = Timers
 
@@ -237,7 +244,7 @@ actor ConnectorSink is Sink
       _host.cstring(), _service.cstring())
     _connect_count = @pony_os_connect_tcp[U32](this,
       _host.cstring(), _service.cstring(),
-      _from.cstring())
+      _from.cstring(), _asio_flags)
     _notify_connecting()
 
   // open question: how do we reconnect if our external system goes away?
@@ -1131,7 +1138,7 @@ actor ConnectorSink is Sink
     if not _connected and not _no_more_reconnect then
       _connect_count = @pony_os_connect_tcp[U32](this,
         _host.cstring(), _service.cstring(),
-        _from.cstring())
+        _from.cstring(), _asio_flags)
       _notify_connecting()
     end
 

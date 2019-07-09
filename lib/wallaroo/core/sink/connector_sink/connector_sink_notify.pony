@@ -165,10 +165,10 @@ class ConnectorSinkNotify
       end
       true
     else
-      conn.expect(4)
-      _header = true
-      let data' = recover val consume data end
       try
+        conn.expect(4)
+        _header = true
+        let data' = recover val consume data end
         _process_connector_sink_v2_data(conn, data')?
       else
         Fail()

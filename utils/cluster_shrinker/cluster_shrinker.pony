@@ -24,6 +24,7 @@ use "net"
 use "files"
 use "wallaroo_labs/bytes"
 use "wallaroo_labs/messages"
+use "wallaroo_labs/mort"
 use "wallaroo_labs/options"
 
 actor Main
@@ -116,7 +117,11 @@ class ClusterShrinkerConnectNotifier is TCPConnectionNotify
 
   fun ref connected(conn: TCPConnection ref) =>
     conn.writev(_msg)
-    conn.expect(4)
+    try
+      conn.expect(4)?
+    else
+      Fail()
+    end
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool
@@ -125,7 +130,7 @@ class ClusterShrinkerConnectNotifier is TCPConnectionNotify
       try
         let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?)
           .usize()
-        conn.expect(expect)
+        conn.expect(expect)?
         _header = false
       else
         _env.err.print("Error reading header")
@@ -151,7 +156,11 @@ class ClusterShrinkerConnectNotifier is TCPConnectionNotify
         _env.exitcode(1)
         conn.dispose()
       end
-      conn.expect(4)
+      try
+        conn.expect(4)?
+      else
+        Fail()
+      end
       _header = true
     end
     true
