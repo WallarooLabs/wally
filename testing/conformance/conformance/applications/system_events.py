@@ -407,6 +407,7 @@ class ResilienceTestBaseApplication(Application):
             logging.info("Validating output")
             cmd_validate = self.config['validation_cmd'].format(
                 out_file = self.cluster.res_dir)
+            #### res = "BUMMER" ##
             res = run_shell_cmd(cmd_validate)
             try:
                 assert(res.success)

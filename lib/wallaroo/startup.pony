@@ -871,10 +871,10 @@ actor Startup
   fun ref _remove_file(filename: String) =>
     @printf[I32]("...Removing %s...\n".cstring(), filename.cstring())
     if _startup_options.use_io_journal then
-      try (_the_journal as SimpleJournal).remove(filename) end
+      None //SLF// try (_the_journal as SimpleJournal).remove(filename) end
     end
     if _startup_options.do_local_file_io then
-      @remove[I32](filename.cstring())
+      None //SLF// @remove[I32](filename.cstring())
     end
 
   fun ref _recover_worker_names(worker_names_filepath: FilePath):

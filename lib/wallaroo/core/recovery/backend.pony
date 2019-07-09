@@ -133,6 +133,7 @@ class FileBackend is Backend
   =>
     _writer = recover iso Writer end
     _filepath = filepath
+    @l[I32](U16(1), U16(1), "FileBackend: create: filepath = %s".cstring(), _filepath.path.cstring())
     _file = recover iso
       AsyncJournalledFile(filepath, the_journal, auth, do_local_file_io) end
     _event_log = event_log
@@ -494,6 +495,7 @@ class RotatingFileBackend is Backend
       let rotation_history = AsyncJournalledFile(FilePath(_auth, "TODO-EventLog-rotation-history.txt")?, _the_journal, _auth,
         _do_local_file_io)
       rotation_history.print("START of rotation: finished writing to " + _backend.get_path())
+      @l[I32](U16(1), U16(1), ("START of rotation: finished writing to " + _backend.get_path()).cstring())
 
       // 1. sync/datasync the current backend to ensure everything is written
       _backend.sync()?
@@ -511,6 +513,7 @@ class RotatingFileBackend is Backend
 
       // TODO Part two of the log rotation hack.  Sync
       rotation_history.print("END of rotation: starting writing to " + _backend.get_path())
+      @l[I32](U16(1), U16(1), ("END of rotation: starting writing to " + _backend.get_path()).cstring())
       rotation_history.sync() // TODO we want synchronous response
       rotation_history.dispose()
     else

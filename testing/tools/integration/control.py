@@ -263,6 +263,7 @@ class WaitForLogRotation(StoppableThread):
         self.base_path = base_path
         self.prefixes = prefixes
         self.timeout = timeout
+        logging.info("SLF: EvLogFileNotifier base_path {} log_suffix {}".format(base_path, log_suffix))
         self.notifier = EvLogFileNotifier(handler=self, path=base_path,
                 log_suffix=log_suffix)
         self.wait_for = set(self.prefixes)

@@ -62,22 +62,26 @@ primitive ExternalMsgEncoder
   fun print_message(message: String, wb: Writer = Writer):
     Array[ByteSeq] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     _encode(_Print(), message, wb)
 
   fun rotate_log(worker_name: String, wb: Writer = Writer):
     Array[ByteSeq] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     _encode(_RotateLog(), worker_name, wb)
 
   fun clean_shutdown(msg: String = "", wb: Writer = Writer):
     Array[ByteSeq] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     _encode(_CleanShutdown(), msg, wb)
 
   fun shrink_request(query: Bool, node_names: Array[String] val =
     recover Array[String] end, num_nodes: U64 = 0, wb: Writer = Writer):
     Array[ByteSeq] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     _encode(_ShrinkRequest(), ShrinkQueryJsonEncoder.request(query, node_names,
       num_nodes), wb)
 
@@ -85,12 +89,14 @@ primitive ExternalMsgEncoder
     recover Array[String] end, num_nodes: U64 = 0, wb: Writer = Writer):
     Array[ByteSeq] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     _encode(_ShrinkQueryResponse(), ShrinkQueryJsonEncoder.response(node_names,
       num_nodes), wb)
 
   fun shrink_error_response(message: String, wb: Writer = Writer):
     Array[ByteSeq] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     _encode(_ShrinkErrorResponse(), message, wb)
 
   fun partition_query(wb: Writer = Writer): Array[ByteSeq] val =>
@@ -98,6 +104,7 @@ primitive ExternalMsgEncoder
     A message requesting the current distribution of partition steps across
     workers (organized by partition type and partition name).
     """
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     _encode(_PartitionQuery(), "", wb)
 
   fun partition_query_response(
@@ -105,6 +112,7 @@ primitive ExternalMsgEncoder
     stateless_routers: Map[U128, StatelessPartitionRouter],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     let digest_map = _partition_digest(state_routers, stateless_routers)
     let pqr = PartitionQueryStateAndStatelessIdsEncoder(digest_map)
     _encode(_PartitionQueryResponse(), pqr, wb)
@@ -115,17 +123,20 @@ primitive ExternalMsgEncoder
     the worker names? Is the cluster currently processing messages (i.e. not
     in a stop the world phase)?
     """
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     _encode(_ClusterStatusQuery(), "", wb)
 
   fun cluster_status_query_reponse_not_initialized(wb: Writer = Writer):
     Array[ByteSeq] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     _encode(_ClusterStatusQueryResponseNotInitialized(), "", wb)
 
   fun cluster_status_query_response(worker_count: USize,
     worker_names: Array[String] val, stop_the_world_in_process: Bool,
     wb: Writer = Writer): Array[ByteSeq] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     let csr = ClusterStatusQueryJsonEncoder.response(worker_count.u64(),
       worker_names, stop_the_world_in_process)
     _encode(_ClusterStatusQueryResponse(), csr, wb)
@@ -135,6 +146,7 @@ primitive ExternalMsgEncoder
     A message requesting the current count of partition steps across
     workers (organized by partition type and partition name).
     """
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     _encode(_PartitionCountQuery(), "", wb)
 
   fun partition_count_query_response(
@@ -142,6 +154,7 @@ primitive ExternalMsgEncoder
     stateless_routers: Map[U128, StatelessPartitionRouter],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     let digest_map = _partition_digest(state_routers, stateless_routers)
     let pqr = PartitionQueryStateAndStatelessCountsEncoder(digest_map)
     _encode(_PartitionCountQueryResponse(), pqr, wb)
@@ -150,11 +163,13 @@ primitive ExternalMsgEncoder
     """
     A message requesting the ids of all sources in the cluster
     """
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     _encode(_SourceIdsQuery(), "", wb)
 
   fun source_ids_query_response(source_ids: Array[String] val,
     wb: Writer = Writer): Array[ByteSeq] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     let sis = SourceIdsQueryEncoder.response(source_ids)
     _encode(_SourceIdsQueryResponse(), sis, wb)
 
@@ -163,12 +178,14 @@ primitive ExternalMsgEncoder
     A message requesting the state entities on the worker (organized by entity
     key).
     """
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     _encode(_StateEntityQuery(), "", wb)
 
   fun state_entity_query_response(
     local_keys: Map[RoutingId, KeySet],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     let digest_map = _state_entity_digest(local_keys)
     let seqr = StateEntityQueryEncoder.state_entity_keys(digest_map)
     _encode(_StateEntityQueryResponse(), seqr, wb)
@@ -178,12 +195,14 @@ primitive ExternalMsgEncoder
     A message requesting the current distribution of stateless partition across
     workers (organized by entity key).
     """
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     _encode(_StatelessPartitionQuery(), "", wb)
 
   fun stateless_partition_query_response(
     stateless_routers: Map[U128, StatelessPartitionRouter],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     let digest_map = _stateless_partition_digest(stateless_routers)
     let spqr = StatelessPartitionQueryEncoder.stateless_partition_keys(digest_map)
     _encode(_StatelessPartitionQueryResponse(), spqr, wb)
@@ -193,12 +212,14 @@ primitive ExternalMsgEncoder
     A message requesting the count of state entities on the worker (organized by
     entity key).
     """
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     _encode(_StateEntityCountQuery(), "", wb)
 
   fun state_entity_count_query_response(
     local_keys: Map[U128, KeySet],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     let digest_map = _state_entity_digest(local_keys)
     let secqr = StateEntityCountQueryEncoder.state_entity_count(digest_map)
     _encode(_StateEntityCountQueryResponse(), secqr, wb)
@@ -208,12 +229,14 @@ primitive ExternalMsgEncoder
     A message requesting the count of stateless partition across workers
     (organized by entity key).
     """
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     _encode(_StatelessPartitionCountQuery(), "", wb)
 
   fun stateless_partition_count_query_response(
     stateless_routers: Map[U128, StatelessPartitionRouter],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     let digest_map = _stateless_partition_digest(stateless_routers)
     let spcqr =
       StatelessPartitionCountQueryEncoder.stateless_partition_count(digest_map)
@@ -223,6 +246,7 @@ primitive ExternalMsgEncoder
     stateless_routers: Map[U128, StatelessPartitionRouter]):
     Map[String, Map[String, Map[String, Array[String] val] val] val] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     let state_ps =
       recover iso Map[String, Map[WorkerName, Array[String] val] val] end
     let stateless_ps =
@@ -246,6 +270,7 @@ primitive ExternalMsgEncoder
   fun _state_entity_digest(local_keys: Map[RoutingId, KeySet]):
     Map[String, Array[Key] val] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     let state_ps = recover trn Map[String, Array[Key] val] end
 
     for (step_group, keys) in local_keys.pairs() do
@@ -265,6 +290,7 @@ primitive ExternalMsgEncoder
     stateless_routers: Map[U128, StatelessPartitionRouter]):
     Map[String, Map[String, Array[String] val] val] val
   =>
+    @printf[I32]("YO: ExternalMsgEncoder.%s %d\n".cstring(), __loc.method_name().cstring(), __loc.line())
     let stateless_ps =
       recover iso Map[String, Map[String, Array[String] val] val] end
 
@@ -290,53 +316,76 @@ primitive ExternalMsgDecoder
     """
     match _decode(data)?
     | (_Print(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_Print".cstring())
       ExternalPrintMsg(s)
     | (_RotateLog(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_RotateLog".cstring())
       ExternalRotateLogFilesMsg(s)
     | (_CleanShutdown(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_CleanShutdown".cstring())
       ExternalCleanShutdownMsg(s)
     | (_ShrinkRequest(), let json: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_ShrinkRequest".cstring())
       ShrinkQueryJsonDecoder.request(json)?
     | (_ShrinkQueryResponse(), let json: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_ShrinkQueryResponse".cstring())
       ShrinkQueryJsonDecoder.response(json)?
     | (_ShrinkErrorResponse(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_ShrinkErrorResponse".cstring())
       ExternalShrinkErrorResponseMsg(s)
     | (_PartitionQuery(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_PartitionQuery".cstring())
       ExternalPartitionQueryMsg
     | (_PartitionQueryResponse(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_PartitionQueryResponse".cstring())
       ExternalPartitionQueryResponseMsg(s)
     | (_ClusterStatusQuery(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_ClusterStatusQuery".cstring())
       ExternalClusterStatusQueryMsg
     | (_ClusterStatusQueryResponse(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_ClusterStatusQueryResponse".cstring())
       ClusterStatusQueryJsonDecoder.response(s)?
     | (_ClusterStatusQueryResponseNotInitialized(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_ClusterStatusQueryResponseNotInitialized".cstring())
       ExternalClusterStatusQueryResponseNotInitializedMsg
     | (_PartitionCountQuery(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_PartitionCountQuery".cstring())
       ExternalPartitionCountQueryMsg
     | (_PartitionCountQueryResponse(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_PartitionCountQueryResponse".cstring())
       ExternalPartitionCountQueryResponseMsg(s)
     | (_SourceIdsQuery(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_SourceIdsQuery".cstring())
       ExternalSourceIdsQueryMsg
     | (_SourceIdsQueryResponse(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_SourceIdsQueryResponse".cstring())
       SourceIdsQueryJsonDecoder.response(s)?
     | (_ReportStatus(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_ReportStatus".cstring())
       ExternalReportStatusMsg(s)
     | (_StateEntityQuery(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_StateEntityQuery".cstring())
       ExternalStateEntityQueryMsg
     | (_StateEntityQueryResponse(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_StateEntityQueryResponse".cstring())
       ExternalStateEntityQueryResponseMsg(s)
     | (_StatelessPartitionQuery(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_StatelessPartitionQuery".cstring())
       ExternalStatelessPartitionQueryMsg
     | (_StatelessPartitionQueryResponse(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_StatelessPartitionQueryResponse".cstring())
       ExternalStatelessPartitionQueryResponseMsg(s)
-
     | (_StateEntityCountQuery(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_StateEntityCountQuery".cstring())
       ExternalStateEntityCountQueryMsg
     | (_StateEntityCountQueryResponse(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_StateEntityCountQueryResponse".cstring())
       ExternalStateEntityCountQueryResponseMsg(s)
     | (_StatelessPartitionCountQuery(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_StatelessPartitionCountQuery".cstring())
       ExternalStatelessPartitionCountQueryMsg
     | (_StatelessPartitionCountQueryResponse(), let s: String) =>
+    @printf[I32]("YO: ExternalMsgDecoder.%s\n".cstring(), "_StatelessPartitionCountQueryResponse".cstring())
       ExternalStatelessPartitionCountQueryResponseMsg(s)
     else
       error

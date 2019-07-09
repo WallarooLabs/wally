@@ -78,6 +78,10 @@ class _NormalBarrierCoordinatorPhase is _BarrierCoordinatorPhase
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
   =>
+      ifdef "checkpoint_trace" then
+        @printf[I32]("Normal: Initiating barrier %s!\n".cstring(),
+          barrier_token.string().cstring())
+      end
     _coordinator.initiate_barrier(barrier_token, result_promise)
 
   fun ref ack_barrier(s: Sink, barrier_token: BarrierToken) =>
@@ -90,6 +94,10 @@ class _NormalBarrierCoordinatorPhase is _BarrierCoordinatorPhase
     true
 
   fun ref barrier_fully_acked(token: BarrierToken) =>
+    ifdef "checkpoint_trace" then
+      @printf[I32]("Normal: Fully acked barrier %s!\n".cstring(),
+        token.string().cstring())
+    end
     _coordinator.next_token()
 
 class _RecoveringBarrierCoordinatorPhase is _BarrierCoordinatorPhase
@@ -207,6 +215,10 @@ class _BlockingBarrierCoordinatorPhase is _BarrierCoordinatorPhase
     _coordinator._worker_ack_barrier(w, barrier_token)
 
   fun ref barrier_fully_acked(token: BarrierToken) =>
+    ifdef "checkpoint_trace" then
+      @printf[I32]("BlockPhase: Fully acked barrier %s!\n".cstring(),
+        token.string().cstring())
+    end
     if token == _wait_for_token then
       _coordinator.next_token()
     end

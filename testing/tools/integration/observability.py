@@ -70,7 +70,7 @@ def external_sender_query(addr, query_type):
     Use external_sender to query the cluster for observability data.
     """
     t = QUERY_TYPES[query_type]
-    cmd = ('external_sender --external {} --type {} --json'
+    cmd = ('sh -c "external_sender --external {} --type {} --json | grep -v YO"'
            .format(addr, t))
     res = run_shell_cmd(cmd)
     try:
@@ -445,10 +445,12 @@ class LogRotationEventHandler(FileSystemEventHandler):
                     "Discarding event: {}".format(self.log_suffix, event))
 
     def on_created(self, event):
+        logging.log(1, "SLF: on_created {}".format(event))
         if isinstance(event, FileCreatedEvent):
             self.notifier.file_created(event.src_path)
 
     def on_deleted(self, event):
+        logging.log(1, "SLF: on_deleted {}".format(event))
         if isinstance(event, DirDeletedEvent):
             self.notifier.dir_deleted(event.src_path)
         else:
@@ -494,6 +496,7 @@ class EvLogFileNotifier(StoppableThread):
         return (base_name, chunk)
 
     def file_created(self, filename):
+        logging.log(1, "SLF: file_created {}".format(filename))
         base_name, chunk = self.parse_log_file_name(filename)
         fn_logs = self.log_files.setdefault(base_name, {})
         fn_logs.setdefault('chunks', []).append(chunk)
@@ -505,6 +508,7 @@ class EvLogFileNotifier(StoppableThread):
         self.handler.file_created(base_name, new_chunk, old_chunk)
 
     def file_deleted(self, filename):
+        logging.log(1, "SLF: file_deleted {}".format(filename))
         base_name, chunk = self.parse_log_file_name(filename)
         fn_logs = self.log_files.setdefault(base_name, {})
         if fn_logs['current'] == chunk:

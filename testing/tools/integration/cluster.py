@@ -631,6 +631,7 @@ class Cluster(object):
         # send a log rotate command directly to each worker's external channel
         for w in to_rotate:
             send_rotate_command(w.external, w.name)
+            time.sleep(2.0)
 
         # Wait for log rotation watcher to return
         wflr.join()
@@ -1096,6 +1097,7 @@ class Cluster(object):
             SinkData(s.name, s.host, s.port, s.start_time, s.data)
             for s in self.sinks]
         self.persistent_data['ops'] = self.ops
+        #### print("SLF: SKIPPING CLEAN UP {}".format(self.res_dir))
         clean_resilience_path(self.res_dir)
         self._finalized = True
 

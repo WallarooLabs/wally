@@ -162,6 +162,10 @@ actor BarrierCoordinator is Initializable
     graph and potentially disrupt the barrier protocol.
     """
     if _barrier_in_progress() then
+      ifdef debug then
+        @printf[I32]("Queueing barrier %s line %d\n".cstring(),
+          "YODEL".cstring(), __loc.line())
+      end
       _pending.push(_PendingSourceInit(s))
     else
       _initialize_source(s)
@@ -318,6 +322,10 @@ actor BarrierCoordinator is Initializable
   fun ref queue_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
   =>
+    ifdef debug then
+      @printf[I32]("Queueing barrier %s line %d\n".cstring(),
+        barrier_token.string().cstring(), __loc.line())
+    end
     _pending.push(_PendingBarrier(barrier_token, result_promise))
 
   fun ref initiate_barrier(barrier_token: BarrierToken,
@@ -382,6 +390,10 @@ actor BarrierCoordinator is Initializable
     initialization.
     """
     let only_pending_sources = Array[_Pending]
+    ifdef debug then
+      @printf[I32]("Queueing NOT REALLY! barrier %s line %d\n".cstring(),
+        "YODEL".cstring(), __loc.line())
+    end
     for p in _pending.values() do
       match p
       | let psi: _PendingSourceInit =>
@@ -484,6 +496,10 @@ actor BarrierCoordinator is Initializable
       if _pending.size() > 0 then
         try
           let next = _pending.shift()?
+          ifdef debug then
+            @printf[I32]("Un-Queueing via shift barrier, line %d\n".cstring(),
+              __loc.line())
+          end
           match next
           | let p: _PendingSourceInit =>
             _initialize_source(p.source)
