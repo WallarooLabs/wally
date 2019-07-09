@@ -631,6 +631,7 @@ class Cluster(object):
         # send a log rotate command directly to each worker's external channel
         for w in to_rotate:
             send_rotate_command(w.external, w.name)
+            time.sleep(2.0) ## work-around for GH 2957
 
         # Wait for log rotation watcher to return
         wflr.join()
