@@ -18,6 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "net"
 use "wallaroo_labs/bytes"
+use "wallaroo_labs/mort"
 use "wallaroo_labs/options"
 
 actor Main
@@ -137,7 +138,11 @@ class ConnectionNotify is TCPConnectionNotify
       if _read_header then
         try
           let expect = Bytes.to_u32(d(0)?, d(1)?, d(2)?, d(3)?).usize()
-          c.expect(expect)
+          try
+            c.expect(expect)?
+          else
+            Fail()
+          end
           _read_header = false
         else
           _stderr.print("Bad framed header value. Exiting.")
@@ -148,7 +153,11 @@ class ConnectionNotify is TCPConnectionNotify
         | Write =>
           _stdout.print(consume d)
         end
-        c.expect(4)
+        try
+          c.expect(4)?
+        else
+          Fail()
+        end
         _read_header = true
       end
     | Streaming =>
@@ -161,7 +170,12 @@ class ConnectionNotify is TCPConnectionNotify
 
   fun ref accepted(c: TCPConnection ref) =>
     match _input_mode
-    | Framed => c.expect(4)
+    | Framed =>
+      try
+        c.expect(4)?
+      else
+        Fail()
+      end
     end
 
   fun ref connect_failed(c: TCPConnection ref) =>
