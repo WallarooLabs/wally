@@ -28,8 +28,8 @@ from conformance.applications.cli import (CLITesterPython2,
 
 class Query(object):
     def __init__(self, cluster, query_type):
-        cmd = "external_sender --json --external {} --type {}"
-        self.cmds = {w.name: cmd.format(w.external, query_type) for w
+        self.cmd = "external_sender --json --external {} --type {}"
+        self.cmds = {w.name: self.cmd.format(w.external, query_type) for w
                      in cluster.workers}
 
     def result(self):
@@ -42,7 +42,7 @@ class Query(object):
                                 format(res.output))
         else:
             raise Exception("Failed running cmd: {!r} with {!r}".
-                            format(self._cmd, res.output))
+                            format(self.cmd, res.output))
 
 
 
