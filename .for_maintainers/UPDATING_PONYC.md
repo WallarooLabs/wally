@@ -10,6 +10,18 @@ The following files have a reference to a specific version of Ponyc and will nee
 
 - `.ci-dockerfiles/ci-standard/Dockerfile`: version referenced following the `ENV` declaration of `PONYC_VERSION`
 
+- `misc/wallaroo-up.sh`: the `WALLAROO_PONYC_MAP` should be updated with the additon of your branch and required ponyc version. If your branch is `update-0.29` and you're upgrading to `0.29.0` then the following should be added: `Wupdate-0.29=0.29.0`. The `Wlatest` value should also be updated to match the version you're upgrading to if this will be merged to `master`.
+
+## Updating the wallaroo-up.sh MD5
+
+The `wallaroo-up.sh` script requires an updated MD5 in order to run. If you make any changes you must update the MD5 using the following command:
+
+```
+bash .release/update-wallaroo-up-md5.sh
+```
+
+**NOTE**: The above command only works on Linux
+
 ## Updating the Circle CI Docker Image
 
 After updating the `.ci-dockerfiles/ci-standard/Dockerfile`, you should follow the [README](/.ci-dockerfiles/ci-standard/README.md) to build, test and push the latest Docker image.
