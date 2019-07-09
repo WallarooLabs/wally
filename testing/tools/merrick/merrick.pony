@@ -27,6 +27,7 @@ use "wallaroo_labs/options"
 use "signals"
 use "time"
 use "wallaroo_labs/messages"
+use "wallaroo_labs/mort"
 use "wallaroo_labs/bytes"
 use "debug"
 
