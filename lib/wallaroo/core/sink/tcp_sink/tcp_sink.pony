@@ -139,12 +139,7 @@ actor TCPSink is Sink
   var _service: String
   var _from: String
 
-  let _asio_flags: U32 =
-    ifdef not windows then
-      AsioEvent.read_write_oneshot()
-    else
-      AsioEvent.read_write()
-    end
+  let _asio_flags: U32 = AsioEvent.read_write_oneshot()
 
   // Producer (Resilience)
   let _timers: Timers = Timers
