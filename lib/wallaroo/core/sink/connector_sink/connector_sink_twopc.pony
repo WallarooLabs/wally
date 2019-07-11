@@ -111,11 +111,7 @@ class ConnectorSink2PC
     let where_list: cwm.WhereList =
       [(1, last_offset.u64(), current_offset.u64())]
     let bs = TwoPCEncode.phase1(txn_id, where_list)
-    try
-      cwm.MessageMsg(0, cwm.Ephemeral(), 0, 0, None, bs)?
-     else
-      Fail()
-    end
+    cwm.MessageMsg(0, 0, 0, None, bs)
 
   fun ref checkpoint_complete(sink: ConnectorSink ref, drop_phase2_msg: Bool) =>
     if (not ((state_is_2commit()) or
@@ -206,10 +202,6 @@ class ConnectorSink2PC
   fun send_phase2(sink: ConnectorSink ref, commit: Bool)
   =>
     let bs: Array[U8] val = TwoPCEncode.phase2(txn_id, commit)
-    try
-      let msg: cwm.MessageMsg = cwm.MessageMsg(0, cwm.Ephemeral(), 0, 0, None, bs)?
-       sink.send_msg(sink, msg)
-     else
-       Fail()
-    end
+    let msg: cwm.MessageMsg = cwm.MessageMsg(0, 0, 0, None, bs)
+    sink.send_msg(sink, msg)
     @ll(_twopc_debug, "2PC: sent phase 2 commit=%s for txn_id %s".cstring(), commit.string().cstring(), txn_id.cstring())
