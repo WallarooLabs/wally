@@ -619,7 +619,11 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         # close connection
         self._stop_asyncore_loop()
         logging.debug("Removing socket from asyncore map")
-        self._socket_map.pop(self._conn.fileno(), None)
+        if self._async_init:
+            self.del_channel(self._socket_map) # remove the connection from asyncore loop
+        ## For future asynchat/asyncore threads, use a different work map
+        self._socket_map = {}
+
         logging.debug("Closing socket {}".format(self._conn.fileno()))
         self._conn.close()
         self._conn = None
