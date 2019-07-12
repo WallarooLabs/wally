@@ -44,7 +44,7 @@ class val MockStateInitializer[InOut: Any val] is
     // !TODO! We need a real decoded thing here probably
     MockStateWrapper[InOut](_h, _lifetime)
 
-  fun val runner_builder(step_group_id: RoutingId, parallelization: USize,
+  fun val runner_builder(step_group_id: RoutingId, parallelism: USize,
     local_routing: Bool): RunnerBuilder
   =>
     StateRunnerBuilder[InOut, InOut, ArrayState[InOut]](this, _step_group,

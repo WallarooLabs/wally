@@ -91,23 +91,26 @@ class val TCPSinkConfig[Out: Any val] is SinkConfig[Out]
     _service = opts.service
 
 
-  fun apply(): SinkBuilder =>
+  fun apply(parallelism: USize): SinkBuilder =>
     TCPSinkBuilder(TypedTCPEncoderWrapper[Out](_encoder), _host, _service,
-      _initial_msgs)
+      _initial_msgs, parallelism)
 
 class val TCPSinkBuilder
   let _encoder_wrapper: TCPEncoderWrapper
   let _host: String
   let _service: String
   let _initial_msgs: Array[Array[ByteSeq] val] val
+  let _parallelism: USize
 
   new val create(encoder_wrapper: TCPEncoderWrapper, host: String,
-    service: String, initial_msgs: Array[Array[ByteSeq] val] val)
+    service: String, initial_msgs: Array[Array[ByteSeq] val] val,
+    parallelism': USize)
   =>
     _encoder_wrapper = encoder_wrapper
     _host = host
     _service = service
     _initial_msgs = initial_msgs
+    _parallelism = parallelism'
 
   fun apply(sink_name: String, event_log: EventLog,
     reporter: MetricsReporter iso, env: Env,
@@ -122,3 +125,7 @@ class val TCPSinkBuilder
     TCPSink(id, sink_name, event_log, recovering, env, _encoder_wrapper,
       consume reporter, barrier_coordinator, checkpoint_initiator, _host, _service,
       _initial_msgs)
+
+  fun parallelism(): USize =>
+    _parallelism
+

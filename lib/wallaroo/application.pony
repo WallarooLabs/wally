@@ -147,11 +147,11 @@ class Pipeline[Out: Any val] is BasicPipeline
       where local_routing = _local_routing)
 
   fun ref to[Next: Any val](comp: Computation[Out, Next],
-    parallelization: USize = 10): Pipeline[Next]
+    parallelism: USize = 10): Pipeline[Next]
   =>
     let node_id = RoutingIdGenerator()
     if not _finished then
-      let runner_builder = comp.runner_builder(node_id, parallelization,
+      let runner_builder = comp.runner_builder(node_id, parallelism,
         _local_routing)
       _stages.add_node(runner_builder, node_id)
       try
@@ -169,9 +169,11 @@ class Pipeline[Out: Any val] is BasicPipeline
         where local_routing = _local_routing)
     end
 
-  fun ref to_sink(sink_information: SinkConfig[Out]): Pipeline[Out] =>
+  fun ref to_sink(sink_information: SinkConfig[Out],
+    parallelism: USize = 1): Pipeline[Out]
+  =>
     if not _finished then
-      let sink_builder = sink_information()
+      let sink_builder = sink_information(parallelism)
       let node_id = _stages.add_node(sink_builder)
       try
         for dag_sink_id in _dag_sink_ids.values() do
@@ -188,7 +190,9 @@ class Pipeline[Out: Any val] is BasicPipeline
         where local_routing = _local_routing)
     end
 
-  fun ref to_sinks(sink_configs: Array[SinkConfig[Out]] box): Pipeline[Out] =>
+  fun ref to_sinks(sink_configs: Array[SinkConfig[Out]] box,
+    parallelism: USize = 1): Pipeline[Out]
+  =>
     if not _finished then
       if sink_configs.size() == 0 then
         FatalUserError("You must specify at least one sink when using " +
@@ -196,7 +200,7 @@ class Pipeline[Out: Any val] is BasicPipeline
       end
       let sink_bs = recover iso Array[SinkBuilder] end
       for config in sink_configs.values() do
-        sink_bs.push(config())
+        sink_bs.push(config(parallelism))
       end
       let node_id = _stages.add_node(consume sink_bs)
       try
