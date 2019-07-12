@@ -52,7 +52,7 @@ integration-tests-testing-conformance: conformance_tests
 
 conformance_tests:
 	cd $(CONFORMANCE_PATH) && \
-	python3 -m pytest -c $(integration_path)/pytest.ini tests/*.py $(pytest_exp) -k Wait2_Rotate0_Wait2_Crash1_Wait2_Recover1_Wait2
+	python3 -m pytest -c $(integration_path)/pytest.ini tests/*.py $(pytest_exp)
 
 # end of prevent rules from being evaluated/included multiple times
 endif
