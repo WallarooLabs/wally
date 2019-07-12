@@ -112,8 +112,16 @@ actor ApplicationDistributor is Distributor
       for sink_node in logical_graph.sinks() do
         match sink_node.value
         | let sb: SinkBuilder =>
-          let egress_builder = EgressBuilder(_app_name, sink_node.id, sb)
-          interm_graph.add_node(egress_builder, sink_node.id)
+          let parallelism = sb.parallelism()
+
+          if parallelism > 1 then
+            let redundant_sink_builder = RedundantSinkBuilder(_app_name,
+              sink_node.id, sb, parallelism)
+            interm_graph.add_node(redundant_sink_builder, sink_node.id)
+          else
+            let egress_builder = EgressBuilder(_app_name, sink_node.id, sb)
+            interm_graph.add_node(egress_builder, sink_node.id)
+          end
         | let sbs: Array[SinkBuilder] val =>
           let multi_sink_builder = MultiSinkBuilder(_app_name, sink_node.id,
             sbs)

@@ -111,8 +111,9 @@ class val ConnectorSinkConfig[Out: Any val] is SinkConfig[Out]
     _protocol_version = opts.protocol_version
     _cookie = opts.cookie
 
-  fun apply(): SinkBuilder =>
-    ConnectorSinkBuilder(TypedConnectorEncoderWrapper[Out](_encoder), _host, _service, _protocol_version, _cookie, _initial_msgs)
+  fun apply(parallelism: USize): SinkBuilder =>
+    ConnectorSinkBuilder(TypedConnectorEncoderWrapper[Out](_encoder), _host,
+      _service, _protocol_version, _cookie, _initial_msgs, parallelism)
 
 class val ConnectorSinkBuilder
   let _encoder_wrapper: ConnectorEncoderWrapper
@@ -121,10 +122,12 @@ class val ConnectorSinkBuilder
   let _protocol_version: String
   let _cookie: String
   let _initial_msgs: Array[Array[ByteSeq] val] val
+  let _parallelism: USize
 
   new val create(encoder_wrapper: ConnectorEncoderWrapper, host: String,
     service: String, protocol_version: String, cookie: String,
-    initial_msgs: Array[Array[ByteSeq] val] val)
+    initial_msgs: Array[Array[ByteSeq] val] val,
+    parallelism': USize)
   =>
     _encoder_wrapper = encoder_wrapper
     _host = host
@@ -132,10 +135,12 @@ class val ConnectorSinkBuilder
     _protocol_version = protocol_version
     _cookie = cookie
     _initial_msgs = initial_msgs
+    _parallelism = parallelism'
 
   fun apply(sink_name: String, event_log: EventLog,
     reporter: MetricsReporter iso, env: Env,
-    barrier_coordinator: BarrierCoordinator, checkpoint_initiator: CheckpointInitiator,
+    barrier_coordinator: BarrierCoordinator,
+    checkpoint_initiator: CheckpointInitiator,
     recovering: Bool, worker_name: WorkerName, auth: AmbientAuth): Sink
   =>
     @l(Log.info(), Log.conn_sink(),
@@ -147,3 +152,6 @@ class val ConnectorSinkBuilder
     ConnectorSink(id, sink_name, event_log, recovering, env, _encoder_wrapper,
       consume reporter, barrier_coordinator, checkpoint_initiator, _host, _service, worker_name, _protocol_version, _cookie,
       ApplyReleaseBackpressureAuth(auth), _initial_msgs)
+
+  fun parallelism(): USize =>
+    _parallelism

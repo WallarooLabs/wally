@@ -51,21 +51,24 @@ class val KafkaSinkConfig[Out: Any val] is SinkConfig[Out]
     _ksco = consume ksco
     _auth = auth
 
-  fun apply(): SinkBuilder =>
-    KafkaSinkBuilder(TypedKafkaEncoderWrapper[Out](_encoder), _ksco, _auth)
+  fun apply(parallelism: USize): SinkBuilder =>
+    KafkaSinkBuilder(TypedKafkaEncoderWrapper[Out](_encoder), _ksco, _auth,
+      parallelism)
 
 class val KafkaSinkBuilder
   let _encoder_wrapper: KafkaEncoderWrapper
   let _ksco: KafkaConfigOptions val
   let _auth: TCPConnectionAuth
+  let _parallelism: USize
 
   new val create(encoder_wrapper: KafkaEncoderWrapper,
     ksco: KafkaConfigOptions val,
-    auth: TCPConnectionAuth)
+    auth: TCPConnectionAuth, parallelism': USize)
   =>
     _encoder_wrapper = encoder_wrapper
     _ksco = ksco
     _auth = auth
+    _parallelism = parallelism'
 
   fun apply(sink_name: String, event_log: EventLog,
     reporter: MetricsReporter iso, env: Env,
@@ -90,3 +93,6 @@ class val KafkaSinkBuilder
       Fail()
       EmptySink
     end
+
+  fun parallelism(): USize =>
+    _parallelism

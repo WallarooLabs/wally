@@ -188,6 +188,9 @@ class DagNode[V: Any val]
   fun ins(): Iterator[this->DagNode[V]] => _ins.values()
   fun outs(): Iterator[this->DagNode[V]] => _outs.values()
 
+  fun ins_count(): USize => _ins.size()
+  fun outs_count(): USize => _outs.size()
+
   fun is_source(): Bool => _ins.size() == 0
   fun is_sink(): Bool => _outs.size() == 0
 
