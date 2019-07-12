@@ -349,13 +349,13 @@ class Message(object):
 
     def encode(self):
         sid = struct.pack('>Q', self.stream_id)
-        messageid = (struct.pack('>Q', self.message_id)
-                     if self.message_id else b'')
-        event_time = (struct.pack('>q', self.event_time)
-                      if self.event_time is not None else b'')
-        key = (struct.pack('>H{}s'.format(len(self.key)), len(self.key),
-                           self.key)
-               if self.key else b'')
+        messageid = struct.pack('>Q', self.message_id)
+        event_time = struct.pack('>q', self.event_time)
+        if self.key is None:
+            k = b''
+        else:
+            k = self.key
+        key = struct.pack('>H{}s'.format(len(k)), len(k), k)
         msg = self.message if self.message else b''
         return b''.join((sid, messageid, event_time, key, msg))
 
@@ -365,9 +365,8 @@ class Message(object):
         stream_id = struct.unpack('>Q', reader.read(8))[0]
         message_id = struct.unpack('>Q', reader.read(8))[0]
         event_time = struct.unpack('>q', reader.read(8))[0]
-        key_length_data = reader.read(2)
-        if key_length_data != b'':
-            key_length = struct.unpack('>H', key_length_data)[0]
+        key_length = struct.unpack('>H', reader.read(2))[0]
+        if key_length > 0:
             key = reader.read(key_length)
         else:
             key = None
@@ -427,8 +426,8 @@ def test_message():
         8 +
         8 +
         8 +
-        ((2 + len(key)) if partial_msg.key else 0) +
-        (len(message) if partial_msg.message else 0)))
+        (2 + 0) +
+        0))
 
     partial_decoded = Message.decode(partial_encoded)
     assert(isinstance(decoded, Message))

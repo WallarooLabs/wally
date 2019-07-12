@@ -296,6 +296,8 @@ class MessageMsg is MessageTrait
     wb.i64_be(event_time)
 
     match key
+    | None =>
+      wb.u16_be(U16(0))
     | let kb: KeyBytes =>
       wb.u16_be(kb.size().u16())
       wb.write(kb)
