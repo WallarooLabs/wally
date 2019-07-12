@@ -37,7 +37,7 @@ use "wallaroo/core/step"
 
 
 type ExecutionStageBuilder is (StepBuilder | SourceData | EgressBuilder |
-  MultiSinkBuilder)
+  MultiSinkBuilder | RedundantSinkBuilder)
 
 class val StepBuilder
   let _app_name: String
@@ -181,6 +181,45 @@ class val MultiSinkBuilder
     let sinks = recover iso Array[Sink] end
     for sb in _sink_builders.values() do
       let next_sink = sb(_name, event_log, reporter.clone(), env,
+        barrier_coordinator, checkpoint_initiator, recovering,
+        worker_name, auth)
+      sinks.push(next_sink)
+    end
+    consume sinks
+
+class val RedundantSinkBuilder
+  let _name: String
+  let _id: RoutingId
+  let _sink_builder: SinkBuilder
+  let _parallelism: USize
+
+  new val create(app_name: String, id': RoutingId,
+    sink_builder: SinkBuilder, parallelism': USize)
+  =>
+    _name = app_name + " sinks"
+    _id = id'
+    _sink_builder = sink_builder
+    _parallelism = parallelism'
+
+  fun name(): String => _name
+  fun routing_group(): (RoutingId | None) => None
+  fun id(): RoutingId => _id
+  fun is_prestate(): Bool => false
+  fun is_stateful(): Bool => false
+  fun is_partitioned(): Bool => false
+  fun partitioner_builder(): PartitionerBuilder => SinglePartitionerBuilder
+  fun parallelism(): USize => _parallelism
+
+  fun apply(worker_name: String, reporter: MetricsReporter ref,
+    event_log: EventLog, recovering: Bool,
+    barrier_coordinator: BarrierCoordinator,
+    checkpoint_initiator: CheckpointInitiator, env: Env, auth: AmbientAuth,
+    proxies: Map[String, OutgoingBoundary] val =
+      recover Map[String, OutgoingBoundary] end): Array[Sink] val
+  =>
+    let sinks = recover iso Array[Sink] end
+    for i in Range(0, _parallelism) do
+      let next_sink = _sink_builder(_name, event_log, reporter.clone(), env,
         barrier_coordinator, checkpoint_initiator, recovering,
         worker_name, auth)
       sinks.push(next_sink)

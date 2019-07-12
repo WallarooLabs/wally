@@ -169,10 +169,10 @@ class val GlobalWindowStateInitializer[In: Any val, Out: Any val,
   fun state_wrapper(key: Key, rand: Random): StateWrapper[In, Out, Acc] =>
     GlobalWindow[In, Out, Acc](key, _agg)
 
-  fun val runner_builder(step_group_id: RoutingId, parallelization: USize,
+  fun val runner_builder(step_group_id: RoutingId, parallelism: USize,
     local_routing: Bool): RunnerBuilder
   =>
-    StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelization,
+    StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelism,
       local_routing)
 
   fun timeout_interval(): U64 =>
@@ -273,10 +273,10 @@ class val RangeWindowsStateInitializer[In: Any val, Out: Any val,
       key, _agg, _range, _slide, _delay, rand', _late_data_policy)
     InitializableWindows[In, Out, Acc](windows_wrapper_builder)
 
-  fun val runner_builder(step_group_id: RoutingId, parallelization: USize,
+  fun val runner_builder(step_group_id: RoutingId, parallelism: USize,
     local_routing: Bool): RunnerBuilder
   =>
-    StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelization,
+    StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelism,
       local_routing)
 
   fun timeout_interval(): U64 =>
@@ -393,10 +393,10 @@ class val EphemeralWindowsStateInitializer[In: Any val, Out: Any val,
       _late_data_policy)
     InitializableWindows[In, Out, Acc](window_wrapper_builder)
 
-  fun val runner_builder(step_group_id: RoutingId, parallelization: USize,
+  fun val runner_builder(step_group_id: RoutingId, parallelism: USize,
     local_routing: Bool): RunnerBuilder
   =>
-    StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelization,
+    StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelism,
       local_routing)
 
   fun timeout_interval(): U64 =>
@@ -437,10 +437,10 @@ class val TumblingCountWindowsStateInitializer[In: Any val, Out: Any val,
   fun state_wrapper(key: Key, rand: Random): StateWrapper[In, Out, Acc] =>
     TumblingCountWindows[In, Out, Acc](key, _agg, _count)
 
-  fun val runner_builder(step_group_id: RoutingId, parallelization: USize,
+  fun val runner_builder(step_group_id: RoutingId, parallelism: USize,
     local_routing: Bool): RunnerBuilder
   =>
-    StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelization,
+    StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelism,
       local_routing)
 
   fun timeout_interval(): U64 =>
