@@ -303,16 +303,10 @@ actor ConnectorSink is Sink
       // We do not include MessageMsg size overhead in our offset accounting
       _twopc.update_offset(encoded1_len)
 
-      let encoded2 =
-        try
-          let w1: Writer = w1.create()
-          let msg = _notify.make_message(encoded1)?
-          let bs = cwm.Frame.encode(msg, w1)
-          Bytes.length_encode(bs)
-        else
-          Fail()
-          encoded1
-        end
+      let w1: Writer = w1.create()
+      let msg = _notify.make_message(encoded1)
+      let bs = cwm.Frame.encode(msg, w1)
+      let encoded2 = Bytes.length_encode(bs)
 
       let next_seq_id = (_seq_id = _seq_id + 1)
       _writev(encoded2, next_seq_id)

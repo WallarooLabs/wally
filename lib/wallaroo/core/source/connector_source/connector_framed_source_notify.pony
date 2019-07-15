@@ -413,9 +413,6 @@ class ConnectorSourceNotify[In: Any val]
         if _fsm_state isnt _ProtoFsmStreaming then
           return _to_error_state(source, "Bad protocol FSM state")
         end
-        if not cwm.FlagsAllowed(m.flags) then
-          return _to_error_state(source, "Bad MessageMsg flags")
-        end
 
         // try to process message
         if not _active_streams.contains(m.stream_id) then
@@ -424,67 +421,57 @@ class ConnectorSourceNotify[In: Any val]
         else
           try
             let s = _active_streams(m.stream_id)?
-            let msg_id = try
-              m.message_id as cwm.MessageId
-            else
-              0
-            end
+            let msg_id = m.message_id
 
             if (msg_id > 0) and (msg_id <= s.last_seen) then
               // skip processing of an already seen message
               return _continue_perhaps(source)
             end
 
-            if cwm.Boundary.is_set(m.flags) then
-              // TODO [post-source-migration] what's supposed to happen here?
-              return _continue_perhaps(source)
-            else // not an EOS and not a boundary
-              // process message
-              try
-                // get bytes content of message
-                let bytes = match (m.message as cwm.MessageBytes)
-                | let str: String      => str.array()
-                | let b: Array[U8] val => b
-                end
-
-                // decode bytes using handler, if bytes not None
-                let decoded = if bytes.size() == 0 then
-                  None
-                else
-                  _handler.decode(bytes)?
-                end
-
-                ifdef "trace" then
-                  @ll(_conn_debug, ("Msg decoded at " + _pipeline_name +
-                    " source\n").cstring())
-                end
-
-                // get message key
-                let key =
-                  match m.key
-                  | let k: Key =>
-                    k
-                  else
-                    ""
-                  end
-
-                // process message
-                return _run_and_subsequent_activity(latest_metrics_id,
-                  ingest_ts, pipeline_time_spent, key, source, consumer_sender,
-                  decoded, s, m.message_id, m.flags)
-              else
-                // _handler.decode(bytes) failed
-                if m.message is None then
-                  // TODO [post-source-migration] revisit this error message
-                  return _to_error_state(source, "No message bytes and BOUNDARY not set")
-                end
-                @ll(_conn_err, ("Unable to decode message at " + _pipeline_name +
-                  " source\n").cstring())
-                ifdef debug then
-                  Fail()
-                end
-                return _to_error_state(source, "Unable to decode message")
+            try
+              // get bytes content of message
+              let bytes = match (m.message as cwm.MessageBytes)
+              | let str: String      => str.array()
+              | let b: Array[U8] val => b
               end
+
+              // decode bytes using handler, if bytes not None
+              let decoded = if bytes.size() == 0 then
+                None
+              else
+                _handler.decode(bytes)?
+              end
+
+              ifdef "trace" then
+                @ll(_conn_debug, ("Msg decoded at " + _pipeline_name +
+                  " source\n").cstring())
+              end
+
+              // get message key
+              let key =
+                match m.key
+                | let k: Key =>
+                  k
+                else
+                  ""
+                end
+
+              // process message
+              return _run_and_subsequent_activity(latest_metrics_id,
+                ingest_ts, pipeline_time_spent, key, source, consumer_sender,
+                decoded, s, m.message_id)
+            else
+              // _handler.decode(bytes) failed
+              if m.message is None then
+                // TODO [post-source-migration] revisit this error message
+                return _to_error_state(source, "No message bytes and BOUNDARY not set")
+              end
+              @ll(_conn_err, ("Unable to decode message at " + _pipeline_name +
+                " source\n").cstring())
+              ifdef debug then
+                Fail()
+              end
+              return _to_error_state(source, "Unable to decode message")
             end
           else
             return _to_error_state(source, "Unknown StreamId")
@@ -524,8 +511,7 @@ class ConnectorSourceNotify[In: Any val]
     consumer_sender: TestableConsumerSender,
     decoded: (In val| None val),
     s: _StreamState,
-    message_id: (cwm.MessageId|None),
-    flags: cwm.Flags): Bool
+    message_id: (cwm.MessageId|None)): Bool
    =>
     let decode_end_ts = WallClock.nanoseconds()
     _metrics_reporter.step_metric(_pipeline_name,
@@ -568,10 +554,7 @@ class ConnectorSourceNotify[In: Any val]
 
     match message_id
     | let m_id: PointOfReference =>
-      if not (cwm.Ephemeral.is_set(flags) or
-        cwm.UnstableReference.is_set(flags)) then
-        s.last_seen = m_id
-      end
+      s.last_seen = m_id
     end
 
     if is_finished then

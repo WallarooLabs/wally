@@ -276,8 +276,8 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                 # send it as a message
                 msg = cwm.Message(
                     stream_id = key,
-                    flags = cwm.Message.Key,
                     message_id = point_of_ref,
+                    event_time = 0,
                     key = source.key,
                     message = value)
                 return msg

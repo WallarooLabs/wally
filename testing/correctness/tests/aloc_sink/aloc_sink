@@ -293,7 +293,7 @@ class AsyncServer(asynchat.async_chat, object):
             # DEBUG only: uncommitted.append("doesnt.exist.txn.aborting-wont-hurt.-----0-0")
             reply = cwm.ReplyUncommitted(msg2.rtag, uncommitted)
             reply_bytes = cwm.TwoPCFrame.encode(reply)
-            msg = cwm.Message(0, cwm.Message.Ephemeral, None, None, None, reply_bytes)
+            msg = cwm.Message(0, 0, 0, None, reply_bytes)
             self.write(msg)
             logging.debug('2PC: ListUncommitted resp: {}'.format(reply))
 
@@ -370,7 +370,7 @@ class AsyncServer(asynchat.async_chat, object):
 
             reply = cwm.TwoPCReply(str(msg2.txn_id).encode('utf-8'), success)
             reply_bytes = cwm.TwoPCFrame.encode(reply)
-            msg = cwm.Message(0, cwm.Message.Ephemeral, None, None, None, reply_bytes)
+            msg = cwm.Message(0, 0, 0, None, reply_bytes)
             self.write(msg)
 
             self._txn_commit_next = True

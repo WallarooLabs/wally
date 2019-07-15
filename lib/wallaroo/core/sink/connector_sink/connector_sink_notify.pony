@@ -105,13 +105,8 @@ class ConnectorSinkNotify
     // their txn_id strings and abort/commit them.
     _rtag = _rtag + 1
     let list_u = TwoPCEncode.list_uncommitted(_rtag)
-    try
-      let list_u_msg =
-        cwm.MessageMsg(0, cwm.Ephemeral(), 0, 0, None, list_u)?
-      send_msg(conn, list_u_msg)
-    else
-      Fail()
-    end
+    let list_u_msg = cwm.MessageMsg(0, 0, 0, None, list_u)
+    send_msg(conn, list_u_msg)
 
     // 2PC: We also don't know how much fine-grained control the sink
     // has for selectively aborting & committing the stuff that we
@@ -430,13 +425,8 @@ class ConnectorSinkNotify
           current_txn_aborted = true
         end
         let p2 = TwoPCEncode.phase2(txn_id, do_commit)
-        try
-          let p2_msg =
-            cwm.MessageMsg(0, cwm.Ephemeral(), 0, 0, None, p2)?
-          send_msg(conn, p2_msg)
-        else
-          Fail()
-        end
+        let p2_msg = cwm.MessageMsg(0, 0, 0, None, p2)
+        send_msg(conn, p2_msg)
       end
       twopc_uncommitted_list = []
       current_txn_aborted
@@ -454,18 +444,17 @@ class ConnectorSinkNotify
     conn.close()
 
   fun ref make_message(encoded1: Array[(String val | Array[U8 val] val)] val):
-    cwm.MessageMsg ?
+    cwm.MessageMsg
   =>
     let stream_id: cwm.StreamId = 1
-    let flags: cwm.Flags = 0
-    let event_time = None
+    let event_time: cwm.EventTimeType = 0
     let key = None
 
     let base_message_id = message_id
     for e in encoded1.values() do
       message_id = message_id + e.size().u64()
     end
-    cwm.MessageMsg(stream_id, flags, base_message_id, event_time, key, encoded1)?
+    cwm.MessageMsg(stream_id, base_message_id, event_time, key, encoded1)
 
   fun ref application_ready_to_work(conn: ConnectorSink ref) =>
     if twopc_txn_id_last_committed is None then

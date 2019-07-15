@@ -26,7 +26,6 @@ actor Main is TestList
   new make() => None
 
   fun tag tests(test: PonyTest) =>
-    test(_TestBitFlags)
     test(_TestHelloMsg)
     test(_TestOkMsg)
     test(_TestErrorMsg)
@@ -36,65 +35,6 @@ actor Main is TestList
     test(_TestEosMessageMsg)
     test(_TestAckMsg)
     test(_TestRestartMsg)
-
-class iso _TestBitFlags is UnitTest
-  fun name(): String => "connector_wire_messages/_TestBitFlags"
-
-  fun apply(h: TestHelper) =>
-    // Test Ephemeral: value 1
-    h.assert_eq[U8](Ephemeral(), 1)
-    h.assert_eq[U8](Ephemeral(2), 3)
-    h.assert_eq[U8](Ephemeral.clear(3), 2)
-    h.assert_true(Ephemeral.eq(1))
-    h.assert_false(Ephemeral.eq(2))
-    h.assert_true(Ephemeral == 1)
-    h.assert_false(Ephemeral == 2)
-    h.assert_true(Ephemeral.is_set(3))
-    h.assert_false(Ephemeral.is_set(2))
-
-    // test Boundary: Value 2
-    h.assert_eq[U8](Boundary(), 2)
-    h.assert_eq[U8](Boundary(2), 2)
-    h.assert_eq[U8](Boundary.clear(3), 1)
-    h.assert_true(Boundary.eq(2))
-    h.assert_false(Boundary.eq(3))
-    h.assert_true(Boundary == 2)
-    h.assert_false(Boundary == 1)
-    h.assert_true(Boundary.is_set(3))
-    h.assert_false(Boundary.is_set(4))
-
-   // test UnstableReference: Value 8
-    h.assert_eq[U8](UnstableReference(), 8)
-    h.assert_eq[U8](UnstableReference(8), 8)
-    h.assert_eq[U8](UnstableReference.clear(9), 1)
-    h.assert_true(UnstableReference.eq(8))
-    h.assert_false(UnstableReference.eq(9))
-    h.assert_true(UnstableReference == 8)
-    h.assert_false(UnstableReference == 9)
-    h.assert_true(UnstableReference.is_set(9))
-    h.assert_false(UnstableReference.is_set(3))
-
-   // test EventTime: Value 16
-    h.assert_eq[U8](EventTime(), 16)
-    h.assert_eq[U8](EventTime(16), 16)
-    h.assert_eq[U8](EventTime.clear(17), 1)
-    h.assert_true(EventTime.eq(16))
-    h.assert_false(EventTime.eq(17))
-    h.assert_true(EventTime == 16)
-    h.assert_false(EventTime == 17)
-    h.assert_true(EventTime.is_set(17))
-    h.assert_false(EventTime.is_set(15))
-
-   // test Key: Value 32
-    h.assert_eq[U8](Key(), 32)
-    h.assert_eq[U8](Key(32), 32)
-    h.assert_eq[U8](Key.clear(33), 1)
-    h.assert_true(Key.eq(32))
-    h.assert_false(Key.eq(33))
-    h.assert_true(Key == 32)
-    h.assert_false(Key == 33)
-    h.assert_true(Key.is_set(33))
-    h.assert_false(Key.is_set(31))
 
 class iso _TestHelloMsg is UnitTest
   fun name(): String => "connector_wire_messages/_TestHelloMsg"
@@ -194,110 +134,27 @@ class iso _TestMessageMsg is UnitTest
   fun name(): String => "connector_wire_messages/_TestMessageMsg"
 
   fun apply(h: TestHelper) ? =>
-    """
-    Allowed flag combinations
-        1 2 4   8   16  32
-        E B --  Un  Et  K
-    E   x           x   x
-    B     x         x
-    --                   
-    Un          x   x   x
-    Et              x   x
-    K                   x
-    """
     let sid: StreamId = 1
     let mid: MessageId = 10
     let kb = "key"
     let et: EventTimeType val = 123456789
     let mb = "this is a message"
-    let all_flags: Array[U8] val =
-      recover
-        [
-          // Ephemeral
-          1
-          1 or 16
-          1 or 32
-          1 or 16 or 32
-          // Boundary
-          2
-          2 or 16
-          // Unstable reference
-          8
-          8 or 16
-          8 or 32
-          8 or 16 or 32
-          // EventTime
-          16
-          16 or 32
-          // Key
-          32
-        ]
-      end
 
-    for fl in all_flags.values() do
-      let a = MessageMsg(
-        sid,
-        fl,
-        if Ephemeral.is_set(fl) then None else mid end,
-        if EventTime.is_set(fl) then et else None end,
-        if Key.is_set(fl) then kb else None end,
-        if Boundary.is_set(fl) then None else mb end)?
-
-
-      let encoded = Frame.encode(a)
-      let m = Frame.decode(encoded)?
-      let b = m as MessageMsg
-      if not Ephemeral.is_set(fl) then
-        match a.message_id
-        | let mid': U64 => h.assert_eq[MessageId](mid', mid)
-        end
-        match b.message_id
-        | let mid': U64 => h.assert_eq[MessageId](mid', mid)
-        end
-      else
-        h.assert_true(a.message_id is None)
-        h.assert_true(b.message_id is None)
-      end
-      if EventTime.is_set(fl) then
-        match a.event_time
-        | let et': I64 =>
-          h.assert_eq[EventTimeType](et', et)
-        end
-        match b.event_time
-        | let et': I64 =>
-          h.assert_eq[EventTimeType](et', et)
-        end
-      else
-        h.assert_true(a.event_time is None)
-        h.assert_true(b.event_time is None)
-      end
-      if Key.is_set(fl) then
-        match a.key
-        | let kb': String =>
-          h.assert_eq[String](kb', kb)
-        end
-        match b.key
-        | let kb': String =>
-          h.assert_eq[String](kb', kb)
-        end
-      else
-        h.assert_true(a.key is None)
-        h.assert_true(b.key is None)
-      end
-      if not Boundary.is_set(fl) then
-        match a.message
-        | let mb': String =>
-          h.assert_eq[String](mb', mb)
-        end
-        match b.message
-        | let mb': String =>
-          h.assert_eq[String](mb', mb)
-        end
-      else
-        h.assert_true(a.message is None)
-        h.assert_true(b.message is None)
-      end
-    end
+    let a = MessageMsg(sid, mid, et, kb, mb)
+    let encoded = Frame.encode(a)
+    let m = Frame.decode(encoded)?
+    let b = m as MessageMsg
+    h.assert_eq[StreamId](a.stream_id, sid)
+    h.assert_eq[StreamId](b.stream_id, sid)
+    h.assert_eq[MessageId](a.message_id, mid)
+    h.assert_eq[MessageId](b.message_id, mid)
+    h.assert_eq[EventTimeType](a.event_time, et)
+    h.assert_eq[EventTimeType](b.event_time, et)
+    // TODO: Figure out how to test equality on these
+    // h.assert_eq[KeyBytes](a.key, kb)
+    // h.assert_eq[KeyBytes](b.key, kb)
+    // h.assert_eq[MessageBytes](a.message as MessageBytes, mb)
+    // h.assert_eq[MessageBytes](b.message as MessageBytes, mb)
 
 class iso _TestEosMessageMsg is UnitTest
   fun name(): String => "connector_wire_messages/_TestEosMessageMsg"

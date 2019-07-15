@@ -19,75 +19,6 @@ Copyright 2018 The Wallaroo Authors.
 use "buffered"
 use col = "collections"
 
-// Message bit flags
-
-type Flags is U8
-
-trait val BitFlags
-  fun apply(value: Flags): Flags      // set the mask's bit
-  fun clear(other: Flags): Flags      // unset the mask's bit
-  fun eq(y: Flags): Bool              // is this mask the only one set?
-  fun is_set(other: Flags): Bool      // is the mask's bit set?
-
-
-primitive Ephemeral is BitFlags
-  fun apply(value: Flags = 0): Flags => value.op_or(1)
-  fun clear(other: Flags): Flags => other.op_and(Flags(1).op_not())
-  fun eq(other: Flags): Bool => other == 1
-  fun is_set(other: Flags): Bool => other.op_and(1) == 1
-
-primitive Boundary is BitFlags
-  fun apply(value: Flags = 0): Flags => value.op_or(2)
-  fun clear(other: Flags): Flags => other.op_and(Flags(2).op_not())
-  fun eq(other: Flags): Bool => other == 2
-  fun is_set(other: Flags): Bool => other.op_and(2) == 2
-
-primitive UnstableReference is BitFlags
-  fun apply(value: Flags = 0): Flags => value.op_or(8)
-  fun clear(other: Flags): Flags => other.op_and(Flags(8).op_not())
-  fun eq(other: Flags): Bool => other == 8
-  fun is_set(other: Flags): Bool => other.op_and(8) == 8
-
-primitive EventTime is BitFlags
-  fun apply(value: Flags = 0): Flags => value.op_or(16)
-  fun clear(other: Flags): Flags => other.op_and(Flags(16).op_not())
-  fun eq(other: Flags): Bool => other == 16
-  fun is_set(other: Flags): Bool => other.op_and(16) == 16
-
-primitive Key is BitFlags
-  fun apply(value: Flags = 0): Flags => value.op_or(32)
-  fun clear(other: Flags): Flags => other.op_and(Flags(32).op_not())
-  fun eq(other: Flags): Bool => other == 32
-  fun is_set(other: Flags): Bool => other.op_and(32) == 32
-
-primitive FlagsAllowed
-  fun apply(f: Flags): Bool =>
-  """
-  Allowed flag combinations
-      E B --  Un  Et  K
-  E   x           x   x
-  B     x         x
-  --                   
-  Un          x   x   x
-  Et              x   x
-  K                   x
-  """
-  if Ephemeral.is_set(f) then
-    if Boundary.is_set(f) or UnstableReference.is_set(f) then
-      false
-    else
-      true
-    end
-  elseif Boundary.is_set(f) then
-    if UnstableReference.is_set(f) or Key.is_set(f) then
-      false
-    else
-      true
-    end
-  else
-    true
-  end
-
 // Frame types
 
 primitive FrameTag
@@ -322,100 +253,59 @@ class NotifyAckMsg is MessageTrait
 
 class MessageMsg is MessageTrait
   let stream_id: StreamId
-  let flags: Flags
-  let message_id: (MessageId | None)
-  let event_time: (EventTimeType | None)
+  let message_id: MessageId
+  let event_time: EventTimeType
   let key: (KeyBytes | None)
   let message: (MessageBytes | ByteSeqIter | None)
 
   new create(
     stream_id': StreamId,
-    flags': Flags,
-    message_id': (MessageId | None) = None,
-    event_time': (EventTimeType | None) = None,
+    message_id': MessageId,
+    event_time': EventTimeType,
     key': (KeyBytes | None) = None,
-    message': (MessageBytes | ByteSeqIter | None) = None) ?
+    message': (MessageBytes | ByteSeqIter | None) = None)
   =>
     stream_id = stream_id'
-    flags = flags'
     message_id = message_id'
     event_time = event_time'
     key = key'
     message = message'
 
-    if not FlagsAllowed(flags) then
-      @printf[I32]("Illegal flags combination: %s\n".cstring(),
-        flags'.string().cstring())
-      error
-    end
+
 
   new decode(rb: Reader) ? =>
     stream_id = rb.u64_be()?
-    flags = rb.u8()?
-    if not FlagsAllowed(flags) then
-      @printf[I32]("Illegal flags combination: %s\n".cstring(),
-        flags.string().cstring())
-      error
-    end
+    message_id = rb.u64_be()?
 
-    message_id =
-      if not Ephemeral.is_set(flags) then
-        rb.u64_be()?
-      else
-        None
-      end
+    event_time = rb.i64_be()?
 
-    event_time =
-      if EventTime.is_set(flags) then
-        rb.i64_be()?
-      else
-        None
-      end
-
+    let key_length = rb.u16_be()?.usize()
     key =
-      if (Key.is_set(flags)) and (not Boundary.is_set(flags))  then
-        let length = rb.u16_be()?.usize()
-        rb.block(length)?
+      if key_length != 0 then
+        rb.block(key_length)?
       else
         None
       end
-
-    message =
-      if not Boundary.is_set(flags) then
-        rb.block(rb.size())?
-      else
-        None
-      end
+    message = rb.block(rb.size())?
 
   fun encode(wb: Writer = Writer): Writer =>
     wb.u64_be(stream_id)
-    wb.u8(flags)
 
-    if not Ephemeral.is_set(flags) then
-      match message_id
-      | let mid: MessageId => wb.u64_be(mid)
-      end
+    wb.u64_be(message_id)
+
+    wb.i64_be(event_time)
+
+    match key
+    | None =>
+      wb.u16_be(U16(0))
+    | let kb: KeyBytes =>
+      wb.u16_be(kb.size().u16())
+      wb.write(kb)
     end
 
-    if EventTime.is_set(flags) then
-      match event_time
-      | let et: EventTimeType => wb.i64_be(et)
-      end
-    end
-
-    if Key.is_set(flags) then
-      match key
-      | let kb: KeyBytes =>
-        wb.u16_be(kb.size().u16())
-        wb.write(kb)
-      end
-    end
-
-    if not Boundary.is_set(flags) then
-      match message
-      | let mb: MessageBytes => wb.write(mb)
-      | let bs: ByteSeqIter => wb.writev(bs)
-      end
+    match message
+    | let mb: MessageBytes => wb.write(mb)
+    | let bs: ByteSeqIter => wb.writev(bs)
     end
     wb
 
