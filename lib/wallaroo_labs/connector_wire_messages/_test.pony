@@ -32,6 +32,7 @@ actor Main is TestList
     test(_TestNotifyMsg)
     test(_TestNotifyAckMsg)
     test(_TestMessageMsg)
+    test(_TestMessageMsg2)
     test(_TestEosMessageMsg)
     test(_TestAckMsg)
     test(_TestRestartMsg)
@@ -155,6 +156,35 @@ class iso _TestMessageMsg is UnitTest
     // h.assert_eq[KeyBytes](b.key, kb)
     // h.assert_eq[MessageBytes](a.message as MessageBytes, mb)
     // h.assert_eq[MessageBytes](b.message as MessageBytes, mb)
+
+class iso _TestMessageMsg2 is UnitTest
+  fun name(): String => "connector_wire_messages/_TestMessageMsg2"
+
+  fun apply(h: TestHelper) ? =>
+    let sid_list: Array[StreamId] = [0; 1; 42; 9111222333444]
+    let mid_list: Array[MessageId] = [0; 2; 52; 8111222333444]
+    let evt_list: Array[EventTimeType] = [0; 3; 62; 7111222333]
+
+    for sid in sid_list.values() do
+      for mid in mid_list.values() do
+        for et in evt_list.values() do
+          for kb in [None; "some key"].values() do
+            for mb in [None; "medium == message"].values() do
+              let a = MessageMsg(sid, mid, et, kb, mb)
+              let encoded = Frame.encode(a)
+              let m = Frame.decode(encoded)?
+              let b = m as MessageMsg
+              h.assert_eq[StreamId](a.stream_id, sid)
+              h.assert_eq[StreamId](b.stream_id, sid)
+              h.assert_eq[MessageId](a.message_id, mid)
+              h.assert_eq[MessageId](b.message_id, mid)
+              h.assert_eq[EventTimeType](a.event_time, et)
+              h.assert_eq[EventTimeType](b.event_time, et)
+            end
+          end
+        end
+      end
+    end
 
 class iso _TestEosMessageMsg is UnitTest
   fun name(): String => "connector_wire_messages/_TestEosMessageMsg"
