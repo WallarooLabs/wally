@@ -141,7 +141,8 @@ class ConnectionNotify is TCPConnectionNotify
           try
             c.expect(expect)?
           else
-            Fail()
+            _stderr.print("Received an expect larger than 16kb. Exiting.")
+            c.close()
           end
           _read_header = false
         else

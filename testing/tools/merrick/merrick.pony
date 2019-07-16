@@ -179,8 +179,14 @@ class FromWallarooNotify is TCPConnectionNotify
       try
 
         let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
-        conn.expect(expect)?
-        _header = false
+        try
+          conn.expect(expect)?
+          _header = false
+        else
+          @printf[I32](("Received expect larger than 16kb, closing " +
+            "connection.\n").cstring())
+          conn.dispose()
+        end
       else
         @printf[I32]("Blew up reading header from Wallaroo\n".cstring())
         Fail()
