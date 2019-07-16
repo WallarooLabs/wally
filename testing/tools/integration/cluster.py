@@ -179,7 +179,16 @@ class Runner(threading.Thread):
         logging.log(1, "kill()")
         try:
             if self.p:
+                logging.debug("kill({})".format(self.p))
+                logging.debug("is_alive() says {}".format(self.is_alive()))
                 self.p.kill()
+                time.sleep(0.25)
+                logging.debug("is_alive() says {}".format(self.is_alive()))
+                while self.is_alive():
+                    logging.debug("is_alive() REDO {}".format(self.is_alive()))
+                    self.p.kill()
+                    time.sleep(0.25)
+                    logging.debug("is_alive() REDO {}".format(self.is_alive()))
         except:
             pass
 
@@ -1098,6 +1107,10 @@ class Cluster(object):
             for s in self.sinks]
         self.persistent_data['ops'] = self.ops
         clean_resilience_path(self.res_dir)
+        ps_cmd = "ps aux"
+        ps_out = subprocess.check_output(ps_cmd, stderr=subprocess.STDOUT,
+            shell=True)
+        logging.debug("procs via {}: {}".format(ps_cmd, ps_out))
         self._finalized = True
 
 
