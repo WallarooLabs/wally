@@ -186,8 +186,14 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     if _header then
       try
         let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
-        conn.expect(expect)?
-        _header = false
+        try
+          conn.expect(expect)?
+          _header = false
+        else
+          @printf[I32](("Received expect larger than 16kb on Control " +
+            "Channel\n").cstring())
+          Fail()
+        end
       else
         @printf[I32]("Error reading header on control channel\n".cstring())
       end
@@ -703,8 +709,14 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
     if _header then
       try
         let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
-        conn.expect(expect)?
-        _header = false
+        try
+          conn.expect(expect)?
+          _header = false
+        else
+          @printf[I32](("Received expect larger than 16kb on Control " +
+            "Channel\n").cstring())
+          Fail()
+        end
       else
         @printf[I32]("Error reading header on control channel\n".cstring())
       end
