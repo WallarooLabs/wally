@@ -507,6 +507,11 @@ class val StatePartitionRouter is Router
   fun step_group(): RoutingId =>
     _step_group
 
+  fun step_id_for_key(key: Key): RoutingId ? =>
+    let idx = (HashKey(key) % _state_steps.size().u128()).usize()
+    let step = _state_steps(idx)?
+    _consumer_ids(step)?
+
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     key: Key, event_ts: U64, watermark_ts: U64,
     consumer_sender: TestableConsumerSender,

@@ -49,6 +49,8 @@ primitive _StateEntityCountQuery                    fun apply(): U16 => 21
 primitive _StateEntityCountQueryResponse            fun apply(): U16 => 22
 primitive _StatelessPartitionCountQuery             fun apply(): U16 => 23
 primitive _StatelessPartitionCountQueryResponse     fun apply(): U16 => 24
+primitive _ClusterStateEntityCountQuery             fun apply(): U16 => 25
+primitive _ClusterStateEntityCountQueryResponse     fun apply(): U16 => 26
 
 primitive ExternalMsgEncoder
   fun _encode(id: U16, s: String, wb: Writer): Array[ByteSeq] val =>
@@ -195,6 +197,15 @@ primitive ExternalMsgEncoder
     """
     _encode(_StateEntityCountQuery(), "", wb)
 
+  fun cluster_state_entity_count_query(wb: Writer = Writer):
+    Array[ByteSeq] val
+  =>
+    """
+    A message requesting the count of state entities of the cluster
+    (organized by worker and entity key).
+    """
+    _encode(_ClusterStateEntityCountQuery(), "", wb)
+
   fun state_entity_count_query_response(
     local_keys: Map[U128, KeySet],
     wb: Writer = Writer): Array[ByteSeq] val
@@ -202,6 +213,24 @@ primitive ExternalMsgEncoder
     let digest_map = _state_entity_digest(local_keys)
     let secqr = StateEntityCountQueryEncoder.state_entity_count(digest_map)
     _encode(_StateEntityCountQueryResponse(), secqr, wb)
+
+  fun step_state_entity_count_query_response(
+    local_step_keys: Map[U128, Map[U128, KeySet]],
+    wb: Writer = Writer): Array[ByteSeq] val
+  =>
+    let digest_map = _step_state_entity_digest(local_step_keys)
+    let secqr =
+      StepStateEntityCountQueryEncoder.step_state_entity_count(digest_map)
+    _encode(_StateEntityCountQueryResponse(), secqr, wb)
+
+  fun cluster_state_entity_count_query_response(
+    cluster_state_entity_counts: Map[WorkerName, String],
+    wb: Writer = Writer): Array[ByteSeq] val ?
+  =>
+    let csecqr =
+      ClusterStateEntityCountQueryEncoder.cluster_state_entity_count(
+        cluster_state_entity_counts)?
+    _encode(_ClusterStateEntityCountQueryResponse(), csecqr, wb)
 
   fun stateless_partition_count_query(wb: Writer = Writer): Array[ByteSeq] val =>
     """
@@ -260,6 +289,28 @@ primitive ExternalMsgEncoder
     end
 
     consume state_ps
+
+  fun _step_state_entity_digest(
+    step_local_keys: Map[RoutingId, Map[RoutingId, KeySet]]):
+    Map[String, Map[String, Array[Key] val] val] val
+  =>
+    let state_ps = recover trn Map[String, Map[String, Array[Key] val] val] end
+    for (step_group, step_keys) in step_local_keys.pairs() do
+      let step_digest = _state_entity_digest(step_keys)
+      state_ps(step_group.string()) = consume step_digest
+    end
+    consume state_ps
+
+  fun state_entity_digest(local_keys: Map[RoutingId, KeySet]):
+    Map[String, Array[Key] val] val
+  =>
+    _state_entity_digest(local_keys)
+
+  fun step_state_entity_digest(
+    step_local_keys: Map[RoutingId, Map[RoutingId, KeySet]]):
+    Map[String, Map[String, Array[Key] val] val] val
+  =>
+    _step_state_entity_digest(step_local_keys)
 
   fun _stateless_partition_digest(
     stateless_routers: Map[U128, StatelessPartitionRouter]):
@@ -329,11 +380,14 @@ primitive ExternalMsgDecoder
       ExternalStatelessPartitionQueryMsg
     | (_StatelessPartitionQueryResponse(), let s: String) =>
       ExternalStatelessPartitionQueryResponseMsg(s)
-
     | (_StateEntityCountQuery(), let s: String) =>
       ExternalStateEntityCountQueryMsg
+    | (_ClusterStateEntityCountQuery(), let s: String) =>
+      ExternalClusterStateEntityCountQueryMsg
     | (_StateEntityCountQueryResponse(), let s: String) =>
       ExternalStateEntityCountQueryResponseMsg(s)
+    | (_ClusterStateEntityCountQueryResponse(), let s: String) =>
+      ExternalClusterStateEntityCountQueryResponseMsg(s)
     | (_StatelessPartitionCountQuery(), let s: String) =>
       ExternalStatelessPartitionCountQueryMsg
     | (_StatelessPartitionCountQueryResponse(), let s: String) =>
@@ -551,6 +605,14 @@ class val ExternalStatelessPartitionQueryResponseMsg is ExternalMsg
 primitive ExternalStateEntityCountQueryMsg is ExternalMsg
 
 class val ExternalStateEntityCountQueryResponseMsg is ExternalMsg
+  let msg: String
+
+  new val create(m: String) =>
+    msg = m
+
+primitive ExternalClusterStateEntityCountQueryMsg is ExternalMsg
+
+class val ExternalClusterStateEntityCountQueryResponseMsg is ExternalMsg
   let msg: String
 
   new val create(m: String) =>

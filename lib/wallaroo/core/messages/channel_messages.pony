@@ -682,6 +682,19 @@ primitive ChannelMsgEncoder
     _encode(ConnectorLeaderNameResponseMsg(leader_name, source_name),
       auth)?
 
+  fun worker_state_entity_count_request(worker_name: WorkerName,
+    requester: WorkerName, request_id: RequestId,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(WorkerStateEntityCountRequestMsg(requester, request_id),
+      auth)?
+
+  fun worker_state_entity_count_response(worker_name: WorkerName,
+    request_id: RequestId, worker_state_entity_count_json: String,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(WorkerStateEntityCountResponseMsg(worker_name, request_id,
+      worker_state_entity_count_json), auth)?
 
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg =>
@@ -1771,3 +1784,24 @@ class val ReportStatusMsg is ChannelMsg
 
   new val create(c: ReportStatusCode) =>
     code = c
+
+class val WorkerStateEntityCountRequestMsg is ChannelMsg
+  let requester: WorkerName
+  let request_id: RequestId
+
+  new val create(requester': WorkerName, request_id': RequestId) =>
+    requester = requester'
+    request_id = request_id'
+
+class val WorkerStateEntityCountResponseMsg is ChannelMsg
+  let worker_name: WorkerName
+  let request_id: RequestId
+  let state_entity_count_json: String
+
+  new val create(worker_name': WorkerName, request_id': RequestId,
+    state_entity_count_json': String)
+  =>
+    worker_name = worker_name'
+    request_id = request_id'
+    state_entity_count_json = state_entity_count_json'
+

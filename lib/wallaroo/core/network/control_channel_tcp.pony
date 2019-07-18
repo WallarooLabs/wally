@@ -645,6 +645,10 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           @printf[I32]("Received SourceCoordinatorMsg.\n".cstring())
         end
         _router_registry.receive_source_coordinator_msg(m)
+      | let m: WorkerStateEntityCountRequestMsg =>
+        _router_registry.receive_worker_state_entity_count_request_msg(m)
+      | let m: WorkerStateEntityCountResponseMsg =>
+        _router_registry.receive_worker_state_entity_count_response_msg(m)
       | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown channel message type.\n".cstring())
       else
