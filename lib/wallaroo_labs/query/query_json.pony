@@ -62,6 +62,38 @@ primitive StateEntityCountQueryEncoder
     end
     o.string()
 
+primitive StepStateEntityCountQueryEncoder
+  fun step_state_entity_count(
+    digest: Map[String, Map[String, Array[Key] val] val] val):
+    String
+  =>
+    let o = JsonObject
+    for (step_group, step_keys) in digest.pairs() do
+      let o1 = JsonObject
+      for (k,v) in step_keys.pairs() do
+        // Type hack/workaround
+        let v2: Array[String] trn = recover v2.create() end
+        for key in v.values() do
+          v2.push("")
+        end
+        o1.data(k) = _EncodeArrayLength(consume v2)
+      end
+      o.data(step_group) = o1
+    end
+    o.string()
+
+primitive ClusterStateEntityCountQueryEncoder
+  fun cluster_state_entity_count(
+    cluster_state_entity_counts: Map[WorkerName, String]): String ?
+  =>
+    let o = JsonObject
+    for (worker, state_entity_count) in cluster_state_entity_counts.pairs() do
+      let doc: JsonDoc = JsonDoc
+      doc.parse(state_entity_count)?
+      let state_entity_count_json: JsonObject = doc.data as JsonObject
+      o.data(worker) = state_entity_count_json
+    end
+    o.string()
 
 primitive StatelessPartitionQueryEncoder
   fun stateless_partition_keys(

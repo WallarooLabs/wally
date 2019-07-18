@@ -1642,6 +1642,14 @@ actor LocalTopologyInitializer is LayoutInitializer
   be state_entity_count_query(conn: TCPConnection) =>
     _router_registry.state_entity_count_query(conn)
 
+  be cluster_state_entity_count_query(conn: TCPConnection) =>
+    match _topology
+    | let t: LocalTopology =>
+      _router_registry.cluster_state_entity_count_query(conn, t.worker_names)
+    else
+      Fail()
+    end
+
   be stateless_partition_count_query(conn: TCPConnection) =>
     _router_registry.stateless_partition_count_query(conn)
 

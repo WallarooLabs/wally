@@ -66,6 +66,8 @@ actor RouterRegistry is (KeyRegistry & SourceRegistry & DisposableRegistry &
   let _checkpoint_initiator: CheckpointInitiator
   var _data_router: DataRouter
   var _local_keys: Map[RoutingId, KeySet] = _local_keys.create()
+  var _local_step_keys: Map[RoutingId, Map[RoutingId, KeySet]] =
+    _local_step_keys.create()
   let _partition_routers: Map[RoutingId, StatePartitionRouter] =
     _partition_routers.create()
   let _stateless_partition_routers: Map[RoutingId, StatelessPartitionRouter] =
@@ -161,6 +163,11 @@ actor RouterRegistry is (KeyRegistry & SourceRegistry & DisposableRegistry &
   // If this is a worker that joined during an autoscale event, then there
   // is one worker we contacted to join.
   let _contacted_worker: (WorkerName | None)
+
+  let _request_id_gen: RequestIdGenerator = RequestIdGenerator
+  let _pending_cluster_msg_requests: Map[RequestId,
+    (TCPConnection, Map[WorkerName, String], Set[WorkerName])] =
+    _pending_cluster_msg_requests.create()
 
   new create(auth: AmbientAuth, worker_name: WorkerName,
     data_receivers: DataReceivers, c: Connections,
@@ -463,11 +470,20 @@ actor RouterRegistry is (KeyRegistry & SourceRegistry & DisposableRegistry &
         _local_keys(step_group) = KeySet
       end
       _local_keys(step_group)?.set(key)
+      _record_step_key(step_group, key)?
       (_local_topology_initializer as LocalTopologyInitializer)
         .register_key(step_group, key, checkpoint_id)
     else
       Fail()
     end
+
+  fun ref _record_step_key(step_group: RoutingId, key: Key) ? =>
+    _local_step_keys.insert_if_absent(step_group, Map[RoutingId, KeySet])?
+    let step_keys = _local_step_keys(step_group)?
+    let partition_router = _partition_routers(step_group)?
+    let step_id = partition_router.step_id_for_key(key)?
+    step_keys.insert_if_absent(step_id, KeySet)?
+    step_keys(step_id)?.set(key)
 
   be unregister_key(step_group: RoutingId, key: Key,
     checkpoint_id: (CheckpointId | None) = None)
@@ -480,11 +496,20 @@ actor RouterRegistry is (KeyRegistry & SourceRegistry & DisposableRegistry &
     try
       _local_keys.insert_if_absent(step_group, KeySet)?
       _local_keys(step_group)?.unset(key)
+      _remove_step_key(step_group, key)?
       (_local_topology_initializer as LocalTopologyInitializer)
         .unregister_key(step_group, key, checkpoint_id)
     else
       Fail()
     end
+
+  fun ref _remove_step_key(step_group: RoutingId, key: Key) ? =>
+    _local_step_keys.insert_if_absent(step_group, Map[RoutingId, KeySet])?
+    let step_keys = _local_step_keys(step_group)?
+    let partition_router = _partition_routers(step_group)?
+    let step_id = partition_router.step_id_for_key(key)?
+    step_keys.insert_if_absent(step_id, KeySet)?
+    step_keys(step_id)?.unset(key)
 
   be register_producer(p: Producer) =>
     _producers.set(p)
@@ -1387,6 +1412,27 @@ actor RouterRegistry is (KeyRegistry & SourceRegistry & DisposableRegistry &
       _local_keys)
     conn.writev(msg)
 
+  be cluster_state_entity_count_query(conn: TCPConnection,
+    worker_names: Array[WorkerName] val)
+  =>
+    let req_id = _request_id_gen()
+    let cluster_state_entity_counts = Map[WorkerName, String]()
+    let worker_digest =
+      ExternalMsgEncoder.step_state_entity_digest(_local_step_keys)
+    let state_entity_count_json =
+       StepStateEntityCountQueryEncoder.step_state_entity_count(worker_digest)
+    cluster_state_entity_counts(_worker_name) = state_entity_count_json
+    let pending_set = Set[WorkerName]()
+    for worker_name in worker_names.values() do
+      if worker_name != _worker_name then
+        pending_set.set(worker_name)
+        _request_worker_state_entity_count(req_id, worker_name)
+      end
+    end
+    _pending_cluster_msg_requests(req_id) =
+      (conn, cluster_state_entity_counts, pending_set)
+    _check_pending_cluster_msg_requests(req_id)
+
   be stateless_partition_count_query(conn: TCPConnection) =>
     let msg = ExternalMsgEncoder.stateless_partition_count_query_response(
       _stateless_partition_routers)
@@ -1417,7 +1463,90 @@ actor RouterRegistry is (KeyRegistry & SourceRegistry & DisposableRegistry &
   be receive_source_coordinator_msg(msg: SourceCoordinatorMsg) =>
     _receive_source_coordinator_msg(msg)
 
+  be receive_worker_state_entity_count_request_msg(
+    msg: WorkerStateEntityCountRequestMsg)
+  =>
+    _receive_worker_state_entity_count_request_msg(msg)
+
+  be receive_worker_state_entity_count_response_msg(
+    msg: WorkerStateEntityCountResponseMsg)
+  =>
+    _receive_worker_state_entity_count_response_msg(msg)
+
+
+  fun ref _receive_worker_state_entity_count_request_msg(
+    msg: WorkerStateEntityCountRequestMsg)
+  =>
+    let requester = msg.requester
+    let request_id = msg.request_id
+
+    let digest = ExternalMsgEncoder.step_state_entity_digest(_local_step_keys)
+    let state_entity_count_json =
+      StepStateEntityCountQueryEncoder.step_state_entity_count(digest)
+    try
+      let out_msg =
+        ChannelMsgEncoder.worker_state_entity_count_response(_worker_name,
+          request_id, state_entity_count_json, _auth)?
+      _connections.send_control(requester, out_msg)
+    else
+      Fail()
+    end
+
+  fun ref _receive_worker_state_entity_count_response_msg(
+    msg: WorkerStateEntityCountResponseMsg)
+  =>
+    let worker_name = msg.worker_name
+    let request_id = msg.request_id
+    let state_entity_count_json = msg.state_entity_count_json
+    try
+      (let conn, let cluster_state_entity_counts, let pending_set) =
+        _pending_cluster_msg_requests(request_id)?
+      if pending_set.contains(worker_name) then
+        cluster_state_entity_counts(worker_name) = state_entity_count_json
+        pending_set.unset(worker_name)
+      end
+      _check_pending_cluster_msg_requests(request_id)
+    else
+      Fail()
+    end
+
   fun ref _receive_source_coordinator_msg(msg: SourceCoordinatorMsg) =>
     for source_coordinator in _source_coordinators.values() do
       source_coordinator.receive_msg(msg)
+    end
+
+  fun ref _request_worker_state_entity_count(request_id: RequestId,
+    worker_name: WorkerName)
+  =>
+    try
+      let msg =
+        ChannelMsgEncoder.worker_state_entity_count_request(worker_name,
+          _worker_name, request_id, _auth)?
+      _connections.send_control(worker_name, msg)
+    else
+      Fail()
+    end
+
+  fun ref _check_pending_cluster_msg_requests(request_id: RequestId) =>
+    try
+      (let conn, let cluster_state_entity_counts, let pending_set) =
+        _pending_cluster_msg_requests(request_id)?
+      if pending_set.size() == 0 then
+        _external_cluster_state_entity_count_query_response(conn,
+          cluster_state_entity_counts)
+        _pending_cluster_msg_requests.remove(request_id)?
+      end
+    else
+      Fail()
+    end
+
+  fun ref _external_cluster_state_entity_count_query_response(
+    conn: TCPConnection, cluster_state_entity_counts: Map[WorkerName, String])
+  =>
+    try
+      let msg = ExternalMsgEncoder.cluster_state_entity_count_query_response(
+        cluster_state_entity_counts)?
+      conn.writev(msg)
+    else
+      Fail()
     end

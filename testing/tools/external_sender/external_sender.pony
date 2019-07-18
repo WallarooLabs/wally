@@ -71,6 +71,7 @@ actor Main
                   partition-count-query | cluster-status-query |
                   source-ids-query | boundary-count-status |
                   state-entity-query | state-entity-count-query |
+                  cluster-state-entity-count-query |
                   stateless-partition-query | stateless-partition-count-query |
                   print
 
@@ -115,6 +116,9 @@ actor Main
         | "state-entity-count-query" =>
           await_response = true
           ExternalMsgEncoder.state_entity_count_query()
+        | "cluster-state-entity-count-query" =>
+          await_response = true
+          ExternalMsgEncoder.cluster_state_entity_count_query()
         | "stateless-partition-count-query" =>
           await_response = true
           ExternalMsgEncoder.stateless_partition_count_query()
@@ -227,6 +231,12 @@ class ExternalSenderConnectNotifier is TCPConnectionNotify
         | let m: ExternalStateEntityCountQueryResponseMsg =>
           if not _json then
             _env.out.print("State Entity Count:")
+          end
+          _env.out.print(m.msg)
+          conn.dispose()
+        | let m: ExternalClusterStateEntityCountQueryResponseMsg =>
+          if not _json then
+            _env.out.print("Cluster State Entity Count:")
           end
           _env.out.print(m.msg)
           conn.dispose()
