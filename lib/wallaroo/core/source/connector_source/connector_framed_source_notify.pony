@@ -326,10 +326,8 @@ class ConnectorSourceNotify[In: Any val]
         // by this connector's one & only pipeline as defined by the
         // app's pipeline definition.
 
-        // process Hello: reply immediately with an Ok(credits, [], [])
-        // reset _credits to _max_credits
         _credits = _max_credits
-        _send_reply(source, cwm.OkMsg(_credits, [], []))
+        _send_reply(source, cwm.OkMsg(_credits))
         _fsm_state = _ProtoFsmStreaming
         return _continue_perhaps(source)
 

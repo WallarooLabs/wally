@@ -78,91 +78,38 @@ def test_hello():
 
 class Ok(object):
     """
-    Ok(initial_credits: U32,
-        credit_list: Array[(stream_id: U64,
-                            stream_name: bytes,
-                            point_of_ref: U64)],
-        source_list: Array[(source_name: String,
-                            source_address: String)])
+    Ok(initial_credits: U32)
 
    """
-    def __init__(self, initial_credits, credit_list, source_list):
+    def __init__(self, initial_credits):
         self.initial_credits = initial_credits
-        self.credit_list = credit_list
-        self.source_list = source_list
 
     def __str__(self):
-        return ("Ok(initial_credits={!r}, credit_list={!r}, source_list={!r})"
-                .format(self.initial_credits, self.credit_list,
-                        self.source_list))
+        return ("Ok(initial_credits={!r})"
+                .format(self.initial_credits))
 
     def __eq__(self, other):
-        return (self.initial_credits == other.initial_credits and
-                self.credit_list == other.credit_list and
-                self.source_list == other.source_list)
+        return (self.initial_credits == other.initial_credits)
 
     def encode(self):
-        packed_credits = []
-        for (sid, sn, por) in self.credit_list:
-            packed_credits.append(
-                struct.pack('>QH{}sQ'.format(len(sn)),
-                            sid,
-                            len(sn),
-                            sn,
-                            por))
-        packed_sources = []
-        for source, addr in self.source_list:
-            s = source.encode()
-            a = addr.encode()
-            packed_sources.append(
-                struct.pack('>H{}sH{}s'.format(len(s), len(a)),
-                            len(s), s,
-                            len(a), a))
-        return (struct.pack('>II', self.initial_credits,
-                            len(self.credit_list)) +
-                b''.join(packed_credits) +
-                struct.pack('>I', len(packed_sources)) +
-                b''.join(packed_sources))
+        return (struct.pack('>I', self.initial_credits))
 
     @staticmethod
     def decode(bs):
         reader = StringIO(bs)
         initial_credit = struct.unpack(">I", reader.read(4))[0]
-        credit_list_length = struct.unpack(">I", reader.read(4))[0]
-        credit_list = []
-        for _ in range(credit_list_length):
-            stream_id = struct.unpack(">Q", reader.read(8))[0]
-            stream_name_length = struct.unpack(">H", reader.read(2))[0]
-            stream_name = reader.read(stream_name_length)
-            point_of_ref = struct.unpack(">Q", reader.read(8))[0]
-            credit_list.append((stream_id,
-                                stream_name,
-                                point_of_ref))
-        source_list_length = struct.unpack('>I', reader.read(4))[0]
-        source_list = []
-        for _ in range(source_list_length):
-            source_length = struct.unpack('>H', reader.read(2))[0]
-            source = reader.read(source_length).decode()
-            addr_length = struct.unpack('>H', reader.read(2))[0]
-            addr = reader.read(addr_length).decode()
-            source_list.append((source, addr))
-        return Ok(initial_credit, credit_list, source_list)
+        return Ok(initial_credit)
 
 
 def test_ok():
-    ic, cl = 100, [(1, b"1", 0), (2, b"2", 1)]
-    sl = [("source1", "127.0.0.1:7000"), ("source2", "192.168.0.1:5555")]
-    ok = Ok(ic, cl, sl)
+    ic = 100
+    ok = Ok(ic)
     assert(ok.initial_credits == ic)
-    assert(ok.credit_list == cl)
-    assert(ok.source_list == sl)
     encoded = ok.encode()
-    assert(len(encoded) == (4 + 4 + len(cl)*(8 + 2 + 1 + 8) +
-                            4 + sum((4 + sum(map(len, p)) for p in sl))))
+    assert(len(encoded) == (4))
     decoded = Ok.decode(encoded)
     assert(isinstance(decoded, Ok))
     assert(decoded.initial_credits == ic)
-    assert(decoded.credit_list == cl)
     assert(decoded == ok)
     assert(str(decoded) == str(ok))
 
@@ -618,7 +565,7 @@ def test_frame():
     assert(Frame.read_header(struct.pack('>I', 50)) == 50)
     msgs = []
     msgs.append(Hello("version", "cookie", "program_name", "instance_name"))
-    msgs.append(Ok(100, [(1,b"",1), (2, b"2", 2)], [("s1", "1.1.1.1:1234")]))
+    msgs.append(Ok(100))
     msgs.append(Error("this is an error message"))
     msgs.append(Notify(123, b"stream123", 1001))
     msgs.append(NotifyAck(False, 123, 1001))

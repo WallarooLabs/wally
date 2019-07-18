@@ -138,56 +138,16 @@ class HelloMsg is MessageTrait
 
 class OkMsg is MessageTrait
   let initial_credits: U32
-  let credit_list: Array[Credit] val
-  let source_list: SourceList val
 
-  new create(initial_credits': U32, credit_list': Array[Credit] val,
-    source_list': SourceList val)
+  new create(initial_credits': U32)
   =>
     initial_credits = initial_credits'
-    credit_list = credit_list'
-    source_list = source_list'
 
   new decode(rb: Reader) ? =>
     initial_credits = rb.u32_be()?
-    let cl = recover iso Array[Credit] end
-    let cl_size = rb.u32_be()?.usize()
-    for x in col.Range(0, cl_size) do
-      let sid = rb.u64_be()?
-      let snl = rb.u16_be()?.usize()
-      let sn = String.from_array(rb.block(snl)?)
-      let por = rb.u64_be()?
-      cl.push((sid, sn, por))
-    end
-    credit_list = consume cl
-
-    let sl = recover iso SourceList end
-    let sl_size = rb.u32_be()?.usize()
-    for x in col.Range(0, sl_size) do
-      let snl = rb.u16_be()?.usize()
-      let sn = String.from_array(rb.block(snl)?)
-      let sal = rb.u16_be()?.usize()
-      let sa = String.from_array(rb.block(sal)?)
-      sl.push((sn, sa))
-    end
-    source_list = consume sl
 
   fun encode(wb: Writer = Writer): Writer =>
     wb.u32_be(initial_credits)
-    wb.u32_be(credit_list.size().u32())
-    for v in credit_list.values() do
-      wb.u64_be(v._1)
-      wb.u16_be(v._2.size().u16())
-      wb.write(v._2)
-      wb.u64_be(v._3)
-    end
-    wb.u32_be(source_list.size().u32())
-    for v in source_list.values() do
-      wb.u16_be(v._1.size().u16())
-      wb.write(v._1)
-      wb.u16_be(v._2.size().u16())
-      wb.write(v._2)
-    end
     wb
 
 class ErrorMsg is MessageTrait

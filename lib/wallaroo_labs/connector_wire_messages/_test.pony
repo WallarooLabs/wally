@@ -55,35 +55,12 @@ class iso _TestOkMsg is UnitTest
 
   fun apply(h: TestHelper) ? =>
     let ic: U32 = 100
-    let cl: Array[Credit] val = [(1, "1", 0); (2, "2", 1); (3, "3", 2)]
-    let sl: SourceList val = [
-      ("s1", "1.1.1.1:1234")
-      ("source2", "127.0.0.1:5000")
-      ("s3", "8.8.8.8:80")]
-    let a = OkMsg(ic, cl, sl)
+    let a = OkMsg(ic)
     let encoded = Frame.encode(a)
     let m = Frame.decode(encoded)?
     let b = m as OkMsg
     h.assert_eq[U32](a.initial_credits, ic)
     h.assert_eq[U32](b.initial_credits, ic)
-    for (i, cr) in a.credit_list.pairs() do
-      h.assert_eq[StreamId](cr._1, cl(i)?._1)
-      h.assert_eq[StreamName](cr._2, cl(i)?._2)
-      h.assert_eq[PointOfRef](cr._3, cl(i)?._3)
-    end
-    for (i, cr) in b.credit_list.pairs() do
-      h.assert_eq[StreamId](cr._1, cl(i)?._1)
-      h.assert_eq[StreamName](cr._2, cl(i)?._2)
-      h.assert_eq[PointOfRef](cr._3, cl(i)?._3)
-    end
-    for (i, p) in a.source_list.pairs() do
-      h.assert_eq[SourceName](p._1, sl(i)?._1)
-      h.assert_eq[SourceAddress](p._2, sl(i)?._2)
-    end
-    for (i, p) in b.source_list.pairs() do
-      h.assert_eq[SourceName](p._1, sl(i)?._1)
-      h.assert_eq[SourceAddress](p._2, sl(i)?._2)
-    end
 
 class iso _TestErrorMsg is UnitTest
   fun name(): String => "connector_wire_messages/_TestErrorMsg"

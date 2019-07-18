@@ -58,8 +58,7 @@ class AsyncServer(asynchat.async_chat, object):
         # Hello, Ok, Error, Notify, NotifyAck, Message, Ack, Restart
         self.count = 0
         if isinstance(msg, cwm.Hello):
-            # respond with an ok or an error
-            ok = cwm.Ok(200, self._streams.values(), self.source_map.items())
+            ok = cwm.Ok(200)
             self.write(ok)
         elif isinstance(msg, cwm.Notify):
             # respond with notifyack
