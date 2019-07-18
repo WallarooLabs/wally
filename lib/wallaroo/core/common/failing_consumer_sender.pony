@@ -32,8 +32,8 @@ use "wallaroo_labs/mort"
 class FailingConsumerSender is TestableConsumerSender
   let _id: RoutingId
 
-  new create(producer_id: RoutingId) =>
-    _id = producer_id
+  new create(producer_id': RoutingId) =>
+    _id = producer_id'
 
   fun _invalid_call() =>
     @printf[I32]("FailingConsumerSender: Invalid call on Producer %s\n"
@@ -62,3 +62,6 @@ class FailingConsumerSender is TestableConsumerSender
   fun ref update_output_watermark(w: U64): (U64, U64) =>
     _invalid_call(); Fail()
     (0, 0)
+
+  fun producer_id(): RoutingId =>
+    _id

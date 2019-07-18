@@ -88,7 +88,7 @@ data_receiver --ponythreads=1 --ponynoblock --listen 127.0.0.1:7002
 Run `machida` with `--application-module alerts`:
 
 ```bash
-alerts_stateless --out 127.0.0.1:7002 \
+alerts_windowed --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --name worker-name --external 127.0.0.1:5050 --cluster-initializer \
   --ponynoblock

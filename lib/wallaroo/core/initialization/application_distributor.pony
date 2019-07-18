@@ -110,55 +110,36 @@ actor ApplicationDistributor is Distributor
 
       // Add Wallaroo sinks to intermediate graph
       for sink_node in logical_graph.sinks() do
-        let instance_ids = Array[U128]
-
         match sink_node.value
         | let sb: SinkBuilder =>
-          var next_id = sink_node.id
-          // Parallelism should not be higher than the number of immediate
-          // upstreams or we will have orphan sinks.
-          let parallelism = sb.parallelism().min(sink_node.ins_count())
-          for _ in Range(0, parallelism) do
-            let egress_builder = EgressBuilder(_app_name, next_id, sb)
-            interm_graph.add_node(egress_builder, next_id)
-            instance_ids.push(next_id)
-            // TODO: Come up with a better way to create deterministic unique
-            // ids for each sink instance.
-            next_id = next_id + 1_000_000_000
+          let parallelism = sb.parallelism()
+
+          if parallelism > 1 then
+            let redundant_sink_builder = RedundantSinkBuilder(_app_name,
+              sink_node.id, sb, parallelism)
+            interm_graph.add_node(redundant_sink_builder, sink_node.id)
+          else
+            let egress_builder = EgressBuilder(_app_name, sink_node.id, sb)
+            interm_graph.add_node(egress_builder, sink_node.id)
           end
         | let sbs: Array[SinkBuilder] val =>
-          var next_id = sink_node.id
-          // Parallelism should not be higher than the number of immediate
-          // upstreams or we will have orphan sinks.
-          let parallelism = sbs(0)?.parallelism().min(sink_node.ins_count())
-          for _ in Range(0, parallelism) do
-            let multi_sink_builder = MultiSinkBuilder(_app_name, next_id,
-              sbs)
-            interm_graph.add_node(multi_sink_builder, next_id)
-            instance_ids.push(next_id)
-            // TODO: Come up with a better way to create deterministic unique
-            // ids for each multisink instance.
-            next_id = next_id + 1_000_000_000
-          end
+          let multi_sink_builder = MultiSinkBuilder(_app_name, sink_node.id,
+            sbs)
+          interm_graph.add_node(multi_sink_builder, sink_node.id)
         else
           // All sinks in logical graph should be Wallaroo sinks
           Fail()
         end
 
-        var instance_ids_idx: USize = 0
         for upstream_node in sink_node.ins() do
-          let next_sink_id = instance_ids(instance_ids_idx)?
           let u_id = upstream_node.id
 
-          edges.insert_if_absent(u_id, SetIs[U128])?.set(next_sink_id)
+          edges.insert_if_absent(u_id, SetIs[U128])?.set(sink_node.id)
           if not frontier.contains(u_id) then
             frontier.push(u_id)
           end
-          instance_ids_idx = (instance_ids_idx + 1) % instance_ids.size()
         end
-        for id in instance_ids.values() do
-          processed.set(id)
-        end
+        processed.set(sink_node.id)
       end
 
       while frontier.size() > 0 do

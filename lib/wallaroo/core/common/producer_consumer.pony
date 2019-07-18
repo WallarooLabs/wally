@@ -77,6 +77,8 @@ trait TestableConsumerSender
 
   fun ref update_output_watermark(w: U64): (U64, U64)
 
+  fun producer_id(): RoutingId
+
 trait tag Runnable
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     key: Key, event_ts: U64, watermark_ts: U64, i_producer_id: RoutingId,
