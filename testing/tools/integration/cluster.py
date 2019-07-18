@@ -560,8 +560,11 @@ class Cluster(object):
             # TODO: when support for different per-worker sourced defs is
             # available, figure out how to allocate sources to workers here
             sources = len(self.source_names)
-            num_ports = (sources + 3) * workers
-            ports = get_port_values(num=num_ports, host=host)
+            num_ports1 = (sources    ) * workers
+            num_ports2 = (          3) * workers
+            ports1 = get_port_values(num=num_ports1, host=host, base_port=1900)
+            ports2 = get_port_values(num=num_ports2, host=host)
+            ports = ports1 + ports2
             addresses = ['{}:{}'.format(host, p) for p in ports]
             (source_addrs, worker_addrs) = (
                 addresses[:sources*workers],
@@ -659,9 +662,13 @@ class Cluster(object):
         pre_partitions = self.get_partition_data() if with_test else None
         runners = []
         sources = len(self.source_names)
-        new_ports = get_port_values(num = (sources + 3) * by,
+        new_ports1 = get_port_values(num = (          3) * by,
                                     host = self.host,
                                     base_port=25000)
+        new_ports2 = get_port_values(num = (sources    ) * by,
+                                    host = self.host,
+                                    base_port=19000)
+        new_ports = new_ports2 + new_ports1
         # format all the addresses to host:port using self.host
         addrs = ["{}:{}".format(self.host, p) for p in new_ports]
         # split addresses into worker_addrs and source_addrs
