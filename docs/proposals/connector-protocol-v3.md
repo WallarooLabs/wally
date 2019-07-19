@@ -4,6 +4,8 @@
 
 This protocol provides a method for source connectors to transmit streams of messages to Wallaroo over a reliable transport like TCP/IP. The protocol does not require that any specific mechanism or party initiate the connection, though the current Wallaroo implementation assumes that the external connector source initiates the TCP connection and that Wallaroo initiates the TCP connection to an external connector sink.
 
+This protocol has been extended for use with connector sinks.  A separate section of this document describes the differences for use as a sink protocol.
+
 Terms like connector, worker, and so on are assumed to be familiar to the reader. They may be refined where useful but familiarity with Wallaroo's application model should be enough. If not, it's recommended that the reader reviews the Wallaroo documentation first.
 
 
@@ -421,13 +423,64 @@ In the Closed state, the following actions are valid:
 
 In the Terminated state, no actions are valid: the worker will close the session and ignore any frames received after the RESTART frame has been sent.
 
-## TODO
+## Connector sink protocol
 
-- add some diagrams to illustrate what a potential session might look like
-- review some of the edge cases that should be errors more explicitly
-- consider a section on TLS and transport setup
-    - even though it was out of scope for this there is plenty to discuss there in a way that can relate to this doc
+The protocol described in this document was originally designed for use with Wallaroo sources.  When the need arose for at-least-once delivery to Wallaroo sinks and implementation of a protocol to coordinate checkpoint handling across multiple sinks, this protocol was adapted for use by connector sinks.  This section describes the changes, relative to the original use case by connector sources.
 
+### 1. WRT the protocol description, Roles of worker and connector are reversed
+
+As used with connector sources, the word "worker" applies to a Wallaroo worker process, and the word "connector" applies to an external Wallaroo data source.  When applied to Wallaroo data sinks, the roles are reversed:
+
+    - A Wallaroo worker initiates the TCP connection to a connector sink.
+    - A Wallaroo worker sends HELLO, NOTIFY, MESSAGE, and EOS_MESSAGE frames to a connector sink.
+    - A connector sinks sends OK, NOTIFY_ACK, ACK, and RESTART frames to a Wallaroo worker
+
+### 2. Use of StreamIds is extremely limited
+
+A connector source may use as many streams (with unique StreamIds) as the entire Wallaroo system may require.  A connector sink, however, only uses two StreamIds:
+
+    - StreamId 1: The MESSAGE frame contains data that is output by a Wallaroo sink actor.
+    - StreamId 0: The MESSAGE frame contains a Two Phase Commit (2PC) protocol message.
+
+This allocation of StreamIDs may need to change as features such as sink `parallelism` factor (see below) are added.
+
+### 3. MessageIds within StreamId 1 are assigned by byte offset of the sink's output data
+
+The MessageId in a StreamId1 MESSAGE is the byte offset of a Wallaroo sink's output.  The sink's output doesn't have an explicit name; a sink's implicit name is the TCP host + port tuple that the sink data is sent to.  Internally to Wallaroo, each sink is assigned an identifier for use by intra- and inter-worker routing, but the identifier is not exposed outside of Wallaroo.
+
+There is in-progress work on Wallaroo to provide a `parallelism` factor, greater than one, for Wallaroo sinks.  The intent is to avoid potential bottlenecks for high-volume sink output that can be caused by the single Pony actor implementation, the single TCP connection per sink per worker, or both.
+
+NOTE: For both multi-worker Wallaroo clusters and the in-progress `parallelism` factor sinks, Wallaroo provides no guarantees on ordering of sink output data of any pair of sink TCP connections.
+
+### 4. Data encapsulated in each StreamId is related to the other
+
+A connector source's StreamIds are logically separate from each other. In contrast, the StreamIds of connector sinks are tightly coupled:
+
+    - The delivery order of all MESSAGE frames by the TCP stream has meaning and must be preserved by the data sink.
+    - The interleaving of StreamId 0 (2PC) and StreamId 1 (application sink output) frames is strictly limited.
+
+While a round of the 2PC protocol is in progress, i.e. a MESSAGE frame in StreamId 0 with a Phase 1 request and ends with MESSAGE frame in StreamId 0 Phase 2 request, Wallaroo MUST NOT send any application MESSAGEs in StreamId 1 or any other StreamId > 0.  This restriction can be onerous to Wallaroo, but it also provides the greatest applicability to connector sinks of all types and capabilities.  This restriction may change in later protocol implementations.
+
+### 5. The Two Phase Commit (2PC) protocol controls the connector sink's durability guarantees
+
+Periodically, Wallaroo will use a Two Phase Commit (2PC) protocol to coordinate the reliable delivery of application sink messages to one or more connector sinks.  The most common trigger of a round of 2PC is a Wallaroo state checkpoint.
+
+During a Wallaroo state checkpoint, a checkpoint barrier token is sent by each Wallaroo source down all Wallaroo pipelines until all barrier tokens are received by Wallaroo sink actors.  Each sink actor then starts a round of 2PC with the external connector sink.  If any connector sink votes ABORT during phase 1, then the barrier protocol will eventually cause all connector sinks to send ABORT during phase 2.  If all connector sinks vote COMMIT during phase 1, then the barrier protocol will eventually cause all connector sinks to send COMMIT during phase 2.
+
+A MESSAGE frame that contains a 2PC phase 1 request will specify the byte offset range of the data sent to the sink for the logical time range that is managed by the Wallaroo global checkpoint protocol.
+
+The connector sink should be able to manage the durability of the data in this byte offset range.  If the connector sink cannot manage durability of this sink data, then the connector sink must always vote COMMIT during phase 1; such a sink then cannot provide the end-to-end message delivery guarantees that the connector sink protocol is intended to provide.  In such cases, we recommend that the Wallaroo TCPSink be used instead.
+
+When the connector sink receives a 2PC phase 2 request:
+
+    - If the phase 2 decision is COMMIT, then the connector sink must make the application sink data in the transaction's byte range(s) durable, using whatever app-specific means necessary.
+        - For file I/O, to write to a file + flush + fsync.
+        - For a relational database, to commit any pending transactions that were created by the sink data.
+    - If the phase 2 decision is ABORT, then the connector sink must discard all application sink data in the transaction's byte range(s).
+
+### 6. Durable storage of 2PC state
+
+A connector sink must provide durable storage for the state of all 2PC state. At a minimum, a connector sink must commit to stable storage all transaction IDs in phase 1 + the local commit/abort decision.
 
 ## Simplified state update sequences for the connector source protocol with sources on multiple workers and source migration
 
