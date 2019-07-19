@@ -480,7 +480,12 @@ When the connector sink receives a 2PC phase 2 request:
 
 ### 6. Durable storage of 2PC state
 
-A connector sink must provide durable storage for the state of all 2PC state. At a minimum, a connector sink must commit to stable storage all transaction IDs in phase 1 + the local commit/abort decision.
+A connector sink must provide durable storage for the state of all 2PC state. At a minimum, a connector sink must commit to stable storage:
+
+    - all transaction IDs in phase 1 + the local commit/abort decision
+    - all sink data in the byte range(s) specified by a phase 1 local COMMIT decision
+
+In the event of a connector sink crash, this persistent data must be used to comply with subsequent 2PC queries as the Wallaroo system works through its recovery protocols.
 
 ## Simplified state update sequences for the connector source protocol with sources on multiple workers and source migration
 
