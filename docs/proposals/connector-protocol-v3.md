@@ -487,6 +487,10 @@ A connector sink must provide durable storage for the state of all 2PC state. At
 
 In the event of a connector sink crash, this persistent data must be used to comply with subsequent 2PC queries as the Wallaroo system works through its recovery protocols.
 
+### 7. Protocol credits not used
+
+Wallaroo's connector sink implementation, `aloc_sink` is not managing the protocol's credit system and will rely solely on TCP backpressure for its own backpressure signalling.
+
 ### 2PC protocol messages
 
 ```erlang
