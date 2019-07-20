@@ -427,7 +427,7 @@ In the Terminated state, no actions are valid: the worker will close the session
 
 The protocol described in this document was originally designed for use with Wallaroo sources.  When the need arose for at-least-once delivery to Wallaroo sinks and implementation of a protocol to coordinate checkpoint handling across multiple sinks, this protocol was adapted for use by connector sinks.  This section describes the changes, relative to the original use case by connector sources.
 
-### 1. WRT the protocol description, Roles of worker and connector are reversed
+### 1. WRT the protocol description, roles of worker and connector are reversed
 
 As used with connector sources, the word "worker" applies to a Wallaroo worker process, and the word "connector" applies to an external Wallaroo data source.  When applied to Wallaroo data sinks, the roles are reversed:
 
@@ -439,7 +439,7 @@ As used with connector sources, the word "worker" applies to a Wallaroo worker p
 
 A connector source may use as many streams (with unique StreamIds) as the entire Wallaroo system may require.  A connector sink, however, only uses two StreamIds:
 
-    - StreamId 1: The MESSAGE frame contains data that is output by a Wallaroo sink actor.
+    - StreamId 1: The MESSAGE frame contains application output data via a Wallaroo sink actor.
     - StreamId 0: The MESSAGE frame contains a Two Phase Commit (2PC) protocol message.
 
 This allocation of StreamIDs may need to change as features such as sink `parallelism` factor (see below) are added.
@@ -465,16 +465,16 @@ While a round of the 2PC protocol is in progress, i.e. a MESSAGE frame in Stream
 
 Periodically, Wallaroo will use a Two Phase Commit (2PC) protocol to coordinate the reliable delivery of application sink messages to one or more connector sinks.  The most common trigger of a round of 2PC is a Wallaroo state checkpoint.
 
-During a Wallaroo state checkpoint, a checkpoint barrier token is sent by each Wallaroo source down all Wallaroo pipelines until all barrier tokens are received by Wallaroo sink actors.  Each sink actor then starts a round of 2PC with the external connector sink.  If any connector sink votes ABORT during phase 1, then the barrier protocol will eventually cause all connector sinks to send ABORT during phase 2.  If all connector sinks vote COMMIT during phase 1, then the barrier protocol will eventually cause all connector sinks to send COMMIT during phase 2.
+During a Wallaroo state checkpoint, a checkpoint barrier token is sent by each Wallaroo source down all Wallaroo pipelines until all barrier tokens are received by Wallaroo sink actors.  Each connector sink actor then starts a round of 2PC with the external connector sink.  If any connector sink votes ABORT during phase 1, then the barrier protocol will eventually cause all connector sinks to send ABORT during phase 2.  If all connector sinks vote COMMIT during phase 1, then the barrier protocol will eventually cause all connector sinks to send COMMIT during phase 2.
 
-A MESSAGE frame that contains a 2PC phase 1 request will specify the byte offset range of the data sent to the sink for the logical time range that is managed by the Wallaroo global checkpoint protocol.
+A MESSAGE frame that contains a 2PC phase 1 request will specify the byte offset range(s) of the data sent to the sink for the logical time range that is managed by the Wallaroo global checkpoint protocol.
 
-The connector sink should be able to manage the durability of the data in this byte offset range.  If the connector sink cannot manage durability of this sink data, then the connector sink must always vote COMMIT during phase 1; such a sink then cannot provide the end-to-end message delivery guarantees that the connector sink protocol is intended to provide.  In such cases, we recommend that the Wallaroo TCPSink be used instead.
+The connector sink should be able to manage the durability of the data in this byte offset range(s).  If the connector sink cannot manage durability of this sink data, then the connector sink must always vote COMMIT during phase 1; such a sink then cannot provide the end-to-end message delivery guarantees that the connector sink protocol is intended to provide.  In such cases, we recommend that the Wallaroo TCPSink be used instead.
 
 When the connector sink receives a 2PC phase 2 request:
 
-    - If the phase 2 decision is COMMIT, then the connector sink must make the application sink data in the transaction's byte range(s) durable, using whatever app-specific means necessary.
-        - For file I/O, to write to a file + flush + fsync.
+    - If the phase 2 decision is COMMIT, then the connector sink must make the application sink data in the transaction's byte range(s) durable, using whatever app-specific means necessary.  For example:
+        - For file I/O, to write to a file(s) + flush(es) + fsync(s), etc.
         - For a relational database, to commit any pending transactions that were created by the sink data.
     - If the phase 2 decision is ABORT, then the connector sink must discard all application sink data in the transaction's byte range(s).
 
@@ -486,6 +486,85 @@ A connector sink must provide durable storage for the state of all 2PC state. At
     - all sink data in the byte range(s) specified by a phase 1 local COMMIT decision
 
 In the event of a connector sink crash, this persistent data must be used to comply with subsequent 2PC queries as the Wallaroo system works through its recovery protocols.
+
+### 2PC protocol messages
+
+```erlang
+-define(TWOPC_LIST_UNCOMMITTED,  201).
+-define(TWOPC_REPLY_UNCOMMITTED, 202).
+-define(TWOPC_PCPHASE1,          203).
+-define(TWOPC_REPLY,             204).
+-define(TWOPC_PCPHASE2,          205).
+
+-spec list_uncommitted(RTag) -> frame()
+  when
+    RTag :: non_neg_integer().
+list_uncommitted(RTag) ->
+    frame([
+        ?TWOPC_LIST_UNCOMMITTED,
+        u64(RTag)
+    ]).
+
+-spec reply_uncommitted(RTag, TxnIdList) -> frame()
+  when
+    RTag :: non_neg_integer(),
+    frame :: list(string()).
+reply_uncommitted(RTag, TxnIdList) ->
+    frame([
+        ?TWOPC_REPLY_UNCOMMITTED,
+        u64(RTag),
+        u32(length(TxnIdList)),
+        lists:map(fun (TxnId) ->
+            short_bytes(TxnId)
+        end, TxnIdList)
+    ]).
+
+-spec twopc_phase1(TxnId, WhereList) -> frame()
+  when
+    TxnId :: string(),
+    WhereList :: list({StreamId :: non_neg_integer,
+                       StartPoR :: non_neg_integer,
+                       EndPoR   :: non_neg_integer}).
+twopc_phase1(TxnId, WhereList) ->
+    frame([
+        ?TWOPC_PHASE1,
+        short_bytes(TxnId),
+        u32(length(WhereList)),
+        lists:map(fun ({StreamId, StartPoR, EndPoR}) ->
+            [u64(StreamId), u64(StartPoR), u64(EndPoR)]
+            end, WhereList)
+    ]).
+
+twopc_phase2(TxnId, Commit) -> frame()
+  when
+    TxnId :: string(),
+    Commit :: bool().
+twopc_phase2(TxnId, Commit) ->
+    frame([
+        ?TWOPC_PHASE2,
+        short_bytes(TxnId),
+        if Commit -> <<1>>;
+           true   -> <<0>>
+        end
+    ]).
+
+%% The twopc_reply message is used by the connector sink to reply
+%% both to 2PC phase 1 and phase 2 messages.
+%% NOTE: The encoding is nearly identical to the twopc_phase2 message.
+
+twopc_reply(TxnId, Commit) -> frame()
+  when
+    TxnId :: string(),
+    Commit :: bool().
+twopc_reply(TxnId, Commit) ->
+    frame([
+        ?TWOPC_REPLY,
+        short_bytes(TxnId),
+        if Commit -> <<1>>;
+           true   -> <<0>>
+        end
+    ]).
+```
 
 ## Simplified state update sequences for the connector source protocol with sources on multiple workers and source migration
 
