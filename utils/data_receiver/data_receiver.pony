@@ -27,6 +27,7 @@ actor Main
     var l_arg: (Array[String] | None) = None
     var output_mode: OutputMode = Write
     var input_mode: InputMode = Streaming
+    var buffer_size: USize = 16384
 
     try
       var options = Options(env.args)
@@ -35,6 +36,7 @@ actor Main
       options.add("help", "h", None)
       options.add("listen", "l", StringArgument)
       options.add("no-write", "n", None)
+      options.add("buffer-size", "b", I64Argument)
 
       for option in options do
         match option
@@ -42,6 +44,7 @@ actor Main
         | ("listen", let arg: String) => l_arg = arg.split(":")
         | ("no-write", None) => output_mode = NoWrite
         | ("framed", None) => input_mode = Framed
+        | ("buffer-size", let arg: I64) => arg.usize()
         | let err: ParseError =>
           err.report(env.err)
           usage(env.out)
@@ -70,7 +73,7 @@ actor Main
       let tcp_auth = TCPListenAuth(env.root as AmbientAuth)
       TCPListener(tcp_auth,
         ListenerNotify(env.out, env.err, input_mode, output_mode, host, port),
-        host, port)
+        host, port where read_buffer_size = buffer_size)
     else
       usage(env.out)
     end
@@ -85,7 +88,9 @@ actor Main
       "  --no-write\n" +
       "    Don't write received data to STDOUT\n" +
       "  --framed\n" +
-      "    Read a framed message protocol with 4 byte header\n"
+      "    Read a framed message protocol with 4 byte header\n" +
+      "  --buffer-size\n" +
+      "    Set the max buffer size for the TCP connection in bytes\n"
       )
 
 class ListenerNotify is TCPListenNotify
