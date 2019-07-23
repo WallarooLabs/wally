@@ -50,7 +50,7 @@ class CompletesWhenNotifier(StoppableThread):
     """
     Run a notifier loop with a query function and a check condition function
     """
-    def __init__(self, context, test_func, timeout=30, period=1):
+    def __init__(self, context, test_func, timeout=90, period=1):
         super().__init__()
         self.context = context
         self.test_func = test_func

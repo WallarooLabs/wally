@@ -136,7 +136,7 @@ class TopologyTesterBaseApp(Application):
         logging.info("Awaiting on sink")
         self.completes_when(data_in_sink_count_is(
             expected=(len(self.source_gens) * self.expect),
-            timeout=30,
+            timeout=90,
             sink=-1,
             allow_more=False))
 

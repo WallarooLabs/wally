@@ -43,8 +43,8 @@ except NameError:
     basestring = (str, bytes)
 
 
-DEFAULT_SINK_STOP_TIMEOUT = 30
-DEFAULT_RUNNER_JOIN_TIMEOUT = 30
+DEFAULT_SINK_STOP_TIMEOUT = 90
+DEFAULT_RUNNER_JOIN_TIMEOUT = 90
 
 
 FROM_TAIL = int(os.environ.get("FROM_TAIL", 10))
@@ -73,10 +73,10 @@ def pipeline_test(sources, expected, command, workers=1,
                   batch_size=1, sender_interval=0.001,
                   sink_expect=None, sink_expect_allow_more=False,
                   sink_stop_timeout=DEFAULT_SINK_STOP_TIMEOUT,
-                  sink_await=None, sink_await_keys=None, delay=30,
+                  sink_await=None, sink_await_keys=None, delay=90,
                   output_file=None, validation_cmd=None,
                   host='127.0.0.1', listen_attempts=1,
-                  ready_timeout=30,
+                  ready_timeout=90,
                   runner_join_timeout=DEFAULT_RUNNER_JOIN_TIMEOUT,
                   resilience_dir=None,
                   spikes={},
@@ -122,10 +122,10 @@ def pipeline_test(sources, expected, command, workers=1,
         be stopped.
     - `sink_stop_timeout`: the timeout in seconds to use when awaiting an
         expected number of messages at the sink. Raise an error if timeout
-        elapses. Default: 30
+        elapses. Default: 90
         Can be a number or a list of numbers of `len(sinks)`.
     - `delay`: Wait for `delay` seconds before stopping the cluster.
-      Default 30 seconds. Only used if `sink_expect` and `sink_await`
+      Default 90 seconds. Only used if `sink_expect` and `sink_await`
       are both `None`.
     - `host`: the network host address to use in workers, senders, and
         receivers. Default '127.0.0.1'
@@ -135,7 +135,7 @@ def pipeline_test(sources, expected, command, workers=1,
         errors, this value should be set higher than 1.
         Default 1.
     - `ready_timeout`: number of seconds before an error is raised if the
-        application does not report as ready. Default 30
+        application does not report as ready. Default 90
     - `runner_join_timeout`: the timeout in seconds to use when waiting for
       the runners to exit cleanly. If the timeout is exceeded, the runners
       are killed and an error is raised.

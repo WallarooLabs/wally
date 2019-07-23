@@ -88,7 +88,7 @@ class Application:
         logging.debug("end of send_tcp")
         return sender
 
-    def completes_when(self, test_func, timeout=30):
+    def completes_when(self, test_func, timeout=90):
         notifier = CompletesWhenNotifier(self, test_func,
             timeout, period=0.1)
         notifier.start()
@@ -105,13 +105,13 @@ class Application:
     def parse_output(self, v):
         return v.decode()
 
-    def sink_await(self, values, timeout=30, func=lambda x: x, sink=-1):
+    def sink_await(self, values, timeout=90, func=lambda x: x, sink=-1):
         if not self.cluster:
             raise TestHarnessException("Can't sink_await before creating "
                     "a cluster!")
         self.cluster.sink_await(values, timeout, func, sink)
 
-    def sink_expect(self, expected, timeout=30, sink=-1, allow_more=False):
+    def sink_expect(self, expected, timeout=90, sink=-1, allow_more=False):
         if not self.cluster:
             raise TestHarnessException("Can't sink_expect before creating "
                     "a cluster!")

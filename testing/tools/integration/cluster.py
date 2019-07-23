@@ -498,7 +498,7 @@ class Cluster(object):
 
     def __init__(self, command, host='127.0.0.1', sources=[], workers=1,
             sinks=1, sink_mode='framed', split_streams=False,
-            worker_join_timeout=30,
+            worker_join_timeout=90,
             is_ready_timeout=60, res_dir=None, log_rotation=False,
             persistent_data={}):
         # Create attributes
@@ -654,7 +654,7 @@ class Cluster(object):
     #############
     # Autoscale #
     #############
-    def grow(self, by=1, timeout=30, with_test=True):
+    def grow(self, by=1, timeout=90, with_test=True):
         logging.log(1, "grow(by={}, timeout={}, with_test={})".format(
             by, timeout, with_test))
         pre_partitions = self.get_partition_data() if with_test else None
@@ -698,7 +698,7 @@ class Cluster(object):
             self.confirm_migration(pre_partitions, workers, timeout=timeout)
         return runners
 
-    def shrink(self, workers=1, timeout=30, with_test=True):
+    def shrink(self, workers=1, timeout=90, with_test=True):
         logging.log(1, "shrink(workers={}, with_test={})".format(
             workers, with_test))
         # pick a worker that's not being shrunk
@@ -877,7 +877,7 @@ class Cluster(object):
         for s in self.sinks:
             s.stop()
 
-    def sink_await(self, values, timeout=30, func=lambda x: x, sink=-1):
+    def sink_await(self, values, timeout=90, func=lambda x: x, sink=-1):
         logging.log(1, "sink_await(values={}, timeout={}, func: {}, sink={})"
             .format(values, timeout, func, sink))
         if isinstance(sink, Sink):
@@ -894,7 +894,7 @@ class Cluster(object):
         logging.debug("sink_await completed successfully")
         return sink
 
-    def sink_expect(self, expected, timeout=30, sink=-1, allow_more=False):
+    def sink_expect(self, expected, timeout=90, sink=-1, allow_more=False):
         logging.log(1, "sink_expect(expected={}, timeout={}, sink={})".format(
             expected, timeout, sink))
         if isinstance(sink, Sink):
@@ -920,7 +920,7 @@ class Cluster(object):
         if start:
             sender.start()
 
-    def wait_for_sender(self, sender=-1, timeout=30):
+    def wait_for_sender(self, sender=-1, timeout=90):
         logging.log(1, "wait_for_sender(sender={}, timeout={})"
             .format(sender, timeout))
         if isinstance(sender, (ALOSender, Sender)):
@@ -947,7 +947,7 @@ class Cluster(object):
             s.pause()
         self.wait_for_senders_to_flush()
 
-    def wait_for_senders_to_flush(self, timeout=30):
+    def wait_for_senders_to_flush(self, timeout=90):
         logging.log(1, "wait_for_senders_to_flush({})".format(timeout))
         awaiters = []
         for s in self.senders:
@@ -973,7 +973,7 @@ class Cluster(object):
     ###########
     # Cluster #
     ###########
-    def wait_to_resume_processing(self, timeout=30):
+    def wait_to_resume_processing(self, timeout=90):
         logging.log(1, "wait_to_resume_processing(timeout={})"
             .format(timeout))
         w = WaitForClusterToResumeProcessing(self.workers, timeout=timeout)
@@ -993,7 +993,7 @@ class Cluster(object):
     #########################
     # Observability queries #
     #########################
-    def query_observability(self, query, args, tests, timeout=30, period=2):
+    def query_observability(self, query, args, tests, timeout=90, period=2):
         logging.log(1, "query_observability(query={}, args={}, tests={}, "
             "timeout={}, period={})".format(
                 query, args, tests, timeout, period))

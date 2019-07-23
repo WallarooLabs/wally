@@ -29,7 +29,7 @@ from .validations import is_processing
 
 
 class WaitForClusterToResumeProcessing(StoppableThread):
-    def __init__(self, runners, timeout=30, interval=0.05):
+    def __init__(self, runners, timeout=90, interval=0.05):
         super(WaitForClusterToResumeProcessing, self).__init__()
         self.name = 'WaitForClusterToResumeProcessing'
         # Wait until all workers have resumed processing
@@ -82,7 +82,7 @@ class SinkExpect(StoppableThread):
     """
     __base_name__ = 'SinkExpect'
 
-    def __init__(self, sink, expected, timeout=30, allow_more=False):
+    def __init__(self, sink, expected, timeout=90, allow_more=False):
         super(SinkExpect, self).__init__()
         self.sink = sink
         self.expected = expected
@@ -125,7 +125,7 @@ class SinkAwaitValue(StoppableThread):
     """
     __base_name__ = 'SinkAwaitValue'
 
-    def __init__(self, sink, values, timeout=30, func=lambda x: x):
+    def __init__(self, sink, values, timeout=90, func=lambda x: x):
         super(SinkAwaitValue, self).__init__()
         self.sink = sink
         if isinstance(values, (list, tuple)):
@@ -172,7 +172,7 @@ class SinkAwaitValue(StoppableThread):
 
 
 class TryUntilTimeout(StoppableThread):
-    def __init__(self, test, pre_process=None, timeout=30, interval=0.1):
+    def __init__(self, test, pre_process=None, timeout=90, interval=0.1):
         """
         Try a test until it passes or the time runs out
 
@@ -255,7 +255,7 @@ class WaitForLogRotation(StoppableThread):
     __base_name__ = 'WaitForLogRottion'
 
     def __init__(self, cluster, base_path, prefixes=[], log_suffix='.evlog',
-                 timeout=30):
+                 timeout=90):
         super(WaitForLogRotation, self).__init__()
         logging.debug("{}({}, {}, {}, {})".format(self.__base_name__,
             base_path, prefixes, log_suffix, timeout))
