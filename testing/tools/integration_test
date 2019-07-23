@@ -469,7 +469,7 @@ def CLI():
     stopper.add_argument('--sink-await-keys', action=SinkAwaitKeysAction,
                          nargs='+', metavar=('key', 'value'),
                          help=("Key and Value to match on, as strings"))
-    expect.add_argument('--sink-stop-timeout', type=float, default=30,
+    expect.add_argument('--sink-stop-timeout', type=float, default=90,
                         help=("Timeout in seconds before raising a "
                               "TimeoutError"))
     stopper.add_argument('--delay', type=float, default=None,
@@ -494,7 +494,7 @@ def CLI():
                            action="store_true")
 
     term_group = parser.add_argument_group('Termination')
-    term_group.add_argument('--runner-join_timeout', type=float, default=30,
+    term_group.add_argument('--runner-join_timeout', type=float, default=90,
                             help=("Timeout in seconds before killing any "
                                   "remaining live workers and raising an "
                                   "error."))

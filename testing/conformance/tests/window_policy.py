@@ -50,7 +50,7 @@ def test_drop_policy():
 
         # Specify end condition (as function over sink)
         test.completes_when(data_in_sink_contains(out_of_order_ts_drop),
-            timeout=30)
+            timeout=90)
 
         # Test validation logic
         output = test.collect()
@@ -71,7 +71,7 @@ def test_firepermessage_policy():
         # Specify end condition (as function over sink)
         test.completes_when(
             data_in_sink_contains(out_of_order_ts_firepermessage),
-            timeout=30)
+            timeout=90)
 
         # Test validation logic
         output = test.collect()

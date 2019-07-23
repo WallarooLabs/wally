@@ -49,7 +49,7 @@ class CLITesterBase(Application):
     def send_data(self):
         self.send(self.values)
         self.completes_when(data_in_sink_contains(self.await_values),
-                            timeout=30)
+                            timeout=90)
 
 
 class CLITesterPython2(CLITesterBase):

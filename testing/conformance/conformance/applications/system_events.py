@@ -136,7 +136,7 @@ class ResilienceOperation(object):
 
 
 class Grow(ResilienceOperation):
-    def __init__(self, size, timeout=30, with_test=True):
+    def __init__(self, size, timeout=90, with_test=True):
         super(Grow, self).__init__(size)
         self.timeout = timeout
         self.with_test = with_test
@@ -150,7 +150,7 @@ class Grow(ResilienceOperation):
 
 
 class Shrink(ResilienceOperation):
-    def __init__(self, workers, timeout=30, with_test=True):
+    def __init__(self, workers, timeout=90, with_test=True):
         self.workers = workers
         self.timeout = timeout
         self.with_test = with_test
@@ -191,7 +191,7 @@ class Crash(ResilienceOperation):
 
 
 class Recover(ResilienceOperation):
-    def __init__(self, size=None, timeout=30, with_test=True, resume=True):
+    def __init__(self, size=None, timeout=90, with_test=True, resume=True):
         """
         :size may be a positive int or None
         if int, it denotes the number of workers to recover from the tail end

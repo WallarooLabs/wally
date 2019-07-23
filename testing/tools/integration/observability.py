@@ -190,7 +190,7 @@ class ObservabilityNotifier(StoppableThread):
     """
     __base_name__ = 'ObservabilityNotifier'
 
-    def __init__(self, query_func, query_args, tests, timeout=30, period=2):
+    def __init__(self, query_func, query_args, tests, timeout=90, period=2):
         """
         - `query_func` is an argument-free function to query an observability
         status. You can use `functools.partial` to create it.
@@ -201,7 +201,7 @@ class ObservabilityNotifier(StoppableThread):
         by raising an error, and pass by returning True.
         - `timeout` is the period in seconds the notifier should wait before
         exiting with an error status if any of the tests is still failing.
-        The default is 30 seconds.
+        The default is 90 seconds.
         - `period` is the time in seconds to wait between queries. The default
         is 2 seconds.
         """
@@ -310,7 +310,7 @@ class RunnerReadyChecker(StoppableThread):
     __base_name__ = 'RunnerReadyChecker'
     pattern = re.compile('Application has successfully initialized')
 
-    def __init__(self, runners, timeout=30):
+    def __init__(self, runners, timeout=90):
         super(RunnerReadyChecker, self).__init__()
         self.runners = runners
         self.name = self.__base_name__
@@ -345,7 +345,7 @@ class RunnerReadyChecker(StoppableThread):
 class RunnerChecker(StoppableThread):
     __base_name__ = 'RunnerChecker'
 
-    def __init__(self, runner, patterns, timeout=30, start_from=0):
+    def __init__(self, runner, patterns, timeout=90, start_from=0):
         super(RunnerChecker, self).__init__()
         self.name = self.__base_name__
         self.runner = runner

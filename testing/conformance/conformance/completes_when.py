@@ -15,7 +15,7 @@
 
 from integration.errors import TimeoutError
 
-def data_in_sink_contains(data, timeout=30, sink=-1):
+def data_in_sink_contains(data, timeout=90, sink=-1):
     def data_in_sink_contains_func(context):
         context.sink_await(data, timeout=timeout, func=context.parse_output,
                            sink=sink)
@@ -23,7 +23,7 @@ def data_in_sink_contains(data, timeout=30, sink=-1):
     return data_in_sink_contains_func
 
 
-def data_in_sink_count_is(expected, timeout=30, sink=-1, allow_more=False):
+def data_in_sink_count_is(expected, timeout=90, sink=-1, allow_more=False):
     def data_in_sink_count_is_func(context):
         context.sink_expect(expected, timeout=timeout, sink=sink,
                             allow_more=allow_more)
