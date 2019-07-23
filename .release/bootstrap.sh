@@ -81,15 +81,16 @@ install_monitoring_hub_dependencies() {
 install_python_dependencies() {
   echo "** Installing python dependencies"
   echo "Installing python"
-  sudo apt-get install -y python-dev
+  sudo apt-get install -y python-dev python3-dev
   echo "Installing build-essential"
   sudo apt-get install -y build-essential
   echo "Installing pip"
-  sudo apt-get install -y python-pip
-  echo "Installing pytest"
-  sudo -H python -m pip install pytest==3.7.4
+  sudo apt-get install -y python-pip python3-pip
   echo "Install enum"
   sudo -H python -m pip install --upgrade pip enum34
+  echo "Installing pytest"
+  sudo -H python -m pip install pytest==3.7.4 watchdog==0.9.0
+  sudo -H python3 -m pip install pytest==3.7.4 watchdog==0.9.0
 
   echo "** Python dependencies installed"
 }
