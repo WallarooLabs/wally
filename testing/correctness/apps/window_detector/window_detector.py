@@ -81,6 +81,7 @@ def application_setup(args):
     ## SLF: FWIW, with key_by, key_0 flows initializer -> worker4 -> worker3
     ## SLF: FWIW, w/o  key_by, key_0 flows
     ## SLF:                  initializer -> worker1 -> worker3 -> worker4
+    ## SLF:   message order: good           bad        bad        bad
     ## SLF: p = p.key_by(extract_key)
     p = p.to(trace_id)
     p = p.key_by(extract_key)
