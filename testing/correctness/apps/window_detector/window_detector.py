@@ -76,7 +76,12 @@ def application_setup(args):
             refill_credits=10)
 
     p = wallaroo.source(source_name, source)
-    p = p.key_by(extract_key)
+    ## SLF: Does removing this matter??
+    ## SLF: No, removing this 1st key_by does not prevent bug #2979
+    ## SLF: FWIW, with key_by, key_0 flows initializer -> worker4 -> worker3
+    ## SLF: FWIW, w/o  key_by, key_0 flows
+    ## SLF:                  initializer -> worker1 -> worker3 -> worker4
+    ## SLF: p = p.key_by(extract_key)
     p = p.to(trace_id)
     p = p.key_by(extract_key)
 
@@ -163,8 +168,9 @@ class Collect(wallaroo.Aggregation):
         return []
 
     def update(self, msg, accumulator):
-        print("!@ Collect.update: append {!r}:{!r} appended to {!r}"
-              .format(msg.key, msg.value, accumulator))
+        ts = time.time()
+        print("!@ Collect.update: ts {!r} append {!r}:{!r} appended to {!r}"
+              .format(ts, msg.key, msg.value, accumulator))
         # tag data key, then add it to accumulator
         accumulator.append(Message(msg.key + ".Collect", msg.value))
 
@@ -198,8 +204,8 @@ def split_accumulated(data):
 
 @wallaroo.encoder
 def encoder(msg):
-    print("encoder({!r}) at {!r}".format(msg, time.time()))
     s = json.dumps({'key': msg[0], 'value': msg[1], 'ts': msg[2]}).encode()
+    print("encoder({!r}) at {!r}: json {!r}".format(msg, time.time(), s))
     return struct.pack(">I{}s".format(len(s)), len(s), s)
 
 

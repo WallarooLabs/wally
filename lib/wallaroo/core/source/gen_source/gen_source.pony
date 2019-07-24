@@ -190,6 +190,7 @@ actor GenSource[V: Any val] is Source
     ifdef "trace" then
       @printf[I32](("Rcvd msg at " + _pipeline_name + " source\n").cstring())
     end
+    @printf[I32](("Rcvd msg at " + _pipeline_name + " source at ingest_ts %s\n").cstring(), ingest_ts.string().cstring())
 
     let decode_end_ts = WallClock.nanoseconds()
     _metrics_reporter.step_metric(_pipeline_name,

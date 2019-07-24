@@ -58,6 +58,7 @@ if args.window_type == 'sliding':
         #!@
         if len(processed) != size:
             print("!@ GAP IN PROCESSED FOR KEY " + k)
+            print("processed = {} size = {} ".format(processed, size))
             old = processed[0]
             for i in range(1, len(processed)):
                 if processed[i] != old + 1:
@@ -89,5 +90,7 @@ for key in sequences:
         if not ((v == old + 1) or (v <= old)):
             print("!@ Old for key " + key + ": " + str(old))
             print("!@ Cur for key " + key + ": " + str(v))
+            print("old = {}".format(old))
+            print("sequences[key] = {}".format(sequences[key]))
         assert((v == old + 1) or (v <= old))
         old = v

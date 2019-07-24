@@ -87,6 +87,7 @@ class OutgoingBoundaryTCPHandler is TestableTCPHandler
       _connect_count = @pony_os_connect_tcp[U32](_tcp_actor,
         host.cstring(), service.cstring(), _from.cstring())
       _notify_connecting()
+      @printf[I32]("SLF: OutgoingBoundaryTCPHandler: connect\n".cstring())
     end
 
   fun ref event_notify(event: AsioEventID, flags: U32, arg: U32) =>
@@ -110,6 +111,7 @@ class OutgoingBoundaryTCPHandler is TestableTCPHandler
             _readable = true
 
             _tcp_actor.connected()
+@printf[I32]("SLF: OutgoingBoundaryTCPHandler: connected _fd %d\n".cstring(), _fd)
             _pending_reads()
 
             ifdef not windows then
@@ -146,6 +148,7 @@ class OutgoingBoundaryTCPHandler is TestableTCPHandler
             _shutdown_peer = false
 
             _tcp_actor.connected()
+@printf[I32]("SLF: OutgoingBoundaryTCPHandler: connected _fd %d\n".cstring(), _fd)
             _pending_reads()
 
             ifdef not windows then
@@ -242,8 +245,10 @@ class OutgoingBoundaryTCPHandler is TestableTCPHandler
     """
     if _connect_count > 0 then
       _tcp_actor.connecting(_connect_count)
+@printf[I32]("SLF: OutgoingBoundaryTCPHandler: connecting _fd %d\n".cstring(), I32(-3))
     else
       _tcp_actor.connect_failed()
+@printf[I32]("SLF: OutgoingBoundaryTCPHandler: connect_failed _fd %d\n".cstring(), I32(-6))
       _hard_close()
     end
 
@@ -306,6 +311,7 @@ class OutgoingBoundaryTCPHandler is TestableTCPHandler
     @pony_asio_event_set_writeable[None](_event, false)
 
     @pony_os_socket_close[None](_fd)
+@printf[I32]("SLF: OutgoingBoundaryTCPHandler: closed _fd %d locally_initiated_close %s\n".cstring(), _fd, locally_initiated_close.string().cstring())
     _fd = -1
 
     _tcp_actor.closed(locally_initiated_close)

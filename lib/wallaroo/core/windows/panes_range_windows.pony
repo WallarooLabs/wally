@@ -121,6 +121,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     try
       var is_late_data = false
       (let earliest_ts, let end_ts) = _earliest_and_end_ts()?
+      @printf[I32]("SLF line %d key %s event_ts %s earliest_ts %s\n".cstring(), __loc.line(), _key.cstring(), event_ts.string().cstring(), earliest_ts.string().cstring())
       var applied = false
       if not _is_past_end_ts(event_ts, end_ts) then
         is_late_data = _apply_input(input, event_ts, earliest_ts)
@@ -134,11 +135,13 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       // If we haven't already applied the input, do it now.
       if not applied then
         (var new_earliest_ts, let new_end_ts) = _earliest_and_end_ts()?
+      @printf[I32]("SLF line %d key %s new_earliest_ts %s\n".cstring(), __loc.line(), _key.cstring(), new_earliest_ts.string().cstring())
         if _is_past_end_ts(event_ts, new_end_ts) then
           // !TODO!: Think about constraining the extent to which we expand
           // windows to prevent memory exhaustion.
           _expand_windows(event_ts, new_end_ts)?
           new_earliest_ts = _earliest_ts()?
+      @printf[I32]("SLF line %d key %s new_earliest_ts %s\n".cstring(), __loc.line(), _key.cstring(), new_earliest_ts.string().cstring())
         end
         is_late_data = _apply_input(input, event_ts, new_earliest_ts)
       end
@@ -147,7 +150,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
         match _late_data_policy
         | LateDataPolicy.drop() =>
           ifdef debug then
-            @printf[I32]("Event ts %s is earlier than earliest window %s. Ignoring\n".cstring(), event_ts.string().cstring(), earliest_ts.string().cstring())
+            @printf[I32]("Event ts %s is earlier than earliest window %s for key %s . Ignoring\n".cstring(), event_ts.string().cstring(), earliest_ts.string().cstring(), _key.cstring())
           end
         | LateDataPolicy.fire_per_message() =>
           let acc = _agg.initial_accumulator()
@@ -163,6 +166,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
           output_watermark_ts = output_watermark_ts.max(event_ts)
         | LateDataPolicy.place_in_oldest_window() =>
           let new_earliest_ts = _earliest_ts()?
+      @printf[I32]("SLF line %d key %s new_earliest_ts %s\n".cstring(), __loc.line(), _key.cstring(), new_earliest_ts.string().cstring())
           _apply_input(input, new_earliest_ts, new_earliest_ts)
         end
       end
@@ -176,6 +180,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   // Return true if the input is late, which means we need to handle it
   // according to the late data policy.
   fun ref _apply_input(input: In, event_ts: U64, earliest_ts: U64): Bool =>
+      @printf[I32]("SLF line %d key %s earliest_ts %s\n".cstring(), __loc.line(), _key.cstring(), earliest_ts.string().cstring())
     ifdef debug then
       try
         Invariant(not _is_past_end_ts(event_ts, _earliest_and_end_ts()?._2))
@@ -220,6 +225,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       end
     try
       (let earliest_ts, let end_ts) = _earliest_and_end_ts()?
+      @printf[I32]("SLF line %d key %s earliest_ts %s\n".cstring(), __loc.line(), _key.cstring(), earliest_ts.string().cstring())
       let last_pane_idx =
         (_earliest_window_idx + (_panes_start_ts.size() - 1)) %
           _panes_start_ts.size()
@@ -260,6 +266,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   =>
     try
       let earliest_ts = _earliest_ts()?
+      @printf[I32]("SLF line %d key %s earliest_ts %s\n".cstring(), __loc.line(), _key.cstring(), earliest_ts.string().cstring())
       let window_end_ts = earliest_ts + (_range - 1)
       if _should_trigger(earliest_ts, watermark_ts) then
         (let out, let output_watermark_ts) = _trigger_next(earliest_ts,
@@ -276,6 +283,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   fun ref _trigger_next(earliest_ts: U64, window_end_ts: U64,
     trigger_diff: U64): ((Out | None), U64) ?
   =>
+      @printf[I32]("SLF line %d key %s earliest_ts %s window_end_ts %s trigger_diff %s\n".cstring(), __loc.line(), _key.cstring(), earliest_ts.string().cstring(), window_end_ts.string().cstring(), trigger_diff.string().cstring())
     var running_acc = _identity_acc
     var pane_idx = _earliest_window_idx
     for i in Range(0, _panes_per_window) do
@@ -288,10 +296,12 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     end
     let out = _agg.output(_key, window_end_ts, running_acc)
     var next_start_ts = earliest_ts + (_all_pane_range() + trigger_diff)
+      @printf[I32]("SLF line %d key %s next_start_ts %s\n".cstring(), __loc.line(), _key.cstring(), next_start_ts.string().cstring())
     var next_pane_idx = _earliest_window_idx
     for _ in Range(0, _panes_per_slide) do
       _panes(next_pane_idx)? = EmptyPane
       _panes_start_ts(next_pane_idx)? = next_start_ts
+      @printf[I32]("SLF line %d key %s next_start_ts %s for next_pane_idx %s _panes_per_slide %s _panes.size() %s\n".cstring(), __loc.line(), _key.cstring(), next_start_ts.string().cstring(), next_pane_idx.string().cstring(), _panes_per_slide.string().cstring(), _panes.size().string().cstring())
       next_pane_idx = (next_pane_idx + 1) % _panes.size()
       next_start_ts = next_start_ts + _pane_size
     end
@@ -334,6 +344,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
   fun _earliest_and_end_ts(): (U64, U64) ? =>
     let earliest_ts = _earliest_ts()?
     let end_ts = (earliest_ts + _all_pane_range()) - 1
+      @printf[I32]("SLF line %d key %s earliest_ts %s\n".cstring(), __loc.line(), _key.cstring(), earliest_ts.string().cstring())
     (earliest_ts, end_ts)
 
   fun _all_pane_range(): U64 =>
@@ -343,6 +354,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     event_ts > end_ts
 
   fun _pane_idx_for_event_ts(event_ts: U64, earliest_ts: U64): USize =>
+      @printf[I32]("SLF line %d key %s earliest_ts %s\n".cstring(), __loc.line(), _key.cstring(), earliest_ts.string().cstring())
     let pane_idx_offset = ((event_ts - earliest_ts) / _pane_size).usize()
     (_earliest_window_idx + pane_idx_offset) % _panes.size()
 
