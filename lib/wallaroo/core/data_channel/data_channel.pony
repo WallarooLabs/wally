@@ -124,7 +124,6 @@ actor DataChannel is TCPActor
     close()
 
   fun ref queue_msg(msg: Array[U8] val) =>
-    @printf[I32]("SLF: line %d queue_msg()\n".cstring(), __loc.line())
     _queue.push(msg)
 
   be identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
@@ -143,7 +142,6 @@ actor DataChannel is TCPActor
       _autoscale, _router_registry, this, dr)
     dr.data_connect(sender_boundary_id, highest_seq_id, this)
     for msg in _queue.values() do
-      @printf[I32]("SLF: line %d call decode_and_process() _receiver 0x%lx\n".cstring(), __loc.line(), _receiver)
       _receiver.decode_and_process(msg)
     end
     _queue.clear()
@@ -168,7 +166,6 @@ actor DataChannel is TCPActor
       ifdef "trace" then
         @printf[I32]("Rcvd msg on data channel\n".cstring())
       end
-      @printf[I32]("SLF: line %d call decode_and_process() _receiver 0x%lx\n".cstring(), __loc.line(), _receiver)
       _receiver.decode_and_process(consume data)
 
       expect(4)
@@ -222,7 +219,6 @@ class _WaitingDataReceiver is _DataReceiverWrapper
       _data_receivers.request_data_receiver(dc.sender_name,
         dc.sender_boundary_id, dc.highest_seq_id, _data_channel)
     else
-    @printf[I32]("SLF: line %d decode_and_process(): queue_msg!\n".cstring(), __loc.line())
       _data_channel.queue_msg(data)
     end
 

@@ -70,7 +70,6 @@ class _RecoveringDataReceiverPhase is _DataReceiverPhase
     pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
-    @printf[I32]("SLF: _RecoveringDataReceiverPhase.deliver: seq_id = %lu this = 0x%lx\n".cstring(), seq_id, this)
     // Drop non-barriers
     ifdef debug then
       @printf[I32]("Recovering DataReceiver dropping non-rollback-barrier\n"
@@ -81,7 +80,6 @@ class _RecoveringDataReceiverPhase is _DataReceiverPhase
   fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
     token: BarrierToken, seq_id: SeqId)
   =>
-    @printf[I32]("SLF: _RecoveringDataReceiverPhase.forward_barrier: seq_id = %lu this = 0x%lx\n".cstring(), seq_id, this)
     // Drop anything that's not related to rollback
     match token
     | let srt: CheckpointRollbackBarrierToken =>
@@ -118,14 +116,12 @@ class _NormalDataReceiverPhase is _DataReceiverPhase
     pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
-    @printf[I32]("SLF: _NormalDataReceiverPhase.deliver: seq_id = %lu this = 0x%lx\n".cstring(), seq_id, this)
     _data_receiver.deliver(d, producer_id, pipeline_time_spent, seq_id,
       latest_ts, metrics_id, worker_ingress_ts)
 
   fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
     token: BarrierToken, seq_id: SeqId)
   =>
-    @printf[I32]("SLF: _NormalDataReceiverPhase.forward_barrier: seq_id = %lu this = 0x%lx\n".cstring(), seq_id, this)
     _data_receiver.send_barrier(input_id, output_id, token, seq_id)
 
   fun ref data_connect(highest_seq_id: SeqId) =>

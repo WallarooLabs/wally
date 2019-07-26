@@ -123,7 +123,6 @@ class _NormalStepPhase is StepPhase
     frac_ids: FractionalMessageId, i_seq_id: SeqId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64)
   =>
-    @printf[I32]("SLF: %s.run: i_seq_id = %lu this = 0x%lx\n".cstring(), __loc.type_name().cstring(), i_seq_id, this)
     _step.process_message[D](metric_name, pipeline_time_spent, data, key,
       event_ts, watermark_ts, i_producer_id, i_producer, msg_uid, frac_ids,
       i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
@@ -168,13 +167,11 @@ class _BarrierStepPhase is StepPhase
     metrics_id: U16, worker_ingress_ts: U64)
   =>
     if input_blocking(i_producer_id) then
-@printf[I32]("SLF: %s.run QUEUE: i_seq_id = %lu this = 0x%lx\n".cstring(), __loc.type_name().cstring(), i_seq_id, this)
       let msg = TypedQueuedMessage[D](metric_name, pipeline_time_spent,
         data, key, event_ts, watermark_ts, i_producer_id, i_producer, msg_uid,
         frac_ids, i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
       _queued.push(msg)
     else
-@printf[I32]("SLF: %s.run process!: i_seq_id = %lu this = 0x%lx\n".cstring(), __loc.type_name().cstring(), i_seq_id, this)
       _step.process_message[D](metric_name, pipeline_time_spent, data, key,
         event_ts, watermark_ts, i_producer_id, i_producer, msg_uid, frac_ids,
         i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
@@ -294,7 +291,6 @@ class _RecoveringStepPhase is StepPhase
     frac_ids: FractionalMessageId, i_seq_id: SeqId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64)
   =>
-@printf[I32]("SLF: %s.run: i_seq_id = %lu this = 0x%lx\n".cstring(), __loc.type_name().cstring(), i_seq_id, this)
     None
 
   fun ref trigger_timeout(step: Step ref) =>
@@ -322,7 +318,6 @@ class _DisposedStepPhase is StepPhase
     frac_ids: FractionalMessageId, i_seq_id: SeqId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64)
   =>
-@printf[I32]("SLF: %s.run: i_seq_id = %lu this = 0x%lx\n".cstring(), __loc.type_name().cstring(), i_seq_id, this)
     None
 
   fun name(): String => __loc.type_name()
