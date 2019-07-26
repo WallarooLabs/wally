@@ -163,6 +163,7 @@ actor DataReceiver is Producer
   be received(d: DeliveryMsg, producer_id: RoutingId, pipeline_time_spent: U64,
     seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    @printf[I32]("SLF: DataReceiver.received: seq_id = %lu this = 0x%lx\n".cstring(), seq_id, this)
     process_message(d, producer_id, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
 
@@ -170,6 +171,7 @@ actor DataReceiver is Producer
     pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
+    @printf[I32]("SLF: DataReceiver.process_message: seq_id = %lu this = 0x%lx _phase = 0x%lx\n".cstring(), seq_id, this, _phase)
     _phase.deliver(d, producer_id, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
 
@@ -177,6 +179,7 @@ actor DataReceiver is Producer
     pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
+    @printf[I32]("SLF: DataReceiver.deliver: seq_id = %lu this = 0x%lx _phase = 0x%lx\n".cstring(), seq_id, this, _phase)
     ifdef "trace" then
       @printf[I32]("Rcvd pipeline msg at DataReceiver\n".cstring())
     end

@@ -150,9 +150,14 @@ class Message(object):
     def __init__(self, key, value):
         self.key = key
         self.value = value
+        qqq = "HEY, key={} and value={}".format(key, value)
+        print("Message.__init__: key={} value={} qqq={}".format(key, value, qqq))
+        self.qqq = qqq
 
     def __str__(self):
-        return "({},{})".format(self.key, self.value)
+        qqq = "({},{},{})".format(self.key, self.value, self.qqq)
+        print("Message.__str__: {}".format(qqq))
+        return qqq
 
     def __repr__(self):
         return str(self)
@@ -212,6 +217,7 @@ def encoder(msg):
 
 @wallaroo.experimental.stream_message_encoder
 def encode_feed(data):
+    print("encode_feed: {!r}".format(data))
     return data
 
 

@@ -1201,6 +1201,7 @@ class val ForwardMsg[D: Any val] is DeliveryMsg
     ifdef "trace" then
       @printf[I32]("DataRouter found Step\n".cstring())
     end
+    @printf[I32]("SLF: %s.deliver: seq_id = %lu this = 0x%lx\n".cstring(), __loc.type_name().cstring(), seq_id, this)
 
     target_step.run[D](_metric_name, pipeline_time_spent, _data, _key,
       _event_ts, _watermark_ts, producer_id, producer, _msg_uid, _frac_ids,
@@ -1249,6 +1250,7 @@ class val ForwardStatePartitionMsg[D: Any val] is DeliveryMsg
     ifdef "trace" then
       @printf[I32]("DataRouter found Step\n".cstring())
     end
+    @printf[I32]("SLF: %s.deliver: seq_id = %lu this = 0x%lx\n".cstring(), __loc.type_name().cstring(), seq_id, this)
 
     let local_state_steps = step_group_steps(_target_step_group)?
     let idx = (HashKey(_target_key) % local_state_steps.size().u128()).usize()
@@ -1303,6 +1305,7 @@ class val ForwardStatelessPartitionMsg[D: Any val] is DeliveryMsg
     ifdef "trace" then
       @printf[I32]("DataRouter found Step\n".cstring())
     end
+    @printf[I32]("SLF: %s.deliver: seq_id = %lu this = 0x%lx\n".cstring(), __loc.type_name().cstring(), seq_id, this)
 
     let partitions = step_group_steps(_target_partition_id)?
     let idx = (HashKey(_key) % partitions.size().u128()).usize()

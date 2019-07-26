@@ -124,6 +124,7 @@ actor DataChannel is TCPActor
     close()
 
   fun ref queue_msg(msg: Array[U8] val) =>
+    @printf[I32]("SLF: line %d queue_msg()\n".cstring(), __loc.line())
     _queue.push(msg)
 
   be identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
@@ -142,6 +143,7 @@ actor DataChannel is TCPActor
       _autoscale, _router_registry, this, dr)
     dr.data_connect(sender_boundary_id, highest_seq_id, this)
     for msg in _queue.values() do
+      @printf[I32]("SLF: line %d call decode_and_process() _receiver 0x%lx\n".cstring(), __loc.line(), _receiver)
       _receiver.decode_and_process(msg)
     end
     _queue.clear()
@@ -166,6 +168,7 @@ actor DataChannel is TCPActor
       ifdef "trace" then
         @printf[I32]("Rcvd msg on data channel\n".cstring())
       end
+      @printf[I32]("SLF: line %d call decode_and_process() _receiver 0x%lx\n".cstring(), __loc.line(), _receiver)
       _receiver.decode_and_process(consume data)
 
       expect(4)
@@ -206,6 +209,7 @@ class _WaitingDataReceiver is _DataReceiverWrapper
     _data_receivers = data_receivers
 
   fun ref decode_and_process(data: Array[U8] val) =>
+    @printf[I32]("SLF: line %d TOP decode_and_process(): %s\n".cstring(), __loc.line(), _Foo._print_array[U8](data).cstring())
     match ChannelMsgDecoder(data, _auth)
     | let dc: DataConnectMsg =>
       ifdef "trace" then
@@ -218,6 +222,7 @@ class _WaitingDataReceiver is _DataReceiverWrapper
       _data_receivers.request_data_receiver(dc.sender_name,
         dc.sender_boundary_id, dc.highest_seq_id, _data_channel)
     else
+    @printf[I32]("SLF: line %d decode_and_process(): queue_msg!\n".cstring(), __loc.line())
       _data_channel.queue_msg(data)
     end
 
@@ -252,6 +257,7 @@ class _DataReceiver is _DataReceiverWrapper
     _data_receiver = dr
 
   fun ref decode_and_process(data: Array[U8] val) =>
+    @printf[I32]("SLF: line %d TOP decode_and_process(): %s\n".cstring(), __loc.line(), _Foo._print_array[U8](data).cstring())
     // because we received this from another worker
     let ingest_ts = WallClock.nanoseconds()
     let my_latest_ts = ingest_ts
@@ -261,6 +267,7 @@ class _DataReceiver is _DataReceiverWrapper
       ifdef "trace" then
         @printf[I32]("Received DataMsg on Data Channel\n".cstring())
       end
+      @printf[I32]("SLF: DataChannel.decode_and_process: seq_id = %lu this = 0x%lx\n".cstring(), data_msg.seq_id, this)
       _metrics_reporter.step_metric(data_msg.metric_name,
         "Before receive on data channel (network time)", data_msg.metrics_id,
         data_msg.latest_ts, ingest_ts)
@@ -306,4 +313,11 @@ class _DataReceiver is _DataReceiverWrapper
       @printf[I32]("Unknown Wallaroo data message type.\n".cstring())
     end
 
+primitive _Foo
+  fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
+    """
+    Generate a printable string of the contents of the given readseq to use in
+    error messages.
+    """
+    "[len=" + array.size().string() + ": " + ", ".join(array.values()) + "]"
 

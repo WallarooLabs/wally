@@ -320,6 +320,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
 
     try
       seq_id = seq_id + 1
+      @printf[I32]("SLF: Boundary.process_message: i_seq_id = %lu seq_id = %lu _target_worker = %s\n".cstring(), i_seq_id, seq_id, _target_worker.cstring())
 
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
         i_producer_id,

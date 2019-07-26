@@ -289,6 +289,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     ifdef "trace" then
       @printf[I32]("Received msg at Step\n".cstring())
     end
+    @printf[I32]("SLF: %s.run: i_seq_id = %lu this = 0x%lx\n".cstring(), __loc.type_name().cstring(), i_seq_id, this)
     _phase.run[D](metric_name, pipeline_time_spent, data, key,
       event_ts, watermark_ts, i_producer_id, i_producer, msg_uid, frac_ids,
       i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
@@ -299,6 +300,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    @printf[I32]("SLF: %s.process_message: i_seq_id = %lu this = 0x%lx\n".cstring(), __loc.type_name().cstring(), i_seq_id, this)
     _seq_id_generator.new_id()
     let process_ts = WallClock.nanoseconds()
 

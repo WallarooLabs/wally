@@ -358,6 +358,7 @@ class val DataRouter is Equatable[DataRouter]
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DataRouter\n".cstring())
     end
+    @printf[I32]("SLF: DataRouter.route: seq_id = %lu this = 0x%lx producer_id %lu\n".cstring(), seq_id, this, producer_id)
     try
       d_msg.deliver(pipeline_time_spent, producer_id, producer,
         seq_id, latest_ts, metrics_id, worker_ingress_ts,
