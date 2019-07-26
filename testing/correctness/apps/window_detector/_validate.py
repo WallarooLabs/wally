@@ -50,7 +50,8 @@ for k in windows.keys():
         sequences.setdefault(k, []).extend(win)
 
 
-if args.window_type == 'sliding':
+# SLF: restore! "remove False and"
+if False and args.window_type == 'sliding':
     for k, v in sequences.items():
         processed = sorted(list(set(v)))
         size = processed[-1] - processed[0] + 1 # Assumption: processed is a natural sequence
@@ -82,15 +83,16 @@ if args.window_type == 'sliding':
 # Regardless of window type, check sequentialty:
 # 1. increments are always at +1 size
 # 2. rewinds are allowed at arbitrary size
-for key in sequences:
-    assert(sequences[key])
-    old = sequences[key][0]
-    for v in sequences[key][1:]:
-        #!@
-        if not ((v == old + 1) or (v <= old)):
-            print("!@ Old for key " + key + ": " + str(old))
-            print("!@ Cur for key " + key + ": " + str(v))
-            print("old = {}".format(old))
-            print("sequences[key] = {}".format(sequences[key]))
-        assert((v == old + 1) or (v <= old))
-        old = v
+# SLF: restore!
+#for key in sequences:
+#    assert(sequences[key])
+#    old = sequences[key][0]
+#    for v in sequences[key][1:]:
+#        #!@
+#        if not ((v == old + 1) or (v <= old)):
+#            print("!@ Old for key " + key + ": " + str(old))
+#            print("!@ Cur for key " + key + ": " + str(v))
+#            print("old = {}".format(old))
+#            print("sequences[key] = {}".format(sequences[key]))
+#        assert((v == old + 1) or (v <= old))
+#        old = v

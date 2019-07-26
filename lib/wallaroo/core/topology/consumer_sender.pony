@@ -77,9 +77,10 @@ class ConsumerSender is TestableConsumerSender
   =>
     if _producer.has_route_to(boundary) then
       ifdef "trace" then
-        @printf[I32]("ConsumerSender.forward msg\n".cstring())
+        @printf[I32]("\n".cstring())
       end
       let o_seq_id = _producer.next_sequence_id()
+      @printf[I32]("SLF: ConsumerSender.forward msg: o_seq_id = %lu boundary = 0x%lx\n".cstring(), o_seq_id, boundary)
 
       boundary.forward(delivery_msg, pipeline_time_spent, _producer_id,
         _producer, o_seq_id, latest_ts, metrics_id, worker_ingress_ts)

@@ -147,6 +147,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
             builder.build_and_initialize(_string_id_gen(boundary_id_string)?,
               target_worker_name, _layout_initializer)
           disposable_registry.register_disposable(new_boundary)
+          @printf[I32]("SLF: ConnectorSource.create: target_worker_name = %s\n".cstring(), target_worker_name.cstring())
           _outgoing_boundaries(target_worker_name) = new_boundary
         else
           Fail()
@@ -248,6 +249,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
         end
       end
 
+      @printf[I32]("SLF: _register_output: id = %lu\n".cstring(), id)
       _outputs(id) = c
       _routes.set(c)
       _consumer_sender.register_producer(id, c)
@@ -309,6 +311,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
             builder.build_and_initialize(_string_id_gen(boundary_id_string)?,
               target_worker_name, _layout_initializer)
           _disposable_registry.register_disposable(boundary)
+          @printf[I32]("SLF: add_boundary_builders: target_worker_name = %s\n".cstring(), target_worker_name.cstring())
           _outgoing_boundaries(target_worker_name) = boundary
           _routes.set(boundary)
         else

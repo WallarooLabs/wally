@@ -591,6 +591,7 @@ class ConnectorSourceNotify[In: Any val]
     _router.routes()
 
   fun ref update_router(router': Router) =>
+    @printf[I32]("SLF: ConnectorSourceNotify.update_router: TOP\n".cstring())
     _router = router'
 
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary]) =>

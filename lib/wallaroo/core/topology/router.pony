@@ -956,6 +956,7 @@ class val StatelessPartitionRouter is Router
       if target_worker == _worker_name then
         let s_idx = (hashed_key % _local_partitions.size().u128()).usize()
         let step = _local_partitions(s_idx)?
+        @printf[I32]("SLF: StatelessPartitionRouter.route: send: i_msg_uid = %lu\n".cstring(), i_msg_uid)
         consumer_sender.send[D](metric_name, pipeline_time_spent, data, key,
           event_ts, watermark_ts, i_msg_uid, frac_ids,
           latest_ts, metrics_id, worker_ingress_ts, step)
@@ -965,6 +966,7 @@ class val StatelessPartitionRouter is Router
           data, key, event_ts, watermark_ts, metric_name, i_msg_uid, frac_ids)
         let proxy = _proxies(target_worker)?
         let ob = proxy.target_boundary()
+        @printf[I32]("SLF: StatelessPartitionRouter.route: forward: proxy = 0x%lx ob = 0x%lx target_worker %s w_idx %lu \n".cstring(), proxy, ob, target_worker.cstring(), w_idx)
         consumer_sender.forward(msg, pipeline_time_spent, latest_ts,
           metrics_id, metric_name, worker_ingress_ts, ob)
         (false, latest_ts)
@@ -1004,6 +1006,7 @@ class val StatelessPartitionRouter is Router
   fun update_boundaries(ob: box->Map[String, OutgoingBoundary]):
     StatelessPartitionRouter
   =>
+    @printf[I32]("SLF: StatelessPartitionRouter proxies update line %d\n".cstring(), __loc.line())
     let new_proxies = recover iso Map[WorkerName, ProxyRouter] end
     for (w, pr) in _proxies.pairs() do
       new_proxies(w) = pr.update_boundary(ob)
@@ -1028,6 +1031,7 @@ class val StatelessPartitionRouter is Router
     end
     new_r_ids(joining_worker) = group_routing_id
 
+    @printf[I32]("SLF: StatelessPartitionRouter proxies update line %d\n".cstring(), __loc.line())
     let new_proxies = recover iso Map[WorkerName, ProxyRouter] end
     for (w, pr) in _proxies.pairs() do
       new_proxies(w) = pr
@@ -1052,6 +1056,7 @@ class val StatelessPartitionRouter is Router
         new_workers.push(w)
       end
     end
+    @printf[I32]("SLF: StatelessPartitionRouter proxies update line %d\n".cstring(), __loc.line())
     for (w, pr) in _proxies.pairs() do
       if not ArrayHelpers[WorkerName].contains[WorkerName](leaving_workers,
         w)

@@ -329,8 +329,10 @@ actor OutgoingBoundary is (Consumer & TCPActor)
       _add_to_upstream_backup(outgoing_msg)
 
       if _connection_initialized then
+        @printf[I32]("SLF: OutgoingBoundary.forward: writev: i_seq_id = %lu producer_id = %lu this = 0x%lx\n".cstring(), i_seq_id, i_producer_id, this)
         _tcp_handler.writev(outgoing_msg)
       else
+        @printf[I32]("SLF: OutgoingBoundary.forward: push: i_seq_id = %lu producer_id = %lu this = 0x%lx\n".cstring(), i_seq_id, i_producer_id, this)
         _unsent.push(outgoing_msg)
       end
 
