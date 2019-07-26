@@ -267,7 +267,7 @@ class _DataReceiver is _DataReceiverWrapper
       ifdef "trace" then
         @printf[I32]("Received DataMsg on Data Channel\n".cstring())
       end
-      @printf[I32]("SLF: DataChannel.decode_and_process: seq_id = %lu this = 0x%lx\n".cstring(), data_msg.seq_id, this)
+      @printf[I32]("SLF: DataChannel.decode_and_process: seq_id = %lu producer_id = %lu this = 0x%lx\n".cstring(), data_msg.seq_id, data_msg.producer_id, this)
       _metrics_reporter.step_metric(data_msg.metric_name,
         "Before receive on data channel (network time)", data_msg.metrics_id,
         data_msg.latest_ts, ingest_ts)
