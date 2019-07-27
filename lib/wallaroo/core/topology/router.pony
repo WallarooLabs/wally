@@ -929,6 +929,14 @@ class val StatelessPartitionRouter is Router
     _proxies = proxies
     _steps_per_worker = steps_per_worker
     _partition_size = _workers.size() * _steps_per_worker
+    @printf[I32]("SLF: StatelessPartitionRouter.create: this = 0x%lx\n".cstring(), this)
+    @printf[I32]("SLF: StatelessPartitionRouter.create: this = 0x%lx p_id %lu\n".cstring(), this, p_id)
+    @printf[I32]("SLF: StatelessPartitionRouter.create: this = 0x%lx #workers %lu\n".cstring(), this, p_id, workers.size())
+    @printf[I32]("SLF: StatelessPartitionRouter.create: this = 0x%lx #local_partitions %lu\n".cstring(), this, local_partitions.size())
+    @printf[I32]("SLF: StatelessPartitionRouter.create: this = 0x%lx #local_partition_ids %lu\n".cstring(), this, local_partition_ids.size())
+    @printf[I32]("SLF: StatelessPartitionRouter.create: this = 0x%lx #worker_routing_ids %lu\n".cstring(), this, worker_routing_ids.size())
+    @printf[I32]("SLF: StatelessPartitionRouter.create: this = 0x%lx #proxies %lu \n".cstring(), this, proxies.size())
+    @printf[I32]("SLF: StatelessPartitionRouter.create: this = 0x%lx steps_per_worker %lu\n".cstring(), this, steps_per_worker)
 
   fun size(): USize =>
     _partition_size
