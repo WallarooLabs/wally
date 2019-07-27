@@ -966,7 +966,7 @@ class val StatelessPartitionRouter is Router
           data, key, event_ts, watermark_ts, metric_name, i_msg_uid, frac_ids)
         let proxy = _proxies(target_worker)?
         let ob = proxy.target_boundary()
-        @printf[I32]("SLF: StatelessPartitionRouter.route: forward: proxy = 0x%lx ob = 0x%lx target_worker %s w_idx %lu \n".cstring(), proxy, ob, target_worker.cstring(), w_idx)
+        @printf[I32]("SLF: StatelessPartitionRouter.route: forward: proxy = 0x%lx ob = 0x%lx target_worker %s w_idx %lu this 0x%lx\n".cstring(), proxy, ob, target_worker.cstring(), w_idx, this)
         consumer_sender.forward(msg, pipeline_time_spent, latest_ts,
           metrics_id, metric_name, worker_ingress_ts, ob)
         (false, latest_ts)
