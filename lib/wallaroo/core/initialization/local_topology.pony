@@ -797,6 +797,36 @@ actor LocalTopologyInitializer is LayoutInitializer
 
               let sink_router = MultiRouter(consume routers)
               built_routers(next_id) = sink_router
+            | let redundant_sink_builder: RedundantSinkBuilder =>
+            ////////////////////////////////////
+            // REDUNDANT SINK BUILDER
+            ////////////////////////////////////
+              let next_id = redundant_sink_builder.id()
+              let routers = recover iso Array[Router] end
+              let sink_ids = Array[RoutingId]
+              for s_id in t.routing_ids()(next_id)?.values() do
+                sink_ids.push(s_id)
+              end
+              let sink_reporter = MetricsReporter(t.name(), _worker_name,
+                _metrics_conn)
+
+              let sinks = redundant_sink_builder(_worker_name,
+                consume sink_reporter, _event_log, _is_recovering,
+                _barrier_coordinator, _checkpoint_initiator, _env, _auth,
+                _outgoing_boundaries)
+
+              for i in Range[USize](0, sinks.size()) do
+                let sink = sinks(i)?
+                let sink_id = sink_ids(i)?
+                _connections.register_disposable(sink)
+                initializables.set(sink)
+                data_routes(sink_id) = sink
+                let next_router = DirectRouter(sink_id, sink)
+                routers.push(next_router)
+              end
+
+              let sink_router = RedundantMultiRouter(consume routers)
+              built_routers(next_id) = sink_router
             | let source_data: SourceData =>
             /////////////////
             // SOURCE DATA
@@ -1012,7 +1042,8 @@ actor LocalTopologyInitializer is LayoutInitializer
   =>
     let steps = Map[RoutingId, Step]
     for r_id in routing_ids.values() do
-      let next_step = builder(r_id, _worker_name, output_router,
+      let next_step = builder(r_id, _worker_name,
+        output_router.select_based_on_producer_id(r_id),
         _metrics_conn, _event_log, _recovery_replayer, _auth, _router_registry,
         _outgoing_boundaries where is_recovering = is_recovering)
 
