@@ -1293,9 +1293,23 @@ primitive _SinkConfig
         let raw_aggregation = @PyTuple_GetItem(stage, 4)
         let aggregation = PyAggregation(raw_aggregation)
         Machida.inc_ref(raw_aggregation)
+        let ldp = recover val
+          Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(stage, 5))
+          end
+        let late_data_policy = match ldp
+          | "drop"                   => LateDataPolicy.drop()
+          | "fire-per-message"       => LateDataPolicy.fire_per_message()
+          | "place-in-oldest-window" => LateDataPolicy.place_in_oldest_window()
+          else
+            @printf[I32]("Invalid value for late_data_policy: %s\n".cstring(),
+              ldp.cstring())
+            Fail()
+            LateDataPolicy.drop()
+          end
         let windows = Wallaroo.range_windows(range)
                                 .with_slide(slide)
                                 .with_delay(delay)
+                                .with_late_data_policy(late_data_policy)
                                 .over[PyData val, PyData val, PyState](
                                   aggregation)
         pipeline = pipeline.to[PyData val](windows)
