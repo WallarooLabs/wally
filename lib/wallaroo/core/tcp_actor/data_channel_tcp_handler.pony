@@ -461,7 +461,9 @@ class DataChannelTCPHandler is TestableTCPHandler
     Resize the read buffer.
     """
     if _expect != 0 then
-      _read_buf.undefined(_expect.next_pow2().max(_next_size))
+      if (_read_buf.size() - _read_buf_offset) < _expect then
+        _read_buf.undefined(_expect.next_pow2().max(_next_size))
+      end
     else
       _read_buf.undefined(_next_size)
     end
