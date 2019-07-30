@@ -92,7 +92,7 @@ window_detector_tumbling_test_pony:
 		--sequence-sender '(0,100]' Detector '>I' key_0 \
 		--sequence-sender '(0,100]' Detector '>I' key_1 \
 		--log-level $(LOGLEVEL) \
-		--command './window_detector --window-type tumbling $(RUN_WITH_RESILIENCE)' \
+		--command './window_detector --window-type tumbling --window-late-policy fire-per-message $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -120,7 +120,7 @@ window_detector_sliding_test_pony:
 		--sequence-sender '(0,100]' Detector '>I' key_0 \
 		--sequence-sender '(0,100]' Detector '>I' key_1 \
 		--log-level $(LOGLEVEL) \
-		--command './window_detector --window-type sliding $(RUN_WITH_RESILIENCE)' \
+		--command './window_detector --window-type sliding --window-late-policy fire-per-message $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type sliding --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -137,7 +137,7 @@ window_detector_tumbling_alo_source_test_python:
 		--alo-sequence-sender key_0 '(100,200]' Detector \
 		--alo-sequence-sender key_1 '(100,200]' Detector \
 		--log-level $(LOGLEVEL) \
-		--command 'machida --application-module window_detector --source alo --window-type tumbling $(RUN_WITH_RESILIENCE)' \
+		--command 'machida --application-module window_detector --source alo --window-type tumbling --window-late-policy fire-per-message $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -153,7 +153,7 @@ window_detector_sliding_alo_source_test_python:
 		--alo-sequence-sender key_0 '(100,200]' Detector \
 		--alo-sequence-sender key_1 '(100,200]' Detector \
 		--log-level $(LOGLEVEL) \
-		--command 'machida --application-module window_detector --source alo --window-type sliding $(RUN_WITH_RESILIENCE)' \
+		--command 'machida --application-module window_detector --source alo --window-type sliding --window-late-policy fire-per-message $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type sliding --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -183,7 +183,7 @@ window_detector_tumbling_test_python:
 		--sequence-sender '(0,100]' Detector '>I' key_0 \
 		--sequence-sender '(0,100]' Detector '>I' key_1 \
 		--log-level $(LOGLEVEL) \
-		--command 'machida --application-module window_detector --window-type tumbling $(RUN_WITH_RESILIENCE)' \
+		--command 'machida --application-module window_detector --window-type tumbling --window-late-policy fire-per-message $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -211,7 +211,7 @@ window_detector_sliding_test_python:
 		--sequence-sender '(0,100]' Detector '>I' key_0 \
 		--sequence-sender '(0,100]' Detector '>I' key_1 \
 		--log-level $(LOGLEVEL) \
-		--command 'machida --application-module window_detector --window-type sliding $(RUN_WITH_RESILIENCE)' \
+		--command 'machida --application-module window_detector --window-type sliding --window-late-policy fire-per-message $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type sliding --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -223,7 +223,7 @@ window_detector_tumbling_gensource_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
 		--log-level $(LOGLEVEL) \
-		--command 'machida --application-module window_detector --source gensource --window-type tumbling $(RUN_WITH_RESILIENCE)' \
+		--command 'machida --application-module window_detector --source gensource --window-type tumbling --window-late-policy fire-per-message $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -247,7 +247,7 @@ window_detector_sliding_gensource_test_python:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
 		--log-level $(LOGLEVEL) \
-		--command 'machida --application-module window_detector --source gensource --window-type sliding $(RUN_WITH_RESILIENCE)' \
+		--command 'machida --application-module window_detector --source gensource --window-type sliding --window-late-policy fire-per-message $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type sliding --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -264,7 +264,7 @@ window_detector_tumbling_alo_source_test_python3:
 		--alo-sequence-sender key_0 '(100, 200]' Detector \
 		--alo-sequence-sender key_1 '(100, 200]' Detector \
 		--log-level $(LOGLEVEL) \
-		--command 'machida3 --application-module window_detector --source alo --window-type tumbling $(RUN_WITH_RESILIENCE)' \
+		--command 'machida3 --application-module window_detector --source alo --window-type tumbling --window-late-policy fire-per-message $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -280,7 +280,7 @@ window_detector_sliding_alo_source_test_python3:
 		--alo-sequence-sender key_0 '(100, 200]' Detector \
 		--alo-sequence-sender key_1 '(100, 200]' Detector \
 		--log-level $(LOGLEVEL) \
-		--command 'machida3 --application-module window_detector --source alo --window-type sliding $(RUN_WITH_RESILIENCE)' \
+		--command 'machida3 --application-module window_detector --source alo --window-type sliding --window-late-policy fire-per-message $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _validate.py --window-type sliding --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -310,7 +310,7 @@ window_detector_tumbling_test_python3:
 		--sequence-sender '(0,100]' Detector '>I' key_0 \
 		--sequence-sender '(0,100]' Detector '>I' key_1 \
 		--log-level $(LOGLEVEL) \
-		--command 'machida3 --application-module window_detector --window-type tumbling $(RUN_WITH_RESILIENCE)' \
+		--command 'machida3 --application-module window_detector --window-type tumbling --window-late-policy fire-per-message $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python3 _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -338,7 +338,7 @@ window_detector_sliding_test_python3:
 		--sequence-sender '(0,100]' Detector '>I' key_0 \
 		--sequence-sender '(0,100]' Detector '>I' key_1 \
 		--log-level $(LOGLEVEL) \
-		--command 'machida3 --application-module window_detector --window-type sliding $(RUN_WITH_RESILIENCE)' \
+		--command 'machida3 --application-module window_detector --window-type sliding --window-late-policy fire-per-message $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python3 _validate.py --window-type sliding --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -350,7 +350,7 @@ window_detector_tumbling_gensource_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
 		--log-level $(LOGLEVEL) \
-		--command 'machida3 --application-module window_detector --source gensource --window-type tumbling $(RUN_WITH_RESILIENCE)' \
+		--command 'machida3 --application-module window_detector --source gensource --window-type tumbling --window-late-policy fire-per-message $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python3 _validate.py --window-type tumbling --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
@@ -374,7 +374,7 @@ window_detector_sliding_gensource_test_python3:
 	cd $(WINDOW_DETECTOR_PATH) && \
 	integration_test \
 		--log-level $(LOGLEVEL) \
-		--command 'machida3 --application-module window_detector --source gensource --window-type sliding $(RUN_WITH_RESILIENCE)' \
+		--command 'machida3 --application-module window_detector --source gensource --window-type sliding --window-late-policy fire-per-message $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python3 _validate.py --window-type sliding --output' \
 		--output 'received.txt' \
 		--batch-size 50 \
