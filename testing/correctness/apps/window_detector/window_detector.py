@@ -38,8 +38,8 @@ def application_setup(args):
     parser.add_argument("--window-slide", type=int, default=25,
                         help=("Window slide size, in milliseconds. "
                               "(Default: 25)"))
-    parser.add_argument("--window-policy", default="drop",
-                        choices=["drop", "fire-per-message"])
+    parser.add_argument("--window-late-policy", default="drop",
+                        choices=["drop", "fire-per-message", "place-in-oldest-window"])
     parser.add_argument("--source", choices=['tcp', 'gensource', 'alo'],
                          default='tcp',
                          help=("Choose source type for resilience tests. "
@@ -93,6 +93,14 @@ def application_setup(args):
         if pargs.window_type == 'sliding':
             print("Using window_slide: {} ms".format(pargs.window_slide))
             window = window.with_slide(wallaroo.milliseconds(pargs.window_slide))
+        if pargs.window_late_policy:
+            ## NOTE: The Wallaroo default policy for late window data is "drop".
+            ##       However, it's quite likely that that policy can cause
+            ##       intermittent test failures.
+            if pargs.window_late_policy == "drop":
+                print("\n\nWARNING: drop policy can cause intermittent test failures!\n\n")
+            print("Using window_late_policy: {}".format(pargs.window_late_policy))
+            window = window.with_late_data_policy(pargs.window_late_policy)
     # add the window to the topology
     p = p.to(window.over(Collect))
 

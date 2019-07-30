@@ -114,7 +114,8 @@ class Pipeline(object):
                                            computation.range,
                                            computation.slide,
                                            computation.delay,
-                                           computation.aggregation))
+                                           computation.aggregation,
+                                           computation.late_data_policy))
         elif isinstance(computation, CountWindows):
             self._pipeline_tree.add_stage(("to_count_windows",
                                            computation.count,
@@ -763,6 +764,7 @@ class RangeWindowsBuilder(object):
         self.delay = None
         self.default_slide = self.range
         self.default_delay = 0
+        self.late_data_policy = ""
 
     def with_slide(self, slide):
         if self.slide is None:
@@ -780,6 +782,14 @@ class RangeWindowsBuilder(object):
             raise WallarooParameterError()
         return self
 
+    def with_late_data_policy(self, late_data_policy):
+        if self.late_data_policy is "":
+            self.late_data_policy = late_data_policy
+        else:
+            print("API_Error: Only call `with_late_data_policy()` once per window specification.")
+            raise WallarooParameterError()
+        return self
+
     def over(self, aggregation_cls):
         if self.slide is None:
             slide = self.range
@@ -791,17 +801,24 @@ class RangeWindowsBuilder(object):
         else:
             delay = self.delay
 
-        return RangeWindows(self.range, slide, delay, aggregation_cls())
+        if self.late_data_policy is "":
+            late_data_policy = "drop"
+        else:
+            late_data_policy = self.late_data_policy
+
+        return RangeWindows(self.range, slide, delay, aggregation_cls(),
+                            late_data_policy)
 
 
 
 class RangeWindows(object):
-    def __init__(self, wrange, slide, delay, agg):
+    def __init__(self, wrange, slide, delay, agg, late):
         self.range = wrange
         self.slide = slide
         self.delay = delay
         _validate_aggregation(agg)
         self.aggregation = agg
+        self.late_data_policy = late
 
 
 class CountWindowsBuilder(object):
