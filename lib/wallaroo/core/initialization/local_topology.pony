@@ -604,8 +604,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   let routers = recover iso Array[Router] end
                   for id in out_ids.values() do
                     try
-                      routers.push(built_routers(id)?
-                        .select_based_on_producer_id(node_id))
+                      routers.push(built_routers(id)?)
                     else
                       @printf[I32]("No router found to target\n".cstring())
                       error
@@ -849,8 +848,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   let routers = recover iso Array[Router] end
                   for id in out_ids.values() do
                     try
-                      routers.push(built_routers(id)?
-                        .select_based_on_producer_id(next_id))
+                      routers.push(built_routers(id)?)
                     else
                       @printf[I32]("No router found to target\n".cstring())
                       error
