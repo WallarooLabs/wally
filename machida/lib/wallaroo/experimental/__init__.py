@@ -296,7 +296,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             self.handle_restart(msg)
         # messages that should only go connector->wallaroo
         # Notify, Hello, Message
-        elif isinstance(msg, (cwm.Hello, cwm.Message, cwm.Notify)):
+        elif isinstance(msg, (cwm.Hello, cwm.Message, cwm.EosMessage, cwm.Notify)):
             # send error to wallaroo then shutdown and raise a protocol
             # exception
             try:
@@ -485,13 +485,13 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             self._write(data)
             # use up 1 credit
             self.credits -= 1
-        elif isinstance(msg, cwm.Error):
+        elif isinstance(msg, (cwm.EosMessage, cwm.Error)):
             # write the message
             data = cwm.Frame.encode(msg)
             self._write(data)
         else:
-            raise ProtocolError("Can only send message types {{Hello, Notify, "
-                                "Message, Error}}. Received {}".format(msg))
+            raise ProtocolError("Can only send message types {{Notify, "
+                                "Message, EosMessage, Error}}. Received {}".format(msg))
 
     def _write(self, data):
         """
@@ -577,54 +577,19 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                               new.name,
                               new.point_of_ref))
 
-    def end_of_stream(self, stream_id, point_of_ref, event_time=None,
-                      key=None):
+    def end_of_stream(self, stream_id):
         """
-        Send an EOS message for a stream_id and point_of_ref,
-        with an optional key and event_time.
-        event_time must be either a datetime or a float of seconds since
-        epoch (it may be negtive for dates before 1970-1-1)
+        Send an EOS message for a stream_id.
         """
         # TODO: Wallaroo needs to ack and connector should implement a
         # stream_ended(stream) method.
         # Without this, there is a race condition around end of streams and
         # restarts which can result in the tail end of a stream not being resent
         # if it was EOSd before a restart, but the rollback is to before the EOS.
-        flags = cwm.Message.Eos | cwm.Message.Ephemeral
-        if event_time is not None:
-            flags |= cwm.Message.EventTime
-            if isinstance(event_time, datetime):
-                ts = dt_to_timestamp(event_time)
-            elif isinstance(event_time, (int, float)):
-                ts = event_time
-            else:
-                raise ProtocolError("Event_time must be a datetime or a float")
-        else:
-            ts = None
-        if key:
-            flags |= cw.Message.key
-            if isinstance(key, bytes):
-                en_key = key
-            else:
-                en_key = key.encode()
-        else:
-            en_key = None
-        msg = cwm.Message(
-            stream_id = stream_id,
-            flags = flags,
-            message_id = None,
-            event_time = ts,
-            key = en_key,
-            message = None)
-        logging.info("Sending End of Stream {} for point_of_ref : {}"
-                     .format(msg, point_of_ref))
+        msg = cwm.EosMessage(
+            stream_id = stream_id)
+        logging.info("Sending End of Stream {}".format(msg))
         self.write(msg)
-        # this isn't used currently.
-        # see connectors.py:MultiSourceConnector for an example implementing
-        # its own eos handler.
-        # perhaps we should push it down here and make stream_eos_ack its own
-        # method.
-        #self._pending_eos[stream_id] = point_of_ref
 
     ###########################
     # User extensible methods #

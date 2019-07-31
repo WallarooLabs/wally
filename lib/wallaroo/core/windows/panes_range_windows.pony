@@ -147,7 +147,7 @@ class _PanesSlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
         match _late_data_policy
         | LateDataPolicy.drop() =>
           ifdef debug then
-            @printf[I32]("Event ts %s is earlier than earliest window %s. Ignoring\n".cstring(), event_ts.string().cstring(), earliest_ts.string().cstring())
+            @printf[I32]("Event ts %s is earlier than earliest window %s for key %s. Ignoring\n".cstring(), event_ts.string().cstring(), earliest_ts.string().cstring(), _key.cstring())
           end
         | LateDataPolicy.fire_per_message() =>
           let acc = _agg.initial_accumulator()

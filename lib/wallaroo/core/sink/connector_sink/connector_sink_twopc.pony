@@ -27,12 +27,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use "wallaroo/core/barrier"
 use "wallaroo/core/checkpoint"
-use cp = "wallaroo_labs/connector_protocol"
+use "wallaroo_labs/connector_protocol"
+use cwm = "wallaroo_labs/connector_wire_messages"
 use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 
 class ConnectorSink2PC
-  var state: cp.TwoPCFsmState = cp.TwoPCFsmStart
+  var state: TwoPCFsmState = TwoPCFsmStart
   var txn_id: String = ""
   var txn_id_at_close: String = ""
   var barrier_token_initial: CheckpointBarrierToken = CheckpointBarrierToken(0)
@@ -53,42 +54,42 @@ class ConnectorSink2PC
     current_offset = current_offset + encoded1_len
 
   fun ref reset_state() =>
-    state = cp.TwoPCFsmStart
+    state = TwoPCFsmStart
     txn_id = ""
     barrier_token = CheckpointBarrierToken(0)
-    @ll(_twopc_debug, "2PC: reset 2PC state\n".cstring())
-    @ll(_twopc_debug, "2PC: set 2PC state => %d\n".cstring(), state())
+    @ll(_twopc_debug, "2PC: reset 2PC state".cstring())
+    @ll(_twopc_debug, "2PC: set 2PC state => %d".cstring(), state())
 
   fun state_is_start(): Bool =>
-    state is cp.TwoPCFsmStart
+    state is TwoPCFsmStart
 
   fun state_is_1precommit(): Bool =>
-    state is cp.TwoPCFsm1Precommit
+    state is TwoPCFsm1Precommit
 
   fun state_is_2commit(): Bool =>
-    state is cp.TwoPCFsm2Commit
+    state is TwoPCFsm2Commit
 
   fun state_is_2commit_fast(): Bool =>
-    state is cp.TwoPCFsm2CommitFast
+    state is TwoPCFsm2CommitFast
 
   fun ref set_state_commit() =>
-    state = cp.TwoPCFsm2Commit
-    @ll(_twopc_debug, "2PC: set 2PC state => %d\n".cstring(), state())
+    state = TwoPCFsm2Commit
+    @ll(_twopc_debug, "2PC: set 2PC state => %d".cstring(), state())
 
   fun ref set_state_commit_fast() =>
-    state = cp.TwoPCFsm2CommitFast
-    @ll(_twopc_debug, "2PC: set 2PC state => %d\n".cstring(), state())
+    state = TwoPCFsm2CommitFast
+    @ll(_twopc_debug, "2PC: set 2PC state => %d".cstring(), state())
 
   fun ref set_state_abort() =>
-    state = cp.TwoPCFsm2Abort
-    @ll(_twopc_debug, "2PC: set 2PC state => %d\n".cstring(), state())
+    state = TwoPCFsm2Abort
+    @ll(_twopc_debug, "2PC: set 2PC state => %d".cstring(), state())
 
   fun ref preemptive_txn_abort(sbt: CheckpointBarrierToken) =>
     txn_id = "preemptive txn abort"
     barrier_token = sbt
 
   fun ref barrier_complete(sbt: CheckpointBarrierToken):
-    (None | cp.MessageMsg)
+    (None | cwm.MessageMsg)
   =>
     if state_is_start() then
       if (current_offset > 0) and
@@ -98,23 +99,19 @@ class ConnectorSink2PC
         return None
       end
 
-      state = cp.TwoPCFsm1Precommit
+      state = TwoPCFsm1Precommit
       txn_id = make_txn_id_string(sbt.id)
       barrier_token = sbt
       current_txn_end_offset = current_offset
     else
-      @ll(_twopc_err, "2PC: ERROR: _twopc.state = %d\n".cstring(), state())
+      @ll(_twopc_err, "2PC: ERROR: _twopc.state = %d".cstring(), state())
       Fail()
     end
 
-    let where_list: cp.WhereList =
+    let where_list: cwm.WhereList =
       [(1, last_offset.u64(), current_offset.u64())]
-    let bs = cp.TwoPCEncode.phase1(txn_id, where_list)
-    try
-      cp.MessageMsg(0, cp.Ephemeral(), 0, 0, None, [bs])?
-     else
-      Fail()
-    end
+    let bs = TwoPCEncode.phase1(txn_id, where_list)
+    cwm.MessageMsg(0, 0, 0, None, bs)
 
   fun ref checkpoint_complete(sink: ConnectorSink ref, drop_phase2_msg: Bool) =>
     if (not ((state_is_2commit()) or
@@ -127,7 +124,7 @@ class ConnectorSink2PC
         // catch up, we'll be in this case, which is ok.
         None
       else
-        @ll(_twopc_err, "2PC: DBG: _twopc.state = %s,\n".cstring(), state().string().cstring())
+        @ll(_twopc_err, "2PC: DBG: _twopc.state = %s,".cstring(), state().string().cstring())
         Fail()
       end
     end
@@ -148,7 +145,7 @@ class ConnectorSink2PC
   fun ref hard_close() =>
     txn_id_at_close = txn_id
     barrier_token_at_close = barrier_token
-    @ll(_twopc_debug, "2PC: DBG: hard_close: state = %s, txn_id_at_close = %s, barrier_token_at_close = %s\n".cstring(), state().string().cstring(), txn_id_at_close.cstring(), barrier_token_at_close.string().cstring())
+    @ll(_twopc_debug, "2PC: DBG: hard_close: state = %s, txn_id_at_close = %s, barrier_token_at_close = %s".cstring(), state().string().cstring(), txn_id_at_close.cstring(), barrier_token_at_close.string().cstring())
     // Do not reset_state() here.  Wait (typically) until 2PC intro is done.
 
   fun make_txn_id_string(checkpoint_id: CheckpointId): String =>
@@ -165,7 +162,7 @@ class ConnectorSink2PC
 
       sink.abort_decision("TCP connection closed during 2PC",
         txn_id_at_close, barrier_token_at_close)
-      @ll(_twopc_debug, "2PC: Wallaroo local abort for txn_id %s barrier %s\n".cstring(), txn_id_at_close.cstring(), barrier_token_at_close.string().cstring())
+      @ll(_twopc_debug, "2PC: Wallaroo local abort for txn_id %s barrier %s".cstring(), txn_id_at_close.cstring(), barrier_token_at_close.string().cstring())
 
       // SLF TODO: if we disconnected, then that txn will be aborted
       // by other parts of the system, e.g c_id=5.  However, we
@@ -181,11 +178,11 @@ class ConnectorSink2PC
 
   fun ref twopc_phase1_reply(txn_id': String, commit: Bool): Bool =>
     if not state_is_1precommit() then
-      @ll(_twopc_err, "2PC: ERROR: twopc_reply: _twopc.state = %d\n".cstring(), state())
+      @ll(_twopc_err, "2PC: ERROR: twopc_reply: _twopc.state = %d".cstring(), state())
       Fail()
     end
     if txn_id' != txn_id then
-      @ll(_twopc_err, "2PC: ERROR: twopc_reply: txn_id %s != %s\n".cstring(),
+      @ll(_twopc_err, "2PC: ERROR: twopc_reply: txn_id %s != %s".cstring(),
         txn_id'.cstring(), txn_id.cstring())
       Fail()
     end
@@ -195,7 +192,7 @@ class ConnectorSink2PC
       // voted to commit. It does not mean that we know
       // the status of the global Wallaroo checkpoint protocol.
       set_state_commit()
-      @ll(_twopc_debug, "2PC: txn_id %s was %s\n".cstring(), txn_id'.cstring(), commit.string().cstring())
+      @ll(_twopc_debug, "2PC: txn_id %s was %s".cstring(), txn_id'.cstring(), commit.string().cstring())
       true
     else
       set_state_abort()
@@ -204,11 +201,7 @@ class ConnectorSink2PC
 
   fun send_phase2(sink: ConnectorSink ref, commit: Bool)
   =>
-    let b: Array[U8] val = cp.TwoPCEncode.phase2(txn_id, commit)
-    try
-      let msg: cp.MessageMsg = cp.MessageMsg(0, cp.Ephemeral(), 0, 0, None, [b])?
-       sink.send_msg(sink, msg)
-     else
-       Fail()
-    end
-    @ll(_twopc_debug, "2PC: sent phase 2 commit=%s for txn_id %s\n".cstring(), commit.string().cstring(), txn_id.cstring())
+    let bs: Array[U8] val = TwoPCEncode.phase2(txn_id, commit)
+    let msg: cwm.MessageMsg = cwm.MessageMsg(0, 0, 0, None, bs)
+    sink.send_msg(sink, msg)
+    @ll(_twopc_debug, "2PC: sent phase 2 commit=%s for txn_id %s".cstring(), commit.string().cstring(), txn_id.cstring())

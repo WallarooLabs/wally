@@ -17,6 +17,7 @@ Copyright 2019 The Wallaroo Authors.
 */
 
 use "buffered"
+use cwm = "wallaroo_labs/connector_wire_messages"
 
 type TwoPCFsmState is (TwoPCFsmStart |
   TwoPCFsm1Precommit |
@@ -38,16 +39,16 @@ primitive TwoPCFsm2Abort
 primitive TwoPCEncode
   fun list_uncommitted(rtag: U64): Array[U8] val =>
     let wb: Writer = wb.create()
-    let m = ListUncommittedMsg(rtag)
-    TwoPCFrame.encode(m, wb)
+    let m = cwm.ListUncommittedMsg(rtag)
+    cwm.TwoPCFrame.encode(m, wb)
 
-  fun phase1(txn_id: String, where_list: WhereList): Array[U8] val =>
+  fun phase1(txn_id: String, where_list: cwm.WhereList): Array[U8] val =>
     let wb: Writer = wb.create()
-    let m = TwoPCPhase1Msg(txn_id, where_list)
-    TwoPCFrame.encode(m, wb)
+    let m = cwm.TwoPCPhase1Msg(txn_id, where_list)
+    cwm.TwoPCFrame.encode(m, wb)
 
   fun phase2(txn_id: String, commit: Bool): Array[U8] val =>
     let wb: Writer = wb.create()
-    let m = TwoPCPhase2Msg(txn_id, commit)
-    TwoPCFrame.encode(m, wb)
+    let m = cwm.TwoPCPhase2Msg(txn_id, commit)
+    cwm.TwoPCFrame.encode(m, wb)
 

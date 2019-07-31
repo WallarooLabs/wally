@@ -215,9 +215,8 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                 # Add it to the set of sources pending closing
                 point_of_ref = source.point_of_ref()
                 self.pending_eos_ack[_id] = point_of_ref
-                # send end of stream
-                self.end_of_stream(stream_id = _id,
-                                   point_of_ref = point_of_ref)
+                # send end of stream/EOS message
+                self.end_of_stream(stream_id = _id) # aka EosMessage
 
     def _close_and_delete_source(self, source):
         key = self.get_id(source.name)
@@ -277,8 +276,8 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
                 # send it as a message
                 msg = cwm.Message(
                     stream_id = key,
-                    flags = cwm.Message.Key,
                     message_id = point_of_ref,
+                    event_time = 0,
                     key = source.key,
                     message = value)
                 return msg
@@ -365,7 +364,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
             # check if there's an eos pending this ack
             eos_point_of_ref = self.pending_eos_ack.get(stream.id, None)
             if eos_point_of_ref:
-                logging.debug("Stream {} is awaiting EOS Ack for {}"
+                logging.debug("Stream {} got awaited EOS Ack for {}"
                               .format(stream, eos_point_of_ref))
                 # source was pending eos ack
                 # check ack's point of ref

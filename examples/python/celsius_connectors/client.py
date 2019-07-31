@@ -34,8 +34,8 @@ for x in range(10):
     try:
         client.write(cwm.Message(
             stream_id = x,
-            flags = 0,
             message_id = x*10,
+            event_time = 0,
             message = "Hello from stream_id {}, message_id {}".format(
                 x, x*10)))
         time.sleep(.1)
