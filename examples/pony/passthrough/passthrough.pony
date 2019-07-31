@@ -38,13 +38,33 @@ actor Main
                   where parallelism' = 64))
 
           inputs
+            .local_key_by(RoundRobin)
+            // .to[None](NoOp where parallelism = 50)
+            .to[Array[U8] val](AsIs where parallelism = 50)
             .to_sink(TCPSinkConfig[InputBlob].from_options(
-              InputBlobEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
+              InputBlobEncoder, TCPSinkConfigCLIParser(env.args)?(0)?)
+              where parallelism = 17)
         end
       Wallaroo.build_application(env, "Passthrough", pipeline)
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end
+
+primitive RoundRobin
+  fun apply(input: Any): Key =>
+    String.from_array([ @ponyint_cpu_tick[U64]().u8() ])
+
+primitive NoOp is StatelessComputation[Array[U8] val, I8]
+  fun name(): String => "NoOp"
+
+  fun apply(input: Array[U8] val): (I8 | None) =>
+    None
+
+primitive AsIs is StatelessComputation[Array[U8] val, Array[U8] val]
+  fun name(): String => "NoOp"
+
+  fun apply(input: Array[U8] val): (Array[U8] val | None) =>
+    input
 
 primitive InputBlobDecoder is FramedSourceHandler[InputBlob]
   fun header_length(): USize => 4

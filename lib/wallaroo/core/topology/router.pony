@@ -294,7 +294,7 @@ class val RedundantMultiRouter is Router
 
   fun val select_based_on_producer_id(producer_id: RoutingId): Router =>
     let idx = producer_id.usize() % _routers.size()
-    @printf[I32]("!@ select_based_on_producer_id: got p_id %s, chose idx %s\n".cstring(), producer_id.string().cstring(), idx.string().cstring())
+    @printf[I32]("!@ select_based_on_producer_id: got p_id %s, chose idx %s out of %s in #_routers\n".cstring(), producer_id.string().cstring(), idx.string().cstring(), _routers.size().string().cstring())
     try
       _routers(idx)?
     else
