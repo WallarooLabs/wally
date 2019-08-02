@@ -1090,7 +1090,9 @@ actor ConnectorSink is Sink
     Resize the read buffer.
     """
     if _expect != 0 then
-      _read_buf.undefined(_expect)
+      if (_read_buf.size() - _read_len) < _expect then
+        _read_buf.undefined(_expect.next_pow2().max(_next_size))
+      end
     else
       _read_buf.undefined(_next_size)
     end

@@ -556,7 +556,10 @@ class SourceTCPHandler is TestableTCPHandler
     Resize the read buffer.
     """
     if _expect != 0 then
-      _read_buf.undefined(_expect.next_pow2().max(_init_size))
+      if (_read_buf.size() - _read_buf_offset) < _expect then
+        // This source doesn't have a _next_size; _init_size is a var.
+        _read_buf.undefined(_expect.next_pow2().max(_init_size))
+      end
     else
       _read_buf.undefined(_init_size)
     end

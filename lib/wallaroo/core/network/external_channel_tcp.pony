@@ -108,8 +108,14 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
         let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?)
           .usize()
         if expect > 0 then
-          conn.expect(expect)?
-          _header = false
+          try
+            conn.expect(expect)?
+            _header = false
+          else
+            conn.dispose()
+            @printf[I32](("Received expect greater than 16kb on External " +
+              "Channel\n").cstring())
+          end
         else
           conn.expect(4)?
           _header = true
