@@ -12,7 +12,7 @@ jobs:
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
-      - run: changelog-tool verify CHANGELOG.md
+      - run: changelog-tool verify
 
   unit-tests:
     executor: wallaroo-ci

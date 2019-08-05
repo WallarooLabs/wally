@@ -47,7 +47,7 @@ check_for_local_only_changes() {
 
 verify_changelog() {
   echo "Verifying CHANGELOG..."
-  changelog_verify_result=$(changelog-tool verify CHANGELOG.md)
+  changelog_verify_result=$(changelog-tool verify)
   if [[ $changelog_verify_result != *"CHANGELOG.md is a valid changelog"* ]]
   then
     echo "CHANGELOG is not valid, make sure it is valid prior to running this script."
@@ -97,7 +97,7 @@ commit_version_update() {
 update_version_in_changelog() {
   echo "Updating version in CHANGELOG..."
   ## Updates the unreleased section to the version provided
-  changelog-tool release CHANGELOG.md "$for_version" -e
+  changelog-tool release "$for_version" -e
 }
 
 commit_changelog_update() {
