@@ -52,7 +52,7 @@ You may run into conflicts with the `CHANGELOG` when merging. You'd want to ensu
 If the `Unreleased` section is missing, it can be added using the [changelog tool](https://github.com/ponylang/changelog-tool), like so:
 
 ```bash
-changelog-tool unreleased CHANGELOG.md -e
+changelog-tool unreleased -e
 ```
 ## Pushing to `master`
 
