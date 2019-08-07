@@ -46,6 +46,8 @@ trait val Router is (Hashable & Equatable[Router])
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   fun routes(): Map[RoutingId, Consumer] val
   fun routes_not_in(router: Router): Map[RoutingId, Consumer] val
+  //!@
+  fun val select_based_on_producer_id(producer_id: RoutingId): Router => this
 
 primitive EmptyRouter is Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
@@ -224,6 +226,79 @@ class val MultiRouter is Router
       h
     else
       0
+    end
+
+//!@
+class val RedundantMultiRouter is Router
+  let _routers: Array[Router] val
+
+  new val create(routers: Array[Router] val) =>
+    _routers = routers
+    ifdef debug then
+      for r in _routers.values() do
+        Invariant(
+          match r
+          | let mr: MultiRouter => false
+          else true end
+        )
+      end
+    end
+
+  fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
+    key: Key, event_ts: U64, watermark_ts: U64,
+    consumer_sender: TestableConsumerSender,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
+  =>
+    Fail()
+    (false, 0)
+
+  fun routes(): Map[RoutingId, Consumer] val =>
+    Fail()
+    recover Map[RoutingId, Consumer] end
+
+  fun routes_not_in(router: Router): Map[RoutingId, Consumer] val =>
+    Fail()
+    recover Map[RoutingId, Consumer] end
+
+  fun eq(that: box->Router): Bool =>
+    match that
+    | let mr: RedundantMultiRouter =>
+      try
+        let theirs = mr._routers
+        if _routers.size() != theirs.size() then return false end
+        var is_equal = true
+        for i in Range(0, _routers.size()) do
+          if _routers(i)? != theirs(i)? then is_equal = false end
+        end
+        is_equal
+      else
+        false
+      end
+    else
+      false
+    end
+
+  fun hash(): USize =>
+    try
+      var h = _routers(0)?.hash()
+      if _routers.size() > 1 then
+        for i in Range(1, _routers.size()) do
+          h = h xor _routers(i)?.hash()
+        end
+      end
+      h
+    else
+      0
+    end
+
+  fun val select_based_on_producer_id(producer_id: RoutingId): Router =>
+    let idx = producer_id.usize() % _routers.size()
+    try
+      _routers(idx)?
+    else
+      Fail()
+      this
     end
 
 class val ProxyRouter is Router

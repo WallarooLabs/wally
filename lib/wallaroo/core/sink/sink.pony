@@ -39,7 +39,7 @@ trait tag Sink is (Consumer & DisposableActor & BarrierProcessor)
     None
 
 interface val SinkConfig[Out: Any val]
-  fun apply(): SinkBuilder
+  fun apply(parallelism: USize): SinkBuilder
 
 interface val SinkBuilder
   fun apply(sink_name: String, event_log: EventLog,
@@ -47,3 +47,5 @@ interface val SinkBuilder
     barrier_coordinator: BarrierCoordinator,
     checkpoint_initiator: CheckpointInitiator, recovering: Bool,
     worker_name: WorkerName, auth: AmbientAuth): Sink
+
+  fun parallelism(): USize

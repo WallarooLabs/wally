@@ -32,10 +32,10 @@ class ConsumerSender is TestableConsumerSender
   let _producer: Producer ref
   let _metrics_reporter: MetricsReporter
 
-  new create(producer_id: RoutingId, producer: Producer ref,
+  new create(producer_id': RoutingId, producer: Producer ref,
     metrics_reporter: MetricsReporter iso)
   =>
-    _producer_id = producer_id
+    _producer_id = producer_id'
     _producer = producer
     _metrics_reporter = consume metrics_reporter
 
@@ -107,3 +107,5 @@ class ConsumerSender is TestableConsumerSender
   fun ref update_output_watermark(w: U64): (U64, U64) =>
     _producer.update_output_watermark(w)
 
+  fun producer_id(): RoutingId =>
+    _producer_id

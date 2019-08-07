@@ -41,3 +41,6 @@ class MockConsumerSender[V: Any val] is TestableConsumerSender
 
   fun ref update_output_watermark(w: U64): (U64, U64) =>
     (0, 0)
+
+  fun producer_id(): RoutingId =>
+    0
