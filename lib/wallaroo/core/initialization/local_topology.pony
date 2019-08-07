@@ -604,8 +604,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   let routers = recover iso Array[Router] end
                   for id in out_ids.values() do
                     try
-                      routers.push(built_routers(id)?
-                        .select_based_on_producer_id(node_id))
+                      routers.push(built_routers(id)?)
                     else
                       @printf[I32]("No router found to target\n".cstring())
                       error
@@ -849,8 +848,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   let routers = recover iso Array[Router] end
                   for id in out_ids.values() do
                     try
-                      routers.push(built_routers(id)?
-                        .select_based_on_producer_id(next_id))
+                      routers.push(built_routers(id)?)
                     else
                       @printf[I32]("No router found to target\n".cstring())
                       error
@@ -1044,8 +1042,8 @@ actor LocalTopologyInitializer is LayoutInitializer
   =>
     let steps = Map[RoutingId, Step]
     for r_id in routing_ids.values() do
-      let next_step = builder(r_id, _worker_name,
-        output_router.select_based_on_producer_id(r_id),
+      let next_router = output_router.select_based_on_producer_id(r_id)
+      let next_step = builder(r_id, _worker_name, next_router,
         _metrics_conn, _event_log, _recovery_replayer, _auth, _router_registry,
         _outgoing_boundaries where is_recovering = is_recovering)
 
