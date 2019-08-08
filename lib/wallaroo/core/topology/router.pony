@@ -46,7 +46,6 @@ trait val Router is (Hashable & Equatable[Router])
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   fun routes(): Map[RoutingId, Consumer] val
   fun routes_not_in(router: Router): Map[RoutingId, Consumer] val
-  //!@
   fun val select_based_on_producer_id(producer_id: RoutingId): Router => this
 
 primitive EmptyRouter is Router
@@ -228,8 +227,15 @@ class val MultiRouter is Router
       0
     end
 
-//!@
 class val RedundantMultiRouter is Router
+  """
+  A router that holds an array of routers to instances representing the same
+  stage that only exist to increase parallelism. This is currently used for a
+  single case: when there are more than one sink for a pipeline on a given
+  worker. We use this router to assign different redundant sinks to the
+  steps in the immediate upstream stage by calling
+  `select_based_on_producer_id()`.
+  """
   let _routers: Array[Router] val
 
   new val create(routers: Array[Router] val) =>
