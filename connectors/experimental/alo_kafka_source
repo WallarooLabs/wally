@@ -1,0 +1,95 @@
+#!/usr/bin/env python
+import argparse
+import logging
+
+from wallaroo.experimental.connectors import (BaseIter,
+                                              BaseSource,
+                                              MultiSourceConnector)
+
+from kafka import (KafkaConsumer, TopicPartition)
+
+class KafkaSourceReader(BaseIter, BaseSource):
+    """
+    A Kafka Consumer Source iterator with a resettable position.
+
+    Note: This source is experimental and is not in a stable state
+    for use in production.
+    """
+    def __init__(self, topic, partition, bootstrap_servers):
+        self.topic = topic
+        self.partition = partition
+        self.bootstrap_servers = bootstrap_servers
+        self.consumer = KafkaConsumer(bootstrap_servers=bootstrap_servers)
+        self.topic_partition = TopicPartition(topic, partition)
+        self.consumer.assign([self.topic_partition])
+        self.name = str(partition).encode()
+        self.key = str(partition).encode()
+
+    def __str__(self):
+        return("KafkaConsumerSource(topic: {}, partition: {}, point_of_ref: {})"
+            .format(self.topic, self.partition, self.point_of_ref()))
+
+    def point_of_ref(self):
+        try:
+            return self.consumer.position(self.topic_partition)
+        except:
+            return -1
+
+    def reset(self, pos=0):
+        logging.debug("resetting {} from {} to position {}"
+            .format(self.__str__(), self.point_of_ref(), pos))
+        self.consumer.seek(self.topic_partition, pos)
+
+    def __next__(self):
+        record = self.consumer.__next__()
+        return (record.value, record.offset)
+
+    def close(self):
+        self.consumer.close()
+
+    def __del__(self):
+        try:
+            self.close()
+        except:
+            pass
+
+parser = argparse.ArgumentParser("ALO Kafka Source Connector")
+
+parser.add_argument("--host", required=True)
+parser.add_argument("--port", required=True)
+parser.add_argument("--topic", required=True)
+parser.add_argument("--bootstrap_servers", default="127.0.0.1:9092")
+parser.add_argument("--version". default="0.0.1")
+parser.add_argument("--cookie", default="cookie")
+
+args = parser.parse_args()
+
+host = args.host
+port = args.port
+topic = args.topic
+bootstrap_servers = args.bootstrap_servers
+
+version = args.version
+cookie = args.cookie
+
+consumer = KafkaConsumer(topic, bootstrap_servers=bootstrap_servers)
+# Hack to get info for partitions for this topic
+consumer.topics()
+partitions = consumer.partitions_for_topic(topic)
+sources = set()
+
+for partition in partitions:
+        source = KafkaSourceReader(topic, partition, bootstrap_servers)
+        sources.add(source)
+
+client = MultiSourceConnector(
+        version,
+        cookie,
+        "program_name",
+        "instance_name",
+        host, port)
+
+client.connect()
+for source in sources:
+        client.add_source(source)
+client.join()
