@@ -133,8 +133,11 @@ actor GenSourceCoordinator[In: Any val] is SourceCoordinator
     let runner = _runner_builder(_router_registry, _event_log, _auth,
       _metrics_reporter.clone(), None, _target_router, _partitioner_builder)
 
+    // It's possible that there are more than one sink per worker for this
+    // pipeline. We select our router based on our source id.
+    let selected_router = _router.select_based_on_producer_id(source_id)
     let source = GenSource[In](source_id, _auth, _pipeline_name,
-      consume runner, _router, _generator, _event_log,
+      consume runner, selected_router, _generator, _event_log,
       _outgoing_boundary_builders, _layout_initializer,
       _metrics_reporter.clone(), _router_registry, _router_registry)
 

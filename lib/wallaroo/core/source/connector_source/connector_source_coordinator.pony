@@ -196,8 +196,11 @@ actor ConnectorSourceCoordinator[In: Any val] is
         partitioner_builder = _partitioner_builder)
       let notify = ConnectorSourceNotify[In](source_id, consume runner,
         notify_parameters, this, _is_recovering)
+      // It's possible that there are more than one sink per worker for this
+      // pipeline. We select our router based on our source id.
+      let selected_router = _router.select_based_on_producer_id(source_id)
       let source = ConnectorSource[In](source_id, _auth, this,
-        consume notify, _event_log, _router, SourceTCPHandlerBuilder,
+        consume notify, _event_log, selected_router, SourceTCPHandlerBuilder,
         _outgoing_boundary_builders, _layout_initializer,
         _metrics_reporter.clone(), _router_registry, _router_registry)
       source.mute(this)
