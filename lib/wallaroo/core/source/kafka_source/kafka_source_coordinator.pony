@@ -288,9 +288,13 @@ actor KafkaSourceCoordinator[In: Any val] is (SourceCoordinator & KafkaClientMan
 
             let source_id = try _rb.u128_le()? else Fail(); 0 end
 
+            // It's possible that there are more than one sink per worker for
+            // this pipeline. We select our router based on our source id.
+            let selected_router = _router.select_based_on_producer_id(
+              source_id)
             let source = KafkaSource[In](source_id, _auth, name, this,
               _notify.build_source(source_id, _env), _event_log,
-              _router, _outgoing_boundary_builders,
+              selected_router, _outgoing_boundary_builders,
               _layout_initializer, _metrics_reporter.clone(), topic, part_id,
               kc, _router_registry, _recovering)
             partitions_sources(part_id) = source

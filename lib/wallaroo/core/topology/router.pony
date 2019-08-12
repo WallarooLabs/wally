@@ -46,6 +46,10 @@ trait val Router is (Hashable & Equatable[Router])
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   fun routes(): Map[RoutingId, Consumer] val
   fun routes_not_in(router: Router): Map[RoutingId, Consumer] val
+  // If a Router holds redundant routers that must be distributed
+  // deterministically among the immediate upstream actors, then this
+  // will select the router for each upstream producer using its id. The
+  // behavior for a non-redundant router is to simply return itself.
   fun val select_based_on_producer_id(producer_id: RoutingId): Router => this
 
 primitive EmptyRouter is Router
@@ -121,6 +125,10 @@ class val DirectRouter is Router
 //TODO: Using the MultiRouter with sub-MultiRouters causes compilation to
 //freeze on Reachability, so for now it's banned.
 class val MultiRouter is Router
+  """
+  Used to route messages using each of n distinct routers. For example, if
+  all outputs are sent to each of n distinct downstream sinks.
+  """
   let _routers: Array[Router] val
 
   new val create(routers: Array[Router] val) =>
@@ -229,11 +237,11 @@ class val MultiRouter is Router
 
 class val RedundantMultiRouter is Router
   """
-  A router that holds an array of routers to instances representing the same
-  stage that only exist to increase parallelism. This is currently used for a
-  single case: when there are more than one sink for a pipeline on a given
-  worker. We use this router to assign different redundant sinks to the
-  steps in the immediate upstream stage by calling
+  A router that holds an array of routers to instances each representing the
+  same logical stage. This only exist to increase parallelism. This is
+  currently used for a single case: when there are more than one sink for a
+  pipeline on a given worker. We use this router to assign different redundant
+  sinks to the steps in the immediate upstream stage by calling
   `select_based_on_producer_id()`.
   """
   let _routers: Array[Router] val
@@ -260,12 +268,23 @@ class val RedundantMultiRouter is Router
     (false, 0)
 
   fun routes(): Map[RoutingId, Consumer] val =>
-    Fail()
-    recover Map[RoutingId, Consumer] end
+    let m = recover iso Map[RoutingId, Consumer] end
+    for router in _routers.values() do
+      for (id, r) in router.routes().pairs() do
+        m(id) = r
+      end
+    end
+    consume m
 
   fun routes_not_in(router: Router): Map[RoutingId, Consumer] val =>
-    Fail()
-    recover Map[RoutingId, Consumer] end
+    let rs = recover iso Map[RoutingId, Consumer] end
+    let those_routes = router.routes()
+    for (id, r) in routes().pairs() do
+      if not those_routes.contains(id) then
+        rs(id) = r
+      end
+    end
+    consume rs
 
   fun eq(that: box->Router): Bool =>
     match that
