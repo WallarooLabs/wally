@@ -24,7 +24,7 @@ actor Main
       var r_arg: U64 = 0
       var t_arg: U64 = 0
       var thr_arg: Bool = false
-      var i_arg: U64 = 1000
+      var i_arg: U64 = 0
 
       var options = Options(env.args)
       if env.args.size() == 1 then
@@ -118,8 +118,14 @@ actor Main
         end
 
         try
+          let nsec_interval = if msec_interval == 0 then
+            500
+          else
+            msec_interval * 1_000_000
+          end
+
           let sender = Sender(env.root as AmbientAuth, env.err,
-            host(0)?, host(1)?, batches, msec_interval,
+            host(0)?, host(1)?, batches, nsec_interval,
             report_interval, time_limit, throttle_messages, catch_up)
           sender.start()
         else
@@ -145,7 +151,7 @@ actor Sender
   let _data_chunks: Array[Array[U8] val] val
   var _data_chunk_index: USize = 0
   let _timers: Timers = Timers
-  let _msec_interval: U64
+  let _nsec_interval: U64
   let _report_interval: U64
   let _time_limit: U64
   var _throttled: Bool = true
@@ -161,7 +167,7 @@ actor Sender
     host: String,
     port: String,
     data_chunks: Array[Array[U8] val] val,
-    msec_interval: U64,
+    nsec_interval: U64,
     report_interval: U64,
     time_limit: U64,
     throttle_messages: Bool,
@@ -172,13 +178,14 @@ actor Sender
       host, port)
     _data_chunks = data_chunks
     _err = err
-    _msec_interval = msec_interval
+    _nsec_interval = nsec_interval
     _report_interval = report_interval
     _time_limit = time_limit
     _catch_up = catch_up
 
   be start() =>
-    let t = Timer(TriggerSend(this), 0, _msec_interval * 1000*1000)
+    // @printf[I32]("Sender: nsec_interval = %lu\n".cstring(), _nsec_interval)
+    let t = Timer(TriggerSend(this), 0, _nsec_interval)
     _timers(consume t)
     if _report_interval > 0 then
       let t2 = Timer(TriggerReport(this, _report_interval > 0),
