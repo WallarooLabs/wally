@@ -24,27 +24,64 @@ use "wallaroo_labs/time"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
 use "wallaroo/core/source/tcp_source"
+use "wallaroo/core/state"
 use "wallaroo/core/topology"
 
 type InputBlob is Array[U8] val
 
 actor Main
   new create(env: Env) =>
+    let par_factor: USize = 64
     try
       let pipeline = recover val
           let inputs = Wallaroo.source[InputBlob]("Input",
                 TCPSourceConfig[InputBlob].from_options(InputBlobDecoder,
                   TCPSourceConfigCLIParser("InputBlobs", env.args)?
-                  where parallelism' = 64))
+                  where parallelism' = par_factor))
 
           inputs
+            .key_by(RoundRobin)
+            // .to[Array[U8] val](NoOp where parallelism = par_factor)
+            // .to[Array[U8] val](AsIsC where parallelism = par_factor)
+            // .to[Array[U8] val](AsIsStateC where parallelism = par_factor)
             .to_sink(TCPSinkConfig[InputBlob].from_options(
-              InputBlobEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
+              InputBlobEncoder, TCPSinkConfigCLIParser(env.args)?(0)?)
+              where parallelism = par_factor)
         end
       Wallaroo.build_application(env, "Passthrough", pipeline)
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end
+
+primitive RoundRobin
+  fun apply(input: Any): Key =>
+    String.from_array([ @ponyint_cpu_tick[U64]().u8() ])
+
+primitive NoOp is StatelessComputation[Array[U8] val, I8]
+  fun name(): String => "NoOp"
+
+  fun apply(input: Array[U8] val): (I8 | None) =>
+    None
+
+primitive AsIsC is StatelessComputation[Array[U8] val, Array[U8] val]
+  fun name(): String => "AsIs computation"
+
+  fun apply(input: Array[U8] val): (Array[U8] val | None) =>
+    input
+
+class AsIsState is State
+  var count: USize =0
+
+primitive AsIsStateC is StateComputation[Array[U8] val, Array[U8] val, AsIsState]
+  fun name(): String => "AsIsState computation"
+
+  fun apply(input: Array[U8] val, state: AsIsState): (Array[U8] val | None) =>
+    state.count = state.count + 1
+    input
+
+  fun initial_state(): AsIsState =>
+    AsIsState
+
 
 primitive InputBlobDecoder is FramedSourceHandler[InputBlob]
   fun header_length(): USize => 4
