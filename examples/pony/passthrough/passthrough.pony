@@ -42,8 +42,8 @@ actor Main
           inputs
             .key_by(RoundRobin)
             // .to[Array[U8] val](NoOp where parallelism = par_factor)
-            // .to[Array[U8] val](AsIsC where parallelism = par_factor)
-            // .to[Array[U8] val](AsIsStateC where parallelism = par_factor)
+            .to[Array[U8] val](AsIsC where parallelism = par_factor)
+            //.to[Array[U8] val](AsIsStateC where parallelism = par_factor)
             .to_sink(TCPSinkConfig[InputBlob].from_options(
               InputBlobEncoder, TCPSinkConfigCLIParser(env.args)?(0)?)
               where parallelism = par_factor)

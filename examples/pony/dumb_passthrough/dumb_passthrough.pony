@@ -30,15 +30,18 @@ type InputBlob is Array[U8] val
 
 actor Main
   new create(env: Env) =>
+    let par_factor: USize = 64
     try
       let pipeline = recover val
           let inputs = Wallaroo.source[InputBlob]("Input",
                 TCPSourceConfig[InputBlob].from_options(InputBlobDecoder,
-                  TCPSourceConfigCLIParser("InputBlobs", env.args)?))
+                  TCPSourceConfigCLIParser("InputBlobs", env.args)?
+                  where parallelism' = par_factor))
 
           inputs
             .to_sink(TCPSinkConfig[InputBlob].from_options(
-              InputBlobEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
+              InputBlobEncoder, TCPSinkConfigCLIParser(env.args)?(0)?)
+              where parallelism = par_factor)
         end
       Wallaroo.build_application(env, "Passthrough", pipeline)
     else
@@ -48,7 +51,7 @@ actor Main
 primitive InputBlobDecoder is FramedSourceHandler[InputBlob]
   fun header_length(): USize => 0
   fun payload_length(data: Array[U8] iso): USize =>
-    999999 // this doesn't matter currently, header = 0
+    16384 // this doesn't matter currently, header = 0
     // means we read as much as possible off socket
   fun decode(data: Array[U8] val): InputBlob =>
     data
