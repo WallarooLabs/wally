@@ -30,17 +30,19 @@ type InputBlob is Array[U8] val
 
 actor Main
   new create(env: Env) =>
+    let par_factor: USize = 64
     try
       let pipeline = recover val
           let inputs = Wallaroo.source[InputBlob]("Input",
                 TCPSourceConfig[InputBlob].from_options(InputBlobDecoder,
                   TCPSourceConfigCLIParser("InputBlobs", env.args)?
-                  where parallelism' = 64))
+                  where parallelism' = par_factor))
 
           inputs
-            .to[InputBlob](Identity[InputBlob])
+            .to[InputBlob](Identity[InputBlob] where parallelism = par_factor)
             .to_sink(TCPSinkConfig[InputBlob].from_options(
-              InputBlobEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
+              InputBlobEncoder, TCPSinkConfigCLIParser(env.args)?(0)?)
+              where parallelism = par_factor)
         end
       Wallaroo.build_application(env, "Multiworker Forwarding", pipeline)
     else
