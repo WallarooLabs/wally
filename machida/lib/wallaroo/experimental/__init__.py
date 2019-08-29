@@ -129,6 +129,7 @@ class BaseConnector(object):
 class SourceConnector(BaseConnector):
     def __init__(self, args=None, required_params=['host', 'port'],
                  optional_params=[]):
+        raise Exception("SourceConnector uses unsupported connector protocol, please use AtLeastOnceSourceConnector")
         super(SourceConnector, self).__init__(args, required_params,
                                               optional_params)
         self._conn = None
