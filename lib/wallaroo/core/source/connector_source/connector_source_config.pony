@@ -24,8 +24,8 @@ use "wallaroo/core/source"
 use "wallaroo_labs/mort"
 
 primitive ConnectorSourceConfigCLIParser
-  fun apply(args: Array[String] val):
-    Map[SourceName, ConnectorSourceConfigOptions] val ?
+  fun apply(source_name: SourceName, args: Array[String] val):
+    ConnectorSourceConfigOptions val ?
   =>
     let in_arg = "in"
     let short_in_arg = "i"
@@ -40,14 +40,14 @@ primitive ConnectorSourceConfigCLIParser
       | ("help", let arg: None) =>
         StartupHelp()
       | (in_arg, let input: String) =>
-        return _from_input_string(input)
+        return _from_input_string(input, source_name)?
       end
     end
 
     error
 
-  fun _from_input_string(inputs: String):
-    Map[SourceName, ConnectorSourceConfigOptions] val
+  fun _from_input_string(inputs: String, source_name: SourceName):
+    ConnectorSourceConfigOptions val ?
   =>
     let opts = recover trn Map[SourceName, ConnectorSourceConfigOptions] end
 
@@ -71,7 +71,7 @@ primitive ConnectorSourceConfigCLIParser
       end
     end
 
-    consume opts
+    opts(source_name)?
 
 // TODO: Refactor. Why is this identical to WorkerConnectorSourceConfig?
 class val ConnectorSourceConfigOptions
