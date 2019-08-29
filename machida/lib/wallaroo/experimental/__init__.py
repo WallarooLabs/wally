@@ -214,6 +214,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
 
         # allow the user to do a join(timeout=0)
         self.stopped = threading.Event()
+        print("version {} cookie {} program_name {} instance_name {} host {} port {} delay {}".format(version, cookie, program_name, instance_name, host, port, delay))
 
     def join(self, timeout=None):
         """
