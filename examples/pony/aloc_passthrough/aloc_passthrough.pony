@@ -19,6 +19,7 @@ Copyright 2019 The Wallaroo Authors.
 use "buffered"
 use "wallaroo"
 use "wallaroo/core/common"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
 use "wallaroo/core/sink/connector_sink"
@@ -31,7 +32,9 @@ type InputBlob is Array[U8] val
 
 actor Main
   new create(env: Env) =>
-    let par_factor: USize = 67
+    let par_factor: USize = 64
+
+    Log.set_defaults()
     try
       let pipeline = recover val
           let inputs = Wallaroo.source[InputBlob]("Input",
@@ -105,5 +108,4 @@ primitive PrintArray
 primitive InputBlobEncoder
   fun apply(t: Array[U8] val, wb: Writer = Writer): Array[ByteSeq] val =>
     wb.write(t)
-    wb.u32_be(0) // fill out the header that was stripped in Decode
     wb.done()
