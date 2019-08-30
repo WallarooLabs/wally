@@ -84,6 +84,15 @@ class BaseSource(BaseMeta):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def wallaroo_acked(self, point_of_ref):
+        """
+        When Wallaroo sends an ACK for our stream_id, this callback is
+        called with the ack'ed point of reference.
+
+        Implementing this callback is optional.
+        """
+        None
 
 class FramedFileReader(BaseIter, BaseSource):
     """
@@ -182,6 +191,9 @@ class LineFileReader(BaseIter, BaseSource):
             self.close()
         except:
             pass
+
+    def wallaroo_acked(self, point_of_ref):
+        logging.debug("wallaroo_acked: por {}".format(point_of_ref))
 
 class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
     """
@@ -408,6 +420,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
     def stream_acked(self, stream):
         logging.debug("MultiSourceConnector acked {}".format(stream))
         source, acked = self.sources.get(stream.id, (None, None))
+        source.wallaroo_acked(stream.point_of_ref)
         if source:
             # check if there's an eos pending this ack
             eos_point_of_ref = self.pending_eos_ack.get(stream.id, None)
