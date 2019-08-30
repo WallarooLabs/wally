@@ -171,7 +171,8 @@ actor ConnectorSink is Sink
     metrics_reporter: MetricsReporter iso,
     barrier_coordinator: BarrierCoordinator,
     checkpoint_initiator: CheckpointInitiator,
-    host: String, service: String, worker_name: WorkerName,
+    host: String, service: String,
+    app_name: String, worker_name: WorkerName,
     protocol_version: String, cookie: String,
     auth: ApplyReleaseBackpressureAuth,
     initial_msgs: Array[Array[ByteSeq] val] val,
@@ -195,7 +196,7 @@ actor ConnectorSink is Sink
     _next_size = init_size
     _max_size = max_size
     _notify = ConnectorSinkNotify(
-      _sink_id, worker_name, protocol_version, cookie, auth)
+      _sink_id, app_name, worker_name, protocol_version, cookie, auth)
     _initial_msgs = initial_msgs
     _reconnect_pause = reconnect_pause
     _host = host
@@ -1195,4 +1196,3 @@ class PauseBeforeReconnectConnectorSink is TimerNotify
   fun ref apply(timer: Timer, count: U64): Bool =>
     _tcp_sink.reconnect()
     false
-
