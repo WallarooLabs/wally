@@ -144,21 +144,28 @@ class FramedFileReader(BaseIter, BaseSource):
         except:
             pass
 
-class LineFileReader(BaseIter, BaseSource):
+class ThrottledFileReader(BaseIter, BaseSource):
     """
-    An ASCII line-based file reader iterator with a resettable position.
-
-    Usage: `LineFileReader(filename)`.
+    An throttled ile reader iterator with a resettable position, capable
+    of reading files with records delimited by:
+      * length-framed data
+      * ASCII data separated by newlines
+    The throttle's units for `limit_rate` units are bytes/sec.
+    Exactly one of `is_framed` and `is_text_lines` must be true.
     """
-    def __init__(self, filename, limit_bytes_per_sec=999999999):
+    def __init__(self, filename,
+                 limit_rate=999999999, is_framed=False, is_text_lines=False):
         self.file = open(filename, mode='r')
         self.name = filename.encode()
         self.key = filename.encode()
-        self.limit_bytes_per_sec = limit_bytes_per_sec
+        self.limit_rate = limit_rate
+        self.is_framed = is_framed
+        self.is_text_lines = is_text_lines
         self.last_acked = None
         self.count = 0
         self.time_1st_iter = None
-        self.bytes_per_iter = None
+        self.bytes_read = 0
+        self.buf = ""
 
     def __str__(self):
         return ("FramedFileReader(filename: {}, closed: {}, point_of_ref: {})"
@@ -176,29 +183,42 @@ class LineFileReader(BaseIter, BaseSource):
         self.file.seek(pos)
 
     def __next__(self):
-        count_boundary = 4
         self.count = self.count + 1
+        now = time.time()
+
         if self.count == 1:
-            self.time_1st_iter = time.time()
+            self.time_1st_iter = now
 
-        if self.count < count_boundary:
-            return (None, self.file.tell())
-        if self.count == count_boundary:
-            time_diff = time.time() - self.time_1st_iter
-            num_iters = count_boundary - 1
-            iters_per_sec = math.trunc(1/(time_diff / num_iters))
-            self.bytes_per_iter = math.trunc(
-                self.limit_bytes_per_sec / iters_per_sec) + 1
-
-        # We need to "yield" by returning None occasionaly in order to
-        # permit MultiSourceConnector to perform it's sleep & re-try
-        # this iterator.
-        if self.count % 2 == 1:
+        read_rate = self.bytes_read / max(0.000001, now - self.time_1st_iter)
+        if read_rate > self.limit_rate:
+            # We need to "yield" by returning None occasionaly in order to
+            # permit MultiSourceConnector to perform it's sleep & re-try
+            # goop for this iterator.
             return (None, self.file.tell())
 
-        b = self.file.read(self.bytes_per_iter)
+        if self.is_text_lines:
+            b = self.file.readline()
+        if self.is_framed:
+            # read header
+            h = self.file.read(4)
+            if not h:
+                raise StopIteration
+            h_bytes = unpack('>I', h)[0]
+            b = self.file.read(h_bytes)
         if not b:
             raise StopIteration
+
+        ## Roughly every minute, reset our basis for calculating the
+        ## sending rate. Otherwise the amount of elapsed time can
+        ## get big enough to make an issue out of floating point
+        ## rounding error?  In the event that single framed messages
+        ## or ASCII lines are bigger than this factor, then our
+        ## throttle's effectiveness will be hurt.
+        if self.bytes_read > (self.limit_rate * 60):
+            self.bytes_read = 0
+            self.time_1st_iter = now - 0.001
+
+        self.bytes_read += len(b)
         return (b, self.file.tell())
 
     def close(self):

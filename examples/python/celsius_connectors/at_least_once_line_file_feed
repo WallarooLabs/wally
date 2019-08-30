@@ -27,7 +27,7 @@ import threading
 import time
 
 from wallaroo.experimental.connectors import (
-                                   LineFileReader,
+                                   ThrottledFileReader,
                                    MultiSourceConnector)
 
 fmt = '%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
@@ -61,15 +61,17 @@ required_params = ['host', 'port', 'filenames']
 optional_params = []
 
 client = MultiSourceConnector(version, cookie, program_name, instance_name,
-                              '127.0.0.1', '7100', delay=0.05)
+                              '127.0.0.1', '7100', delay=0.5)
 
 
 sender1 = Sender(client)
 
 sender1.start()
 
-client.add_source(LineFileReader(filename = sys.argv[1],
-                                 limit_bytes_per_sec = 100))
+bytes_per_sec = 150
+client.add_source(ThrottledFileReader(filename = sys.argv[1],
+                                      is_text_lines = True,
+                                      limit_rate = bytes_per_sec))
 
 
 sender1.join()
