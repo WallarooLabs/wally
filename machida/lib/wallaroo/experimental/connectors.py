@@ -165,6 +165,8 @@ class LineFileReader(BaseIter, BaseSource):
         b = self.file.readline()
         if not b:
             raise StopIteration
+        logging.info("__next__(len {})".format(len(b)))
+        time.sleep(1.1)
         return (b, self.file.tell())
 
     def close(self):
