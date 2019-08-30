@@ -61,14 +61,15 @@ required_params = ['host', 'port', 'filenames']
 optional_params = []
 
 client = MultiSourceConnector(version, cookie, program_name, instance_name,
-                              '127.0.0.1', '7100', delay=0.1)
+                              '127.0.0.1', '7100', delay=0.05)
 
 
 sender1 = Sender(client)
 
 sender1.start()
 
-client.add_source(LineFileReader(filename = sys.argv[1]))
+client.add_source(LineFileReader(filename = sys.argv[1],
+                                 limit_bytes_per_sec = 100))
 
 
 sender1.join()
