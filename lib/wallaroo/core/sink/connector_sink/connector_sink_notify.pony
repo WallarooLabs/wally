@@ -34,6 +34,7 @@ class ConnectorSinkNotify
   var _throttled: Bool = false
   let _stream_id: cwm.StreamId = 1
   let _sink_id: RoutingId
+  let _app_name: String
   let _worker_name: WorkerName
   let _protocol_version: String
   let _cookie: String
@@ -59,17 +60,18 @@ class ConnectorSinkNotify
   let twopc_reconnect_buffer: Array[(String val | Array[U8] val)] = twopc_reconnect_buffer.create()
   var twopc_current_txn_aborted: Bool = false
 
-  new create(sink_id: RoutingId, worker_name: WorkerName,
+  new create(sink_id: RoutingId, app_name: String, worker_name: WorkerName,
     protocol_version: String, cookie: String,
     auth: ApplyReleaseBackpressureAuth)
   =>
     _sink_id = sink_id
+    _app_name = app_name
     _worker_name = worker_name
     _protocol_version = protocol_version
     _cookie = cookie
     _auth = auth
 
-    stream_name = "worker-" + worker_name + "-id-" + _sink_id.string()
+    stream_name = _app_name + "-w-" + worker_name + "-id-" + _sink_id.string()
 
   fun ref accepted(conn: WallarooOutgoingNetworkActor ref) =>
     Unreachable()
@@ -96,7 +98,7 @@ class ConnectorSinkNotify
     // TODO: configure connector v2 program string
     // TODO: configure connector v2 instance_name string
     let hello = cwm.HelloMsg(_protocol_version, _cookie,
-      "a program", "an instance")
+      _app_name, _worker_name)
     send_msg(conn, hello)
 
     // 2PC: We don't know how many transactions the sink has that

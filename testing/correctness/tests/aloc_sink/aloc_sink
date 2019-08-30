@@ -9,6 +9,7 @@ import re
 import socket
 import struct
 import sys
+import threading
 import time
 import traceback
 
@@ -134,11 +135,6 @@ class AsyncServer(asynchat.async_chat, object):
         self._id = handler_id
         self._conn = sock
         self._out_path = out_path
-        self._out = open(self._out_path, 'ab')
-        self._out_offset = self._out.tell()
-        logging.debug('top of AsyncServer self._out_offset = {}'.format(self._out_offset))
-        txn_log_path = self._out_path + ".txnlog"
-        self._txn_log = open(txn_log_path, 'ab')
         self._abort_rule_path = abort_rule_path
         asynchat.async_chat.__init__(self, sock=self._conn)
         self.in_buffer = []
@@ -162,9 +158,15 @@ class AsyncServer(asynchat.async_chat, object):
         else:
             self._s3 = None
         self._s3_chunk = b''
-
         self._s3_bucket = s3_bucket
         self._s3_prefix = s3_prefix
+        # Items that are initialized later, set to nonsense None now
+        self._abort_rules = None
+        self._out = None
+        self._out_offset = None
+        self._txn_state = None
+        self._txn_log = None
+        self._worker_name = None
 
         if self._s3 is not None:
             try:
@@ -172,34 +174,6 @@ class AsyncServer(asynchat.async_chat, object):
             except Exception as e:
                 logging.critical('{}'.format(e))
                 sys.exit(66)
-
-        self._abort_rules = parse_abort_rules(self._abort_rule_path)
-        for t in self._abort_rules:
-            if t[0] == "stream-content":
-                stream_id = t[1]
-                regexp = t[2]
-                self._txn_stream_content.append((stream_id, regexp))
-                # NOTE: This type doesn't have extended disconnect control!
-
-        self._txn_state = reload_phase1_txn_state(txn_log_path)
-        logging.debug('restored txn state: {}'.format(self._txn_state))
-        self._txn_commit_next = look_for_forced_abort(txn_log_path)
-
-        orphaned = []
-        if self._s3 is not None:
-            orphaned = look_for_orphaned_s3_phase2_data(txn_log_path)
-        logging.debug('S3: orphaned {}'.format(orphaned))
-        if orphaned == []:
-            logging.info('found zero orphaned items')
-            None
-        elif len(orphaned) > 1:
-            logging.critical('expected max 1 orphaned item: {}'.format(orphaned))
-            sys.exit(66)
-        else:
-            (txn_id, start_por, end_por, _) = orphaned[0]
-            chunk = read_chunk(self._out_path, start_por, end_por)
-            self.log_it(['orphaned', (txn_id, start_por, end_por)])
-            self.write_to_s3_and_log(start_por, chunk, txn_id, 'orphaned')
 
     def collect_incoming_data(self, data):
         """Buffer the data"""
@@ -236,11 +210,76 @@ class AsyncServer(asynchat.async_chat, object):
             if msg.cookie != "Dragons Love Tacos!":
                 logging.critical('bad cookie: {}'.format(msg.cookie))
                 sys.exit(66)
+
             # As of 2019-03-04, Wallaroo's connector sink is not managing
             # credits and will rely solely on TCP backpressure for its
             # own backpressure signalling.
-            ok = cwm.Ok(500)
-            self.write(ok)
+
+            self._worker_name = msg.instance_name
+            with active_workers as active_workers_l:
+                if self._worker_name in active_workers_l:
+                    ## The most likely causes of this error are:
+                    ## 1. Misconfiguration, e.g., two different Wallaroo
+                    ##    clusters trying to use the same sink.
+                    ## 2. A Wallaroo cluster that uses sink parallelism > 1.
+                    ##    The sink connector protocol doesn't support more
+                    ##    than one connection per worker.  If the sink
+                    ##    parallelism management can include the sink ID #
+                    ##    or sink instance or something repeatable, then
+                    ##    perhaps we can add that ID thingie into the
+                    ##    protocol.  But this would have to be a stable
+                    ##    indentifier that survives a Wallaroo worker crash
+                    ##    then restart, *and also* it would have to be the
+                    ##    sink instance that represents that same part of the
+                    ##    pipeline topology before & after the restart.
+                    txt = "Hello message from worker {}: already active".format(self._worker_name)
+                    logging.error(txt)
+                    err = cwm.Error(txt)
+                    self.write(err)
+                    self.close(delete_from_active_workers = False)
+                else:
+                    txt = "Hello message from worker {}".format(self._worker_name)
+                    logging.info(txt)
+                    ok = cwm.Ok(500)
+                    self.write(ok)
+                    active_workers_l[self._worker_name] = True
+
+            arpath = self._abort_rule_path + "." + msg.instance_name
+            self._abort_rules = parse_abort_rules(arpath)
+            for t in self._abort_rules:
+                if t[0] == "stream-content":
+                    stream_id = t[1]
+                    regexp = t[2]
+                    self._txn_stream_content.append((stream_id, regexp))
+                    # NOTE: This type doesn't have extended disconnect control!
+
+            opath = self._out_path + "." + msg.instance_name
+            self._out = open(opath, 'ab')
+            self._out_offset = self._out.tell()
+            logging.debug('top of AsyncServer self._out_offset = {}'.format(self._out_offset))
+
+            tlpath = self._out_path + "." + msg.instance_name + ".txnlog"
+            self._txn_log = open(tlpath, 'ab')
+            self._txn_state = reload_phase1_txn_state(tlpath)
+            logging.debug('restored txn state: {}'.format(self._txn_state))
+            self._txn_commit_next = look_for_forced_abort(tlpath)
+
+            orphaned = []
+            if self._s3 is not None:
+                orphaned = look_for_orphaned_s3_phase2_data(tlpath)
+            logging.debug('S3: orphaned {}'.format(orphaned))
+            if orphaned == []:
+                logging.info('found zero orphaned items')
+                None
+            elif len(orphaned) > 1:
+                logging.critical('expected max 1 orphaned item: {}'.format(orphaned))
+                sys.exit(66)
+            else:
+                (txn_id, start_por, end_por, _) = orphaned[0]
+                chunk = read_chunk(opath, start_por, end_por)
+                self.log_it(['orphaned', (txn_id, start_por, end_por)])
+                self.write_to_s3_and_log(start_por, chunk, txn_id, 'orphaned')
+
         elif isinstance(msg, cwm.Notify):
             if msg.stream_id != 1:
                 logging.error("Unsupported stream id {}".format(msg.stream_id))
@@ -351,7 +390,8 @@ class AsyncServer(asynchat.async_chat, object):
             self.flush_fsync(self._txn_log)
             success = self._txn_commit_next
             if success and (self._s3 is not None) and start_por >= 0:
-                chunk = read_chunk(self._out_path, start_por, end_por)
+                opath = self._out_path + "." + msg.instance_name
+                chunk = read_chunk(opath, start_por, end_por)
                 logging.debug('S3: offset {} to {} len(chunk) = {}'.format(start_por, end_por, len(chunk)))
                 self._s3_chunk = chunk
                 self._s3_chunk_offset = start_por
@@ -486,14 +526,26 @@ class AsyncServer(asynchat.async_chat, object):
         _type, _value, _traceback = sys.exc_info()
         traceback.print_exception(_type, _value, _traceback)
 
-    def close(self):
+    def close(self, delete_from_active_workers = True):
         logging.info("Closing the connection")
         logging.info("last received id by stream:\n\t{}".format(
             "\n\t".join("{}, {}: {}".format(sid, sn, mid)
                       for sid, sn, mid in self._streams.values())))
         super(AsyncServer, self).close()
-        self.log_it(['connection-closed', True])
-        self.flush_fsync(self._out)
+        try:
+            self.log_it(['connection-closed', True])
+            self.flush_fsync(self._out)
+        except:
+            ## In case of very early errors, file descriptors
+            ## may not have been initialized yet. No harm.
+            None
+
+        if delete_from_active_workers:
+            with active_workers as active_workers_l:
+                if not (self._worker_name in active_workers_l):
+                    raise Exception("Lock not active for {}"
+                        .format(self._worker_name))
+                del active_workers_l[self._worker_name]
 
     def flush_fsync(self, file):
         """
@@ -530,7 +582,7 @@ class AsyncServer(asynchat.async_chat, object):
                     time.sleep(2.0)
             self.log_it(['2-s3-ok', txn_id, name, why])
 
-class EchoServer(asyncore.dispatcher):
+class SinkServer(asyncore.dispatcher):
 
     def __init__(self, host, port, out_path, abort_rule_path,
                  s3_scheme, s3_bucket, s3_prefix):
@@ -553,6 +605,22 @@ class EchoServer(asyncore.dispatcher):
             self._out_path, self._abort_rule_path, s3_scheme, s3_bucket, s3_prefix, self._streams)
         self.count += 1
 
+## Class from dos_server.py
+
+class ThreadSafeDict(dict) :
+    def __init__(self, * p_arg, ** n_arg) :
+        dict.__init__(self, * p_arg, ** n_arg)
+        self._lock = threading.Lock()
+
+    def __enter__(self) :
+        self._lock.acquire()
+        return self
+
+    def __exit__(self, type, value, traceback) :
+        self._lock.release()
+
+active_workers = ThreadSafeDict()
+
 fmt = '%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
 logging.root.formatter = logging.Formatter(fmt)
 stream_handler = logging.StreamHandler()
@@ -562,18 +630,19 @@ logging.root.setLevel(logging.INFO)
 
 out_path = sys.argv[1]
 abort_rule_path = sys.argv[2]
+listen_port = int(sys.argv[3])
 try:
-    s3_scheme = sys.argv[3]
-    s3_bucket = sys.argv[4]
-    s3_prefix = sys.argv[5]
+    s3_scheme = sys.argv[4]
+    s3_bucket = sys.argv[5]
+    s3_prefix = sys.argv[6]
     logging.debug("s3_scheme: {}, s3_bucket: {}, s3_prefix: {}".format(s3_scheme, s3_bucket, s3_prefix))
 except:
     s3_scheme = None
     s3_bucket = None
     s3_prefix = None
 logging.debug("out_path: {}".format(out_path))
-logging.info("abort_rule_path: {}".format(abort_rule_path))
-server = EchoServer('127.0.0.1', 7200, out_path, abort_rule_path, s3_scheme, s3_bucket, s3_prefix)
+logging.debug("abort_rule_path: {}".format(abort_rule_path))
+server = SinkServer('127.0.0.1', listen_port, out_path, abort_rule_path, s3_scheme, s3_bucket, s3_prefix)
 logging.debug("server: {}".format(server))
 logging.debug("asyncore file: {}".format(asyncore.__file__))
 asyncore.loop(timeout=0.001)

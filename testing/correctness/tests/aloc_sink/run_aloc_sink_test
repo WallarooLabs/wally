@@ -86,7 +86,8 @@ def terminate(_signal=None, _frame=None):
 sink_args = [
     "./aloc_sink",
     "/tmp/aloc_sink.out",
-    "./aloc_sink.abort-rules"]
+    "./aloc_sink.abort-rules",
+    "7200"]
 if os.environ.get('USE_FAKE_S3', '') == 'on':
     sink_args.append('fake-s3')
     sink_args.append('wallaroo-s3-sink-test')
