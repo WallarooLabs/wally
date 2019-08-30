@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import math
 from struct import unpack
 import sys
 import time
@@ -153,7 +154,11 @@ class LineFileReader(BaseIter, BaseSource):
         self.file = open(filename, mode='r')
         self.name = filename.encode()
         self.key = filename.encode()
-        self.last_acked = -1
+        self.last_acked = None
+        self.count = 0
+        self.time_1st_iter = None
+        self.iters_per_sec = None
+        self.buf = None
 
     def __str__(self):
         return ("FramedFileReader(filename: {}, closed: {}, point_of_ref: {})"
@@ -171,13 +176,27 @@ class LineFileReader(BaseIter, BaseSource):
         self.file.seek(pos)
 
     def __next__(self):
+        count_boundary = 3
+        self.count = self.count + 1
+        if self.count == 1:
+            self.time_1st_iter = time.time()
+        # logging.debug("__next__ {}".format(self.count))
+
+        if self.count < count_boundary:
+            return (None, self.file.tell())
+        if self.count == count_boundary:
+            time_diff = time.time() - self.time_1st_iter
+            num_iters = count_boundary - 1
+            secs_per_iter = time_diff / num_iters
+            self.iters_per_sec = math.trunc(1/secs_per_iter)
+            logging.debug("iters_per_sec = {}".format(self.iters_per_sec))
         if self.last_acked != self.file.tell():
             return (None, self.file.tell())
         # read header
-        b = self.file.readline()
-        if not b:
+        self.buf = self.file.readline()
+        if not self.buf:
             raise StopIteration
-        return (b, self.file.tell())
+        return (self.buf, self.file.tell())
 
     def close(self):
         self.file.close()
@@ -189,7 +208,7 @@ class LineFileReader(BaseIter, BaseSource):
             pass
 
     def wallaroo_acked(self, point_of_ref):
-        logging.debug("wallaroo_acked: por {}".format(point_of_ref))
+        # logging.debug("wallaroo_acked: por {}".format(point_of_ref))
         self.last_acked = point_of_ref
 
 class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
