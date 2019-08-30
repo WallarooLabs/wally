@@ -1195,4 +1195,3 @@ class PauseBeforeReconnectConnectorSink is TimerNotify
   fun ref apply(timer: Timer, count: U64): Bool =>
     _tcp_sink.reconnect()
     false
-
