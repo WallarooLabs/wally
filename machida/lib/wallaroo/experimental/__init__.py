@@ -494,8 +494,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         else:
             raise ProtocolError("Can only send message types {{Notify, "
                                 "Message, EosMessage, Error}}. Received {}".format(msg))
-        logging.info("self._write({})".format(msg))
-        time.sleep(1.1)
 
     def _write(self, data):
         """
@@ -538,8 +536,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 self.data.append(data)
         except OSError:
             self.handle_error()
-        logging.info("self._write(len {})".format(len(data)))
-        time.sleep(2.1)
 
     def pending_sends(self):
         """
