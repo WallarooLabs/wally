@@ -150,15 +150,15 @@ class LineFileReader(BaseIter, BaseSource):
 
     Usage: `LineFileReader(filename)`.
     """
-    def __init__(self, filename):
+    def __init__(self, filename, limit_bytes_per_sec=999999999):
         self.file = open(filename, mode='r')
         self.name = filename.encode()
         self.key = filename.encode()
+        self.limit_bytes_per_sec = limit_bytes_per_sec
         self.last_acked = None
         self.count = 0
         self.time_1st_iter = None
-        self.iters_per_sec = None
-        self.buf = None
+        self.bytes_per_iter = None
 
     def __str__(self):
         return ("FramedFileReader(filename: {}, closed: {}, point_of_ref: {})"
@@ -176,29 +176,30 @@ class LineFileReader(BaseIter, BaseSource):
         self.file.seek(pos)
 
     def __next__(self):
-        count_boundary = 3
+        count_boundary = 4
         self.count = self.count + 1
         if self.count == 1:
             self.time_1st_iter = time.time()
-        # logging.debug("__next__ {}".format(self.count))
 
         if self.count < count_boundary:
             return (None, self.file.tell())
         if self.count == count_boundary:
             time_diff = time.time() - self.time_1st_iter
             num_iters = count_boundary - 1
-            secs_per_iter = time_diff / num_iters
-            self.iters_per_sec = math.trunc(1/secs_per_iter)
-            logging.debug("iters_per_sec = {}".format(self.iters_per_sec))
+            iters_per_sec = math.trunc(1/(time_diff / num_iters))
+            self.bytes_per_iter = math.trunc(
+                self.limit_bytes_per_sec / iters_per_sec) + 1
 
-        if self.last_acked != self.file.tell():
+        # We need to "yield" by returning None occasionaly in order to
+        # permit MultiSourceConnector to perform it's sleep & re-try
+        # this iterator.
+        if self.count % 2 == 1:
             return (None, self.file.tell())
 
-        self.buf = self.file.readline()
-        if not self.buf:
+        b = self.file.read(self.bytes_per_iter)
+        if not b:
             raise StopIteration
-        self.bytes_per_iter = math.trunc(len(self.buf) / self.iters_per_sec) + 1
-        return (self.buf[0:self.bytes_per_iter], self.file.tell())
+        return (b, self.file.tell())
 
     def close(self):
         self.file.close()
