@@ -153,7 +153,7 @@ class LineFileReader(BaseIter, BaseSource):
         self.file = open(filename, mode='r')
         self.name = filename.encode()
         self.key = filename.encode()
-        self.count = 0
+        self.last_acked = -1
 
     def __str__(self):
         return ("FramedFileReader(filename: {}, closed: {}, point_of_ref: {})"
@@ -171,16 +171,12 @@ class LineFileReader(BaseIter, BaseSource):
         self.file.seek(pos)
 
     def __next__(self):
-        self.count = self.count + 1
-        if self.count % 10 != 0:
-            #logging.info("LineFileReader.__next__ count {}".format(self.count))
-            #time.sleep(0.1)
+        if self.last_acked != self.file.tell():
             return (None, self.file.tell())
         # read header
         b = self.file.readline()
         if not b:
             raise StopIteration
-        logging.debug("__next__ {}".format(b))
         return (b, self.file.tell())
 
     def close(self):
@@ -194,6 +190,7 @@ class LineFileReader(BaseIter, BaseSource):
 
     def wallaroo_acked(self, point_of_ref):
         logging.debug("wallaroo_acked: por {}".format(point_of_ref))
+        self.last_acked = point_of_ref
 
 class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
     """
