@@ -219,6 +219,7 @@ class ThrottledFileReader(BaseIter, BaseSource):
             self.time_1st_iter = now - 0.001
 
         self.bytes_read += len(b)
+        #logging.info("b = {}".format(b))
         return (b, self.file.tell())
 
     def close(self):
