@@ -30,6 +30,11 @@ from wallaroo.experimental.connectors import (
                                    LineFileReader,
                                    MultiSourceConnector)
 
+fmt = '%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
+logging.root.formatter = logging.Formatter(fmt)
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(logging.root.formatter)
+logging.root.addHandler(stream_handler)
 logging.root.setLevel(logging.DEBUG)
 
 class Sender(threading.Thread):
