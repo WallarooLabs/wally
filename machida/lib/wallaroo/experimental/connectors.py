@@ -144,6 +144,7 @@ class LineFileReader(BaseIter, BaseSource):
         self.file = open(filename, mode='r')
         self.name = filename.encode()
         self.key = filename.encode()
+        self.count = 0
 
     def __str__(self):
         return ("FramedFileReader(filename: {}, closed: {}, point_of_ref: {})"
@@ -161,12 +162,16 @@ class LineFileReader(BaseIter, BaseSource):
         self.file.seek(pos)
 
     def __next__(self):
+        self.count = self.count + 1
+        if self.count % 10 != 0:
+            #logging.info("LineFileReader.__next__ count {}".format(self.count))
+            #time.sleep(0.1)
+            return (None, self.file.tell())
         # read header
         b = self.file.readline()
         if not b:
             raise StopIteration
-        logging.info("__next__(len {})".format(len(b)))
-        time.sleep(1.1)
+        logging.debug("__next__ {}".format(b))
         return (b, self.file.tell())
 
     def close(self):
