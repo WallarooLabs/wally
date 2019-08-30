@@ -190,13 +190,15 @@ class LineFileReader(BaseIter, BaseSource):
             secs_per_iter = time_diff / num_iters
             self.iters_per_sec = math.trunc(1/secs_per_iter)
             logging.debug("iters_per_sec = {}".format(self.iters_per_sec))
+
         if self.last_acked != self.file.tell():
             return (None, self.file.tell())
-        # read header
+
         self.buf = self.file.readline()
         if not self.buf:
             raise StopIteration
-        return (self.buf, self.file.tell())
+        self.bytes_per_iter = math.trunc(len(self.buf) / self.iters_per_sec) + 1
+        return (self.buf[0:self.bytes_per_iter], self.file.tell())
 
     def close(self):
         self.file.close()
@@ -208,7 +210,6 @@ class LineFileReader(BaseIter, BaseSource):
             pass
 
     def wallaroo_acked(self, point_of_ref):
-        # logging.debug("wallaroo_acked: por {}".format(point_of_ref))
         self.last_acked = point_of_ref
 
 class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
