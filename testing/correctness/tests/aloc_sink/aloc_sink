@@ -562,10 +562,11 @@ logging.root.setLevel(logging.INFO)
 
 out_path = sys.argv[1]
 abort_rule_path = sys.argv[2]
+listen_port = int(sys.argv[3])
 try:
-    s3_scheme = sys.argv[3]
-    s3_bucket = sys.argv[4]
-    s3_prefix = sys.argv[5]
+    s3_scheme = sys.argv[4]
+    s3_bucket = sys.argv[5]
+    s3_prefix = sys.argv[6]
     logging.debug("s3_scheme: {}, s3_bucket: {}, s3_prefix: {}".format(s3_scheme, s3_bucket, s3_prefix))
 except:
     s3_scheme = None
@@ -573,7 +574,7 @@ except:
     s3_prefix = None
 logging.debug("out_path: {}".format(out_path))
 logging.info("abort_rule_path: {}".format(abort_rule_path))
-server = EchoServer('127.0.0.1', 7200, out_path, abort_rule_path, s3_scheme, s3_bucket, s3_prefix)
+server = EchoServer('127.0.0.1', listen_port, out_path, abort_rule_path, s3_scheme, s3_bucket, s3_prefix)
 logging.debug("server: {}".format(server))
 logging.debug("asyncore file: {}".format(asyncore.__file__))
 asyncore.loop(timeout=0.001)
