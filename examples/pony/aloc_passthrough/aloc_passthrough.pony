@@ -43,7 +43,7 @@ actor Main
                   where parallelism' = par_factor))
 
           inputs
-            .key_by(RoundRobin)
+            .key_by(FirstByte)
             // .to[Array[U8] val](NoOp where parallelism = par_factor)
             // .to[Array[U8] val](AsIsC where parallelism = par_factor)
             .to[Array[U8] val](AsIsStateC where parallelism = par_factor)
@@ -55,6 +55,19 @@ actor Main
       Wallaroo.build_application(env, "Passthrough", pipeline)
     else
       @printf[I32]("Couldn't build topology\n".cstring())
+    end
+
+primitive FirstByte
+  fun apply(input: Array[U8] val): Key =>
+    if input.size() > 0 then
+      try
+        String.from_array([input(0)?])
+      else
+        Fail()
+        ""
+      end
+    else
+      ""
     end
 
 primitive RoundRobin
