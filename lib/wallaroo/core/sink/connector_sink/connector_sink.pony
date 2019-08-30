@@ -488,6 +488,7 @@ actor ConnectorSink is Sink
         // checkpoint, then don't bother with 2PC, return early.
         _barrier_coordinator.ack_barrier(this, sbt)
         @ll(_twopc_debug, "2PC: no data written during this checkpoint interval, skipping 2PC round".cstring())
+        _twopc.txn_id = "skip--.--" + barrier_token.string()
         return
 
       | let msg: cwm.MessageMsg =>
@@ -532,7 +533,9 @@ actor ConnectorSink is Sink
       @ll(_twopc_err, "Error: checkpoint_complete() with empty _twopc.txn_id = %s.".cstring(), _twopc.txn_id.cstring())
       Fail()
     else
-      _notify.twopc_txn_id_last_committed = _twopc.txn_id
+      if not _twopc.txn_id.contains("skip--.--CheckpointBarrierToken") then
+        _notify.twopc_txn_id_last_committed = _twopc.txn_id
+      end
       try @ll(_twopc_debug, "2PC: DBGDBG: twopc_txn_id_last_committed = %s.".cstring(), (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
     end
     _twopc.reset_state()
