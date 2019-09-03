@@ -218,6 +218,20 @@ class AsyncServer(asynchat.async_chat, object):
             self._worker_name = msg.instance_name
             with active_workers as active_workers_l:
                 if self._worker_name in active_workers_l:
+                    ## The most likely causes of this error are:
+                    ## 1. Misconfiguration, e.g., two different Wallaroo
+                    ##    clusters trying to use the same sink.
+                    ## 2. A Wallaroo cluster that uses sink parallelism > 1.
+                    ##    The sink connector protocol doesn't support more
+                    ##    than one connection per worker.  If the sink
+                    ##    parallelism management can include the sink ID #
+                    ##    or sink instance or something repeatable, then
+                    ##    perhaps we can add that ID thingie into the
+                    ##    protocol.  But this would have to be a stable
+                    ##    indentifier that survives a Wallaroo worker crash
+                    ##    then restart, *and also* it would have to be the
+                    ##    sink instance that represents that same part of the
+                    ##    pipeline topology before & after the restart.
                     txt = "Hello message from worker {}: already active".format(self._worker_name)
                     logging.error(txt)
                     err = cwm.Error(txt)
@@ -568,7 +582,7 @@ class AsyncServer(asynchat.async_chat, object):
                     time.sleep(2.0)
             self.log_it(['2-s3-ok', txn_id, name, why])
 
-class EchoServer(asyncore.dispatcher):
+class SinkServer(asyncore.dispatcher):
 
     def __init__(self, host, port, out_path, abort_rule_path,
                  s3_scheme, s3_bucket, s3_prefix):
@@ -628,7 +642,7 @@ except:
     s3_prefix = None
 logging.debug("out_path: {}".format(out_path))
 logging.debug("abort_rule_path: {}".format(abort_rule_path))
-server = EchoServer('127.0.0.1', listen_port, out_path, abort_rule_path, s3_scheme, s3_bucket, s3_prefix)
+server = SinkServer('127.0.0.1', listen_port, out_path, abort_rule_path, s3_scheme, s3_bucket, s3_prefix)
 logging.debug("server: {}".format(server))
 logging.debug("asyncore file: {}".format(asyncore.__file__))
 asyncore.loop(timeout=0.001)
