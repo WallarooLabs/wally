@@ -46,6 +46,6 @@ interface val SinkBuilder
     reporter: MetricsReporter iso, env: Env,
     barrier_coordinator: BarrierCoordinator,
     checkpoint_initiator: CheckpointInitiator, recovering: Bool,
-    worker_name: WorkerName, auth: AmbientAuth): Sink
+    app_name: String, worker_name: WorkerName, auth: AmbientAuth): Sink
 
   fun parallelism(): USize

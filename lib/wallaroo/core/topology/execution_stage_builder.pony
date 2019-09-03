@@ -121,12 +121,14 @@ class val SourceData
     _source_coordinator_builder_builder
 
 class val EgressBuilder
+  let _app_name: String
   let _name: String
   let _id: RoutingId
   let _sink_builder: SinkBuilder
 
   new val create(app_name: String, id': RoutingId, sink_builder: SinkBuilder)
   =>
+    _app_name = app_name
     _name = app_name + " sink"
     _id = id'
     _sink_builder = sink_builder
@@ -148,9 +150,10 @@ class val EgressBuilder
       recover Map[String, OutgoingBoundary] end): Sink
   =>
     _sink_builder(_name, event_log, reporter.clone(), env, barrier_coordinator,
-      checkpoint_initiator, recovering, worker_name, auth)
+      checkpoint_initiator, recovering, _app_name, worker_name, auth)
 
 class val MultiSinkBuilder
+  let _app_name: String
   let _name: String
   let _id: RoutingId
   let _sink_builders: Array[SinkBuilder] val
@@ -158,6 +161,7 @@ class val MultiSinkBuilder
   new val create(app_name: String, id': RoutingId,
     sink_builders: Array[SinkBuilder] val)
   =>
+    _app_name = app_name
     _name = app_name + " sinks"
     _id = id'
     _sink_builders = sink_builders
@@ -182,12 +186,13 @@ class val MultiSinkBuilder
     for sb in _sink_builders.values() do
       let next_sink = sb(_name, event_log, reporter.clone(), env,
         barrier_coordinator, checkpoint_initiator, recovering,
-        worker_name, auth)
+        _app_name, worker_name, auth)
       sinks.push(next_sink)
     end
     consume sinks
 
 class val RedundantSinkBuilder
+  let _app_name: String
   let _name: String
   let _id: RoutingId
   let _sink_builder: SinkBuilder
@@ -196,6 +201,7 @@ class val RedundantSinkBuilder
   new val create(app_name: String, id': RoutingId,
     sink_builder: SinkBuilder, parallelism': USize)
   =>
+    _app_name = app_name
     _name = app_name + " sinks"
     _id = id'
     _sink_builder = sink_builder
@@ -221,7 +227,7 @@ class val RedundantSinkBuilder
     for i in Range(0, _parallelism) do
       let next_sink = _sink_builder(_name, event_log, reporter.clone(), env,
         barrier_coordinator, checkpoint_initiator, recovering,
-        worker_name, auth)
+        _app_name, worker_name, auth)
       sinks.push(next_sink)
     end
     consume sinks
