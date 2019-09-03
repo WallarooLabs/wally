@@ -71,7 +71,7 @@ class ConnectorSinkNotify
     _cookie = cookie
     _auth = auth
 
-    stream_name = _app_name + "-worker-" + worker_name + "-id-" + _sink_id.string()
+    stream_name = _app_name + "-w-" + worker_name + "-id-" + _sink_id.string()
 
   fun ref accepted(conn: WallarooOutgoingNetworkActor ref) =>
     Unreachable()
