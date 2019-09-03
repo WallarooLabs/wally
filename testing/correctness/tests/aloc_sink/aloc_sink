@@ -9,6 +9,7 @@ import re
 import socket
 import struct
 import sys
+import threading
 import time
 import traceback
 
@@ -165,6 +166,7 @@ class AsyncServer(asynchat.async_chat, object):
         self._out_offset = None
         self._txn_state = None
         self._txn_log = None
+        self._worker_name = None
 
         if self._s3 is not None:
             try:
@@ -208,16 +210,28 @@ class AsyncServer(asynchat.async_chat, object):
             if msg.cookie != "Dragons Love Tacos!":
                 logging.critical('bad cookie: {}'.format(msg.cookie))
                 sys.exit(66)
-            logging.info("HelloMsg: program_name {} instance_name {}"
-                .format(msg.program_name, msg.instance_name))
+
             # As of 2019-03-04, Wallaroo's connector sink is not managing
             # credits and will rely solely on TCP backpressure for its
             # own backpressure signalling.
-            ok = cwm.Ok(500)
-            self.write(ok)
 
-            arp = self._abort_rule_path + "." + msg.instance_name
-            self._abort_rules = parse_abort_rules(arp)
+            self._worker_name = msg.instance_name
+            with active_workers as active_workers_l:
+                if self._worker_name in active_workers_l:
+                    txt = "Hello message from worker {}: already active".format(self._worker_name)
+                    logging.error(txt)
+                    err = cwm.Error(txt)
+                    self.write(err)
+                    self.close(delete_from_active_workers = False)
+                else:
+                    txt = "Hello message from worker {}".format(self._worker_name)
+                    logging.info(txt)
+                    ok = cwm.Ok(500)
+                    self.write(ok)
+                    active_workers_l[self._worker_name] = True
+
+            arpath = self._abort_rule_path + "." + msg.instance_name
+            self._abort_rules = parse_abort_rules(arpath)
             for t in self._abort_rules:
                 if t[0] == "stream-content":
                     stream_id = t[1]
@@ -498,14 +512,26 @@ class AsyncServer(asynchat.async_chat, object):
         _type, _value, _traceback = sys.exc_info()
         traceback.print_exception(_type, _value, _traceback)
 
-    def close(self):
+    def close(self, delete_from_active_workers = True):
         logging.info("Closing the connection")
         logging.info("last received id by stream:\n\t{}".format(
             "\n\t".join("{}, {}: {}".format(sid, sn, mid)
                       for sid, sn, mid in self._streams.values())))
         super(AsyncServer, self).close()
-        self.log_it(['connection-closed', True])
-        self.flush_fsync(self._out)
+        try:
+            self.log_it(['connection-closed', True])
+            self.flush_fsync(self._out)
+        except:
+            ## In case of very early errors, file descriptors
+            ## may not have been initialized yet. No harm.
+            None
+
+        if delete_from_active_workers:
+            with active_workers as active_workers_l:
+                if not (self._worker_name in active_workers_l):
+                    raise Exception("Lock not active for {}"
+                        .format(self._worker_name))
+                del active_workers_l[self._worker_name]
 
     def flush_fsync(self, file):
         """
@@ -565,6 +591,22 @@ class EchoServer(asyncore.dispatcher):
             self._out_path, self._abort_rule_path, s3_scheme, s3_bucket, s3_prefix, self._streams)
         self.count += 1
 
+## Class from dos_server.py
+
+class ThreadSafeDict(dict) :
+    def __init__(self, * p_arg, ** n_arg) :
+        dict.__init__(self, * p_arg, ** n_arg)
+        self._lock = threading.Lock()
+
+    def __enter__(self) :
+        self._lock.acquire()
+        return self
+
+    def __exit__(self, type, value, traceback) :
+        self._lock.release()
+
+active_workers = ThreadSafeDict()
+
 fmt = '%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
 logging.root.formatter = logging.Formatter(fmt)
 stream_handler = logging.StreamHandler()
@@ -585,7 +627,7 @@ except:
     s3_bucket = None
     s3_prefix = None
 logging.debug("out_path: {}".format(out_path))
-logging.info("abort_rule_path: {}".format(abort_rule_path))
+logging.debug("abort_rule_path: {}".format(abort_rule_path))
 server = EchoServer('127.0.0.1', listen_port, out_path, abort_rule_path, s3_scheme, s3_bucket, s3_prefix)
 logging.debug("server: {}".format(server))
 logging.debug("asyncore file: {}".format(asyncore.__file__))
