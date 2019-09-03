@@ -134,8 +134,6 @@ class AsyncServer(asynchat.async_chat, object):
         self._id = handler_id
         self._conn = sock
         self._out_path = out_path
-        txn_log_path = self._out_path + ".txnlog"
-        self._txn_log = open(txn_log_path, 'ab')
         self._abort_rule_path = abort_rule_path
         asynchat.async_chat.__init__(self, sock=self._conn)
         self.in_buffer = []
@@ -165,6 +163,8 @@ class AsyncServer(asynchat.async_chat, object):
         self._abort_rules = None
         self._out = None
         self._out_offset = None
+        self._txn_state = None
+        self._txn_log = None
 
         if self._s3 is not None:
             try:
@@ -172,26 +172,6 @@ class AsyncServer(asynchat.async_chat, object):
             except Exception as e:
                 logging.critical('{}'.format(e))
                 sys.exit(66)
-
-        self._txn_state = reload_phase1_txn_state(txn_log_path)
-        logging.debug('restored txn state: {}'.format(self._txn_state))
-        self._txn_commit_next = look_for_forced_abort(txn_log_path)
-
-        orphaned = []
-        if self._s3 is not None:
-            orphaned = look_for_orphaned_s3_phase2_data(txn_log_path)
-        logging.debug('S3: orphaned {}'.format(orphaned))
-        if orphaned == []:
-            logging.info('found zero orphaned items')
-            None
-        elif len(orphaned) > 1:
-            logging.critical('expected max 1 orphaned item: {}'.format(orphaned))
-            sys.exit(66)
-        else:
-            (txn_id, start_por, end_por, _) = orphaned[0]
-            chunk = read_chunk(self._out_path, start_por, end_por)
-            self.log_it(['orphaned', (txn_id, start_por, end_por)])
-            self.write_to_s3_and_log(start_por, chunk, txn_id, 'orphaned')
 
     def collect_incoming_data(self, data):
         """Buffer the data"""
@@ -236,8 +216,8 @@ class AsyncServer(asynchat.async_chat, object):
             ok = cwm.Ok(500)
             self.write(ok)
 
-            # TODO: SLF: abort rules path + instance name
-            self._abort_rules = parse_abort_rules(self._abort_rule_path)
+            arp = self._abort_rule_path + "." + msg.instance_name
+            self._abort_rules = parse_abort_rules(arp)
             for t in self._abort_rules:
                 if t[0] == "stream-content":
                     stream_id = t[1]
@@ -245,10 +225,33 @@ class AsyncServer(asynchat.async_chat, object):
                     self._txn_stream_content.append((stream_id, regexp))
                     # NOTE: This type doesn't have extended disconnect control!
 
-            # TODO: SLF: path + instance name
-            self._out = open(self._out_path, 'ab')
+            opath = self._out_path + "." + msg.instance_name
+            self._out = open(opath, 'ab')
             self._out_offset = self._out.tell()
             logging.debug('top of AsyncServer self._out_offset = {}'.format(self._out_offset))
+
+            tlpath = self._out_path + "." + msg.instance_name + ".txnlog"
+            self._txn_log = open(tlpath, 'ab')
+            self._txn_state = reload_phase1_txn_state(tlpath)
+            logging.debug('restored txn state: {}'.format(self._txn_state))
+            self._txn_commit_next = look_for_forced_abort(tlpath)
+
+            orphaned = []
+            if self._s3 is not None:
+                orphaned = look_for_orphaned_s3_phase2_data(tlpath)
+            logging.debug('S3: orphaned {}'.format(orphaned))
+            if orphaned == []:
+                logging.info('found zero orphaned items')
+                None
+            elif len(orphaned) > 1:
+                logging.critical('expected max 1 orphaned item: {}'.format(orphaned))
+                sys.exit(66)
+            else:
+                (txn_id, start_por, end_por, _) = orphaned[0]
+                chunk = read_chunk(opath, start_por, end_por)
+                self.log_it(['orphaned', (txn_id, start_por, end_por)])
+                self.write_to_s3_and_log(start_por, chunk, txn_id, 'orphaned')
+
         elif isinstance(msg, cwm.Notify):
             if msg.stream_id != 1:
                 logging.error("Unsupported stream id {}".format(msg.stream_id))
@@ -359,7 +362,8 @@ class AsyncServer(asynchat.async_chat, object):
             self.flush_fsync(self._txn_log)
             success = self._txn_commit_next
             if success and (self._s3 is not None) and start_por >= 0:
-                chunk = read_chunk(self._out_path, start_por, end_por)
+                opath = self._out_path + "." + msg.instance_name
+                chunk = read_chunk(opath, start_por, end_por)
                 logging.debug('S3: offset {} to {} len(chunk) = {}'.format(start_por, end_por, len(chunk)))
                 self._s3_chunk = chunk
                 self._s3_chunk_offset = start_por
