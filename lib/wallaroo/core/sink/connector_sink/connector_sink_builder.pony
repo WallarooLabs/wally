@@ -141,7 +141,8 @@ class val ConnectorSinkBuilder
     reporter: MetricsReporter iso, env: Env,
     barrier_coordinator: BarrierCoordinator,
     checkpoint_initiator: CheckpointInitiator,
-    recovering: Bool, worker_name: WorkerName, auth: AmbientAuth): Sink
+    recovering: Bool, app_name: String, worker_name: WorkerName,
+    auth: AmbientAuth): Sink
   =>
     @l(Log.info(), Log.conn_sink(),
       ("ConnectorSinkBuilder: Connecting to sink at " + _host + ":" + _service + "\n")
@@ -150,7 +151,7 @@ class val ConnectorSinkBuilder
     let id: RoutingId = RoutingIdGenerator()
 
     ConnectorSink(id, sink_name, event_log, recovering, env, _encoder_wrapper,
-      consume reporter, barrier_coordinator, checkpoint_initiator, _host, _service, worker_name, _protocol_version, _cookie,
+      consume reporter, barrier_coordinator, checkpoint_initiator, _host, _service, app_name, worker_name, _protocol_version, _cookie,
       ApplyReleaseBackpressureAuth(auth), _initial_msgs)
 
   fun parallelism(): USize =>
