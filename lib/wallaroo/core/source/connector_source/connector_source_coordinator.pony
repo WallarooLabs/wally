@@ -105,6 +105,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
     _connected_sources.create()
   let _available_sources: Array[(RoutingId, ConnectorSource[In])] =
     _available_sources.create()
+  var _sources_are_muted: Bool
 
   // Stream Registry for managing updates to local and global stream state
   let _stream_registry: LocalConnectorStreamRegistry[In]
@@ -218,6 +219,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
       _available_sources.push((source_id, source))
     end
 
+    _sources_are_muted = true
     _event_log.register_resilient(_id, this)
 
   fun ref _start_listening() =>
@@ -499,6 +501,10 @@ actor ConnectorSourceCoordinator[In: Any val] is
       for (_, s) in _available_sources.values() do
         s.first_checkpoint_complete()
       end
+      _start_sources()
+    end
+    if _sources_are_muted then
+      _sources_are_muted = false
       _start_sources()
     end
 
