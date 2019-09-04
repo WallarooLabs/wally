@@ -92,33 +92,6 @@ set_artifact_names() {
   wallaroo_bintray_package="wallaroo"
   ## Sets Wallaroo source archive name
   wallaroo_source_archive="wallaroo-${bintray_artifacts_version}.tar.gz"
-  ## Sets Metrics UI appimage name
-  metrics_ui_appimage="Wallaroo_Metrics_UI-${bintray_artifacts_version}-x86_64.AppImage"
-}
-
-build_metrics_ui_appimage() {
-  ## Conditional check for whether the current Metrics UI appimage exists in bintray, does not
-  ## re-upload appimage if so. Otherwise uploads to Bintray.
-  bintray_metrics_ui_appimage=$(curl -s "https://${wallaroo_bintray_subject}.bintray.com/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${bintray_artifacts_version}/" grep -Po "(?<=>)$metrics_ui_appimage(?=<)" || echo "0")
-  if [[ "$bintray_metrics_ui_appimage" == "$metrics_ui_appimage" ]]
-  then
-    if [[ $BRANCH == "release" ]]
-    then
-      echo "Appimage for metrics ui: $metrics_ui_appimage already exists in bintray for this release. Cannot overwrite!"
-      exit 1
-    fi
-  fi
-
-  ## delete the existing file if it exists
-  rm -f "$metrics_ui_appimage"
-
-  sudo make clean-monitoring_hub
-
-  make build-metrics-ui-appimage
-
-  sudo make clean-monitoring_hub
-
-  mv Wallaroo_Metrics_UI*-x86_64.AppImage "$metrics_ui_appimage"
 }
 
 build_wallaroo_source_archive() {
@@ -162,15 +135,6 @@ push_wallaroo_bintray_artifacts() {
     echo "Failed to uploaded wallaroo source archive $wallaroo_source_archive to bintray"
   fi
 
-  # push the metrcis appimage
-  if ./jfrog bt u --override --publish "$metrics_ui_appimage" "${wallaroo_bintray_subject}/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${bintray_artifacts_version}" "${wallaroo_bintray_package}/${bintray_artifacts_version}/"
-  then
-    echo "Uploaded $metrics_ui_appimage to bintray successfully."
-  else
-    echo "Failed to upload $metrics_ui_appimage to bintray."
-    exit 1
-  fi
-
   # delete jfrog cli
   rm -f jfrog
 }
@@ -199,6 +163,5 @@ verify_no_local_changes
 checkout_to_commit
 set_artifact_names
 build_wallaroo_source_archive
-build_metrics_ui_appimage
 push_wallaroo_bintray_artifacts
 git_reset

@@ -12,19 +12,6 @@ set -eu
 RC_BRANCH_NAME=$1
 FOR_VERSION=$2
 
-build_metrics_binary() {
-  curl --user-agent "Wallaroo AMI builder" -L -o Wallaroo_Metrics_UI-0.5.3-x86_64.AppImage 'https://wallaroo-labs.bintray.com/wallaroolabs-ftp/wallaroo/0.5.3/Wallaroo_Metrics_UI-0.5.3-x86_64.AppImage'
-  chmod +x Wallaroo_Metrics_UI-0.5.3-x86_64.AppImage
-  ./Wallaroo_Metrics_UI-0.5.3-x86_64.AppImage --appimage-extract
-  rm Wallaroo_Metrics_UI-0.5.3-x86_64.AppImage
-  mv squashfs-root metrics_ui
-  sed -i 's/sleep 4/sleep 0/' metrics_ui/AppRun
-  rm -rf .release/metrics_ui
-  mv metrics_ui .release/
-  (cd .release/metrics_ui && ln -s AppRun metrics_reporter_ui)
-  (cd .release && zip -r metrics_ui.zip metrics_ui && rm -rf metrics_ui)
-}
-
 compile_for_sandy_bridge() {
   PREV_HEAD=$(git rev-parse --abbrev-ref HEAD)
   TARGET_CPU=sandybridge
@@ -67,6 +54,5 @@ build_ami_with_packer() {
   )
 }
 
-build_metrics_binary
 compile_for_sandy_bridge
 build_ami_with_packer
