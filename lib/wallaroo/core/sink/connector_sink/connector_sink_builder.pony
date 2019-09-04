@@ -148,7 +148,10 @@ class val ConnectorSinkBuilder
       ("ConnectorSinkBuilder: Connecting to sink at " + _host + ":" + _service + "\n")
       .cstring())
 
-    let id: RoutingId = RoutingIdGenerator()
+    let id: RoutingId = try DeterministicSourceIdGenerator(
+      app_name + sink_name + worker_name + "-connector-sink")?
+      else Fail(); 0
+      end
 
     ConnectorSink(id, sink_name, event_log, recovering, env, _encoder_wrapper,
       consume reporter, barrier_coordinator, checkpoint_initiator, _host, _service, app_name, worker_name, _protocol_version, _cookie,

@@ -25,7 +25,7 @@ use "wallaroo/core/sink"
 use "wallaroo/core/barrier"
 use "wallaroo/core/recovery"
 use "wallaroo/core/checkpoint"
-
+use "wallaroo_labs/mort"
 
 primitive TCPSinkConfigCLIParser
   fun apply(args: Array[String] val): Array[TCPSinkConfigOptions] val ? =>
@@ -115,13 +115,16 @@ class val TCPSinkBuilder
   fun apply(sink_name: String, event_log: EventLog,
     reporter: MetricsReporter iso, env: Env,
     barrier_coordinator: BarrierCoordinator, checkpoint_initiator: CheckpointInitiator,
-    recovering: Bool, app_name_: String, worker_name_: WorkerName,
+    recovering: Bool, app_name: String, worker_name: WorkerName,
     auth_: AmbientAuth): Sink
   =>
     @printf[I32](("Connecting to sink at " + _host + ":" + _service + "\n")
       .cstring())
 
-    let id: RoutingId = RoutingIdGenerator()
+    let id: RoutingId = try DeterministicSourceIdGenerator(
+      app_name + sink_name + worker_name + "-connector-sink")?
+      else Fail(); 0
+      end
 
     TCPSink(id, sink_name, event_log, recovering, env, _encoder_wrapper,
       consume reporter, barrier_coordinator, checkpoint_initiator, _host, _service,
