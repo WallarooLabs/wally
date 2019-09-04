@@ -121,8 +121,8 @@ class val TCPSinkBuilder
     @printf[I32](("Connecting to sink at " + _host + ":" + _service + "\n")
       .cstring())
 
-    let id: RoutingId = try DeterministicSourceIdGenerator(
-      app_name + sink_name + worker_name + "-tcp-sink")?
+    let id: RoutingId = try RoutingIdFromStringGenerator(
+      app_name + sink_name + worker_name + "-tcp-sink-" + _host + _service)?
       else Fail(); 0
       end
 
