@@ -65,8 +65,8 @@ actor ConnectorSourceCoordinator[In: Any val] is
   """
   # ConnectorSourceCoordinator
   """
-  let _routing_id_gen: DeterministicSourceIdGenerator =
-    DeterministicSourceIdGenerator
+  let _routing_id_gen: RoutingIdFromStringGenerator =
+    RoutingIdFromStringGenerator
   let _id: RoutingId
   let _env: Env
   let _worker_name: WorkerName

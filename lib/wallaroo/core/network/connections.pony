@@ -71,8 +71,8 @@ actor Connections is Cluster
   let _init_d_service: String
   let _disposables: SetIs[DisposableActor] = _disposables.create()
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
-  let _string_id_gen: DeterministicSourceIdGenerator =
-    DeterministicSourceIdGenerator
+  let _string_id_gen: RoutingIdFromStringGenerator =
+    RoutingIdFromStringGenerator
   let _connection_addresses_file: String
   let _is_joining: Bool
   let _event_log: EventLog
