@@ -211,6 +211,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self._async_init = False
 
         self._sent = 0
+        self._in_reconnect_loop = False
 
         # allow the user to do a join(timeout=0)
         self.stopped = threading.Event()
@@ -358,7 +359,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
     ##########################
 
     def connect(self):
-        logging.debug("ALOConnectorSource.connect")
         self.handshake_complete = False
         conn = socket.socket()
         try:
@@ -367,8 +367,20 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             logging.error("Failed to connect to {}:{}".format(self._host,
                 self._port))
             self.error = err
-            self.stopped.set()
-            raise err
+            if not self._in_reconnect_loop:
+                ## Only stop the thread if the connect failure
+                ## was on our first attempt.
+                self.stopped.set()
+                raise err
+            else:
+                ## TODO: If the server is down for too long, we can blow
+                ## out our thread's stack space.  However, I don't know
+                ## of a way to send an event into asynchat to tell it to
+                ## reconnect or of any other method to avoid this
+                ## possibly deep recursion.
+                time.sleep(5.0)
+                self.connect()
+                return
         self._conn = conn
         self._conn.setblocking(1) # Set socket to blocking mode
 
@@ -431,8 +443,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 self.initiate_send()
 
     def shutdown(self, error=None):
-        if error is not None:
-            logging.info("AtLeastOnceConnector.shutdown(error={})".format(error))
+        logging.info("AtLeastOnceConnector.shutdown(error={})".format(error))
         if self._async_init:
             self.del_channel(self._socket_map) # remove the connection from asyncore loop
         self._stop_asyncore_loop()
@@ -616,6 +627,21 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
     def handle_restart(self, msg):
         logging.warning("Received RESTART message. Closing streams and "
             "reinitiating handshake.")
+
+        self._close_common()
+
+        # optionally update target host and port
+        if msg.address:
+            logging.info("Updating target address from {}:{} to {}"
+                .format(self._host, self._port, msg.address))
+            host, port = msg.address.split(':')
+            port = int(port)
+            self._host = host
+            self._port = port
+
+        self._reconnect_common()
+
+    def _close_common(self):
         # reset credits
         self.credits = 0
         # close connection
@@ -635,17 +661,29 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 new = Stream(stream.id, stream.name, stream.point_of_ref, False)
                 self._streams[sid] = new
                 self.stream_closed(new)
-        # optionally update target host and port
-        if msg.address:
-            logging.info("Updating target address from {}:{} to {}"
-                .format(self._host, self._port, msg.address))
-            host, port = msg.address.split(':')
-            port = int(port)
-            self._host = host
-            self._port = port
+
+    def _reconnect_common(self):
         # try to connect again
-        self.connect()
+        self._in_reconnect_loop = True
+        try:
+            self.connect()
+            self._in_reconnect_loop = False
+        except socket.error as err:
+            if err.errno == socket.errno.ECONNREFUSED:
+                logging.info("_reconnect_common: ECONNREFUSED")
+                time.sleep(1.0)
+                logging.debug("_reconnect_common: retry")
+                raise
+        except Exception as err:
+            logging.error("_reconnect_common: connect failed: {}".format(err))
+            raise
         self.handle_restarted(self._streams)
+
+    def handle_close(self):
+        logging.error("YO, handle_close!")
+        self._close_common()
+        time.sleep(0.10)
+        self._reconnect_common()
 
     def handle_error(self):
         """
@@ -665,6 +703,11 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 self.stop_server()
         ```
         """
+        if self._in_reconnect_loop:
+            logging.debug("Let's reconnect")
+            self._reconnect_common()
+            return
+
         _type, _value, _traceback = sys.exc_info()
         exc_text = ''.join(
                 traceback.format_exception(_type, _value, _traceback)).strip()
