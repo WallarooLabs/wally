@@ -39,8 +39,8 @@ use "wallaroo_labs/mort"
 actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   let _source_id: RoutingId
   let _auth: AmbientAuth
-  let _string_id_gen: DeterministicSourceIdGenerator =
-    DeterministicSourceIdGenerator
+  let _string_id_gen: RoutingIdFromStringGenerator =
+    RoutingIdFromStringGenerator
   var _router: Router
   let _routes: SetIs[Consumer] = _routes.create()
   var _consumer_sender: TestableConsumerSender

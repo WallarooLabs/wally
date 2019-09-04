@@ -38,7 +38,7 @@ class RequestIdGenerator
   fun ref apply(): RequestId =>
     _guid.u128()
 
-primitive DeterministicSourceIdGenerator
+primitive RoutingIdFromStringGenerator
   fun apply(text: String): RoutingId ? =>
     let temp_id = MD5(text)
     let rb = Reader
