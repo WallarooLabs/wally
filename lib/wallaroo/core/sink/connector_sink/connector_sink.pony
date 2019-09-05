@@ -440,6 +440,7 @@ actor ConnectorSink is Sink
   fun ref receive_new_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
+    @ll(_conn_debug, "Receive new barrier %s at ConnectorSink %s".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
     _phase = BarrierSinkPhase(_sink_id, this,
       barrier_token)
     _phase.receive_barrier(input_id, producer,
@@ -448,6 +449,11 @@ actor ConnectorSink is Sink
   fun ref process_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
+    ifdef "checkpoint_trace" then
+      @ll(_conn_debug, "Process Barrier %s at ConnectorSink %s from %s with phase %s\n".cstring(),
+        barrier_token.string().cstring(), _sink_id.string().cstring(),
+        input_id.string().cstring(), _phase.name().cstring())
+    end
     match barrier_token
     | let srt: CheckpointRollbackBarrierToken =>
       _phase.prepare_for_rollback(barrier_token)
@@ -514,6 +520,9 @@ actor ConnectorSink is Sink
     | let rbrt: CheckpointRollbackResumeBarrierToken =>
       _resume_processing_messages()
       _twopc.reset_state()
+    else
+      // AutoscaleBarrierToken, AutoscaleResumeBarrierToken, et al.
+      _resume_processing_messages()
     end
     if ack_now then
       _barrier_coordinator.ack_barrier(this, barrier_token)
