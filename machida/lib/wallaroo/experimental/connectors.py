@@ -90,10 +90,9 @@ class BaseSource(BaseMeta):
         """
         When Wallaroo sends an ACK for our stream_id, this callback is
         called with the ack'ed point of reference.
-
-        Implementing this callback is optional.
         """
-        None
+        raise NotImplementedError
+
 
 class FramedFileReader(BaseIter, BaseSource):
     """
@@ -134,6 +133,9 @@ class FramedFileReader(BaseIter, BaseSource):
         if not b:
             raise StopIteration
         return (b, self.file.tell())
+
+    def wallaroo_acked(self, point_of_ref):
+        None
 
     def close(self):
         self.file.close()
@@ -222,6 +224,9 @@ class ThrottledFileReader(BaseIter, BaseSource):
         #logging.info("b = {}".format(b))
         return (b, self.file.tell())
 
+    def wallaroo_acked(self, point_of_ref):
+        self.last_acked = point_of_ref
+
     def close(self):
         self.file.close()
 
@@ -230,9 +235,6 @@ class ThrottledFileReader(BaseIter, BaseSource):
             self.close()
         except:
             pass
-
-    def wallaroo_acked(self, point_of_ref):
-        self.last_acked = point_of_ref
 
 class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
     """
