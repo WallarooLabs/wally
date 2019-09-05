@@ -149,7 +149,7 @@ class val ConnectorSinkBuilder
       .cstring())
 
     let id: RoutingId = try DeterministicSourceIdGenerator(
-      app_name + sink_name + worker_name + "-connector-sink-" + app_name + worker_name)?
+      sink_name + worker_name + "-connector-sink-" + _host + _service)?
       else Fail(); 0
       end
 
