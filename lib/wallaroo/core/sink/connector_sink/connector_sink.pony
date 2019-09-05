@@ -537,7 +537,7 @@ actor ConnectorSink is Sink
 
     _twopc.checkpoint_complete(this, drop_phase2_msg)
 
-    try @ll(_twopc_debug, "2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d _notify.twopc_txn_id_last_committed %s".cstring(), _twopc.last_offset, (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
+    @ll(_twopc_debug, "2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d _notify.twopc_txn_id_last_committed %s".cstring(), _twopc.last_offset, _notify.twopc_txn_id_last_committed_helper().cstring())
 
     if _twopc.txn_id == "" then
       @ll(_twopc_err, "Error: checkpoint_complete() with empty _twopc.txn_id = %s.".cstring(), _twopc.txn_id.cstring())
@@ -546,7 +546,7 @@ actor ConnectorSink is Sink
       if not _twopc.txn_id.contains("skip--.--CheckpointBarrierToken") then
         _notify.twopc_txn_id_last_committed = _twopc.txn_id
       end
-      try @ll(_twopc_debug, "2PC: DBGDBG: twopc_txn_id_last_committed = %s.".cstring(), (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
+      @ll(_twopc_debug, "2PC: DBGDBG: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
     end
     _twopc.reset_state()
 
@@ -646,11 +646,11 @@ actor ConnectorSink is Sink
     // commit status: commit for checkpoint_id, all greater are invalid.
     _notify.twopc_txn_id_last_committed =
       _twopc.make_txn_id_string(checkpoint_id)
-    try @ll(_twopc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.".cstring(), (_notify.twopc_txn_id_last_committed as String).cstring()) else Fail() end
+    @ll(_twopc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
     _notify.twopc_current_txn_aborted = _notify.process_uncommitted_list(this)
 
     @ll(_twopc_debug, "DBGDBG: 2PC: twopc_current_txn_aborted = %s.".cstring(), _notify.twopc_current_txn_aborted.string().cstring())
-    @ll(_twopc_debug, "2PC: Rollback: _twopc.last_offset %lu _twopc.current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s".cstring(), _twopc.last_offset, _twopc.current_offset, _notify.acked_point_of_ref, try (_notify.twopc_txn_id_last_committed as String).cstring() else "<<<None>>>".string() end, _sink_id.string().cstring())
+    @ll(_twopc_debug, "2PC: Rollback: _twopc.last_offset %lu _twopc.current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s".cstring(), _twopc.last_offset, _twopc.current_offset, _notify.acked_point_of_ref, _notify.twopc_txn_id_last_committed_helper().cstring(), _sink_id.string().cstring())
 
     event_log.ack_rollback(_sink_id)
 

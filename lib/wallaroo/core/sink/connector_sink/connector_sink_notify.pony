@@ -446,13 +446,19 @@ class ConnectorSinkNotify
       // are starting for the first time.  There is no prior committed
       // txn_id.
       twopc_txn_id_last_committed = ""
-      try @ll(_twopc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.".cstring(), (twopc_txn_id_last_committed as String).cstring()) else Fail() end
+      @ll(_twopc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.".cstring(), twopc_txn_id_last_committed_helper().cstring())
       process_uncommitted_list(conn)
     end
 
   fun _payload_length(data: Array[U8] iso): USize ? =>
     Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
+  fun twopc_txn_id_last_committed_helper(): String =>
+    try
+      twopc_txn_id_last_committed as String
+    else
+      "--<<{{None}}>>--"
+    end
 
   fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
     """
