@@ -809,6 +809,9 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
         payload = struct.pack('>Q{}s'.format(len(key)), val, key)
         return (payload, pos)
 
+    def wallaroo_acked(self, point_of_ref):
+        None
+
     def close(self):
         self.closed = True
 
