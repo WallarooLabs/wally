@@ -207,7 +207,7 @@ class AsyncServer(asynchat.async_chat, object):
             if msg.version != "v0.0.1":
                 logging.critical('bad protocol version: {}'.format(msg.version))
                 sys.exit(66)
-            if msg.cookie != "Dragons Love Tacos!":
+            if msg.cookie != "Dragons-Love-Tacos":
                 logging.critical('bad cookie: {}'.format(msg.cookie))
                 sys.exit(66)
 
