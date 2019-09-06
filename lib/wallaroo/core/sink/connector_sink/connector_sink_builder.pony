@@ -60,7 +60,7 @@ primitive ConnectorSinkConfigCLIParser
     for output in outputs.split(",").values() do
       let o = output.split(":")
       opts.push(ConnectorSinkConfigOptions(o(0)?, o(1)?, "v0.0.1",
-        "Dragons Love Tacos!"))
+        "Dragons-Love-Tacos"))
     end
 
     consume opts
