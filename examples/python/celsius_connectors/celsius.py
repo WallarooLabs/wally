@@ -33,7 +33,7 @@ def application_setup(args):
         decoder=decode_feed,
         host=in_host,
         port=in_port,
-        cookie="Dragons Love Tacos!",
+        cookie="Dragons-Love-Tacos",
         max_credits=10,
         refill_credits=8)
     #sink_config = wallaroo.experimental.SinkConnectorConfig(

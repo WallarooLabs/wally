@@ -48,7 +48,7 @@ class Sender(threading.Thread):
 
 
 version = "0.0.1"
-cookie = "Dragons Love Tacos!"
+cookie = "Dragons-Love-Tacos"
 program_name = "celsius at least once"
 instance_name = "instance"
 args=None
