@@ -16,7 +16,7 @@ VERBOSE=""
 JOIN_ARG=""
 
 # Ref: /usr/share/doc/util-linux/examples/getopt-parse.bash
-TEMP=`getopt -o jn:v --long j-long,n-long:,v-long \
+TEMP=`getopt -o jn:v --long join,num-workers:,verbose \
      -n $0 -- "$@"`
 
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
@@ -26,9 +26,9 @@ eval set -- "$TEMP"
 
 while true ; do
     case "$1" in
-        -j|--j-long) JOIN_ARG="--join $WALLAROO_ARG_CONTROL"; shift 1 ;;
-        -n|--n-long) NUM_WORKERS=$2; shift 2 ;;
-        -v|--v-long) VERBOSE=true; shift 1 ;;
+        -j|--join) JOIN_ARG="--join $WALLAROO_ARG_CONTROL"; shift 1 ;;
+        -n|--num-workers) NUM_WORKERS=$2; shift 2 ;;
+        -v|--verbose) VERBOSE=true; shift 1 ;;
         --) shift ; break ;;
         *) echo "Internal error!" ; exit 1 ;;
     esac

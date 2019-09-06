@@ -15,7 +15,7 @@ NUM_WORKERS=1
 VERBOSE=""
 
 # Ref: /usr/share/doc/util-linux/examples/getopt-parse.bash
-TEMP=`getopt -o n:v --long n-long:,v-long \
+TEMP=`getopt -o n:v --long num-workers:,verbose \
      -n $0 -- "$@"`
 
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
@@ -25,8 +25,8 @@ eval set -- "$TEMP"
 
 while true ; do
     case "$1" in
-        -n|--n-long) NUM_WORKERS=$2; shift 2 ;;
-        -v|--v-long) VERBOSE=true; shift 1 ;;
+        -n|--num-workers) NUM_WORKERS=$2; shift 2 ;;
+        -v|--verbose) VERBOSE=true; shift 1 ;;
         --) shift ; break ;;
         *) echo "Internal error!" ; exit 1 ;;
     esac
