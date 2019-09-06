@@ -13,9 +13,10 @@ fi
 
 NUM_WORKERS=1
 VERBOSE=""
+JOIN_ARG=""
 
 # Ref: /usr/share/doc/util-linux/examples/getopt-parse.bash
-TEMP=`getopt -o n:v --long n-long:v-long \
+TEMP=`getopt -o jn:v --long j-long,n-long:,v-long \
      -n $0 -- "$@"`
 
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
@@ -25,6 +26,7 @@ eval set -- "$TEMP"
 
 while true ; do
     case "$1" in
+        -j|--j-long) JOIN_ARG="--join $WALLAROO_ARG_CONTROL"; shift 1 ;;
         -n|--n-long) NUM_WORKERS=$2; shift 2 ;;
         -v|--v-long) VERBOSE=true; shift 1 ;;
         --) shift ; break ;;
@@ -37,14 +39,24 @@ if [ ! -z "$VERBOSE" ]; then
     echo NUM_WORKERS=$NUM_WORKERS
     echo VERBOSE=$VERBOSE
     echo WORKER=$WORKER
+    echo JOIN_ARG=$JOIN_ARG
 fi
 
-my_ip=${WALLAROO_HOST_PREFIX}.$WORKER
-my_control=`echo $WALLAROO_ARG_MY_CONTROL | sed s/__WORKER_HOST__/$my_ip/g`
-my_data=`echo $WALLAROO_ARG_MY_DATA | sed s/__WORKER_HOST__/$my_ip/g`
-cmd="$WALLAROO_BIN $WALLAROO_BASE_ARGS \
+## Assume: all Wallaroo workers are on the same machine via loopback interface
+my_ip=${WALLAROO_INIT_HOST}
+
+my_shift=`expr $WORKER \* 10`
+my_in_port=`expr $WALLAROO_IN_BASE + $my_shift`
+my_in=`echo $WALLAROO_ARG_IN | \
+    sed -e "s/__IN_HOST__/$WALLAROO_INIT_HOST/" \
+        -e "s/__IN_PORT__/$my_in_port/"`
+my_control="${my_ip}:`expr $WALLAROO_MY_CONTROL_BASE + $my_shift`"
+my_data="${my_ip}:`expr $WALLAROO_MY_DATA_BASE + $my_shift`"
+
+cmd="$WALLAROO_BIN --in $my_in \
+     $WALLAROO_BASE_ARGS \
      --name worker$WORKER --my-control $my_control --my-data $my_data \
-     $WALLAROO_ARG_PONY"
+     $JOIN_ARG $WALLAROO_ARG_PONY"
 if [ ! -z "$VERBOSE" ]; then
     echo "cmd: $cmd /tmp/wallaroo.$WORKER 2>&1 &"
 fi
