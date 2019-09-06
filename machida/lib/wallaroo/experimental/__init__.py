@@ -431,6 +431,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 try:
                     while self.credits > 0:
                         msg = self.__next__()
+                        #if msg is not None: logging.debug("ITER msg = {}".format(msg))
                         if msg:
                             self.write(msg)
                         else:
