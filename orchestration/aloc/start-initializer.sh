@@ -15,7 +15,7 @@ NUM_WORKERS=1
 VERBOSE=""
 
 # Ref: /usr/share/doc/util-linux/examples/getopt-parse.bash
-TEMP=`getopt -o n:v --long n-long:v-long \
+TEMP=`getopt -o n:v --long n-long:,v-long \
      -n $0 -- "$@"`
 
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
@@ -38,13 +38,18 @@ if [ ! -z "$VERBOSE" ]; then
     echo VERBOSE=$VERBOSE
 fi
 
-cmd="$WALLAROO_BIN $WALLAROO_BASE_ARGS --data $WALLAROO_ARG_DATA \
+my_in=`echo $WALLAROO_ARG_IN | \
+    sed -e "s/__IN_HOST__/$WALLAROO_INIT_HOST/" \
+        -e "s/__IN_PORT__/$WALLAROO_IN_BASE/"`
+
+cmd="$WALLAROO_BIN --in $my_in \
+     $WALLAROO_BASE_ARGS --data $WALLAROO_ARG_DATA \
      --cluster-initializer --worker-count $NUM_WORKERS \
      $WALLAROO_ARG_PONY"
 if [ ! -z "$VERBOSE" ]; then
     echo "cmd: $cmd /tmp/wallaroo.1 2>&1 &"
 fi
 
-eval "strace -o /tmp/strace.out -f $cmd" > /tmp/wallaroo.1 2>&1 &
+eval "$cmd" > /tmp/wallaroo.1 2>&1 &
 
 exit 0
