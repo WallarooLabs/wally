@@ -1,3 +1,4 @@
+## When using sh/bash, use via: . /path/to/this/file
 
 ## Assume: all Wallaroo workers are on the same machine via loopback interface
 export WALLAROO_INIT_HOST=127.0.0.1
@@ -12,7 +13,7 @@ export WALLAROO_EXTERNAL_BASE=7103
 export WALLAROO_MY_CONTROL_BASE=7104
 export WALLAROO_MY_DATA_BASE=7105
 
-export WALLAROO_BIN="./examples/pony/aloc_passthrough/aloc_passthrough"
+## export WALLAROO_BIN="./examples/pony/aloc_passthrough/aloc_passthrough"
 export WALLAROO_ARG_IN="InputBlobs@__IN_HOST__:__IN_PORT__:Dragons-Love-Tacos:500:50"
 export WALLAROO_ARG_OUT="${WALLAROO_OUT_HOST}:7200"
 export WALLAROO_ARG_METRICS="${WALLAROO_METRICS_HOST}:5001"
