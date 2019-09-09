@@ -30,6 +30,28 @@ while true ; do
 done
 
 if [ ! -z "$ALL_RUNNING" ]; then
+    ## Use cluster-state-entity-count-query to initializer to check if
+    ## all of the nodes in the cluster are actually running &
+    ## queryable.  The query will hang if one or more of the workers
+    ## has crashed.  Unfortunately, that hang makes scripting
+    ## difficult: the `external_sender` proc can hang forever waiting
+    ## for a reply from Wallaroo that will never arrive.
+    ##
+    ## If a worker *has* crashed, then a `cluster-status-query` that
+    ## is sent to any running worker process will return successfully.
+    ## That's not what we want to know.
+    ##
+    ## The only way that I can think of around this problem is to send
+    ## a `cluster-status-query` and then parse the output, e.g.,
+    ## Processing messages: true, Worker count: 2, Workers: |initializer,worker2,|,
+    ## then map the worker name -> Wallaroo external TCP port, then
+    ## send a `cluster-status-query` to each of the workers.  But that
+    ## embeds a lot more Wallaroo internal knowledge (and also the TCP
+    ## port number convention used by these shell scripts).
+    ##
+    ## NOTE: GH bug #3002 means that we can DoS ourselves by sending
+    ##       this query too soon!  {sigh}
+
     if [ ! -z "$VERBOSE" ]; then
         echo -n "Entity count: "
     fi
