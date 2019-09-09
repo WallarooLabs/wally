@@ -29,62 +29,24 @@ while true ; do
     esac
 done
 
-if [ ! -z "$ALL_RUNNING" ]; then
-    ## Use cluster-state-entity-count-query to initializer to check if
-    ## all of the nodes in the cluster are actually running &
-    ## queryable.  The query will hang if one or more of the workers
-    ## has crashed.  Unfortunately, that hang makes scripting
-    ## difficult: the `external_sender` proc can hang forever waiting
-    ## for a reply from Wallaroo that will never arrive.
-    ##
-    ## If a worker *has* crashed, then a `cluster-status-query` that
-    ## is sent to any running worker process will return successfully.
-    ## That's not what we want to know.
-    ##
-    ## The only way that I can think of around this problem is to send
-    ## a `cluster-status-query` and then parse the output, e.g.,
-    ## Processing messages: true, Worker count: 2, Workers: |initializer,worker2,|,
-    ## then map the worker name -> Wallaroo external TCP port, then
-    ## send a `cluster-status-query` to each of the workers.  But that
-    ## embeds a lot more Wallaroo internal knowledge (and also the TCP
-    ## port number convention used by these shell scripts).
-    ##
-    ## NOTE: GH bug #3002 means that we can DoS ourselves by sending
-    ##       this query too soon!  {sigh}
+## If a worker has crashed, then a `cluster-status-query` that
+## is sent to any running worker process will return successfully.
+## That's not what we want to know.
+##
+## NOTE: GH bug #3002 means that we can DoS ourselves by sending
+##       this query too soon!  {sigh}
+##
+## If we use cluster-state-entity-count-query to initializer to check if
+## all of the nodes in the cluster are actually running &
+## queryable.  The query will hang if one or more of the workers
+## has crashed.  Unfortunately, that hang makes scripting
+## difficult: the `external_sender` proc can hang forever waiting
+## for a reply from Wallaroo that will never arrive.
+##
+## Our workaround is to use our external TCP port numbering scheme to
+## query each worker directly.  We assume that the initializer's
+## cluster membership info is the Source of Truth(tm).
 
-    if [ ! -z "$VERBOSE" ]; then
-        echo -n "Entity count: "
-    fi
-    OUTFILE=`tempfile -d /tmp`
-    trap "rm -f $OUTFILE" 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-    for i in `seq 1 $COUNT`; do
-        ../../testing/tools/external_sender/external_sender \
-            -e $WALLAROO_ARG_EXTERNAL \
-            -t cluster-state-entity-count-query > $OUTFILE 2>&1 &
-        PID=$!
-        sleep 0.1
-        grep -s initializer $OUTFILE > /dev/null 2>&1
-        if [ $? -eq 0 ]; then
-            if [ ! -z "$VERBOSE" ]; then
-                echo Success
-            fi
-            break
-        fi
-        if [ ! -z "$VERBOSE" ]; then
-            echo -n .
-        fi
-    done
-    if [ $i -eq $COUNT ]; then
-        if [ ! -z "$VERBOSE" ]; then
-            echo Failed
-        fi
-        exit 1
-    fi
-fi
-
-if [ ! -z "$VERBOSE" ]; then
-    echo -n "Processing messages: "
-fi
 for i in `seq 1 $COUNT`; do
     ../../testing/tools/external_sender/external_sender \
         -e $WALLAROO_ARG_EXTERNAL -t cluster-status-query 2>&1 | \
@@ -97,6 +59,64 @@ for i in `seq 1 $COUNT`; do
     fi
     sleep 0.1
 done
+
+if [ $i -eq $COUNT ]; then
+    if [ ! -z "$VERBOSE" ]; then
+        echo Failed
+    fi
+    exit 1
+fi
+
+if [ ! -z "$ALL_RUNNING" ]; then
+    workers=`../../testing/tools/external_sender/external_sender \
+        -e $WALLAROO_ARG_EXTERNAL -t cluster-status-query 2>&1 | \
+      grep -s 'Processing messages: ' | \
+      sed -e 's/.*Workers: .//' -e 's/,|.*//' | \
+      tr ',' ' '`
+    for worker in $workers; do
+        if [ ! -z "$VERBOSE" ]; then
+            echo -n "Worker $worker: "
+        fi
+        base_port=7103
+        case $worker in
+            initializer)
+                port=$base_port
+                ;;
+            worker*)
+                n=`echo $worker | sed 's/worker//'`
+                my_shift=`expr $n \* 10`
+                port=`expr $base_port + $my_shift`
+                ;;
+            *)
+                echo Error: unknown worker $worker
+                exit 1
+                ;;
+        esac
+        if [ ! -z "$VERBOSE" ]; then
+            echo -n port = $port
+        fi
+        for i in `seq 1 $COUNT`; do
+            ../../testing/tools/external_sender/external_sender \
+                -e 127.0.0.1:$port -t cluster-status-query 2>&1 | \
+                grep -s 'Processing messages: true' > /dev/null 2>&1
+            if [ $? -eq 0 ]; then
+                if [ ! -z "$VERBOSE" ]; then
+                    echo ""
+                fi
+                break;
+            fi
+            if [ ! -z "$VERBOSE" ]; then
+                echo -n .
+            fi
+            sleep 0.1
+        done
+        if [ $i -eq $COUNT ]; then
+            if [ ! -z "$VERBOSE" ]; then
+                break
+            fi
+        fi
+    done
+fi
 
 if [ $i -eq $COUNT ]; then
     if [ ! -z "$VERBOSE" ]; then
