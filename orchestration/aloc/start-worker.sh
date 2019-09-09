@@ -50,12 +50,14 @@ my_in_port=`expr $WALLAROO_IN_BASE + $my_shift`
 my_in=`echo $WALLAROO_ARG_IN | \
     sed -e "s/__IN_HOST__/$WALLAROO_INIT_HOST/" \
         -e "s/__IN_PORT__/$my_in_port/"`
+my_external="${my_ip}:`expr $WALLAROO_MY_EXTERNAL_BASE + $my_shift`"
 my_control="${my_ip}:`expr $WALLAROO_MY_CONTROL_BASE + $my_shift`"
 my_data="${my_ip}:`expr $WALLAROO_MY_DATA_BASE + $my_shift`"
 
 cmd="$WALLAROO_BIN --in $my_in \
      $WALLAROO_BASE_ARGS \
-     --name worker$WORKER --my-control $my_control --my-data $my_data \
+     --name worker$WORKER --external $my_external \
+     --my-control $my_control --my-data $my_data \
      $JOIN_ARG $WALLAROO_ARG_PONY"
 if [ ! -z "$VERBOSE" ]; then
     echo "cmd: $cmd /tmp/wallaroo.$WORKER 2>&1 &"
