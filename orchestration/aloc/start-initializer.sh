@@ -41,10 +41,13 @@ fi
 my_in=`echo $WALLAROO_ARG_IN | \
     sed -e "s/__IN_HOST__/$WALLAROO_INIT_HOST/" \
         -e "s/__IN_PORT__/$WALLAROO_IN_BASE/"`
+my_external="${WALLAROO_INIT_HOST}:${WALLAROO_MY_EXTERNAL_BASE}"
 
 cmd="$WALLAROO_BIN --in $my_in \
      $WALLAROO_BASE_ARGS --data $WALLAROO_ARG_DATA \
-     --cluster-initializer --worker-count $NUM_WORKERS \
+     --cluster-initializer \
+     --external $my_external \
+     --worker-count $NUM_WORKERS \
      $WALLAROO_ARG_PONY"
 if [ ! -z "$VERBOSE" ]; then
     echo "cmd: $cmd /tmp/wallaroo.1 2>&1 &"
