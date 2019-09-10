@@ -36,6 +36,7 @@ use "wallaroo/core/common"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/network"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
 
@@ -124,6 +125,9 @@ class GlobalConnectorStreamRegistry[In: Any val]
   var _source_addrs_reallocation: Map[WorkerName, (String, String)] =
     _source_addrs_reallocation.create()
   var _workers_set: Set[WorkerName] = _workers_set.create()
+  let _debug: U16 = Log.make_sev_cat(Log.debug(), Log.global_stream_registry())
+  let _info: U16 = Log.make_sev_cat(Log.info(), Log.global_stream_registry())
+  let _err: U16 = Log.make_sev_cat(Log.err(), Log.global_stream_registry())
 
   new create(coordinator: ConnectorSourceCoordinator[In],
     auth: AmbientAuth, worker_name: WorkerName, source_name: String,
@@ -152,6 +156,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     workers_set: Set[WorkerName], leader_name: WorkerName,
     is_leader: Bool, local_registry: LocalConnectorStreamRegistry[In])
   =>
+    @ll(_info, "from_checkpoint".cstring())
     _coordinator = coordinator
     _auth = auth
     _worker_name = worker_name
@@ -204,8 +209,8 @@ class GlobalConnectorStreamRegistry[In: Any val]
     if not _is_leader then
       _leader_name = msg.leader_name
     else
-      @printf[I32](("GlobalConnectorStreamRegistry leader received a new "
-        + "leader message from non-leader: %s.\n").cstring(),
+      @ll(_info, ("GlobalConnectorStreamRegistry leader received a new "
+        + "leader message from non-leader: %s").cstring(),
         msg.leader_name.cstring())
       Fail()
     end
@@ -221,22 +226,22 @@ class GlobalConnectorStreamRegistry[In: Any val]
       _source_addrs.clear()
       _pending_notify_promises.clear()
       _is_relinquishing = false
-      @printf[I32](("Connector Leadership relinquish complete. New Leader: " +
-        msg.leader_name + "\n").cstring())
+      @ll(_info, ("Connector Leadership relinquish complete. New Leader: " +
+        msg.leader_name).cstring())
       _coordinator.complete_shrink_migration()
     else
-      @printf[I32](("Not a Connector leader but received a " +
-        "ConnectorLeaderStateReceivedAckMsg from " + msg.leader_name +
-        "\n").cstring())
+      @ll(_err, ("Not a Connector leader but received a " +
+        "ConnectorLeaderStateReceivedAckMsg from " +
+        msg.leader_name).cstring())
     end
 
   fun ref relinquish_leadership(new_leader_name: WorkerName) =>
     if _is_leader then
       _initiate_leadership_relinquishment(new_leader_name)
     else
-      @printf[I32](("GlobalConnectorStreamRegistry received a relinquish " +
-        "leadership message, from %s but is not the current leader.\n")
-        .cstring(), new_leader_name.cstring())
+      @ll(_err, ("GlobalConnectorStreamRegistry received a relinquish " +
+        "leadership message, from %s but is not the current leader.").cstring(),
+        new_leader_name.cstring())
     end
 
   fun ref process_leadership_relinquish_msg(
@@ -250,6 +255,8 @@ class GlobalConnectorStreamRegistry[In: Any val]
     inactive_streams: Map[StreamId, StreamTuple] val,
     source_addrs: Map[WorkerName, (String, String)] val)
   =>
+    @ll(_info, "_accept_leadership_state".cstring())
+
     // update active stream map
     let active_streams_copy = Map[StreamId, WorkerName]()
     for (k,v) in active_streams.pairs() do
@@ -310,6 +317,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
     _relinquish_leader_state(new_leader_name)
 
   fun ref _relinquish_leader_state(new_leader_name: WorkerName) =>
+    @ll(_info, "_relinquish_leader_state".cstring())
     _active_streams = Map[StreamId, WorkerName]()
     _inactive_streams = Map[StreamId, StreamTuple]()
     _source_addrs = Map[WorkerName, (String, String)]()
@@ -341,13 +349,14 @@ class GlobalConnectorStreamRegistry[In: Any val]
     try
       sorted_worker_names(0)?
     else
-      @printf[I32](("GlobalConnectorStreamRegistry could not determine "
-      + "the new leader. Exiting.\n").cstring())
+      @ll(_err, ("GlobalConnectorStreamRegistry could not determine "
+      + "the new leader. Exiting.").cstring())
       Fail()
       ""
     end
 
   fun ref _initiate_leader_state() =>
+    @ll(_info, "_initiate_leader_state".cstring())
     _is_leader = true
     _leader_name = _worker_name
     _active_streams = Map[StreamId, WorkerName]()
@@ -370,6 +379,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
       _worker_name, _source_name, consume workers_list, _connections, _auth)
 
   fun ref _initiate_leadership_relinquishment(new_leader_name: WorkerName) =>
+    @ll(_info, "_initiate_leadership_relinquishment".cstring())
     _is_relinquishing = true
     let active_streams_copy = recover trn Map[StreamId, WorkerName] end
     for (k,v) in _active_streams.pairs() do
@@ -398,8 +408,8 @@ class GlobalConnectorStreamRegistry[In: Any val]
     if _is_leader then
       _source_addrs(msg.worker_name) = (msg.host, msg.service)
     else
-      @printf[I32](("GlobalConnectorStreamRegistry received a add_source_addr "
-        + "message from %s but is not the current leader.\n").cstring(),
+      @ll(_err, ("GlobalConnectorStreamRegistry received a add_source_addr "
+        + "message from %s but is not the current leader.").cstring(),
         msg.worker_name.cstring())
     end
 
@@ -424,46 +434,47 @@ class GlobalConnectorStreamRegistry[In: Any val]
   // INTERNAL STATE MANAGEMENT
   ////////////////////////////
   fun ref _deactivate_stream(stream: StreamTuple) ? =>
-    ifdef debug then
-      @printf[I32](("%s ::: GlobalConnectorStreamRegistry._deactivate_stream("
-        + "StreamTuple(%s, %s, %s))\n").cstring(),
-        WallClock.seconds().string().cstring(),
-        stream.id.string().cstring(), stream.name.cstring(),
-        stream.last_acked.string().cstring())
-    end
+    @ll(_debug, "_deactivate_stream(StreamTuple(%s, %s, %s))".cstring(),
+      stream.id.string().cstring(), stream.name.cstring(),
+      stream.last_acked.string().cstring())
     // fail if not already active
     _active_streams.remove(stream.id)?
+    @ll(_debug, "_deactivate_stream: name %s id %s last_acked %lu".cstring(),
+      stream.name.cstring(),
+      stream.id.string().cstring(), stream.last_acked)
     _inactive_streams(stream.id) = stream
 
   fun ref _activate_stream(stream: StreamTuple, worker_name: WorkerName):
     StreamTuple ?
   =>
-    ifdef debug then
-      @printf[I32](("%s ::: GlobalConnectorStreamRegistry._activate_stream("
-        + "StreamTuple(%s, %s, %s), worker_name: %s)\n").cstring(),
-        WallClock.seconds().string().cstring(),
-        stream.id.string().cstring(), stream.name.cstring(),
-        stream.last_acked.string().cstring(),
-        worker_name.cstring())
-    end
+    @ll(_debug, "_activate_stream(StreamTuple(%s, %s, %s), worker_name: %s)".cstring(),
+      stream.id.string().cstring(), stream.name.cstring(),
+      stream.last_acked.string().cstring(),
+      worker_name.cstring())
     // fail if not already in inactive
     let s = _inactive_streams.remove(stream.id)?
     _active_streams(stream.id) = worker_name
+    @ll(_debug, "_activate_stream: name %s id %s last_acked %lu worker_name %s".cstring(),
+      stream.name.cstring(),
+      stream.id.string().cstring(), stream.last_acked, worker_name.cstring())
     s._2
 
   fun ref _new_stream(stream: StreamTuple, worker_name: WorkerName) ? =>
-    ifdef debug then
-      @printf[I32](("%s ::: GlobalConnectorStreamRegistry._new_stream("
-        + "StreamTuple(%s, %s, %s), worker_name: %s)\n").cstring(),
-        WallClock.seconds().string().cstring(),
-        stream.id.string().cstring(), stream.name.cstring(),
-        stream.last_acked.string().cstring(),
-        worker_name.cstring())
-    end
+    let is_inactive = _inactive_streams.contains(stream.id)
+    let is_active = _active_streams.contains(stream.id)
+    @ll(_debug, ("_new_stream(StreamTuple(%s, %s, %s), worker_name: %s)" +
+      "inactive %s active %s").cstring(),
+      stream.id.string().cstring(), stream.name.cstring(),
+      stream.last_acked.string().cstring(),
+      worker_name.cstring(),
+      is_inactive.string().cstring(), is_active.string().cstring())
     // fail if already in inactive or active
-    if _inactive_streams.contains(stream.id) then error end
-    if _active_streams.contains(stream.id) then error end
+    if is_inactive then error end
+    if is_active then error end
     _active_streams(stream.id) = worker_name
+    @ll(_debug, "_new_stream: name %s id %s last_acked %lu worker_name %s".cstring(),
+      stream.name.cstring(),
+      stream.id.string().cstring(), stream.last_acked, worker_name.cstring())
 
   ////////////////
   // STREAM_NOTIFY
@@ -490,6 +501,9 @@ class GlobalConnectorStreamRegistry[In: Any val]
             (false, stream)
           end
         end
+      @ll(_debug, "stream_notify: success %s name %s id %s last_acked %lu".cstring(),
+        success.string().cstring(), stream'.name.cstring(),
+        stream'.id.string().cstring(), stream'.last_acked)
       // respond to local registry
       try (_local_registry as LocalConnectorStreamRegistry[In])
             .stream_notify_global_result(success,
@@ -524,13 +538,16 @@ class GlobalConnectorStreamRegistry[In: Any val]
             (false, msg.stream)
           end
         end
+      @ll(_debug, "stream_notify: success %s name %s id %s last_acked %lu".cstring(),
+        success.string().cstring(), stream'.name.cstring(),
+        stream'.id.string().cstring(), stream'.last_acked)
       ConnectorStreamRegistryMessenger.respond_to_stream_notify(
         msg.worker_name, msg.source_name(), success, stream', msg.request_id,
         _connections, _auth)
     else
-      @printf[I32](("Non-leader worker received a stream notify request."
+      @ll(_err, ("Non-leader worker received a stream notify request."
         + " This indicates an invalid leader state at " +
-        msg.worker_name + "\n").cstring())
+        msg.worker_name).cstring())
       Fail()
     end
 
@@ -550,11 +567,9 @@ class GlobalConnectorStreamRegistry[In: Any val]
         Fail()
       end
     else
-      ifdef debug then
-        @printf[I32](("GlobalConnectorStreamRegistry received a stream_ "
+      @ll(_debug, ("GlobalConnectorStreamRegistry received a stream_ "
           + "notify reponse message for an unknown request."
-          +" Ignoring.\n").cstring())
-      end
+          +" Ignoring.").cstring())
     end
 
   fun ref contains_notify_request(request_id: ConnectorStreamNotifyId): Bool =>
@@ -595,9 +610,9 @@ class GlobalConnectorStreamRegistry[In: Any val]
     if _is_leader then
       streams_relinquish(msg.streams, msg.worker_name)
     else
-      @printf[I32](("Non-leader worker received a streams relinquish request."
+      @ll(_err, ("Non-leader worker received a streams relinquish request."
         + " This indicates an invalid leader state at " +
-        msg.worker_name + "\n").cstring())
+        msg.worker_name).cstring())
       Fail()
     end
 
@@ -608,8 +623,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
   fun ref begin_shrink(leaving: Array[WorkerName] val,
     streams_to_shrink: Array[StreamId] val)
   =>
-    @printf[I32]("GlobalConnectorStreamRegistry beginning shrink.\n"
-      .cstring())
+    @ll(_info, "GlobalConnectorStreamRegistry beginning shrink.".cstring())
 
     if leaving.contains(_worker_name, {(l, r) => l == r}) then
       _is_shrinking = true
@@ -679,7 +693,13 @@ class GlobalConnectorStreamRegistry[In: Any val]
           worker_name)
         try
           // assume active, try deactivate
+          @ll(_debug, "streams_shrink: try name %s id %s last_acked %lu".cstring(),
+            stream.name.cstring(),
+            stream.id.string().cstring(), stream.last_acked)
           _deactivate_stream(stream)?
+          @ll(_debug,"streams_shrink: deactivate name %s id %s last_acked %lu".cstring(),
+            stream.name.cstring(),
+            stream.id.string().cstring(), stream.last_acked)
           _pending_shrink.unset(stream.id)
         end
       end
@@ -693,6 +713,9 @@ class GlobalConnectorStreamRegistry[In: Any val]
     else
       for stream in streams.values() do
         _pending_shrink.set(stream.id)
+        @ll(_debug, "streams_shrink: set name %s id %s last_acked %lu".cstring(),
+          stream.name.cstring(),
+          stream.id.string().cstring(), stream.last_acked)
       end
       ConnectorStreamRegistryMessenger.streams_shrink(_leader_name,
         _worker_name, _source_name, streams, source_id, _connections, _auth)
@@ -705,8 +728,9 @@ class GlobalConnectorStreamRegistry[In: Any val]
 
     worker->leader.stream_shrink
     """
-    @printf[I32](("GlobalConnectorStreamRegistry received streams shrink from"
-    + " %s.\n").cstring(), msg.worker_name.cstring())
+    @ll(_info,
+      "GlobalConnectorStreamRegistry received streams shrink from %s".cstring(),
+      msg.worker_name.cstring())
     if _is_leader then
       streams_shrink(msg.source_id, msg.streams, msg.worker_name)
       try
@@ -716,17 +740,17 @@ class GlobalConnectorStreamRegistry[In: Any val]
           msg.source_id, _connections, _auth)
       end
     else
-      @printf[I32](("Non-leader worker received a streams relinquish request."
+      @ll(_err, ("Non-leader worker received a streams relinquish request."
         + " This indicates an invalid leader state at " +
-        msg.worker_name + "\n").cstring())
+        msg.worker_name).cstring())
       Fail()
     end
 
   fun ref process_streams_shrink_response_msg(
     msg: ConnectorStreamsShrinkResponseMsg)
   =>
-    @printf[I32](("GlobalConnectorStreamRegistry received streams shrink"
-      + " response.\n").cstring())
+    @ll(_info, ("GlobalConnectorStreamRegistry received streams shrink"
+      + " response").cstring())
     if _is_shrinking then
       for stream in msg.streams.values() do
         _pending_shrink.unset(stream.id)
@@ -735,8 +759,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
         _local_shrink_complete(msg.source_id, msg.host, msg.service)
       end
     else
-      @printf[I32](("Received a shrink response while not in a shrinking" +
-        "state.\n").cstring())
+      @ll(_err, "Received a shrink response while not in a shrinking state".cstring())
       ifdef debug then Fail() end
     end
 
@@ -761,9 +784,9 @@ class GlobalConnectorStreamRegistry[In: Any val]
     if _is_leader then
       worker_shrink_complete(msg.worker_name)
     else
-      @printf[I32](("Non-leader worker received "
+      @ll(_err, ("Non-leader worker received "
         + "ConnectorWorkerShrinkComplete+ from %s\n. This indicates invalid "
-        + "leader state at the sender.\n").cstring(),
+        + "leader state at the sender.").cstring(),
         msg.worker_name.cstring())
       Fail()
     end
@@ -817,6 +840,10 @@ class LocalConnectorStreamRegistry[In: Any val]
 
   // ConnectorSourceCoordinator
   let _coordinator: ConnectorSourceCoordinator[In] tag
+
+  let _debug: U16 = Log.make_sev_cat(Log.debug(), Log.local_stream_registry())
+  let _info: U16 = Log.make_sev_cat(Log.info(), Log.local_stream_registry())
+  let _err: U16 = Log.make_sev_cat(Log.err(), Log.local_stream_registry())
 
   new ref create(coordinator: ConnectorSourceCoordinator[In] tag,
     auth: AmbientAuth,
@@ -897,9 +924,9 @@ class LocalConnectorStreamRegistry[In: Any val]
         _global_registry.process_streams_shrink_response_msg(m)
       end
     else
-      @printf[I32](("**LocalConnectorStreamRegistry Dropping message**"
+      @ll(_err, ("**LocalConnectorStreamRegistry Dropping message**"
         + " _pipeline_name: " + _source_name +  " =/= source_name: "
-        + msg.source_name() + " \n").cstring())
+        + msg.source_name()).cstring())
     end
 
   fun ref set_joining(is_joining: Bool) =>
@@ -924,6 +951,9 @@ class LocalConnectorStreamRegistry[In: Any val]
     let streams_to_shrink = recover iso Array[StreamId] end
     for stream in _active_streams.values() do
       streams_to_shrink.push(stream.id)
+      @ll(_debug, "begin_shrink: name %s id %s last_acked %lu".cstring(),
+        stream.name.cstring(),
+        stream.id.string().cstring(), stream.last_acked)
     end
     let streams_to_shrink' = recover val consume streams_to_shrink end
 
@@ -931,16 +961,15 @@ class LocalConnectorStreamRegistry[In: Any val]
 
     if leaving.contains(_worker_name, {(l, r) => l == r}) then
       _is_shrinking = true
-      @printf[I32]("Starting shrink migration\n.".cstring())
+      @ll(_info, "Starting shrink migration.".cstring())
       if connected_sources.size() == 0 then
-        @printf[I32]("LocalConnectorStreamRegistry nothing to migrate\n."
-          .cstring())
+        @ll(_info, "LocalConnectorStreamRegistry nothing to migrate.".cstring())
         Invariant(streams_to_shrink'.size() == 0)
         _maybe_shrink_complete()
       else
         // for each source, call shrink
-        @printf[I32]("LocalConnectorStreamRegistry shrinking %s sources\n."
-          .cstring(), connected_sources.size().string().cstring())
+        @ll(_info, "LocalConnectorStreamRegistry shrinking %s sources.".cstring(),
+          connected_sources.size().string().cstring())
         for (source_id, source) in connected_sources.values() do
           _shrinking_sources(source_id) = source
           source.begin_shrink()
@@ -950,8 +979,7 @@ class LocalConnectorStreamRegistry[In: Any val]
 
   fun ref complete_shrink(source_id: RoutingId, host: String, service: String)
   =>
-    @printf[I32]("LocalConnectorStreamRegistry completing shrink\n"
-      .cstring())
+    @ll(_info, "LocalConnectorStreamRegistry completing shrink".cstring())
     // tell each source to complete shrink and send a RESTART
     try
       (let source_id', let source) = _shrinking_sources.remove(source_id)?
@@ -979,10 +1007,16 @@ class LocalConnectorStreamRegistry[In: Any val]
         // stream_id in _active_streams
         let stream = _active_streams(stream_id)?
           // reject: already owned by a source in this registry
-          stream_notify_local_result(false, StreamTuple(stream_id, stream_name,
-            point_of_ref), promise, connector_source)
+        @ll(_debug, "stream_notify: success %s name %s id %s last_acked %lu".cstring(),
+          "false".cstring(), stream_name.cstring(),
+          stream_id.string().cstring(), point_of_ref)
+        stream_notify_local_result(false, StreamTuple(stream_id, stream_name,
+          point_of_ref), promise, connector_source)
       else
         // No local knowledge of stream_id: defer to global
+        @ll(_debug, "stream_notify: DEFER name %s id %s last_acked %lu".cstring(),
+          stream_name.cstring(),
+          stream_id.string().cstring(), point_of_ref)
         _global_registry.stream_notify(request_id,
           StreamTuple(stream_id, stream_name, point_of_ref), promise,
           connector_source)
@@ -1001,6 +1035,9 @@ class LocalConnectorStreamRegistry[In: Any val]
     promise: Promise[NotifyResult[In]],
     connector_source: ConnectorSource[In] tag)
   =>
+    @ll(_debug, "stream_notify_global_result: success %s name %s id %s last_acked %lu".cstring(),
+      success.string().cstring(), stream.name.cstring(),
+      stream.id.string().cstring(), stream.last_acked)
     if success then
       // update locally
       _active_streams(stream.id) = ActiveStreamTuple[In](stream.id,
@@ -1012,8 +1049,19 @@ class LocalConnectorStreamRegistry[In: Any val]
     streams: Array[StreamTuple] val)
   =>
     for stream in streams.values() do
-      try _active_streams.remove(stream.id)? end
+      try
+        _active_streams.remove(stream.id)?
+        @ll(_debug, "streams_relinquish: removed name %s id %s last_acked %lu".cstring(),
+          stream.name.cstring(),
+          stream.id.string().cstring(), stream.last_acked)
+      else
+        @ll(_debug, "streams_relinquish: failed name %s id %s last_acked %lu".cstring(),
+          stream.name.cstring(),
+          stream.id.string().cstring(), stream.last_acked)
+      end
     end
+    @ll(_debug, "streams_relinquish: _is_shrinking %s".cstring(),
+      _is_shrinking.string().cstring())
     if _is_shrinking then
       _global_registry.streams_shrink(source_id, streams, _worker_name)
     else
