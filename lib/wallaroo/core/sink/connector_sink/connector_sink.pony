@@ -540,8 +540,18 @@ actor ConnectorSink is Sink
     @ll(_twopc_debug, "2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d _notify.twopc_txn_id_last_committed %s".cstring(), _twopc.last_offset, _notify.twopc_txn_id_last_committed_helper().cstring())
 
     if _twopc.txn_id == "" then
-      @ll(_twopc_err, "Error: checkpoint_complete() with empty _twopc.txn_id = %s.".cstring(), _twopc.txn_id.cstring())
-      Fail()
+      // There are two reasons for this:
+      // 1. There is a legitimate bug.
+      // 2. We crashed and restarted, and we're still very early in
+      //    the restart process, e.g., during "INIT PHASE II".
+      //    Now we're told that the checkpoint is complete.  We didn't
+      //    really particpate in this checkpoint (because we had
+      //    crashed), but we can continue.
+      // We can't easily tell the difference between #1 and #2 because
+      // we would need to query LocalTopologyInitializer _initializer
+      // but can't.  I've ironed out most bugs in the 2PC impl, so
+      // let's assume that this isn't a fatal error.
+      @ll(_twopc_info, "checkpoint_complete() with empty _twopc.txn_id = %s.".cstring(), _twopc.txn_id.cstring())
     else
       if not _twopc.txn_id.contains("skip--.--CheckpointBarrierToken") then
         _notify.twopc_txn_id_last_committed = _twopc.txn_id
