@@ -63,6 +63,8 @@ primitive Log
   fun conn_sink(): LogCategory        => LogCategory(6).shl(8)
   fun tcp_source(): LogCategory       => LogCategory(7).shl(8)
   fun conn_source(): LogCategory      => LogCategory(8).shl(8)
+  fun global_stream_registry(): LogCategory => LogCategory(9).shl(8)
+  fun local_stream_registry(): LogCategory => LogCategory(10).shl(8)
   fun max_category(): LogCategory     => LogCategory(40).shl(8)
   fun manual_category(n: U16): LogCategory  => LogCategory(n).shl(8)
 
@@ -90,6 +92,8 @@ primitive Log
       (default_severity(), conn_sink(),        "ConnectorSink")
       (default_severity(), tcp_source(),       "TCPSource")
       (default_severity(), conn_source(),      "ConnectorSource")
+      (default_severity(), global_stream_registry(), "GlobalStreamRegistry")
+      (default_severity(), local_stream_registry(), "LocalStreamRegistry")
     ] // END category_map
 
   fun set_defaults() =>
