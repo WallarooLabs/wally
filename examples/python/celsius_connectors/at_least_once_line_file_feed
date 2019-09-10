@@ -68,7 +68,12 @@ sender1 = Sender(client)
 
 sender1.start()
 
-bytes_per_sec = 150
+filename = sys.argv[1]
+try:
+    bytes_per_sec = int(sys.argv[2])
+except:
+    bytes_per_sec = 150
+
 client.add_source(ThrottledFileReader(filename = sys.argv[1],
                                       is_text_lines = True,
                                       limit_rate = bytes_per_sec))
