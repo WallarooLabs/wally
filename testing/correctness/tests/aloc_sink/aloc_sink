@@ -167,6 +167,7 @@ class AsyncServer(asynchat.async_chat, object):
         self._txn_state = None
         self._txn_log = None
         self._worker_name = None
+        self._out_path_opath = None
 
         if self._s3 is not None:
             try:
@@ -255,6 +256,7 @@ class AsyncServer(asynchat.async_chat, object):
 
             opath = self._out_path + "." + msg.instance_name
             self._out = open(opath, 'ab')
+            self._out_path_opath = opath
             self._out_offset = self._out.tell()
             logging.debug('top of AsyncServer self._out_offset = {}'.format(self._out_offset))
 
@@ -432,7 +434,7 @@ class AsyncServer(asynchat.async_chat, object):
                         if stream_id != 1:
                             raise Exception('Phase 2 abort: bad stream_id {}'.
                                 format(stream_id))
-                        logging.info('2PC: truncating {} to offset {}'.format(self._out_path, start_por))
+                        logging.info('2PC: truncating {} to offset {}'.format(self._out_path_opath, start_por))
                         self._out.truncate(start_por)
                         self.flush_fsync(self._out)
                         self._out_offset = start_por
@@ -495,7 +497,7 @@ class AsyncServer(asynchat.async_chat, object):
                     self._next_txn_force_abort_written = True
                     self.log_it(['next-txn-force-abort', m])
             elif self._out_offset > msg.message_id:
-                logging.error('NOTICE: duplicate data: self._out_offset {} > msg.message_id {}'.format(self._out_offset, msg.message_id))
+                logging.info('duplicate data: self._out_offset {} > msg.message_id {}'.format(self._out_offset, msg.message_id))
                 ## Deduplication case: we've already seen this, so
                 ## we don't take any further action.
         else:
