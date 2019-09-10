@@ -681,7 +681,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self.handle_restarted(self._streams)
 
     def handle_close(self):
-        logging.error("YO, handle_close!")
+        logging.error("handle_close")
         self._close_common()
         time.sleep(0.10)
         self._reconnect_common()
