@@ -116,6 +116,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   // TODO: this should go away and TerminusRoute entirely takes
   // over seq_id generation whether there is resilience or not.
   var seq_id: SeqId = 0
+  var _disposed: Bool = false
 
   // Reconnect
   var _initial_reconnect_pause: U64 = 500_000_000
@@ -415,6 +416,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _unmute_upstreams()
     _timers.dispose()
     _tcp_handler.close()
+    _disposed = true
 
   be request_ack() =>
     // TODO: How do we propagate this down?
@@ -500,8 +502,10 @@ actor OutgoingBoundary is (Consumer & TCPActor)
       let msg = ChannelMsgEncoder.forward_barrier(target_routing_id,
         origin_routing_id, barrier_token, seq_id, _auth)?
       if _connection_initialized then
+        @printf[I32]("SLF: %s line %d token %s\n".cstring(), __loc.type_name().cstring(), __loc.line(), barrier_token.string().cstring())
         _tcp_handler.writev(msg)
       else
+        @printf[I32]("SLF: %s line %d token %s\n".cstring(), __loc.type_name().cstring(), __loc.line(), barrier_token.string().cstring())
         _unsent.push(msg)
       end
       _add_to_upstream_backup(msg)
@@ -613,6 +617,9 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     end
 
   fun ref _schedule_reconnect() =>
+    if _disposed then
+      return
+    end
     // Gradually back off
     if _reconnect_pause < 8_000_000_000 then
       _reconnect_pause = _reconnect_pause * 2
