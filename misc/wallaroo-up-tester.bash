@@ -63,14 +63,9 @@ if [[ "${TEST_CUSTOM}" == "custom" ]]; then
   CUSTOM_MESSAGE="with custom artifacts"
   pushd "${WALLAROO_DIR}"
   CUSTOM_WALLAROO_SOURCE_TGZ_URL="${WALLAROO_DIR}/wallaroo.tgz"
-  CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL="${WALLAROO_DIR}/Wallaroo_Metrics_UI*-x86_64.AppImage"
   if [[ ! -e "${CUSTOM_WALLAROO_SOURCE_TGZ_URL}" ]]; then
     echo "Building wallaroo source archive for testing using custom artifacts..."
     make build-wallaroo-source-archive
-  fi
-  if [[ ! -e "${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL}" ]]; then
-    echo "Building wallaroo metrics ui appimage for testing using custom artifacts..."
-    make build-metrics-ui-appimage
   fi
   popd
 fi
@@ -171,7 +166,6 @@ print_results() {
 set_commands_to_run() {
   commands_to_run="
 export CUSTOM_WALLAROO_SOURCE_TGZ_URL=${CUSTOM_WALLAROO_SOURCE_TGZ_URL:-} && \
-export CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL=${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL:-} && \
 cd '${tmp_for_run}' && \
 (echo y | ${HERE}/wallaroo-up.sh -t python || exit) && \
 export TMPDIR='${tmp_for_run}' && \

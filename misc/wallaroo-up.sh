@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # md5 for validatiing script checksum
-MD5="81a872da2020622e8416a4f221600c48  -"
+MD5="ec14b119bb73c2b2f8636603294c4aa7  -"
 
 set -eEuo pipefail
 
@@ -564,8 +564,6 @@ configure_wallaroo() {
   wallaroo_bintray_package="wallaroo"
   ## Sets Wallaroo source archive name
   wallaroo_source_archive="wallaroo-${WALLAROO_VERSION}.tar.gz"
-  ## Sets Metrics UI appimage name
-  metrics_ui_appimage="Wallaroo_Metrics_UI-${WALLAROO_VERSION}-x86_64.AppImage"
 
   # set the correct wallaroo bintray repo name
   if [[ "$WALLAROO_VERSION" == "release"* ]]; then
@@ -637,34 +635,8 @@ configure_wallaroo() {
 
   if [ "$PREVIEW_COMMANDS" != "true" ]; then
     log "Configuring Wallaroo Metrics UI..."
+    log "TODO: Wallaroo Metrics UI replacement of AppImage"
   fi
-
-  ## download/install metrics UI appImage
-  WALLAROO_METRICS_UI_APPIMAGE_URL="https://${wallaroo_bintray_subject}.bintray.com/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${WALLAROO_VERSION}/${metrics_ui_appimage}${WGET_URL_SUFFIX}"
-  if [[ "${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL:-}" == "" ]]; then
-    run_cmd "wget $QUIET -O $metrics_ui_appimage '${WALLAROO_METRICS_UI_APPIMAGE_URL}' $REDIRECT" "" retry
-  else
-    log "Using custom wallaroo metrics ui appimage '${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL:-}'..."
-    if [[ "${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL:-}" == "http://"* ]] ; then
-      run_cmd "wget $QUIET -O $metrics_ui_appimage '${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL:-}' $REDIRECT" "" retry
-    else
-      run_cmd "cp ${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL:-} $metrics_ui_appimage $REDIRECT"
-    fi
-  fi
-  run_cmd "chmod +x $metrics_ui_appimage $REDIRECT"
-
-  # extract the appimage because metrics_ui likes to be able to write to it's directories and also because appimages don't work in docker
-  run_cmd "./$metrics_ui_appimage --appimage-extract $REDIRECT"
-  run_cmd "mv squashfs-root bin/metrics_ui $REDIRECT"
-
-  # delete libtinfo.so.5 so the one provided by the distribution can be used
-  if [[ "$dist" != "fedora" ]]; then
-    if [[ "$dist_version" != "buster" ]]; then
-      run_cmd "rm bin/metrics_ui/usr/lib/libtinfo.so.5"
-    fi
-  fi
-  run_cmd "sed -i 's/sleep 4/sleep 0/' bin/metrics_ui/AppRun"
-  run_cmd "rm $metrics_ui_appimage $REDIRECT"
 
   if [ "$PREVIEW_COMMANDS" != "true" ]; then
     log "Compiling Wallaroo tools..."
