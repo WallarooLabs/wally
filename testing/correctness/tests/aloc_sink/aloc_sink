@@ -560,40 +560,26 @@ class AsyncServer(asynchat.async_chat, object):
                 ## End DIAGNOSTIC
 
             elif self._out_offset > msg.message_id:
-                ## The message_id has gone backward.  That's good or bad.
-                ## If the message_id is exactly equal to the last 2PC
-                ## committed offset, then that's OK.  Assume that we've
-                ## got a new connection from a new wallaroo worker process,
-                ## probably after a crash + restart, and Wallaroo has done
-                ## a rollback to the last fully committed checkpoint, and
-                ## has started re-processing data.  Whatever we've written
-                ## so far as been uncommitted and thus it's safe to discard.
-                if msg.message_id == self._last_committed_offset:
-                    logging.info('duplicate data: go back to last committed offset {}'.format(
-                        self._last_committed_offset))
-                    self._out.truncate(self._last_committed_offset)
-                    self.flush_fsync(self._out)
-                    self._out_offset = self._last_committed_offset
-                else:
-                    logging.fatal('duplicate data: self._out_offset {} tell {} > msg.message_id {}'.format(self._out_offset, self._out.tell(), msg.message_id))
-                    ## Deduplication case: we've already seen this, so
-                    ## we don't take any further action.
+                ## The message_id has gone backward.
+                logging.fatal('duplicate data: self._out_offset {} tell {} > msg.message_id {}'.format(self._out_offset, self._out.tell(), msg.message_id))
+                ## Deduplication case: we've already seen this, so
+                ## we don't take any further action.
 
-                    ## DIAGNOSTIC: Let's see what's there, shall we?
-                    try:
-                        diag = read_chunk(self._out_path_opath, msg.message_id,
-                            msg.message_id + len(msg.message))
-                    except:
-                        diag = "<-<exception>->"
-                    if diag == msg.message:
-                        logging.fatal('diag: file bytes match message')
-                    else:
-                        logging.fatal('diag: msg = {}'.format(msg))
-                        logging.fatal('diag: bytes in opath = {}'.format(diag))
-                    ## End DIAGNOSTIC
-                    self.flush_fsync(self._out)
-                    self.flush_fsync(self._txn_log)
-                    os.exit(66)
+                ## DIAGNOSTIC: Let's see what's there, shall we?
+                try:
+                    diag = read_chunk(self._out_path_opath, msg.message_id,
+                        msg.message_id + len(msg.message))
+                except:
+                    diag = "<-<exception>->"
+                if diag == msg.message:
+                    logging.fatal('diag: file bytes match message')
+                else:
+                    logging.fatal('diag: msg = {}'.format(msg))
+                    logging.fatal('diag: bytes in opath = {}'.format(diag))
+                ## End DIAGNOSTIC
+                self.flush_fsync(self._out)
+                self.flush_fsync(self._txn_log)
+                os.exit(66)
         else:
             logging.critical('message has no message_id')
             sys.exit(66)
