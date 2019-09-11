@@ -374,10 +374,8 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 raise err
             else:
                 ## TODO: If the server is down for too long, we can blow
-                ## out our thread's stack space.  However, I don't know
-                ## of a way to send an event into asynchat to tell it to
-                ## reconnect or of any other method to avoid this
-                ## possibly deep recursion.
+                ## out our thread's stack space.  Rewrite this recursive
+                ## loop to iterate instead.
                 time.sleep(5.0)
                 self.connect()
                 return
