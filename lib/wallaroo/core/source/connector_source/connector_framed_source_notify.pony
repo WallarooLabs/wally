@@ -717,7 +717,6 @@ class ConnectorSourceNotify[In: Any val]
 
   fun ref prepare_for_rollback() =>
     if _session_active then
-      _clear_streams()
       _prep_for_rollback = true
       ifdef "trace" then
         @ll(_conn_debug, "TRACE: %s.%s\n".cstring(), __loc.type_name().cstring(),
@@ -746,6 +745,7 @@ class ConnectorSourceNotify[In: Any val]
       while true do
         let s = _StreamState.deserialize(rb)?
         _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
+        // SLF TODO: should I remove s.id from all my other lists, _active_streams, etc??
       end
     end
     _relinquish_streams()
@@ -756,6 +756,8 @@ class ConnectorSourceNotify[In: Any val]
   =>
     _prep_for_rollback = false
     send_restart(source)
+    _clear_and_relinquish_all()
+    source.close()
 
   fun ref initiate_checkpoint(checkpoint_id: CheckpointId) =>
     if not _prep_for_rollback then
@@ -867,6 +869,7 @@ class ConnectorSourceNotify[In: Any val]
 
   fun ref _clear_and_relinquish_all() =>
     for s_map in [_active_streams ; _pending_close].values() do
+      @ll(_conn_debug, "s_map.size = %lu".cstring(), s_map.size())
       for s in s_map.values() do
         _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_seen))
       end
@@ -929,6 +932,9 @@ class ConnectorSourceNotify[In: Any val]
     end
     // send response either way
     send_notify_ack(source, success, stream.id, stream.last_acked)
+for s_map in [_active_streams ; _pending_close].values() do
+  @ll(_conn_debug, "after send_notify_ack: s_map.size = %lu".cstring(), s_map.size())
+end
 
   fun ref send_notify_ack(source: ConnectorSource[In] ref, success: Bool,
     stream_id: StreamId, point_of_reference: PointOfReference)
@@ -979,8 +985,6 @@ class ConnectorSourceNotify[In: Any val]
       @ll(_conn_info, "Sending RESTART(%s:%s)\n".cstring(),
         host.cstring(), service.cstring())
       _send_reply(source, cwm.RestartMsg(host + ":" + service))
-      _clear_and_relinquish_all()
-      _session_active = false
     end
 
   fun _send_reply(source: ConnectorSource[In] ref, msg: cwm.Message) =>
