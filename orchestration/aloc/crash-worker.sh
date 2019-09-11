@@ -21,7 +21,7 @@ case $1 in
         pattern="name worker$1"
         ;;
     *)
-        echo Error: bad worker number $1
+        echo Error: bad worker number: $1
         exit 1
         ;;
 esac
