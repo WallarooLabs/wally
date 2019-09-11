@@ -47,9 +47,12 @@ done
 ## query each worker directly.  We assume that the initializer's
 ## cluster membership info is the Source of Truth(tm).
 
+initializer_external="${WALLAROO_INIT_HOST}:${WALLAROO_MY_EXTERNAL_BASE}"
+
+
 for i in `seq 1 $COUNT`; do
     ../../testing/tools/external_sender/external_sender \
-        -e $WALLAROO_ARG_EXTERNAL -t cluster-status-query 2>&1 | \
+        -e $initializer_external -t cluster-status-query 2>&1 | \
       grep -s 'Processing messages: true' > /dev/null 2>&1
     if [ $? -eq 0 ]; then
         break;
@@ -69,7 +72,7 @@ fi
 
 if [ ! -z "$ALL_RUNNING" ]; then
     workers=`../../testing/tools/external_sender/external_sender \
-        -e $WALLAROO_ARG_EXTERNAL -t cluster-status-query 2>&1 | \
+        -e $initializer_external -t cluster-status-query 2>&1 | \
       grep -s 'Processing messages: ' | \
       sed -e 's/.*Workers: .//' -e 's/,|.*//' | \
       tr ',' ' '`
