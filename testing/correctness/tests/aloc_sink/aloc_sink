@@ -435,6 +435,9 @@ class AsyncServer(asynchat.async_chat, object):
                             raise Exception('Phase 2 abort: bad stream_id {}'.
                                 format(stream_id))
                         logging.info('2PC: truncating {} to offset {}'.format(self._out_path_opath, start_por))
+
+                        ## DIAGNOSTIC: Let's write the stuff where we said we would, then
+                        QQQ
                         self._out.truncate(start_por)
                         self.flush_fsync(self._out)
                         self._out_offset = start_por
@@ -493,15 +496,45 @@ class AsyncServer(asynchat.async_chat, object):
                 m = 'ERROR: MISSING DATA: self._out_offset {} tell {} < msg.message_id {}'.format(self._out_offset, self._out.tell(), msg.message_id)
                 self._txn_commit_next = False
                 logging.error(m)
-                logging.error("last_msg = {}".format(self.last_msg))
-                logging.error("     msg = {}".format(msg))
+                logging.info("last_msg = {}".format(self.last_msg))
+                logging.info("     msg = {}".format(msg))
                 if not self._next_txn_force_abort_written:
                     self._next_txn_force_abort_written = True
                     self.log_it(['next-txn-force-abort', m])
+
+                ## DIAGNOSTIC: we're going to truncate this crap, right?
+                ## Let's write the stuff where we said we would, then.
+                ## Later, we'll save a copy of the file before we truncate
+                ## the crap out of the universe.
+                flush_fsync(self._out)
+                self._out.seek(msg.message_id)
+                ## cut-and-paste from offset == message_id case above, ALMOST!
+                ret1 = self._out.write(bs)
+                if len(bs) != ret1:
+                    self._txn_commit_next = False
+                    raise Exception("File write error? {} != {} or {} != None".format(len(bs), ret1, ret2))
+                self._out_offset = self._out.tell()
+                logging.info('FORCE _out_offset is now {}'.format(self._out_offset))
+                self._streams[msg.stream_id][2] = msg.message_id
+                flush_fsync(self._out)
+
             elif self._out_offset > msg.message_id:
-                logging.info('duplicate data: self._out_offset {} > msg.message_id {}'.format(self._out_offset, msg.message_id))
+                logging.info('duplicate data: self._out_offset {} tell {} > msg.message_id {}'.format(self._out_offset, self._out.tell(), msg.message_id))
                 ## Deduplication case: we've already seen this, so
                 ## we don't take any further action.
+
+                ## DIAGNOSTIC: Let's see what's there, shall we?
+                try:
+                    diag = read_chunk(self._out_path_opath, msg.message_id,
+                        msg.message_id + len(msg.message))
+                except:
+                    diag = "<-<exception>->"
+                if diag == msg.message:
+                    logging.debug("diag: file bytes match message")
+                else:
+                    logging.info("diag: msg = {}".format(msg))
+                    logging.info("diag: bytes in opath = {}".format(diag))
+
         else:
             logging.critical('message has no message_id')
             sys.exit(66)
