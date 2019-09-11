@@ -172,6 +172,16 @@ class GlobalConnectorStreamRegistry[In: Any val]
     _workers_set = workers_set
     _local_registry = local_registry
 
+    for (stream_id, worker) in _active_streams.pairs() do
+      @ll(_debug, "from_checkpoint: active: id %s worker_name %s".cstring(),
+      stream_id.string().cstring(), worker_name.cstring())
+    end
+    for stream in inactive_streams.values() do
+      @ll(_debug, "from_checkpoint: inactive: name %s id %s last_acked %lu".cstring(),
+        stream.name.cstring(),
+        stream.id.string().cstring(), stream.last_acked)
+    end
+
   fun ref checkpoint_state(): Array[ByteSeq] val ? =>
     let state = StreamRegistryCheckpointState[In](_worker_name, _source_name,
       _source_addr, _active_streams, _inactive_streams,
