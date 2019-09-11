@@ -701,6 +701,13 @@ class ConnectorSourceNotify[In: Any val]
 
   fun create_checkpoint_state(): Array[ByteSeq val] val =>
     let w: Writer = w.create()
+
+    // We don't want to send an empty checkpoint state to EventLog,
+    // because EventLog won't write it.  If EventLog doesn't write
+    // it, then we'll never read it, so we'll never have rollback()
+    // called, and that makes us sad.
+    w.u8(nonempty_magic())
+
     for s_map in [_active_streams ; _pending_close].values() do
       for stream_state in s_map.values() do
         stream_state.serialize(w)
@@ -725,11 +732,17 @@ class ConnectorSourceNotify[In: Any val]
       .cstring(), _source_name.cstring(), checkpoint_id.string().cstring())
     _barrier_checkpoint_id = checkpoint_id
 
+    if payload.size() < 1 then
+      Fail()
+    end
     // After a rollback, all streams go directly to relinquish
     // So we don't distinguish where they came from.
     let rb: Reader ref = Reader
     rb.append(payload)
     try
+      if rb.u8()? != nonempty_magic() then
+        Fail()
+      end
       while true do
         let s = _StreamState.deserialize(rb)?
         _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
@@ -962,16 +975,22 @@ class ConnectorSourceNotify[In: Any val]
     _credits = _credits + new_credits
 
   fun ref send_restart(source: ConnectorSource[In] ref) =>
-    @ll(_conn_info, "Sending RESTART(%s:%s)\n".cstring(),
-      host.cstring(), service.cstring())
-    _send_reply(source, cwm.RestartMsg(host + ":" + service))
-    _clear_and_relinquish_all()
-    _session_active = false
+    if _session_active then
+      @ll(_conn_info, "Sending RESTART(%s:%s)\n".cstring(),
+        host.cstring(), service.cstring())
+      _send_reply(source, cwm.RestartMsg(host + ":" + service))
+      _clear_and_relinquish_all()
+      _session_active = false
+    end
 
   fun _send_reply(source: ConnectorSource[In] ref, msg: cwm.Message) =>
     let w1: Writer = w1.create()
     let b1 = cwm.Frame.encode(msg, w1)
     source.writev_final(Bytes.length_encode(b1))
+
+  fun nonempty_magic(): U8 =>
+    """An arbitrary constant."""
+    84
 
   fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
     """
