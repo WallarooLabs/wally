@@ -116,6 +116,18 @@ def look_for_orphaned_s3_phase2_data(path):
         None
     return list(x for x in orphaned.values() if x[3] == False)
 
+def find_last_committed_offset(path):
+    offset = 0
+    try:
+        with open(path, 'rb') as f:
+            for l in f:
+                a = eval(l)
+                if a[1] == '2-ok':
+                    offset = a[3]
+    except FileNotFoundError:
+        True
+    return offset
+
 def read_chunk(path, start_offset, end_offset):
     """
     Return only if 100% successful.
@@ -168,6 +180,8 @@ class AsyncServer(asynchat.async_chat, object):
         self._txn_log = None
         self._worker_name = None
         self._out_path_opath = None
+        self._last_committed_offset = None
+        self._last_msg = None
 
         if self._s3 is not None:
             try:
@@ -255,7 +269,10 @@ class AsyncServer(asynchat.async_chat, object):
                     # NOTE: This type doesn't have extended disconnect control!
 
             opath = self._out_path + "." + msg.instance_name
-            self._out = open(opath, 'ab')
+            with open(opath, 'ab') as tmp:
+                None # Create the file if it doesn't already exist
+            self._out = open(opath, 'r+b')
+            self._out.seek(0, 2) ## Seek to end of the file
             self._out_path_opath = opath
             self._out_offset = self._out.tell()
             logging.debug('top of AsyncServer self._out_offset = {}'.format(self._out_offset))
@@ -281,6 +298,13 @@ class AsyncServer(asynchat.async_chat, object):
                 chunk = read_chunk(opath, start_por, end_por)
                 self.log_it(['orphaned', (txn_id, start_por, end_por)])
                 self.write_to_s3_and_log(start_por, chunk, txn_id, 'orphaned')
+
+            self._last_committed_offset = find_last_committed_offset(tlpath)
+            logging.info("last committed offset for {} is {}".format(opath, self._last_committed_offset))
+            ## There may be junk data at the end of the file, get rid of it.
+            self._out.truncate(self._last_committed_offset)
+            self._out.seek(self._last_committed_offset)
+            self._out_offset = self._last_committed_offset
 
         elif isinstance(msg, cwm.Notify):
             if msg.stream_id != 1:
@@ -345,6 +369,10 @@ class AsyncServer(asynchat.async_chat, object):
 
             # Sanity checks
             start_por = -1
+            if self._out_offset != self._out.tell():
+                self._txn_commit_next = False
+                logging.error('2PC: sanity: offset {} != tell {}'.format(
+                    self._out_offset, self._out.tell()))
             for (stream_id, start_por, end_por) in msg2.where_list:
                 if stream_id != 1:
                     self._txn_commit_next = False
@@ -436,8 +464,13 @@ class AsyncServer(asynchat.async_chat, object):
                                 format(stream_id))
                         logging.info('2PC: truncating {} to offset {}'.format(self._out_path_opath, start_por))
 
-                        ## DIAGNOSTIC: Let's write the stuff where we said we would, then
-                        QQQ
+                        ## DIAGNOSTIC: Save a copy of the file for diag purposes:
+                        self.flush_fsync(self._out)
+                        copy_path = "{}.{}".format(self._out_path_opath, time.time())
+                        os.system("cp {} {}".format(self._out_path_opath, copy_path))
+                        logging.info("flushed & copied to {}".format(copy_path))
+                        ## End DIAGNOSTIC
+
                         self._out.truncate(start_por)
                         self.flush_fsync(self._out)
                         self._out_offset = start_por
@@ -447,15 +480,22 @@ class AsyncServer(asynchat.async_chat, object):
                     logging.fatal('2PC: Protocol error: phase 1 status was rollback but phase 2 says commit')
                     sys.exit(66)
 
-                if msg2.commit and phase1_status:
+                if msg2.commit:
                     log_tag = '2-ok'
                     offset = where_list[0][2]
+                    ## Extra sanity check
+                    if self._last_committed_offset is None or \
+                            offset < self._last_committed_offset:
+                        logging.fatal("2PC: _last_committed_offset {} offset {}".format(
+                            self._last_committed_offset, offset))
+                        os.exit(66)
+                    self._last_committed_offset = offset
                 else:
                     log_tag = '2-rollback'
                     offset = where_list[0][1]
                 self.log_it([log_tag, msg2.txn_id, offset])
 
-                if msg2.commit and phase1_status and \
+                if msg2.commit and \
                         (self._s3 is not None) and (self._s3_chunk != b''):
                     self.write_to_s3_and_log(self._s3_chunk_offset,
                         self._s3_chunk, msg2.txn_id, 'normal')
@@ -496,7 +536,7 @@ class AsyncServer(asynchat.async_chat, object):
                 m = 'ERROR: MISSING DATA: self._out_offset {} tell {} < msg.message_id {}'.format(self._out_offset, self._out.tell(), msg.message_id)
                 self._txn_commit_next = False
                 logging.error(m)
-                logging.info("last_msg = {}".format(self.last_msg))
+                logging.info("last_msg = {}".format(self._last_msg))
                 logging.info("     msg = {}".format(msg))
                 if not self._next_txn_force_abort_written:
                     self._next_txn_force_abort_written = True
@@ -506,7 +546,7 @@ class AsyncServer(asynchat.async_chat, object):
                 ## Let's write the stuff where we said we would, then.
                 ## Later, we'll save a copy of the file before we truncate
                 ## the crap out of the universe.
-                flush_fsync(self._out)
+                self.flush_fsync(self._out)
                 self._out.seek(msg.message_id)
                 ## cut-and-paste from offset == message_id case above, ALMOST!
                 ret1 = self._out.write(bs)
@@ -516,29 +556,48 @@ class AsyncServer(asynchat.async_chat, object):
                 self._out_offset = self._out.tell()
                 logging.info('FORCE _out_offset is now {}'.format(self._out_offset))
                 self._streams[msg.stream_id][2] = msg.message_id
-                flush_fsync(self._out)
+                self.flush_fsync(self._out)
+                ## End DIAGNOSTIC
 
             elif self._out_offset > msg.message_id:
-                logging.info('duplicate data: self._out_offset {} tell {} > msg.message_id {}'.format(self._out_offset, self._out.tell(), msg.message_id))
-                ## Deduplication case: we've already seen this, so
-                ## we don't take any further action.
-
-                ## DIAGNOSTIC: Let's see what's there, shall we?
-                try:
-                    diag = read_chunk(self._out_path_opath, msg.message_id,
-                        msg.message_id + len(msg.message))
-                except:
-                    diag = "<-<exception>->"
-                if diag == msg.message:
-                    logging.debug("diag: file bytes match message")
+                ## The message_id has gone backward.  That's good or bad.
+                ## If the message_id is exactly equal to the last 2PC
+                ## committed offset, then that's OK.  Assume that we've
+                ## got a new connection from a new wallaroo worker process,
+                ## probably after a crash + restart, and Wallaroo has done
+                ## a rollback to the last fully committed checkpoint, and
+                ## has started re-processing data.  Whatever we've written
+                ## so far as been uncommitted and thus it's safe to discard.
+                if msg.message_id == self._last_committed_offset:
+                    logging.info('duplicate data: go back to last committed offset {}'.format(
+                        self._last_committed_offset))
+                    self._out.truncate(self._last_committed_offset)
+                    self.flush_fsync(self._out)
+                    self._out_offset = self._last_committed_offset
                 else:
-                    logging.info("diag: msg = {}".format(msg))
-                    logging.info("diag: bytes in opath = {}".format(diag))
+                    logging.fatal('duplicate data: self._out_offset {} tell {} > msg.message_id {}'.format(self._out_offset, self._out.tell(), msg.message_id))
+                    ## Deduplication case: we've already seen this, so
+                    ## we don't take any further action.
 
+                    ## DIAGNOSTIC: Let's see what's there, shall we?
+                    try:
+                        diag = read_chunk(self._out_path_opath, msg.message_id,
+                            msg.message_id + len(msg.message))
+                    except:
+                        diag = "<-<exception>->"
+                    if diag == msg.message:
+                        logging.fatal('diag: file bytes match message')
+                    else:
+                        logging.fatal('diag: msg = {}'.format(msg))
+                        logging.fatal('diag: bytes in opath = {}'.format(diag))
+                    ## End DIAGNOSTIC
+                    self.flush_fsync(self._out)
+                    self.flush_fsync(self._txn_log)
+                    os.exit(66)
         else:
             logging.critical('message has no message_id')
             sys.exit(66)
-        self.last_msg = msg
+        self._last_msg = msg
 
     def write(self, msg):
         logging.debug("write {}".format(msg))
