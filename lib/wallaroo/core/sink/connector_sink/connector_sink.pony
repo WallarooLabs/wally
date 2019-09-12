@@ -399,9 +399,13 @@ actor ConnectorSink is Sink
     """
     match _twopc.twopc_phase1_reply(txn_id, commit)
     | true =>
-      _barrier_coordinator.ack_barrier(this, _twopc.barrier_token)
+      if _twopc.barrier_token != _twopc.barrier_token_initial then
+        _barrier_coordinator.ack_barrier(this, _twopc.barrier_token)
+      end
     | false =>
-      abort_decision("phase 1 ABORT", _twopc.txn_id, _twopc.barrier_token)
+      if _twopc.barrier_token != _twopc.barrier_token_initial then
+        abort_decision("phase 1 ABORT", _twopc.txn_id, _twopc.barrier_token)
+      end
     | None =>
       // This case is possible when:
       // 1. We've sent a 2PC phase 1 message to our sink for the txn id
@@ -495,10 +499,14 @@ actor ConnectorSink is Sink
         // messages to us will block the senders.  However, the nature
         // of backpressure may change over time as the runtime's
         // backpressure system changes.
-        @ll(_twopc_debug, "2PC: preemptive abort: connector sink not fully connected".cstring())
-        abort_decision("connector sink not fully connected",
-          _twopc.txn_id, _twopc.barrier_token)
-        _twopc.preemptive_txn_abort(sbt)
+        if _twopc.barrier_token != _twopc.barrier_token_initial then
+          @ll(_twopc_debug, "2PC: preemptive abort: connector sink not fully connected".cstring())
+          abort_decision("connector sink not fully connected",
+            _twopc.txn_id, _twopc.barrier_token)
+          _twopc.preemptive_txn_abort(sbt)
+        else
+        @ll(_twopc_debug, "2PC: preemptive abort: connector sink not fully connected, but we're at barrier_token_initial: skip".cstring())
+        end
         return
       end
 
