@@ -583,6 +583,17 @@ actor Autoscale
   // COORDINATOR
   //////////////////////////////////
 
+  be try_shrink(local_topology: LocalTopologyInitializer,
+    target_workers: Array[WorkerName] val, shrink_count: U64,
+    conn: TCPConnection)
+  =>
+    _phase.try_shrink(local_topology, target_workers, shrink_count, conn)
+
+  be try_join(local_topology: LocalTopologyInitializer, conn: TCPConnection,
+    worker_name: WorkerName, worker_count: USize)
+  =>
+    _phase.try_join(local_topology, conn, worker_name, worker_count, _auth)
+
   be inject_shrink_autoscale_barrier(remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>

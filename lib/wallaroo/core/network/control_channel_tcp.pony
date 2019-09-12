@@ -328,7 +328,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         ifdef "autoscale" then
           match _layout_initializer
           | let lti: LocalTopologyInitializer =>
-            lti.worker_join(conn, m.worker_name, m.worker_count)
+            // lti.worker_join(conn, m.worker_name, m.worker_count)
+            _autoscale.try_join(lti, conn, m.worker_name, m.worker_count)
           else
             Fail()
           end

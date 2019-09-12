@@ -28,9 +28,9 @@ use "wallaroo/core/messages"
 use "wallaroo/core/network"
 use "wallaroo/core/routing"
 use "wallaroo_labs/collection_helpers"
+use "wallaroo_labs/messages/"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/string_set"
-
 
 trait _AutoscalePhase
   fun name(): String
@@ -93,6 +93,26 @@ trait _AutoscalePhase
   fun ref boundary_acked_registering(b: OutgoingBoundary) =>
     _invalid_call(); Fail()
 
+  fun ref try_shrink(local_topology: LocalTopologyInitializer,
+    target_workers: Array[WorkerName] val, shrink_count: U64,
+    conn: TCPConnection)
+  =>
+    let reply = ExternalMsgEncoder.shrink_error_response(
+      "Autoscale event currently underway, cannot shirk at this time")
+    conn.writev(reply)
+
+  fun ref try_join(local_topology: LocalTopologyInitializer,
+    conn: TCPConnection, worker_name: WorkerName, worker_count: USize,
+    auth: AmbientAuth)
+  =>
+    let error_msg = "Autoscale event currently underway, cannot join at this time"
+    try
+      let msg = ChannelMsgEncoder.inform_join_error(error_msg, auth)?
+      conn.writev(msg)
+    else
+      Fail()
+    end
+
   fun ref stop_the_world_for_shrink_migration_initiated(
     coordinator: WorkerName, remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
@@ -135,12 +155,24 @@ class _WaitingForAutoscale is _AutoscalePhase
   =>
     _autoscale.stop_the_world_for_grow_migration(coordinator, joining_workers)
 
+  fun ref try_shrink(local_topology: LocalTopologyInitializer,
+    target_workers: Array[WorkerName] val, shrink_count: U64,
+    conn: TCPConnection)
+  =>
+    local_topology.initiate_shrink(target_workers, shrink_count, conn)
+
   fun ref stop_the_world_for_shrink_migration_initiated(
     coordinator: WorkerName, remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
     _autoscale.stop_the_world_for_shrink_migration(coordinator,
       remaining_workers, leaving_workers)
+
+  fun ref try_join(local_topology: LocalTopologyInitializer,
+    conn: TCPConnection, worker_name: WorkerName, worker_count: USize,
+    auth: AmbientAuth)
+  =>
+    local_topology.worker_join(conn, worker_name, worker_count)
 
   fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
@@ -176,6 +208,12 @@ class _WaitingForJoiners is _AutoscalePhase
       _current_worker_count.string().cstring())
 
   fun name(): String => "WaitingForJoiners"
+
+  fun ref try_join(local_topology: LocalTopologyInitializer,
+    conn: TCPConnection, worker_name: WorkerName, worker_count: USize,
+    auth: AmbientAuth)
+  =>
+    local_topology.worker_join(conn, worker_name, worker_count)
 
   fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
@@ -534,6 +572,12 @@ class _JoiningWorker is _AutoscalePhase
 
   fun name(): String => "JoiningWorker"
 
+  fun ref try_join(local_topology: LocalTopologyInitializer,
+    conn: TCPConnection, worker_name: WorkerName, worker_count: USize,
+    auth: AmbientAuth)
+  =>
+    local_topology.worker_join(conn, worker_name, worker_count)
+
   fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
     current_worker_count: USize)
@@ -607,6 +651,12 @@ class _WaitingForProducersList is _AutoscalePhase
 
   fun name(): String => "_WaitingForProducersList"
 
+  fun ref try_join(local_topology: LocalTopologyInitializer,
+    conn: TCPConnection, worker_name: WorkerName, worker_count: USize,
+    auth: AmbientAuth)
+  =>
+    local_topology.worker_join(conn, worker_name, worker_count)
+
   fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
     current_worker_count: USize)
@@ -650,6 +700,12 @@ class _WaitingForProducersToRegister is _AutoscalePhase
 
   fun name(): String => "_WaitingForProducersToRegister"
 
+  fun ref try_join(local_topology: LocalTopologyInitializer,
+    conn: TCPConnection, worker_name: WorkerName, worker_count: USize,
+    auth: AmbientAuth)
+  =>
+    local_topology.worker_join(conn, worker_name, worker_count)
+
   fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
     current_worker_count: USize)
@@ -691,6 +747,12 @@ class _WaitingForBoundariesMap is _AutoscalePhase
     _completion_action = completion_action
 
   fun name(): String => "_WaitingForBoundariesMap"
+
+  fun ref try_join(local_topology: LocalTopologyInitializer,
+    conn: TCPConnection, worker_name: WorkerName, worker_count: USize,
+    auth: AmbientAuth)
+  =>
+    local_topology.worker_join(conn, worker_name, worker_count)
 
   fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
@@ -739,6 +801,12 @@ class _WaitingForBoundariesToAckRegistering is _AutoscalePhase
     _completion_action = completion_action
 
   fun name(): String => "_WaitingForBoundariesToAckRegistering"
+
+  fun ref try_join(local_topology: LocalTopologyInitializer,
+    conn: TCPConnection, worker_name: WorkerName, worker_count: USize,
+    auth: AmbientAuth)
+  =>
+    local_topology.worker_join(conn, worker_name, worker_count)
 
   fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,

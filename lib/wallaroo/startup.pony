@@ -378,7 +378,7 @@ actor Startup
       if (_external_host != "") or (_external_service != "") then
         let external_channel_notifier =
           ExternalChannelListenNotifier(_startup_options.worker_name, auth,
-            connections, this, local_topology_initializer)
+            connections, this, local_topology_initializer, autoscale)
         let external_listener = TCPListener(auth,
           consume external_channel_notifier, _external_host, _external_service)
         connections.register_disposable(external_listener)
@@ -599,7 +599,7 @@ actor Startup
       if (_external_host != "") or (_external_service != "") then
         let external_channel_notifier =
           ExternalChannelListenNotifier(_startup_options.worker_name, auth,
-            connections, this, local_topology_initializer)
+            connections, this, local_topology_initializer, autoscale)
         let external_listener = TCPListener(auth,
           consume external_channel_notifier, _external_host, _external_service)
         connections.register_disposable(external_listener)

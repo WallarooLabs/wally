@@ -23,6 +23,7 @@ use "time"
 use "wallaroo_labs/bytes"
 use "wallaroo_labs/messages"
 use "wallaroo"
+use "wallaroo/core/autoscale"
 use "wallaroo/core/common"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
@@ -37,16 +38,19 @@ class ExternalChannelListenNotifier is TCPListenNotify
   let _connections: Connections
   let _recovery_file_cleaner: RecoveryFileCleaner
   let _local_topology_initializer: LocalTopologyInitializer
+  let _autoscale: Autoscale
 
   new iso create(name: String, auth: AmbientAuth, connections: Connections,
     recovery_file_cleaner: RecoveryFileCleaner,
-    local_topology_initializer: LocalTopologyInitializer)
+    local_topology_initializer: LocalTopologyInitializer,
+    autoscale: Autoscale)
   =>
     _auth = auth
     _worker_name = name
     _connections = connections
     _recovery_file_cleaner = recovery_file_cleaner
     _local_topology_initializer = local_topology_initializer
+    _autoscale = autoscale
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -68,7 +72,7 @@ class ExternalChannelListenNotifier is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
     ExternalChannelConnectNotifier(_worker_name, _auth, _connections,
-      _recovery_file_cleaner, _local_topology_initializer)
+      _recovery_file_cleaner, _local_topology_initializer, _autoscale)
 
   fun ref closed(listen: TCPListener ref) =>
     @printf[I32]("%s external: listener closed\n".cstring(),
@@ -80,17 +84,20 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
   let _connections: Connections
   let _recovery_file_cleaner: RecoveryFileCleaner
   let _local_topology_initializer: LocalTopologyInitializer
+  let _autoscale: Autoscale
   var _header: Bool = true
 
   new iso create(name: String, auth: AmbientAuth, connections: Connections,
     recovery_file_cleaner: RecoveryFileCleaner,
-    local_topology_initializer: LocalTopologyInitializer)
+    local_topology_initializer: LocalTopologyInitializer,
+    autoscale: Autoscale)
   =>
     _auth = auth
     _worker_name = name
     _connections = connections
     _recovery_file_cleaner = recovery_file_cleaner
     _local_topology_initializer = local_topology_initializer
+    _autoscale = autoscale
 
   fun ref accepted(conn: TCPConnection ref) =>
     try
@@ -165,7 +172,9 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
           if m.query is true then
             _local_topology_initializer.shrinkable_query(conn)
           else
-            _local_topology_initializer.initiate_shrink(m.node_names,
+            // _local_topology_initializer.initiate_shrink(m.node_names,
+            //   m.num_nodes, conn)
+            _autoscale.try_shrink(_local_topology_initializer, m.node_names,
               m.num_nodes, conn)
           end
         | let m: ExternalPartitionQueryMsg =>
