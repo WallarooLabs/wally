@@ -463,7 +463,7 @@ class AsyncServer(asynchat.async_chat, object):
             reply = cwm.TwoPCReply(str(msg2.txn_id).encode('utf-8'), success)
             reply_bytes = cwm.TwoPCFrame.encode(reply)
             msg = cwm.Message(0, 0, 0, None, reply_bytes)
-            time.sleep(0.151) ### TESTING ONLY! DELETE ME
+            #time.sleep(0.151)      ### TESTING ONLY! DELETE ME
             self.write(msg)
 
             self._txn_commit_next = True
@@ -558,7 +558,7 @@ class AsyncServer(asynchat.async_chat, object):
                     self._txn_commit_next = False
                     raise Exception("File write error? {} != {} or {} != None".format(len(bs), ret1, ret2))
                 self._out_offset += len(msg.message)
-                self._streams[msg.stream_id][2] = msg.message_id
+                self._streams[msg.stream_id][2] = self._out_offset
                 logging.debug('_out_offset is now {} tell {}'.format(self._out_offset, self._out.tell()))
             elif self._out_offset < msg.message_id:
                 # TODO: After the bugfix in commit 88e4cdca2, this
@@ -586,7 +586,7 @@ class AsyncServer(asynchat.async_chat, object):
                     raise Exception("File write error? {} != {} or {} != None".format(len(bs), ret1, ret2))
                 self._out_offset = self._out.tell()
                 logging.info('FORCE _out_offset is now {}'.format(self._out_offset))
-                self._streams[msg.stream_id][2] = msg.message_id
+                self._streams[msg.stream_id][2] = self._out_offset
                 self.flush_fsync(self._out)
                 ## End DIAGNOSTIC
 
