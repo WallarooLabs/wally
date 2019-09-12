@@ -397,10 +397,25 @@ actor ConnectorSink is Sink
     This is a callback used by the ConnectorSinkNotify class to Inform
     us that it received a 2PC phase 1 reply.
     """
-    if _twopc.twopc_phase1_reply(txn_id, commit) then
+    match _twopc.twopc_phase1_reply(txn_id, commit)
+    | true =>
       _barrier_coordinator.ack_barrier(this, _twopc.barrier_token)
-    else
+    | false =>
       abort_decision("phase 1 ABORT", _twopc.txn_id, _twopc.barrier_token)
+    | None =>
+      // This case is possible when:
+      // 1. We've sent a 2PC phase 1 message to our sink for the txn id
+      //    for checkpoint 315.
+      // 2. The reply to #1 is delayed.
+      // 3. Stuff happens, Wallaroo decides to roll back to checkpoint 314.
+      // 4. Wallaroo rolls back to 314 and immediately checkpoints again
+      //    with checkpoint 316.
+      // 5. _twopc's state now has the txn id for checkpoint 316.
+      // 6. The reply to #1 arrives, and it contains the txn id
+      //    for checkpoint 315.
+      // 7. twopc_phase1_reply() ignores the information in the reply to #1
+      //    via this None.
+      None
     end
 
   fun ref abort_decision(reason: String, txn_id: String,
