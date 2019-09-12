@@ -177,7 +177,13 @@ class ConnectorSink2PC
     end
 
   fun ref twopc_phase1_reply(txn_id': String, commit: Bool): (Bool | None) =>
-    if not state_is_1precommit() then
+    if not (state_is_start() or state_is_1precommit()) then
+      // This could be a matter of a late arriving reply after
+      // Wallaroo has started a rollback.  Rollback will reset the
+      // 2PC state to TwoPCFsmStart.  So if it's a late reply, the
+      // next check below, for txn_ids, will do the right thing
+      // for us, because it's not reasonable to fail here for the
+      // late reply + rollback scenario.
       @ll(_twopc_err, "2PC: ERROR: twopc_reply: _twopc.state = %d".cstring(), state())
       Fail()
     end
