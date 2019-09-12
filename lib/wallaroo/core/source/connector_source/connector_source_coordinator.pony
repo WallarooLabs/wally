@@ -78,6 +78,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
   let _metrics_conn: MetricsSink
   let _metrics_reporter: MetricsReporter
   let _router_registry: RouterRegistry
+  let _barrier_coordinator: BarrierCoordinator
   var _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val
   let _event_log: EventLog
   let _auth: AmbientAuth
@@ -132,6 +133,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
     handler: FramedSourceHandler[In] val,
     host: String, service: String, cookie: String,
     max_credits: U32, refill_credits: U32,
+    barrier_coordinator: BarrierCoordinator,
     init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -161,6 +163,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
     _host = host
     _service = service
     _cookie = cookie
+    _barrier_coordinator = barrier_coordinator
     _max_credits = max_credits
     _refill_credits = refill_credits
     _limit = parallelism
@@ -203,7 +206,8 @@ actor ConnectorSourceCoordinator[In: Any val] is
       let source = ConnectorSource[In](source_id, _auth, this,
         consume notify, _event_log, selected_router, SourceTCPHandlerBuilder,
         _outgoing_boundary_builders, _layout_initializer,
-        _metrics_reporter.clone(), _router_registry, _router_registry)
+        _metrics_reporter.clone(), _router_registry, _router_registry,
+        _barrier_coordinator)
       source.mute(this)
 
       _router_registry.register_source(source, source_id)
