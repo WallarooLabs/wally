@@ -655,14 +655,29 @@ actor ConnectorSink is Sink
     @ll(_conn_debug, "Rollback to %s at ConnectorSink %s".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring())
     @ll(_twopc_debug, "2PC: Rollback: twopc_state %d txn_id %s.".cstring(), _twopc.state(), _twopc.txn_id.cstring())
 
-    if _twopc.txn_id != "" then
-      // Phase 1 decision was abort + we haven't been disconnected.
-      // If we were disconnected + perform a local abort, then we
-      // arrive here with _twopc.txn_id="".  The last transaction,
-      // named by _twopc.txn_id_at_close, has already been aborted
-      // during the twopc_intro portion of the connector sink protocol.
-      _twopc.send_phase2(this, false)
+    // If we were disconnected + perform a local abort, then we
+    // arrive here with _twopc.txn_id="".  The last transaction,
+    // named by _twopc.txn_id_at_close, has already been aborted
+    // during the twopc_intro portion of the connector sink protocol.
+
+    if _twopc.txn_id == "" then
+      // We may have sent data to the sink that has not been committed,
+      // and also we haven't sent a phase1 message.  Do that now,
+      // and we'll immediately abort it below.
+      let bt = CheckpointBarrierToken(checkpoint_id)
+      match _twopc.barrier_complete(bt where is_rollback = true)
+      | None =>
+        // No data has been processed by the sink since the last
+        // checkpoint.
+        @ll(_twopc_debug, "no data written during this checkpoint interval, skipping phase 1".cstring())
+        _twopc.txn_id = "skip--.--" + bt.string()
+      | let msg: cwm.MessageMsg =>
+        _notify.send_msg(this, msg)
+        @ll(_twopc_debug, "sent rollback phase 1 for txn_id %s".cstring(), _twopc.txn_id.cstring())
+      end
     end
+
+    _twopc.send_phase2(this, false)
     _twopc.reset_state()
 
     let r = Reader
