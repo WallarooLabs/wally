@@ -335,17 +335,16 @@ class AsyncServer(asynchat.async_chat, object):
                 self.write(error)
                 return
             # respond with notifyack
+            key = (self._out_path_opath, msg.stream_id)
             try:
-                por = self._streams[msg.stream_id][2]
+                por = self._streams[key][2]
             except:
                 por = 0
             notify_ack = cwm.NotifyAck(
                 True,
                 msg.stream_id,
                 por)
-            self._streams[msg.stream_id] = [msg.stream_id,
-                                            msg.stream_name,
-                                            por]
+            self._streams[key] = [msg.stream_id, msg.stream_name, por]
             self.write(notify_ack)
         elif isinstance(msg, cwm.Message):
             self.handle_message(msg)
@@ -364,8 +363,9 @@ class AsyncServer(asynchat.async_chat, object):
     def handle_eos_message(self, msg):
         # ack eos
         logging.debug("NH: acking eos for {}".format(msg))
+        key = (self._out_path_opath, msg.stream_id)
         self.write(cwm.Ack(credits = 1,
-                           acks= [(msg.stream_id, self._streams[msg.stream_id][2])]))
+                           acks= [(msg.stream_id, self._streams[key][2])]))
 
     def handle_message(self, msg):
         if msg.stream_id == 0:
@@ -498,7 +498,8 @@ class AsyncServer(asynchat.async_chat, object):
                         self._out.truncate(start_por)
                         self._out.seek(start_por)
                         self._out_offset = start_por
-                        self._streams[stream_id][2] = start_por
+                        key = (self._out_path_opath, stream_id)
+                        self._streams[key][2] = start_por
 
                 if not phase1_status and msg2.commit:
                     logging.fatal('2PC: Protocol error: phase 1 status was rollback but phase 2 says commit')
@@ -550,6 +551,7 @@ class AsyncServer(asynchat.async_chat, object):
                     logging.info('2PC: abort next transaction: {} matches {}'
                         .format(regexp, bs))
 
+        key = (self._out_path_opath, msg.stream_id)
         if msg.message_id != None:
             logging.debug('msg.message_id = {}'.format(msg.message_id))
             if self._out_offset == msg.message_id:
@@ -558,7 +560,7 @@ class AsyncServer(asynchat.async_chat, object):
                     self._txn_commit_next = False
                     raise Exception("File write error? {} != {} or {} != None".format(len(bs), ret1, ret2))
                 self._out_offset += len(msg.message)
-                self._streams[msg.stream_id][2] = self._out_offset
+                self._streams[key][2] = self._out_offset
                 logging.debug('_out_offset is now {} tell {}'.format(self._out_offset, self._out.tell()))
             elif self._out_offset < msg.message_id:
                 # TODO: After the bugfix in commit 88e4cdca2, this
@@ -586,7 +588,7 @@ class AsyncServer(asynchat.async_chat, object):
                     raise Exception("File write error? {} != {} or {} != None".format(len(bs), ret1, ret2))
                 self._out_offset = self._out.tell()
                 logging.info('FORCE _out_offset is now {}'.format(self._out_offset))
-                self._streams[msg.stream_id][2] = self._out_offset
+                self._streams[key][2] = self._out_offset
                 self.flush_fsync(self._out)
                 ## End DIAGNOSTIC
 
@@ -617,7 +619,7 @@ class AsyncServer(asynchat.async_chat, object):
         self._last_msg = msg
 
     def write(self, msg):
-        logging.debug("write {}".format(msg))
+        logging.debug("write {} DIAG {}".format(msg, self._out_path_opath))
         data = cwm.Frame.encode(msg)
         super(AsyncServer, self).push(data)
 
@@ -628,7 +630,9 @@ class AsyncServer(asynchat.async_chat, object):
             ack = cwm.Ack(
                 credits = 10,
                 acks = [
-                    (sid, por) for sid, _, por in self._streams.values()])
+                    (sid, por)
+                    for (opath,sid), _, por in self._streams.values()
+                    if opath == self._out_path_opath ])
             logging.debug('send ack msg: {}'.format(ack))
             self.write(ack)
         if self.received_count % 9999200 == 0:
@@ -642,9 +646,8 @@ class AsyncServer(asynchat.async_chat, object):
 
     def close(self, delete_from_active_workers = True):
         logging.info("Closing the connection")
-        logging.info("last received id by stream:\n\t{}".format(
-            "\n\t".join("{}, {}: {}".format(sid, sn, mid)
-                      for sid, sn, mid in self._streams.values())))
+        logging.info("last received id by stream for {}:\n\t{}".format(
+            self._out_path_opath, self._streams))
         super(AsyncServer, self).close()
         try:
             self.log_it(['connection-closed', True])
