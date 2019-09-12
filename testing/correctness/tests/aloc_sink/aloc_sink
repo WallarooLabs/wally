@@ -323,6 +323,7 @@ class AsyncServer(asynchat.async_chat, object):
                     truncate_offset = self._last_committed_offset
             elif len(self._txn_state) == 0:
                 truncate_offset = self._last_committed_offset
+            logging.info("truncate {} at offset {}".format(opath, truncate_offset))
             self._out.truncate(truncate_offset)
             self._out.seek(truncate_offset)
             self._out_offset = truncate_offset
@@ -492,8 +493,9 @@ class AsyncServer(asynchat.async_chat, object):
                         logging.info("flushed & copied to {}".format(copy_path))
                         ## End DIAGNOSTIC
 
-                        self._out.truncate(start_por)
                         self.flush_fsync(self._out)
+                        self._out.truncate(start_por)
+                        self._out.seek(start_por)
                         self._out_offset = start_por
                         self._streams[stream_id][2] = start_por
 
@@ -556,7 +558,7 @@ class AsyncServer(asynchat.async_chat, object):
                     raise Exception("File write error? {} != {} or {} != None".format(len(bs), ret1, ret2))
                 self._out_offset += len(msg.message)
                 self._streams[msg.stream_id][2] = msg.message_id
-                logging.debug('_out_offset is now {}'.format(self._out_offset))
+                logging.debug('_out_offset is now {} tell {}'.format(self._out_offset, self._out.tell()))
             elif self._out_offset < msg.message_id:
                 # TODO: After the bugfix in commit 88e4cdca2, this
                 # case should be impossible, and we ought to make this
