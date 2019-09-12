@@ -51,6 +51,9 @@ def reload_phase1_txn_state(path):
                     del txn_state[a[2]]
     except FileNotFoundError:
         True
+    if len(txn_state) > 1:
+        logging.critical('reload_phase1_txn_state: bad txn_state: {}'.format(txn_state))
+        sys.exit(66)
     return txn_state
 
 def look_for_forced_abort(path):
@@ -301,10 +304,28 @@ class AsyncServer(asynchat.async_chat, object):
 
             self._last_committed_offset = find_last_committed_offset(tlpath)
             logging.info("last committed offset for {} is {}".format(opath, self._last_committed_offset))
-            ## There may be junk data at the end of the file, get rid of it.
-            self._out.truncate(self._last_committed_offset)
-            self._out.seek(self._last_committed_offset)
-            self._out_offset = self._last_committed_offset
+            truncate_offset = None
+            if len(self._txn_state) > 1:
+                sys.exit("Invariant already checked elsewhere")
+            elif len(self._txn_state) == 1:
+                uncommitted_txn_id = list(self._txn_state.keys())[0]
+                (phase1_status, where_list) = self._txn_state[uncommitted_txn_id]
+                if len(where_list) != 1:
+                    logging.critical('Bad where_list in {}'.format(self._txn_state))
+                    sys.exit(66)
+                (stream_id, start_por, end_por) = where_list[0]
+                if stream_id != 1:
+                    logging.critical('Bad stream_id in {}'.format(self._txn_state))
+                    sys.exit(66)
+                if phase1_status is True:
+                    truncate_offset = end_por
+                else:
+                    truncate_offset = self._last_committed_offset
+            elif len(self._txn_state) == 0:
+                truncate_offset = self._last_committed_offset
+            self._out.truncate(truncate_offset)
+            self._out.seek(truncate_offset)
+            self._out_offset = truncate_offset
 
         elif isinstance(msg, cwm.Notify):
             if msg.stream_id != 1:
@@ -488,7 +509,14 @@ class AsyncServer(asynchat.async_chat, object):
                             offset < self._last_committed_offset:
                         logging.fatal("2PC: _last_committed_offset {} offset {}".format(
                             self._last_committed_offset, offset))
-                        os.exit(66)
+                        sys.exit(66)
+
+                    ## TODO: Remove when the protocol evolves to be unnecessary
+                    if offset != self._out_offset:
+                        logging.critical('2PC: phase 2 offset {} != {}'.format(
+                            offset, self._out_offset))
+                        sys.exit(66)
+
                     self._last_committed_offset = offset
                 else:
                     log_tag = '2-rollback'
@@ -579,7 +607,7 @@ class AsyncServer(asynchat.async_chat, object):
                 ## End DIAGNOSTIC
                 self.flush_fsync(self._out)
                 self.flush_fsync(self._txn_log)
-                os.exit(66)
+                sys.exit(66)
         else:
             logging.critical('message has no message_id')
             sys.exit(66)
@@ -709,7 +737,7 @@ logging.root.formatter = logging.Formatter(fmt)
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(logging.root.formatter)
 logging.root.addHandler(stream_handler)
-logging.root.setLevel(logging.INFO)
+logging.root.setLevel(logging.DEBUG)
 
 out_path = sys.argv[1]
 abort_rule_path = sys.argv[2]
