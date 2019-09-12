@@ -201,6 +201,7 @@ class ConnectorSourceNotify[In: Any val]
   var _instance_name: String = ""
   var _prep_for_rollback: Bool = false
   let _debug_disconnect: Bool = false
+  var _commit_successful: Bool = true
 
   // Watermark !TODO! How do we handle this respecting per-connector-type
   // policies
@@ -759,7 +760,7 @@ class ConnectorSourceNotify[In: Any val]
     _clear_and_relinquish_all()
     source.close()
 
-  fun ref initiate_checkpoint(checkpoint_id: CheckpointId) =>
+  fun ref initiate_checkpoint(checkpoint_id: CheckpointId): Bool =>
     if not _prep_for_rollback then
       ifdef debug then
         Invariant(checkpoint_id > _barrier_checkpoint_id)
@@ -781,6 +782,12 @@ class ConnectorSourceNotify[In: Any val]
           end
         end
       end
+    end
+    if _commit_successful then
+      return true
+    else
+      _commit_successful = true // for the next iteration
+      return false
     end
 
   fun ref checkpoint_complete(source: ConnectorSource[In] ref,
@@ -909,21 +916,41 @@ class ConnectorSourceNotify[In: Any val]
         stream.name.cstring(),
         stream.last_acked.string().cstring())
     end
-    if (session_id != _session_id) or (not _session_active) then
-      ifdef debug then
-        @ll(_conn_debug, "Notify request session_id is old. Rejecting result\n"
-          .cstring())
-      end
-      // This is a reply from a query that we'd sent in a prior TCP
-      // connection, or else the TCP connection is closed now,
-      // so ignore it.
-      // If the connection has been closed, any state about this query would
-      // have already been purged from any local state
-      return
-    end
 
     // remove entry from _pending_notify set
     _pending_notify.unset(stream.id)
+
+    if (session_id != _session_id) or (not _session_active) then
+      // This is a reply from a query that we'd sent in a prior TCP
+      // connection, or else the TCP connection is closed now. If the
+      // connection has been closed, any state about this query would
+      // have already been purged from any local state ... which makes
+      // it difficult to recover from the situation we're in here.
+      // After all, that stream ID may already be registered & in active
+      // use on some other worker right now.
+      //
+      // The one hammer that we have in our toolbox is a complete
+      // rollback to the prior state: we can force the next checkpoint
+      // to rollback. That would cause the entire cluster to rollback,
+      // and each worker would tell all active ConnectorSource sessions
+      // to RESTART and close. Then the entire stream registry starts
+      // from a clean slate.
+      //
+      // If the global stream registry sends a success=true reply but
+      // this worker were to crash immediately afterward and drop that
+      // reply, then we might have a "leak" of the stream id,
+      // permanently stuck in active state.  Also, we don't have
+      // Erlang's process link and monitor mechanisms to help repair
+      // such "leaked" stream id registrations. Fortunately, because
+      // this worker crashed, when this worker restarts, it will cause a
+      // global rollback and thus, as noted above, restart the stream
+      // registry from a clean slate.
+      @ll(_conn_debug, "Notify request session_id is old. Rejecting result\n"
+          .cstring())
+      _commit_successful = false
+      return
+    end
+
     if success then
       // create _StreamState to place in _active_streams
       let s = _StreamState(stream.id, stream.name, stream.last_acked,

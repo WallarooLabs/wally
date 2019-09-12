@@ -911,7 +911,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   out_router, _metrics_conn, consume source_reporter,
                   _router_registry, _outgoing_boundary_builders, _event_log,
                   _auth, this, _is_recovering, worker_source_config, _connections,
-                  t.worker_names, _is_joining)
+                  t.worker_names, _is_joining, _barrier_coordinator)
                 _sc_builders.push(sc_builder)
               else
                 Fail()
