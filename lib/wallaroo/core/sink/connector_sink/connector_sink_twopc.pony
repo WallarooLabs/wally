@@ -176,15 +176,19 @@ class ConnectorSink2PC
       reset_state()
     end
 
-  fun ref twopc_phase1_reply(txn_id': String, commit: Bool): Bool =>
+  fun ref twopc_phase1_reply(txn_id': String, commit: Bool): (Bool | None) =>
     if not state_is_1precommit() then
       @ll(_twopc_err, "2PC: ERROR: twopc_reply: _twopc.state = %d".cstring(), state())
       Fail()
     end
     if txn_id' != txn_id then
-      @ll(_twopc_err, "2PC: ERROR: twopc_reply: txn_id %s != %s".cstring(),
+      // It's possible that the reply we got is for an old txn id, see
+      // comments in ConnectorSink.twopc_phase1_reply.  The other
+      // explanation, believe/hope/trust, is that this response from
+      // the connector is buggy/Byzantine and must be fixed.
+      @ll(_twopc_info, "2PC: twopc_reply: txn_id %s != %s".cstring(),
         txn_id'.cstring(), txn_id.cstring())
-      Fail()
+      return None
     end
 
     if commit then
