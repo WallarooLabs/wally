@@ -165,6 +165,7 @@ actor ConnectorSink is Sink
 
   // 2PC
   let _twopc: ConnectorSink2PC
+  var _seen_checkpointbarriertoken: (CheckpointBarrierToken | None) = None
 
   new create(sink_id: RoutingId, sink_name: String, event_log: EventLog,
     recovering: Bool, env: Env, encoder_wrapper: ConnectorEncoderWrapper,
@@ -438,7 +439,17 @@ actor ConnectorSink is Sink
     This callback is used by ConnectorSinkNotify when the 2PC intro
     part of the connector sink protocol has finished.
     """
+    @ll(_twopc_debug, "twopc_intro_done: top".cstring())
     _twopc.twopc_intro_done(this)
+    match _seen_checkpointbarriertoken
+    | let sbt: CheckpointBarrierToken =>
+      @ll(_twopc_debug, "twopc_intro_done: we've seen %s, abort checkpoint now".cstring(), sbt.string().cstring())
+      abort_decision("connector sink disconnected & reconnected",
+        "no txn: twopc-intro-done", sbt)
+      _twopc.preemptive_txn_abort(sbt)
+    else
+      @ll(_twopc_debug, "twopc_intro_done: _seen_checkpointbarriertoken is None".cstring())
+    end
 
   ///////////////
   // BARRIER
@@ -476,6 +487,15 @@ actor ConnectorSink is Sink
     match barrier_token
     | let srt: CheckpointRollbackBarrierToken =>
       _phase.prepare_for_rollback(barrier_token)
+    | let sbt: CheckpointBarrierToken =>
+      _seen_checkpointbarriertoken = sbt
+      if _connected and _notify.twopc_intro_done then
+        @ll(_conn_debug, "process_barrier: connected & 2PC intro done".cstring())
+      else
+        @ll(_conn_debug, "process_barrier: connected & 2PC intro not done".cstring())
+        // Don't abort checkpoint here.  Rather, wait until
+        // twopc_intro_done()
+      end
     end
     _phase.receive_barrier(input_id, producer,
       barrier_token)
@@ -492,23 +512,22 @@ actor ConnectorSink is Sink
     var ack_now = true
     match barrier_token
     | let sbt: CheckpointBarrierToken =>
-      ack_now = false
-      if not _notify.twopc_intro_done then
-        // This sink applies Pony runtime backpressure when disconnected,
-        // so it's quite unlikely that we will get here: sending
-        // messages to us will block the senders.  However, the nature
-        // of backpressure may change over time as the runtime's
-        // backpressure system changes.
-        if _twopc.barrier_token != _twopc.barrier_token_initial then
-          @ll(_twopc_debug, "2PC: preemptive abort: connector sink not fully connected".cstring())
-          abort_decision("connector sink not fully connected",
-            _twopc.txn_id, _twopc.barrier_token)
-          _twopc.preemptive_txn_abort(sbt)
-        else
-        @ll(_twopc_debug, "2PC: preemptive abort: connector sink not fully connected, but we're at barrier_token_initial: skip".cstring())
-        end
+      if not (_connected and _notify.twopc_intro_done) then
+        // If we call _barrier_coordinator.abort_decision() here,
+        // then (if backpressure has been disabled) a new checkpoint
+        // will be immediately triggered (and probably disabled by
+        // this clause again), several hundred checkpoints/second.
+        // With backpressure on, as of 2019-09-13 @ commit 71355cd,
+        // the entire worker deadlocks, so we need a workaround for
+        // the rapid checkpoint loop and then implement an
+        // alternative to runtime backpressure for this actor!
+        // The workaround is to rely on _seen_checkpointbarriertoken
+        // to tell us when we need to abort the checkpoint @ time
+        // when the 2PC intro has finished.
         return
       end
+      _seen_checkpointbarriertoken = None
+      ack_now = false
 
       checkpoint_state(sbt.id)
       _notify.twopc_txn_id_current = _twopc.txn_id
@@ -539,8 +558,10 @@ actor ConnectorSink is Sink
         this)
 
     | let srt: CheckpointRollbackBarrierToken =>
+      _seen_checkpointbarriertoken = None
       _use_normal_processor()
     | let rbrt: CheckpointRollbackResumeBarrierToken =>
+      _seen_checkpointbarriertoken = None
       _resume_processing_messages()
       _twopc.reset_state()
     else
@@ -673,11 +694,14 @@ actor ConnectorSink is Sink
         _twopc.txn_id = "skip--.--" + bt.string()
       | let msg: cwm.MessageMsg =>
         _notify.send_msg(this, msg)
+        _twopc.set_state_1precommit()
         @ll(_twopc_debug, "sent rollback phase 1 for txn_id %s".cstring(), _twopc.txn_id.cstring())
       end
     end
 
-    _twopc.send_phase2(this, false)
+    if _twopc.state_is_1precommit() then
+      _twopc.send_phase2(this, false)
+    end
     _twopc.reset_state()
 
     let r = Reader
