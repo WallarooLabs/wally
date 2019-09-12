@@ -88,19 +88,32 @@ class ConnectorSink2PC
     txn_id = "preemptive txn abort"
     barrier_token = sbt
 
-  fun ref barrier_complete(sbt: CheckpointBarrierToken):
-    (None | cwm.MessageMsg)
+  fun ref barrier_complete(sbt: CheckpointBarrierToken,
+    is_rollback: Bool = false): (None | cwm.MessageMsg)
   =>
     if state_is_start() then
-      if (current_offset > 0) and
+      // Calculate short circuit/commit-fast here.
+      // Don't short circuit if we're rolling back.
+      if (not is_rollback) and
+         (current_offset > 0) and
          (current_offset == last_offset)
       then
         set_state_commit_fast()
         return None
       end
+      if is_rollback and (current_offset == 0)
+      then
+        // We've rolled back and also 1. we've never sent anything
+        // or 2. we still have amnesia about what we've written.
+        // In either case, phase 1 isn't needed.  The phase 2 abort
+        // that we send later will be harmless.
+        set_state_commit_fast()
+        return None
+      end
 
       state = TwoPCFsm1Precommit
-      txn_id = make_txn_id_string(sbt.id)
+      let prefix = if is_rollback then "rollback--" else "" end
+      txn_id = prefix + make_txn_id_string(sbt.id)
       barrier_token = sbt
       current_txn_end_offset = current_offset
     else
@@ -177,16 +190,6 @@ class ConnectorSink2PC
     end
 
   fun ref twopc_phase1_reply(txn_id': String, commit: Bool): (Bool | None) =>
-    if not (state_is_start() or state_is_1precommit()) then
-      // This could be a matter of a late arriving reply after
-      // Wallaroo has started a rollback.  Rollback will reset the
-      // 2PC state to TwoPCFsmStart.  So if it's a late reply, the
-      // next check below, for txn_ids, will do the right thing
-      // for us, because it's not reasonable to fail here for the
-      // late reply + rollback scenario.
-      @ll(_twopc_err, "2PC: ERROR: twopc_reply: _twopc.state = %d".cstring(), state())
-      Fail()
-    end
     if txn_id' != txn_id then
       // It's possible that the reply we got is for an old txn id, see
       // comments in ConnectorSink.twopc_phase1_reply.  The other
@@ -195,6 +198,17 @@ class ConnectorSink2PC
       @ll(_twopc_info, "2PC: twopc_reply: txn_id %s != %s".cstring(),
         txn_id'.cstring(), txn_id.cstring())
       return None
+    end
+    if not (state_is_start() or state_is_1precommit() or
+      state_is_2commit_fast()) then
+      // This could be a matter of a late arriving reply after
+      // Wallaroo has started a rollback.  Rollback will reset the
+      // 2PC state to TwoPCFsmStart.  So if it's a late reply, the
+      // next check below, for txn_ids, will do the right thing
+      // for us, because it's not reasonable to fail here for the
+      // late reply + rollback scenario.
+      @ll(_twopc_err, "2PC: ERROR: twopc_reply: _twopc.state = %d".cstring(), state())
+      Fail()
     end
 
     if commit then
