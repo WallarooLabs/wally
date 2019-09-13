@@ -227,8 +227,16 @@
 
 - name: create cpu shield
   script: create_cpu_shield.sh {{ system_cpus if system_cpus is defined else "" }} > /create_cpu_shield.out
-  when: ('vagrant' != '{{ ansible_ssh_user }}')
+  when: ('vagrant' != '{{ ansible_ssh_user }}' and '{{ provider }}' != 'azure')
+
+- name: create cpu shield in azure
+  script: create_cpu_shield_azure.sh {{ system_cpus if system_cpus is defined else "" }} > /create_cpu_shield.out
+  when: ('vagrant' != '{{ ansible_ssh_user }}' and '{{ provider }}' == 'azure')
 
 - name: apply kernel tweaks
   script: kerneltweaks.sh > /kerneltweaks.out
-  when: ('vagrant' != '{{ ansible_ssh_user }}')
+  when: ('vagrant' != '{{ ansible_ssh_user }}' and '{{ provider }}' != 'azure')
+
+- name: apply azure kernel tweaks
+  script: kerneltweaks_azure.sh > /kerneltweaks.out
+  when: ({{ provider is defined }} and {{ provider == 'azure' }})

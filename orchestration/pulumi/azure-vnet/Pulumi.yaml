@@ -1,0 +1,23 @@
+name: azure-vnet
+runtime: nodejs
+description: Azure Virtual Network and related Resources creation and management
+template:
+  config:
+    azure-vnet:location:
+      description: The Azure location to use (`eastus`, `eastus2`,`centralus`, `westus2`)
+      default: eastus
+    azure-vnet:resourcegroup-name:
+      description: The Azure Resource Group name to use
+      default: wallaroo-dev_rg
+    azure-vnet:vnet-name:
+      description: The Azure Virtual Network name to use
+      default: wallaroo-dev_vnet
+    azure-vnet:subnet-name:
+      description: The Azure Subnet name to use
+      default: wallaroo-dev_snet
+    azure-vnet:nsg-name:
+      description: The Azure Network Security Group name to use
+      default: wallaroo-dev_nsg
+    azure-vnet:project-name:
+      description: The project name for tagging purporses.
+      default: orch-dev

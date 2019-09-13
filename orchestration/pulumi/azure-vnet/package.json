@@ -1,0 +1,8 @@
+{
+    "name": "azure-vnet",
+    "main": "index.js",
+    "dependencies": {
+        "@pulumi/pulumi": "^1.0.0",
+        "@pulumi/azure": "^1.0.0"
+    }
+}
