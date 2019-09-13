@@ -1,0 +1,10 @@
+name: azure-cluster
+runtime: nodejs
+description: Azure VMSS Cluster management
+template:
+  config:
+    azure-cluster:vmss-name:
+      description: The name of the VMSS cluster to retrieve
+    azure-cluster:vmss-id:
+      description: The ID of the VMSS cluster to retrieve
+
