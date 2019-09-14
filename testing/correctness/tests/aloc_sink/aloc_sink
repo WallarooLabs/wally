@@ -406,8 +406,23 @@ class AsyncServer(asynchat.async_chat, object):
                         .format(start_por, end_por))
                 if end_por > self._out_offset:
                     self._txn_commit_next = False
-                    logging.error('2PC: Phase 1 invalid end_por {} self._out_offset {} file size {}'
-                        .format(end_por, self._out_offset, self._out.tell()))
+                    m = '2PC: Phase 1 invalid end_por {} self._out_offset {} file size {} commit id {}'.format(
+                        end_por, self._out_offset, self._out.tell(), msg2.txn_id)
+                    if self._out_offset == start_por:
+                        ## We probably restarted, we've truncated uncommitted
+                        ## bytes at the end of the file, and here's Wallaroo
+                        ## starting phase 1 with a byte range that starts
+                        ## exactly at that uncommitted range, and Wallaroo is
+                        ## already planning to abort in phase 2.  That's OK,
+                        ## we'll play along: we are already forcing this round
+                        ## to abort, so Wallaroo must abort in phase 2
+                        ## regardless.
+                        logging.info(m)
+                    else:
+                        ## This is something bad that Wallaroo has done
+                        logging.critical(m)
+                        self.log_it(['next-txn-force-abort', m])
+                        sys.exit(66)
 
             # Check local debugging/testing abort rules
             global TXN_COUNT
