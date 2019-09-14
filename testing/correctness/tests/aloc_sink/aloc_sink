@@ -488,10 +488,10 @@ class AsyncServer(asynchat.async_chat, object):
                         logging.info('2PC: truncating {} to offset {}'.format(self._out_path_opath, start_por))
 
                         ## DIAGNOSTIC: Save a copy of the file for diag purposes:
-                        self.flush_fsync(self._out)
-                        copy_path = "{}.{}".format(self._out_path_opath, time.time())
-                        os.system("cp {} {}".format(self._out_path_opath, copy_path))
-                        logging.info("flushed & copied to {}".format(copy_path))
+                        #self.flush_fsync(self._out)
+                        #copy_path = "{}.{}".format(self._out_path_opath, time.time())
+                        #os.system("cp {} {}".format(self._out_path_opath, copy_path))
+                        #logging.info("flushed & copied to {}".format(copy_path))
                         ## End DIAGNOSTIC
 
                         self.flush_fsync(self._out)
@@ -568,13 +568,15 @@ class AsyncServer(asynchat.async_chat, object):
                 # a fatal error.
                 m = 'ERROR: MISSING DATA: self._out_offset {} tell {} < msg.message_id {}'.format(self._out_offset, self._out.tell(), msg.message_id)
                 self._txn_commit_next = False
-                logging.error(m)
-                logging.info("last_msg = {}".format(self._last_msg))
-                logging.info("     msg = {}".format(msg))
+                logging.critical(m)
+                logging.critical("last_msg = {}".format(self._last_msg))
+                logging.critical("     msg = {}".format(msg))
                 if not self._next_txn_force_abort_written:
                     self._next_txn_force_abort_written = True
                     self.log_it(['next-txn-force-abort', m])
+                sys.exit(66)
 
+                ## TODO delete
                 ## DIAGNOSTIC: we're going to truncate this crap, right?
                 ## Let's write the stuff where we said we would, then.
                 ## Later, we'll save a copy of the file before we truncate
