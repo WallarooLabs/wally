@@ -80,6 +80,7 @@ class ConnectorSinkNotify
     Unreachable()
 
   fun ref connecting(conn: WallarooOutgoingNetworkActor ref, count: U32) =>
+    @ll(_conn_debug, "ConnectorSink connecting".cstring())
     None
 
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
@@ -210,27 +211,39 @@ class ConnectorSinkNotify
   fun ref throttled(conn: WallarooOutgoingNetworkActor ref) =>
     if (not _throttled) or (not twopc_intro_done) then
       _throttled = true
+      if false then
       Backpressure.apply(_auth)
       @ll(_conn_info, ("ConnectorSink is experiencing back pressure, " +
         "connected = %s").cstring(), _connected.string().cstring())
+      else
+      @ll(_conn_info, ("ConnectorSink is experiencing back pressure, <BACKPRESSURE REMOVED> " +
+        "connected = %s").cstring(), _connected.string().cstring())
+      end
     end
 
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
     if _throttled and twopc_intro_done then
       _throttled = false
+      if false then
       Backpressure.release(_auth)
       @ll(_conn_info, ("ConnectorSink is no longer experiencing" +
         " back pressure, connected = %s").cstring(),
         _connected.string().cstring())
+      else
+      @ll(_conn_info, ("ConnectorSink is no longer experiencing" +
+        " back pressure <BACKPRESSURE REMOVED>, connected = %s").cstring(),
+        _connected.string().cstring())
+      end
       try @ll(_twopc_debug, "DBGDBG: unthrottled: buffer check, FSM state = %d".cstring(), (conn as ConnectorSink ref).get_twopc_state()) else Fail() end
       @ll(_twopc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s current txn=%s.".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_txn_id_current.cstring())
       if twopc_current_txn_aborted then
         @ll(_twopc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s discard %d items".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_reconnect_buffer.size())
         None
       else
+        // SLF TODO: remove the reconnect buffer entirely?
         for d in twopc_reconnect_buffer.values() do
-          @ll(_twopc_debug, "DBG: unthrottled: writing buffered %d bytes".cstring(), d.size())
-          try (conn as ConnectorSink ref)._write_final(d, None) else Fail() end
+          @ll(_twopc_debug, "DBG: unthrottled: SKIP writing buffered %d bytes".cstring(), d.size())
+          // TODO delete? try (conn as ConnectorSink ref)._write_final(d, None) else Fail() end
         end
       end
       twopc_reconnect_buffer.clear()
@@ -272,6 +285,7 @@ class ConnectorSinkNotify
     | let m: cwm.NotifyAckMsg =>
       if _fsm_state is ConnectorProtoFsmStreaming then
         @ll(_conn_debug, "NotifyAck: success %s stream_id %d p-o-r %lu".cstring(), m.success.string().cstring(), m.stream_id, m.point_of_ref)
+        // SLF TODO: This comment is incorrect, FIX
         // We are going to ignore the point of reference sent to us by
         // the connector sink.  We assume that we know best, and if our
         // point of reference is earlier, then we'll send some duplicates
