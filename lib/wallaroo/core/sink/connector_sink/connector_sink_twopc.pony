@@ -72,6 +72,10 @@ class ConnectorSink2PC
   fun state_is_2commit_fast(): Bool =>
     state is TwoPCFsm2CommitFast
 
+  fun ref set_state_1precommit() =>
+    state = TwoPCFsm1Precommit
+    @ll(_twopc_debug, "2PC: set 2PC state => %d".cstring(), state())
+
   fun ref set_state_commit() =>
     state = TwoPCFsm2Commit
     @ll(_twopc_debug, "2PC: set 2PC state => %d".cstring(), state())
