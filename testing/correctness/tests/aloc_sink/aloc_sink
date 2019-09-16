@@ -214,7 +214,11 @@ class AsyncServer(asynchat.async_chat, object):
             self.in_buffer = []
             self.set_terminator(4) # read next frame header
             self.reading_header = True
-            self._handle_frame(frame_data)
+            try:
+                self._handle_frame(frame_data)
+            except Exception as e:
+                logging.critical('_handle_frame error: {}'.format(e))
+                sys.exit(66)
 
     def _handle_frame(self, frame):
         self.update_received_count()
@@ -514,7 +518,16 @@ class AsyncServer(asynchat.async_chat, object):
                         self._out.seek(start_por)
                         self._out_offset = start_por
                         key = (self._out_path_opath, stream_id)
-                        self._streams[key][2] = start_por
+                        try:
+                            self._streams[key][2] = start_por
+                        except KeyError as e:
+                            ## In case of disconnect, reconnect, and
+                            ## ReplyUncommitted's list of txns is not empty,
+                            ## then when the phase 2 abort arrives, we have
+                            ## not seen a Notify message for the stream id,
+                            ## this attempt to update offset will throw
+                            ## an exception, which is ok here.
+                            None
 
                 if not phase1_status and msg2.commit:
                     logging.fatal('2PC: Protocol error: phase 1 status was rollback but phase 2 says commit')
