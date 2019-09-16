@@ -32,7 +32,7 @@ class ConnectorSinkNotify
   var _header: Bool = true
   var _connected: Bool = false
   var _throttled: Bool = false
-  let _stream_id: cwm.StreamId = 1
+  let stream_id: cwm.StreamId = 1
   let _sink_id: RoutingId
   let _app_name: String
   let _worker_name: WorkerName
@@ -83,11 +83,14 @@ class ConnectorSinkNotify
     @ll(_conn_debug, "ConnectorSink connecting".cstring())
     None
 
-  fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
+  fun ref connected(conn: WallarooOutgoingNetworkActor ref,
+    twopc: ConnectorSink2PC)
+  =>
     @ll(_conn_info, "ConnectorSink connected".cstring())
     _header = true
     _connected = true
     _throttled = false
+    twopc.notify1_sent = false
     twopc_intro_done = false
     twopc_uncommitted_list = None
     _connection_count = _connection_count + 1
@@ -117,7 +120,9 @@ class ConnectorSinkNotify
 
     _fsm_state = ConnectorProtoFsmHandshake
 
-  fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
+  fun ref closed(conn: WallarooOutgoingNetworkActor ref,
+    twopc: ConnectorSink2PC)
+  =>
     """
     We have no idea how much stuff that we've sent recently
     has actually been received by the now-disconnected sink.
@@ -137,6 +142,7 @@ class ConnectorSinkNotify
     @ll(_conn_info, "ConnectorSink connection closed, throttling".cstring())
     _connected = false
     _throttled = false
+    twopc.notify1_sent = false
     twopc_intro_done = false
     twopc_uncommitted_list = None
     throttled(conn)
@@ -150,8 +156,8 @@ class ConnectorSinkNotify
   fun ref expect(conn: WallarooOutgoingNetworkActor ref, qty: USize): USize =>
     qty
 
-  fun ref received(conn: WallarooOutgoingNetworkActor ref, data: Array[U8] iso,
-    times: USize): Bool
+  fun ref received(conn: WallarooOutgoingNetworkActor ref,
+    twopc: ConnectorSink2PC, data: Array[U8] iso, times: USize): Bool
   =>
     if _header then
       try
@@ -168,7 +174,7 @@ class ConnectorSinkNotify
         conn.expect(4)
         _header = true
         let data' = recover val consume data end
-        _process_connector_sink_v2_data(conn, data')?
+        _process_connector_sink_v2_data(conn, twopc, data')?
       else
         Fail()
       end
@@ -258,7 +264,8 @@ class ConnectorSinkNotify
     end
 
   fun ref _process_connector_sink_v2_data(
-    conn: WallarooOutgoingNetworkActor ref, data: Array[U8] val): None ?
+    conn: WallarooOutgoingNetworkActor ref,
+    twopc: ConnectorSink2PC, data: Array[U8] val): None ?
   =>
     match cwm.Frame.decode(data)?
     | let m: cwm.HelloMsg =>
@@ -271,8 +278,9 @@ class ConnectorSinkNotify
         if credits < 2 then
           _error_and_close(conn, "HEY, too few credits: " + credits.string())
         else
-          let notify = cwm.NotifyMsg(_stream_id, stream_name, message_id)
+          let notify = cwm.NotifyMsg(stream_id, stream_name, message_id)
           send_msg(conn, notify)
+          twopc.notify1_sent = true
           credits = credits - 1
         end
       else
@@ -354,7 +362,7 @@ class ConnectorSinkNotify
         // NOTE: we aren't actually using credits
         credits = credits + m.credits
         for (s_id, p_o_r) in m.credit_list.values() do
-          if s_id == _stream_id then
+          if s_id == stream_id then
             if p_o_r > message_id then
               // This is possible with 2PC, but it's harmless if
               // we recognize it and ignore it.
@@ -382,7 +390,7 @@ class ConnectorSinkNotify
               // ACKs.
               None
             elseif p_o_r < acked_point_of_ref then
-              @ll(_conn_err, "Error: Ack: stream-id %lu p_o_r %lu acked_point_of_ref %lu".cstring(), _stream_id, p_o_r, acked_point_of_ref)
+              @ll(_conn_err, "Error: Ack: stream-id %lu p_o_r %lu acked_point_of_ref %lu".cstring(), stream_id, p_o_r, acked_point_of_ref)
               Fail()
             else
               acked_point_of_ref = p_o_r
@@ -444,7 +452,6 @@ class ConnectorSinkNotify
   fun ref make_message(encoded1: Array[(String val | Array[U8 val] val)] val):
     cwm.MessageMsg
   =>
-    let stream_id: cwm.StreamId = 1
     let event_time: cwm.EventTimeType = 0
     let key = None
 
