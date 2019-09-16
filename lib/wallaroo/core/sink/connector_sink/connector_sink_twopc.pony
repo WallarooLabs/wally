@@ -43,6 +43,7 @@ class ConnectorSink2PC
   var current_offset: USize = 0
   var current_txn_end_offset: USize = 0
   let stream_name: String
+  var notify1_sent: Bool = false
   let _twopc_debug: U16 = Log.make_sev_cat(Log.debug(), Log.twopc())
   let _twopc_info: U16 = Log.make_sev_cat(Log.info(), Log.twopc())
   let _twopc_err: U16 = Log.make_sev_cat(Log.err(), Log.twopc())
@@ -93,7 +94,9 @@ class ConnectorSink2PC
     barrier_token = sbt
 
   fun ref barrier_complete(sbt: CheckpointBarrierToken,
-    is_rollback: Bool = false): (None | cwm.MessageMsg)
+    is_rollback: Bool = false,
+    stream_id: cwm.StreamId = 223344 /* arbitrary integer != 1 or 0 */):
+  (None | Array[cwm.Message])
   =>
     if state_is_start() then
       // Calculate short circuit/commit-fast here.
@@ -125,10 +128,25 @@ class ConnectorSink2PC
       Fail()
     end
 
+    let msgs: Array[cwm.Message] = recover trn msgs.create() end
+    if not notify1_sent then
+      // The barrier arrived before we've sent a Notify message for
+      // stream ID 1.  Our attempt to abort a byte range for stream ID 1
+      // will be rejected if we don't send a notify first.
+      if (not is_rollback) or (stream_id != 1) then
+        Fail()
+      end
+      @ll(_twopc_debug, "barrier_complete: push NotifyMsg onto list for %s".cstring(), txn_id.cstring())
+      msgs.push(cwm.NotifyMsg(stream_id, stream_name, 0))
+    end
+
+    @ll(_twopc_debug, "barrier_complete: push Phase1 onto list for %s".cstring(), txn_id.cstring())
     let where_list: cwm.WhereList =
       [(1, last_offset.u64(), current_offset.u64())]
     let bs = TwoPCEncode.phase1(txn_id, where_list)
-    cwm.MessageMsg(0, 0, 0, None, bs)
+    msgs.push(cwm.MessageMsg(0, 0, 0, None, bs))
+
+    consume msgs
 
   fun ref checkpoint_complete(sink: ConnectorSink ref, drop_phase2_msg: Bool) =>
     if (not ((state_is_2commit()) or

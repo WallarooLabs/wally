@@ -540,9 +540,11 @@ actor ConnectorSink is Sink
         _twopc.txn_id = "skip--.--" + barrier_token.string()
         return
 
-      | let msg: cwm.MessageMsg =>
-        _notify.send_msg(this, msg)
-        @ll(_twopc_debug, "2PC: sent phase 1 for txn_id %s".cstring(), _twopc.txn_id.cstring())
+      | let msgs: Array[cwm.Message] =>
+        for msg in msgs.values() do
+          _notify.send_msg(this, msg)
+        end
+        @ll(_twopc_debug, "2PC: sent phase 1 for txn_id %s, size %lu".cstring(), _twopc.txn_id.cstring(), msgs.size())
       end
 
       // As a 2PC participant as a Wallaroo *sink*, we cannot
@@ -686,16 +688,19 @@ actor ConnectorSink is Sink
       // and also we haven't sent a phase1 message.  Do that now,
       // and we'll immediately abort it below.
       let bt = CheckpointBarrierToken(checkpoint_id)
-      match _twopc.barrier_complete(bt where is_rollback = true)
+      match _twopc.barrier_complete(bt where
+        is_rollback = true, stream_id = _notify.stream_id)
       | None =>
         // No data has been processed by the sink since the last
         // checkpoint.
         @ll(_twopc_debug, "no data written during this checkpoint interval, skipping phase 1".cstring())
         _twopc.txn_id = "skip--.--" + bt.string()
-      | let msg: cwm.MessageMsg =>
-        _notify.send_msg(this, msg)
+      | let msgs: Array[cwm.Message] =>
+        for msg in msgs.values() do
+          _notify.send_msg(this, msg)
+        end
         _twopc.set_state_1precommit()
-        @ll(_twopc_debug, "sent rollback phase 1 for txn_id %s".cstring(), _twopc.txn_id.cstring())
+        @ll(_twopc_debug, "sent rollback phase 1 for txn_id %s, size %lu".cstring(), _twopc.txn_id.cstring(), msgs.size())
       end
     end
 
@@ -749,7 +754,7 @@ actor ConnectorSink is Sink
             _writeable = true
             _readable = true
 
-            _notify.connected(this)
+            _notify.connected(this, _twopc)
             _pending_reads()
 
             for msg in _initial_msgs.values() do
@@ -786,7 +791,7 @@ actor ConnectorSink is Sink
             _shutdown = false
             _shutdown_peer = false
 
-            _notify.connected(this)
+            _notify.connected(this, _twopc)
             _pending_reads()
 
             ifdef not windows then
@@ -965,7 +970,7 @@ actor ConnectorSink is Sink
     _fd = -1
 
     _twopc.hard_close()
-    _notify.closed(this)
+    _notify.closed(this, _twopc)
 
   fun ref _pending_reads() =>
     """
@@ -1007,8 +1012,7 @@ actor ConnectorSink is Sink
           _read_len = 0
 
           received_called = received_called + 1
-          if not _notify.received(this, consume data,
-            received_called)
+          if not _notify.received(this, _twopc, consume data, received_called)
           then
             _read_buf_size()
             _read_again()
