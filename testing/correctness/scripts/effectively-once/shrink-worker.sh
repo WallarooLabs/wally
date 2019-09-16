@@ -11,6 +11,8 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
+CLUSTER_SHRINKER=../../../../utils/cluster_shrinker/cluster_shrinker
+
 case $1 in
     1)
         echo Error: cannot shrink the initializer worker
@@ -32,7 +34,7 @@ if [ -z "$pid" ]; then
     exit 1
 fi
 
-eligible=`../../utils/cluster_shrinker/cluster_shrinker -e 127.0.0.1:$WALLAROO_MY_EXTERNAL_BASE -q | \
+eligible=`$CLUSTER_SHRINKER -e 127.0.0.1:$WALLAROO_MY_EXTERNAL_BASE -q | \
     sed -e 's/.*Nodes: .//' -e 's/,|.*//' | \
       tr ',' ' '`
 ok=0
@@ -49,6 +51,6 @@ if [ $ok -eq 0 ]; then
     exit 1
 fi
 
-../../utils/cluster_shrinker/cluster_shrinker -e 127.0.0.1:$WALLAROO_MY_EXTERNAL_BASE -w $name
+$CLUSTER_SHRINKER -e 127.0.0.1:$WALLAROO_MY_EXTERNAL_BASE -w $name
 
 exit 0

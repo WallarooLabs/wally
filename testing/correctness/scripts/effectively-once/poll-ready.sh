@@ -6,6 +6,7 @@ if [ `uname -s` != Linux ]; then
     exit 1
 fi
 
+EXTERNAL_SENDER=../../../../testing/tools/external_sender/external_sender
 COUNT=`expr 15 \* 10` # 15 seconds
 VERBOSE=""
 ALL_RUNNING=""
@@ -51,7 +52,7 @@ initializer_external="${WALLAROO_INIT_HOST}:${WALLAROO_MY_EXTERNAL_BASE}"
 
 
 for i in `seq 1 $COUNT`; do
-    ../../testing/tools/external_sender/external_sender \
+    $EXTERNAL_SENDER \
         -e $initializer_external -t cluster-status-query 2>&1 | \
       grep -s 'Processing messages: true' > /dev/null 2>&1
     if [ $? -eq 0 ]; then
@@ -71,7 +72,7 @@ if [ $i -eq $COUNT ]; then
 fi
 
 if [ ! -z "$ALL_RUNNING" ]; then
-    workers=`../../testing/tools/external_sender/external_sender \
+    workers=`$EXTERNAL_SENDER \
         -e $initializer_external -t cluster-status-query 2>&1 | \
       grep -s 'Processing messages: ' | \
       sed -e 's/.*Workers: .//' -e 's/,|.*//' | \
@@ -99,7 +100,7 @@ if [ ! -z "$ALL_RUNNING" ]; then
             echo -n port = $port
         fi
         for i in `seq 1 $COUNT`; do
-            ../../testing/tools/external_sender/external_sender \
+            $EXTERNAL_SENDER \
                 -e 127.0.0.1:$port -t cluster-status-query 2>&1 | \
                 grep -s 'Processing messages: true' > /dev/null 2>&1
             if [ $? -eq 0 ]; then
