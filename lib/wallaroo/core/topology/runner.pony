@@ -18,7 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "buffered"
 use "collections"
-// use "crypto"
+use "crypto"
 use "net"
 use "random"
 use "time"

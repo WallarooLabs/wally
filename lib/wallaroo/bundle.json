@@ -2,6 +2,10 @@
   "deps": [
     { "type": "local",
       "local-path": "../"
+    },
+    { "type": "github",
+      "repo": "ponylang/crypto",
+  	  "tag": "1.0.0"
     }
   ]
 }
