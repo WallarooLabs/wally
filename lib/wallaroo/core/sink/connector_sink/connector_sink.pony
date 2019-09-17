@@ -556,8 +556,12 @@ actor ConnectorSink is Sink
       // commit/abort decisions only on the range of output
       // governed by a single round of 2PC.
 
-      _phase = QueuingSinkPhase(_sink_id,
-        this)
+      try
+        let queued = (_phase as BarrierSinkPhase).get_internal_queue()
+        _phase = QueuingSinkPhase(_sink_id, this, queued)
+      else
+        Fail()
+      end
 
     | let srt: CheckpointRollbackBarrierToken =>
       _seen_checkpointbarriertoken = None
