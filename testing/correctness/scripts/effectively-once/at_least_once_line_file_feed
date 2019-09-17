@@ -3,22 +3,6 @@
 """
 An example at-least-once feed with resettable sources that exercises the new
 AtLeastOnceSourceConnector and at-least-once protocol.
-
-To run it:
-
-1. start the mock server (TODO: replace with wallaroo app once pony connector is ready)
-    ```sh
-    python3 server.py
-    ```
-
-    The mock server will choose a random offset betwee 0 and 800 for each stream to in its notify_ack. (Since each stream has 1000 total messagrs, each of size 8 bytes, it does so by choosing `random.randint(0,800)*8` as the point_of_ref.)
-
-2. Start the feed:
-
-    ```sh
-    export PYTHONPATH="$PYTHONPATH:/home/nisan/wallaroo-tutorial/wallaroo/machida/lib/:/home/nisan/wallaroo-tutorial/wallaroo/testing/tools"
-    ./at_least_once_feed
-    ```
 """
 
 import logging

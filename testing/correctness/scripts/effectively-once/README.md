@@ -16,10 +16,33 @@ make -C ../../../.. \
 
 ## Basic command use
 
+### Prerequisites
+
+The environment variable `WALLAROO_BIN` must contain the path to the
+Wallaroo executable that you wish to test.  Also, when additional
+logging detail is required, I recommend setting the
+`WALLAROO_THRESHOLDS` environment variable as shown below.  For
+example:
+
+```
+export WALLAROO_BIN=$HOME/wallaroo/examples/pony/aloc_passthrough/aloc_passthrough 
+export WALLAROO_THRESHOLDS='*.8'
+```
+
+Finally, all of the Bourne/Bash shell variables in the
+`sample-env-vars.sh` file must be defined by using:
+
+```
+. ./sample-env-vars.sh
+```
+
+Their values may be tweaked to fit your use case, hence the prefix
+"sample" in the file name.
+
 ### Stop all Wallaroo-related processes and delete all state files
 
 ```
-reset.sh
+./reset.sh
 ```
 
 ### Prerequisite: Start Wallaroo's sink
@@ -35,7 +58,6 @@ NOTE: The `poll-ready.sh` script will fail if the sink process is not
 already running.
 
 ```
-. ./sample-env-vars.sh
 ./start-initializer.sh -n 1
 poll-ready.sh -v -a
 ```
@@ -60,7 +82,6 @@ then starting `worker1` through `worker3`.
 
 ```
 DESIRED=4
-. ./sample-env-vars.sh
 ./start-initializer.sh -n $DESIRED
 sleep 1
 DESIRED_1=`expr $DESIRED - 1`
@@ -79,7 +100,6 @@ worker.
 Let's join `worker4`.
 
 ```
-. ./sample-env-vars.sh
 ./join-worker.sh -n 1 4
 sleep 1
 ./poll-ready.sh -v -a
@@ -99,7 +119,6 @@ a worker joining very close in time to another worker's join.
 Let's start 4 workers: `worker5` through `worker8`.
 
 ```
-. ./sample-env-vars.sh
 for i in `seq 5 8`; do ./join-worker.sh -n 4 $i; sleep 1; done
 ./poll-ready.sh -v -a
 ```
@@ -114,7 +133,6 @@ you specify `6`, then it will shrink away the `worker6` worker.
 Let's shrink `worker6`.
 
 ```
-. ./sample-env-vars.sh
 ./shrink-worker.sh 6
 sleep 1
 ./poll-ready.sh -v -a
@@ -128,7 +146,6 @@ to mean the `initializer` worker.
 Let's crash `initializer`.
 
 ```
-. ./sample-env-vars.sh
 ./crash-worker.sh 0
 sleep 1
 ./poll-ready.sh -v -a
@@ -137,7 +154,6 @@ sleep 1
 ### Restart the `initializer` after a crash
 
 ```
-. ./sample-env-vars.sh
 ./start-initializer.sh
 ```
 
@@ -146,8 +162,75 @@ sleep 1
 Let's restart 1 worker, `worker5`.
 
 ```
-. ./sample-env-vars.sh
 ./start-worker.sh -n 1 5
 ```
 
 
+## Testing Recipes
+
+### Prerequisites
+
+Create a large input file, approx 12MB, using the command:
+
+```
+dd if=testing/data/market_spread/nbbo/r3k-symbols_nbbo-fixish.msg bs=1000000 count=4 | od -x | sed 's/^/T/' > /tmp/input-file.txt
+```
+
+All lines in this ASCII file will begin with the letter "T". The
+`aloc_passthrough` Wallaroo app uses the first character of each line
+as the "key" for routing in a multi-worker cluster.  Therefore, all
+lines in the file will be processed by the same worker; this property
+makes correctness checking easier.
+
+### Run without errors
+
+In Window 1:
+
+* Run `reset.sh`
+* Start the Wallaroo cluster with the desired number of workers.
+* Be sure to run `poll-ready.sh -a -v` to verify that all workers are ready for work.
+
+In Window 2:
+
+```
+env PYTHONPATH=$HOME/wallaroo/machida/lib:examples/python/celsius_connectors $HOME/wallaroo/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 21222 |& tee /tmp/feed.out
+```
+
+In Window 1:
+
+```
+while [ 1 ]; do ./1-to-1-passthrough-verify.sh /tmp/input-file.txt  ; if [ $? -ne 0 ]; then killall -STOP aloc_passthrough; echo STOPPED; break; fi ; sleep 1; done
+```
+
+### Repeatedly crashing and restarting the sink
+
+TODO replace hack
+
+```
+for i in `seq 1 100`; do ps axww | grep aloc_sink | grep -v grep | awk '{print $1}' | xargs kill ; amount=`date | sed -e 's/.*://' -e 's/ .*//'`; echo i is $i, amount is $amount; sleep 2.$amount ; env PYTHONPATH=$HOME/wallaroo/machida/lib $HOME/wallaroo/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 >> /tmp/sink-out/stdout-stderr 2>&1 & sleep 2 ; ./1-to-1-passthrough-verify.sh /tmp/input-file.txt ; if [ $? -eq 0 ]; then echo OK; else killall -STOP aloc_passthrough ; echo STOPPED; break; fi ; egrep -v 'DEBUG|INFO' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then killall -STOP aloc_passthrough ; echo STOP-grep; break; fi; done
+```
+
+### Repeatedly crashing and restarting a non-initializer worker
+
+TODO replace hack
+
+```
+TO_CRASH=1
+for i in `seq 1 100`; do echo -n $i; crash-worker.sh $TO_CRASH ; sleep 0.2 ; mv /tmp/wallaroo.$TO_CRASH /tmp/wallaroo.$TO_CRASH.$i ; gzip -f /tmp/wallaroo.$TOCRASH.$i & start-worker.sh $TO_CRASH ; sleep 1.2; poll-ready.sh -w 2 -a; if [ $? -ne 0 ]; then echo BREAK0; break; fi; egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then echo BREAK; break; fi; ./1-to-1-passthrough-verify.sh /tmp/input-file.txt; if [ $? -ne 0 ]; then echo BREAK2; break; fi ;sleep 0.2; done
+```
+
+### Repeatedly crashing and restarting the initializer worker
+
+TODO replace hack
+
+```
+for i in `seq 1 100`; do echo -n $i; crash-worker.sh 0 ; sleep 0.2 ; mv /tmp/wallaroo.0 /tmp/wallaroo.0.$i ; gzip -f /tmp/wallaroo.0.$i & start-initializer.sh ; sleep 1.2; poll-ready.sh -w 2 -a; if [ $? -ne 0 ]; then echo BREAK0; break; fi; egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then echo BREAK; break; fi; ./1-to-1-passthrough-verify.sh /tmp/input-file.txt; if [ $? -ne 0 ]; then echo BREAK2; break; fi ;sleep 0.2; done
+```
+
+### Repeatedly crashing and restarting the source
+
+TODO replace hack
+
+```
+while [ 1 ]; do env PYTHONPATH=$HOME/wallaroo/machida/lib:$HOME/wallaroo/examples/python/celsius_connectors /home/vagrant/wallaroo/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 41000 & amount=`date | sed -e 's/.*://' -e 's/ .*//'`; echo amount is $amount; sleep 1.$amount ; kill -9 `ps axww | grep -v grep | grep feed | awk '{print $1}'`; sleep 0.$amount; done
+```
