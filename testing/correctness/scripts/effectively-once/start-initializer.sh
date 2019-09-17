@@ -50,9 +50,9 @@ cmd="$WALLAROO_BIN --in $my_in \
      --worker-count $NUM_WORKERS \
      $WALLAROO_ARG_PONY"
 if [ ! -z "$VERBOSE" ]; then
-    echo "cmd: $cmd /tmp/wallaroo.1 2>&1 &"
+    echo "cmd: $cmd > /tmp/wallaroo.0 2>&1 &"
 fi
 
-eval "$cmd" > /tmp/wallaroo.1 2>&1 &
+eval "$cmd" > /tmp/wallaroo.0 2>&1 &
 
 exit 0

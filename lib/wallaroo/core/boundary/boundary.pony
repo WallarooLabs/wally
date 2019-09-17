@@ -502,10 +502,8 @@ actor OutgoingBoundary is (Consumer & TCPActor)
       let msg = ChannelMsgEncoder.forward_barrier(target_routing_id,
         origin_routing_id, barrier_token, seq_id, _auth)?
       if _connection_initialized then
-        @printf[I32]("SLF: %s line %d token %s\n".cstring(), __loc.type_name().cstring(), __loc.line(), barrier_token.string().cstring())
         _tcp_handler.writev(msg)
       else
-        @printf[I32]("SLF: %s line %d token %s\n".cstring(), __loc.type_name().cstring(), __loc.line(), barrier_token.string().cstring())
         _unsent.push(msg)
       end
       _add_to_upstream_backup(msg)
