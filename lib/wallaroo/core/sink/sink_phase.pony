@@ -152,6 +152,9 @@ class BarrierSinkPhase is SinkPhase
     end
     qd
 
+  fun ref get_internal_queue(): Array[_Queued] =>
+    _queued
+
   fun ref higher_priority(token: BarrierToken): Bool =>
     token > _barrier_token
 
@@ -181,11 +184,14 @@ class BarrierSinkPhase is SinkPhase
 class QueuingSinkPhase is SinkPhase
   let _sink_id: RoutingId
   let _sink: Sink ref
-  let _queued: Array[_Queued] = _queued.create()
+  let _queued: Array[_Queued]
 
-  new create(sink_id: RoutingId, sink: Sink ref) =>
+  new create(sink_id: RoutingId, sink: Sink ref,
+    q: Array[_Queued] = Array[_Queued].create())
+  =>
     _sink_id = sink_id
     _sink = sink
+    _queued = q
 
   fun name(): String => __loc.type_name()
 
