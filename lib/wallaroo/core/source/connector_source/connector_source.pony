@@ -166,11 +166,12 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
 
     // We need to have the ability to abort a checkpoint. Sinks can do
     // that, so let's impersonate a sink.
-    // TODO: Um, this actor isn't a full Resilient, so it doesn't do all
+    // TODO: This actor isn't a full Resilient, so it doesn't do all
     //       the things that a sink needs to do?  For example, if we
     //       leave all of the _barrier_coordinator calls in this actor,
     //       then we'll hang a worker forever when it restarts. {sigh}
-    //TODO _barrier_coordinator.register_sink(_fake_sink)
+    //       See also GH #3012.
+    //REGISTRY TODO _barrier_coordinator.register_sink(_fake_sink)
 
     // register resilient with event log
     _event_log.register_resilient(_source_id, this)
@@ -396,7 +397,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
         b.dispose()
       end
       close()
-      //TODO _barrier_coordinator.unregister_sink(_fake_sink)
+      //REGISTRY TODO _barrier_coordinator.unregister_sink(_fake_sink)
       _muted = true
       _disposed = true
     end
@@ -451,10 +452,12 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     match token
     | let sbt: CheckpointBarrierToken =>
       if _notify.initiate_checkpoint(sbt.id) then
-        //TODO _barrier_coordinator.ack_barrier(_fake_sink, token)
+        //REGISTRY TODO _barrier_coordinator.ack_barrier(_fake_sink, token)
         checkpoint_state(sbt.id)
       else
-        //TODO _barrier_coordinator.abort_barrier(token)
+        //REGISTRY TODO This abort decision is based on an earlier decision
+        // by _notify.stream_notify_result().
+        //REGISTRY TODO _barrier_coordinator.abort_barrier(token)
         None
       end
     end

@@ -276,11 +276,8 @@ class ConnectorSinkNotify
     | let m: cwm.NotifyAckMsg =>
       if _fsm_state is ConnectorProtoFsmStreaming then
         @ll(_conn_debug, "NotifyAck: success %s stream_id %d p-o-r %lu".cstring(), m.success.string().cstring(), m.stream_id, m.point_of_ref)
-        // SLF TODO: This comment is incorrect, FIX
-        // We are going to ignore the point of reference sent to us by
-        // the connector sink.  We assume that we know best, and if our
-        // point of reference is earlier, then we'll send some duplicates
-        // and the connector sink can ignore them.
+        // We ignore the point of reference sent to us by
+        // the connector sink.
       else
         _error_and_close(conn, "Bad FSM State: D" + _fsm_state().string())
       end
