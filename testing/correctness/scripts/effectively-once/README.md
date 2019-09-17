@@ -16,6 +16,29 @@ make -C ../../../.. \
 
 ## Basic command use
 
+### Prerequisites
+
+The environment variable `WALLAROO_BIN` must contain the path to the
+Wallaroo executable that you wish to test.  Also, when additional
+logging detail is required, I recommend setting the
+`WALLAROO_THRESHOLDS` environment variable as shown below.  For
+example:
+
+```
+export WALLAROO_BIN=$HOME/wallaroo/examples/pony/aloc_passthrough/aloc_passthrough 
+export WALLAROO_THRESHOLDS='*.8'
+```
+
+Finally, all of the Bourne/Bash shell variables in the
+`sample-env-vars.sh` file must be defined by using:
+
+```
+. ./sample-env-vars.sh
+```
+
+Their values may be tweaked to fit your use case, hence the prefix
+"sample" in the file name.
+
 ### Stop all Wallaroo-related processes and delete all state files
 
 ```
@@ -35,7 +58,6 @@ NOTE: The `poll-ready.sh` script will fail if the sink process is not
 already running.
 
 ```
-. ./sample-env-vars.sh ; export WALLAROO_BIN=$HOME/wallaroo/examples/pony/aloc_passthrough/aloc_passthrough ; export WALLAROO_THRESHOLDS='*.8'
 ./start-initializer.sh -n 1
 poll-ready.sh -v -a
 ```
@@ -60,7 +82,6 @@ then starting `worker1` through `worker3`.
 
 ```
 DESIRED=4
-. ./sample-env-vars.sh ; export WALLAROO_BIN=$HOME/wallaroo/examples/pony/aloc_passthrough/aloc_passthrough ; export WALLAROO_THRESHOLDS='*.8'
 ./start-initializer.sh -n $DESIRED
 sleep 1
 DESIRED_1=`expr $DESIRED - 1`
@@ -79,7 +100,6 @@ worker.
 Let's join `worker4`.
 
 ```
-. ./sample-env-vars.sh ; export WALLAROO_BIN=$HOME/wallaroo/examples/pony/aloc_passthrough/aloc_passthrough ; export WALLAROO_THRESHOLDS='*.8'
 ./join-worker.sh -n 1 4
 sleep 1
 ./poll-ready.sh -v -a
@@ -99,7 +119,6 @@ a worker joining very close in time to another worker's join.
 Let's start 4 workers: `worker5` through `worker8`.
 
 ```
-. ./sample-env-vars.sh ; export WALLAROO_BIN=$HOME/wallaroo/examples/pony/aloc_passthrough/aloc_passthrough ; export WALLAROO_THRESHOLDS='*.8'
 for i in `seq 5 8`; do ./join-worker.sh -n 4 $i; sleep 1; done
 ./poll-ready.sh -v -a
 ```
@@ -114,7 +133,6 @@ you specify `6`, then it will shrink away the `worker6` worker.
 Let's shrink `worker6`.
 
 ```
-. ./sample-env-vars.sh ; export WALLAROO_BIN=$HOME/wallaroo/examples/pony/aloc_passthrough/aloc_passthrough ; export WALLAROO_THRESHOLDS='*.8'
 ./shrink-worker.sh 6
 sleep 1
 ./poll-ready.sh -v -a
@@ -128,7 +146,6 @@ to mean the `initializer` worker.
 Let's crash `initializer`.
 
 ```
-. ./sample-env-vars.sh ; export WALLAROO_BIN=$HOME/wallaroo/examples/pony/aloc_passthrough/aloc_passthrough ; export WALLAROO_THRESHOLDS='*.8'
 ./crash-worker.sh 0
 sleep 1
 ./poll-ready.sh -v -a
@@ -137,7 +154,6 @@ sleep 1
 ### Restart the `initializer` after a crash
 
 ```
-. ./sample-env-vars.sh ; export WALLAROO_BIN=$HOME/wallaroo/examples/pony/aloc_passthrough/aloc_passthrough ; export WALLAROO_THRESHOLDS='*.8'
 ./start-initializer.sh
 ```
 
@@ -146,7 +162,6 @@ sleep 1
 Let's restart 1 worker, `worker5`.
 
 ```
-. ./sample-env-vars.sh ; export WALLAROO_BIN=$HOME/wallaroo/examples/pony/aloc_passthrough/aloc_passthrough ; export WALLAROO_THRESHOLDS='*.8'
 ./start-worker.sh -n 1 5
 ```
 
