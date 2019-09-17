@@ -959,9 +959,9 @@ class ConnectorSourceNotify[In: Any val]
     end
     // send response either way
     send_notify_ack(source, success, stream.id, stream.last_acked)
-for s_map in [_active_streams ; _pending_close].values() do
-  @ll(_conn_debug, "after send_notify_ack: s_map.size = %lu".cstring(), s_map.size())
-end
+    for s_map in [_active_streams ; _pending_close].values() do
+      @ll(_conn_debug, "after send_notify_ack: s_map.size = %lu".cstring(), s_map.size())
+    end
 
   fun ref send_notify_ack(source: ConnectorSource[In] ref, success: Bool,
     stream_id: StreamId, point_of_reference: PointOfReference)
