@@ -65,6 +65,7 @@ class val KafkaSourceCoordinatorBuilderBuilder[In: Any val] is
     connections: Connections,
     workers_list: Array[WorkerName] val,
     is_joining: Bool,
+    barrier_coordinator_: BarrierCoordinator,
     target_router: Router = EmptyRouter):
     KafkaSourceCoordinatorBuilder[In]
   =>
