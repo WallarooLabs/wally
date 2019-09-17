@@ -241,7 +241,7 @@ class MultiSourceConnector(AtLeastOnceSourceConnector, BaseIter):
     """
     MultiSourceConnector
 
-    Send data from mutliple sources in a round-robin fashion using the
+    Send data from multiple sources in a round-robin fashion using the
     AtLeastOnceSourceConnector protocol and superclass.
     New sources may be added at any point.
 
