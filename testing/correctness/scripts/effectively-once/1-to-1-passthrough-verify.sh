@@ -33,12 +33,23 @@
 # 9. This script will be for 1-time verification use.
 
 INPUT=$1
-OUTPUT=/tmp/sink-out/output.worker2
-OUTPUT_TXNLOG=/tmp/sink-out/output.worker2.txnlog
+OUTPUT_DIR=/tmp/sink-out
+OUTPUT=`ls -l /tmp/sink-out/output.* | grep -v txnlog | sort -nr -k 5 | head -1 | awk '{ print $9 }'`
+OUTPUT_TXNLOG=$OUTPUT.txnlog
 TMP_INPUT=`mktemp /tmp/first-bytes-of-input.XXXXX`
 TMP_OUTPUT=`mktemp /tmp/first-bytes-of-output.XXXXX`
 rm -f $TMP_INPUT $TMP_OUTPUT
 trap "rm -f $TMP_INPUT $TMP_OUTPUT" 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+
+if [ ! -f $INPUT ]; then
+    echo Error: usage: $0 /path/to/input-file
+    echo "File '$INPUT' does not exist"
+    exit 1
+fi
+if [ ! -f $OUTPUT -o ! -f $OUTPUT_TXNLOG ]; then
+    echo Error: calculated file $OUTPUT and/or $OUTPUT_TXNLOG does not exist
+    exit 1
+fi
 
 sink_offset=0
 tmp=`grep "2-ok" $OUTPUT_TXNLOG | tail -1 | \
@@ -51,10 +62,10 @@ cmp -n $sink_offset $INPUT $OUTPUT
 if [ $? -eq 0 ]; then
     exit 0
 else
-    echo ERROR
     dd if=$INPUT bs=$sink_offset count=1 > $TMP_INPUT 2> /dev/null
     dd if=$OUTPUT bs=$sink_offset count=1 > $TMP_OUTPUT 2> /dev/null
     ls -l $TMP_INPUT $TMP_OUTPUT
     diff -u $TMP_INPUT $TMP_OUTPUT
+    echo ERROR
     exit 1
 fi
