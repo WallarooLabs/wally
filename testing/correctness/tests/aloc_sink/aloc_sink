@@ -543,7 +543,7 @@ class AsyncServer(asynchat.async_chat, object):
                             self._last_committed_offset, offset))
                         sys.exit(66)
 
-                    ## TODO: Remove when the protocol evolves to be unnecessary
+                    ## Remove when the protocol evolves to be unnecessary
                     if offset != self._out_offset:
                         logging.critical('2PC: phase 2 offset {} != {}'.format(
                             offset, self._out_offset))
@@ -591,9 +591,6 @@ class AsyncServer(asynchat.async_chat, object):
                 self._streams[key][2] = self._out_offset
                 logging.debug('_out_offset is now {} tell {}'.format(self._out_offset, self._out.tell()))
             elif self._out_offset < msg.message_id:
-                # TODO: After the bugfix in commit 88e4cdca2, this
-                # case should be impossible, and we ought to make this
-                # a fatal error.
                 m = 'ERROR: MISSING DATA: self._out_offset {} tell {} < msg.message_id {}'.format(self._out_offset, self._out.tell(), msg.message_id)
                 self._txn_commit_next = False
                 logging.critical(m)
@@ -603,25 +600,6 @@ class AsyncServer(asynchat.async_chat, object):
                     self._next_txn_force_abort_written = True
                     self.log_it(['next-txn-force-abort', m])
                 sys.exit(66)
-
-                ## TODO delete
-                ## DIAGNOSTIC: we're going to truncate this crap, right?
-                ## Let's write the stuff where we said we would, then.
-                ## Later, we'll save a copy of the file before we truncate
-                ## the crap out of the universe.
-                self.flush_fsync(self._out)
-                self._out.seek(msg.message_id)
-                ## cut-and-paste from offset == message_id case above, ALMOST!
-                ret1 = self._out.write(bs)
-                if len(bs) != ret1:
-                    self._txn_commit_next = False
-                    raise Exception("File write error? {} != {} or {} != None".format(len(bs), ret1, ret2))
-                self._out_offset = self._out.tell()
-                logging.info('FORCE _out_offset is now {}'.format(self._out_offset))
-                self._streams[key][2] = self._out_offset
-                self.flush_fsync(self._out)
-                ## End DIAGNOSTIC
-
             elif self._out_offset > msg.message_id:
                 ## The message_id has gone backward.
                 logging.fatal('duplicate data: self._out_offset {} tell {} > msg.message_id {}'.format(self._out_offset, self._out.tell(), msg.message_id))

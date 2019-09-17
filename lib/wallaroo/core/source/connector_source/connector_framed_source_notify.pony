@@ -321,7 +321,7 @@ class ConnectorSourceNotify[In: Any val]
           return _to_error_state(source, "Bad cookie: " + m.cookie + ", wanted: " + _cookie)
         end
 
-        // SLF TODO: add routing logic to handle
+        // TODO: add routing logic to handle
         // m.program_name and m.instance_name routing requirements
         // Right now, we assume that all messages are to be processed
         // by this connector's one & only pipeline as defined by the
@@ -746,7 +746,7 @@ class ConnectorSourceNotify[In: Any val]
       while true do
         let s = _StreamState.deserialize(rb)?
         _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
-        // SLF TODO: should I remove s.id from all my other lists, _active_streams, etc??
+        // TODO: should we remove s.id from all my other lists, _active_streams, etc??
       end
     end
     _relinquish_streams()
