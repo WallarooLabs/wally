@@ -12,11 +12,11 @@ if [ -z "$1" ]; then
 fi
 
 case $1 in
-    1)
+    0)
         name=initializer
         pattern="cluster-initializer"
         ;;
-    [0-9]*)
+    [1-9]*)
         name=worker$1
         pattern="name worker$1"
         ;;
