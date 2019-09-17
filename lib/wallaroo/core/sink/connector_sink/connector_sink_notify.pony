@@ -57,7 +57,6 @@ class ConnectorSinkNotify
   var twopc_txn_id_last_committed: (None|String) = None
   var twopc_txn_id_current: String = ""
   var twopc_uncommitted_list: (None|Array[String] val) = None
-  let twopc_reconnect_buffer: Array[(String val | Array[U8] val)] = twopc_reconnect_buffer.create()
   var twopc_current_txn_aborted: Bool = false
 
   new create(sink_id: RoutingId, app_name: String, worker_name: WorkerName,
@@ -188,8 +187,6 @@ class ConnectorSinkNotify
     All 2PC messages are sent via this class's send_msg(), which uses
     conn._write_final(), which does *not* filter its data through the
     sent() callback.
-    Also, all Wallaroo data that is buffered in twopc_reconnect_buffer
-    and later sent after we are unthrottled uses conn._write_final().
 
     As a result, this function should be unreachable.
     """
@@ -207,10 +204,7 @@ class ConnectorSinkNotify
     if _connected and (not _throttled) then
       data
     else
-      @ll(_conn_debug, "Sink sentv: not connected or throttled: buffering".cstring())
-      for d in data.values() do
-        twopc_reconnect_buffer.push(d)
-      end
+      @ll(_conn_debug, "Sink sentv: not connected or throttled".cstring())
       []
     end
 
@@ -242,17 +236,6 @@ class ConnectorSinkNotify
       end
       try @ll(_twopc_debug, "DBGDBG: unthrottled: buffer check, FSM state = %d".cstring(), (conn as ConnectorSink ref).get_twopc_state()) else Fail() end
       @ll(_twopc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s current txn=%s.".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_txn_id_current.cstring())
-      if twopc_current_txn_aborted then
-        @ll(_twopc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s discard %d items".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_reconnect_buffer.size())
-        None
-      else
-        // SLF TODO: remove the reconnect buffer entirely?
-        for d in twopc_reconnect_buffer.values() do
-          @ll(_twopc_debug, "DBG: unthrottled: SKIP writing buffered %d bytes".cstring(), d.size())
-          // TODO delete? try (conn as ConnectorSink ref)._write_final(d, None) else Fail() end
-        end
-      end
-      twopc_reconnect_buffer.clear()
     end
 
   fun send_msg(conn: WallarooOutgoingNetworkActor ref, msg: cwm.Message) =>
