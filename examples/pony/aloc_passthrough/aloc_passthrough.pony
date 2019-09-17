@@ -49,7 +49,7 @@ actor Main
             .to[Array[U8] val](AsIsStateC where parallelism = par_factor)
 
             .to_sink(ConnectorSinkConfig[InputBlob].from_options(
-              InputBlobEncoder, ConnectorSinkConfigCLIParser(env.args)?(0)?)
+              OutputBlobEncoder, ConnectorSinkConfigCLIParser(env.args)?(0)?)
               where parallelism = 1 /*** par_factor ***/)
         end
       Wallaroo.build_application(env, "Passthrough", pipeline)
@@ -88,7 +88,7 @@ primitive AsIsC is StatelessComputation[Array[U8] val, Array[U8] val]
     input
 
 class AsIsState is State
-  var count: USize =0
+  var count: USize = 0
 
 primitive AsIsStateC is StateComputation[Array[U8] val, Array[U8] val, AsIsState]
   fun name(): String => "AsIsState computation"
@@ -118,7 +118,7 @@ primitive PrintArray
     "[len=" + array.size().string() + ": " + ", ".join(array.values()) + "]"
 
 
-primitive InputBlobEncoder
+primitive OutputBlobEncoder
   fun apply(t: Array[U8] val, wb: Writer = Writer): Array[ByteSeq] val =>
     wb.write(t)
     wb.done()

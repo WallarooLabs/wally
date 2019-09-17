@@ -198,6 +198,7 @@ class ThrottledFileReader(BaseIter, BaseSource):
             # goop for this iterator.
             return (None, self.file.tell())
 
+        read_offset = self.file.tell()
         if self.is_text_lines:
             b = self.file.readline()
         if self.is_framed:
@@ -222,7 +223,7 @@ class ThrottledFileReader(BaseIter, BaseSource):
 
         self.bytes_read += len(b)
         #logging.info("b = {}".format(b))
-        return (b, self.file.tell())
+        return (b, read_offset)
 
     def wallaroo_acked(self, point_of_ref):
         self.last_acked = point_of_ref
