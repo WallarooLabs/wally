@@ -1,7 +1,7 @@
 #!/bin/sh
 
-IN1=/tmp/aloc_sink.out.txnlog
-IN=/tmp/aloc_sink.out.txnlog.short
+IN1=/tmp/aloc_sink.out.initializer.txnlog
+IN=/tmp/aloc_sink.out.initializer.txnlog.short
 
 if [ ! -f $IN1 ]; then
 	echo Error: input file $IN1 does not exist
