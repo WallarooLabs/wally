@@ -591,15 +591,25 @@ class AsyncServer(asynchat.async_chat, object):
                 self._streams[key][2] = self._out_offset
                 logging.debug('_out_offset is now {} tell {}'.format(self._out_offset, self._out.tell()))
             elif self._out_offset < msg.message_id:
-                m = 'ERROR: MISSING DATA: self._out_offset {} tell {} < msg.message_id {}'.format(self._out_offset, self._out.tell(), msg.message_id)
+                m = 'MISSING DATA: self._out_offset {} tell {} < msg.message_id {}'.format(self._out_offset, self._out.tell(), msg.message_id)
                 self._txn_commit_next = False
-                logging.critical(m)
-                logging.critical("last_msg = {}".format(self._last_msg))
-                logging.critical("     msg = {}".format(msg))
                 if not self._next_txn_force_abort_written:
                     self._next_txn_force_abort_written = True
                     self.log_it(['next-txn-force-abort', m])
-                sys.exit(66)
+                if self._last_msg is None:
+                    # Wallaroo's internal buffering has sent us data after
+                    # a gap.  However, we know that this connection is new,
+                    # and this is the first message we've received.
+                    logging.info(m)
+                elif not self._next_txn_force_abort_written:
+                    # This is bad.  This isn't the first stream id 1 message
+                    # that we've received, and we don't have a reason for
+                    # forcing the next txn to abort.  We could force an
+                    # abort and continue, but I believe this deserves to fail.
+                    logging.critical(m)
+                    logging.critical("last_msg = {}".format(self._last_msg))
+                    logging.critical("     msg = {}".format(msg))
+                    sys.exit(66)
             elif self._out_offset > msg.message_id:
                 ## The message_id has gone backward.
                 logging.fatal('duplicate data: self._out_offset {} tell {} > msg.message_id {}'.format(self._out_offset, self._out.tell(), msg.message_id))
@@ -751,7 +761,7 @@ logging.root.formatter = logging.Formatter(fmt)
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(logging.root.formatter)
 logging.root.addHandler(stream_handler)
-logging.root.setLevel(logging.DEBUG)
+logging.root.setLevel(logging.INFO)
 
 out_path = sys.argv[1]
 abort_rule_path = sys.argv[2]
