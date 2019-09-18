@@ -929,12 +929,15 @@ class ConnectorSourceNotify[In: Any val]
       // After all, that stream ID may already be registered & in active
       // use on some other worker right now.
       //
-      // The one hammer that we have in our toolbox is a complete
+      // TODO: The one hammer that we have in our toolbox is a complete
       // rollback to the prior state: we can force the next checkpoint
       // to rollback. That would cause the entire cluster to rollback,
       // and each worker would tell all active ConnectorSource sessions
       // to RESTART and close. Then the entire stream registry starts
-      // from a clean slate.
+      // from a clean slate.  However, Wallaroo sources cannot abort
+      // a checkpoint, so we cannot use this method.  Either, we need
+      // to allow sources to abort a checkpoint, or else we need
+      // another way to address the problem of leaked stream ids.
       //
       // If the global stream registry sends a success=true reply but
       // this worker were to crash immediately afterward and drop that
