@@ -17,7 +17,6 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
-use "wallaroo/core/barrier"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/partitioning"
@@ -111,7 +110,6 @@ class val TCPSourceCoordinatorBuilderBuilder[In: Any val] is
     connections: Connections,
     workers_list: Array[WorkerName] val,
     is_joining: Bool,
-    barrier_coordinator_: BarrierCoordinator,
     target_router: Router = EmptyRouter):
     TCPSourceCoordinatorBuilder[In]
   =>

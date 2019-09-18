@@ -122,8 +122,7 @@ actor GenSource[V: Any val] is Source
     layout_initializer: LayoutInitializer,
     metrics_reporter': MetricsReporter iso,
     source_registry: SourceRegistry,
-    disposable_registry: DisposableRegistry,
-    barrier_coordinator_: BarrierCoordinator)
+    disposable_registry: DisposableRegistry)
   =>
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"

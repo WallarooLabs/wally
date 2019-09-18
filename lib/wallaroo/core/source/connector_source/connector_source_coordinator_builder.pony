@@ -18,7 +18,6 @@ Copyright 2017 The Wallaroo Authors.
 
 use "collections"
 use "wallaroo"
-use "wallaroo/core/barrier"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/partitioning"
@@ -57,7 +56,6 @@ class val ConnectorSourceCoordinatorBuilder[In: Any val]
   let _cookie: String
   let _max_credits: U32
   let _refill_credits: U32
-  let _barrier_coordinator: BarrierCoordinator
 
   new val create(worker_name: WorkerName, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
@@ -72,8 +70,7 @@ class val ConnectorSourceCoordinatorBuilder[In: Any val]
     parallelism: USize,
     handler: FramedSourceHandler[In] val,
     host: String, service: String, cookie: String,
-    max_credits: U32, refill_credits: U32,
-    barrier_coordinator: BarrierCoordinator)
+    max_credits: U32, refill_credits: U32)
   =>
     _worker_name = worker_name
     _pipeline_name = pipeline_name
@@ -99,7 +96,6 @@ class val ConnectorSourceCoordinatorBuilder[In: Any val]
     _cookie = cookie
     _max_credits = max_credits
     _refill_credits = refill_credits
-    _barrier_coordinator = barrier_coordinator
 
   fun apply(env: Env): SourceCoordinator =>
     ConnectorSourceCoordinator[In](env, _worker_name, _pipeline_name,
@@ -108,7 +104,7 @@ class val ConnectorSourceCoordinatorBuilder[In: Any val]
       _outgoing_boundary_builders, _event_log, _auth, _layout_initializer,
       _recovering, _target_router, _connections,
       _workers_list, _is_joining, _parallelism, _handler, _host, _service,
-      _cookie, _max_credits, _refill_credits, _barrier_coordinator)
+      _cookie, _max_credits, _refill_credits)
 
 class val ConnectorSourceCoordinatorBuilderBuilder[In: Any val] is
   SourceCoordinatorBuilderBuilder
@@ -135,7 +131,6 @@ class val ConnectorSourceCoordinatorBuilderBuilder[In: Any val] is
     connections: Connections,
     workers_list: Array[WorkerName] val,
     is_joining: Bool,
-    barrier_coordinator: BarrierCoordinator,
     target_router: Router = EmptyRouter):
     ConnectorSourceCoordinatorBuilder[In]
   =>
@@ -147,7 +142,7 @@ class val ConnectorSourceCoordinatorBuilderBuilder[In: Any val] is
         event_log, auth, layout_initializer, recovering, target_router,
         connections, workers_list, is_joining, _source_config.parallelism,
         _source_config.handler, config.host, config.service, config.cookie,
-        config.max_credits, config.refill_credits, barrier_coordinator)
+        config.max_credits, config.refill_credits)
     else
       Unreachable()
       ConnectorSourceCoordinatorBuilder[In](worker_name, pipeline_name,
@@ -155,5 +150,5 @@ class val ConnectorSourceCoordinatorBuilderBuilder[In: Any val] is
         consume metrics_reporter, router_registry, outgoing_boundary_builders,
         event_log, auth, layout_initializer, recovering, target_router,
         connections, workers_list, is_joining, _source_config.parallelism,
-        _source_config.handler, "0", "0", "0", 0, 0, barrier_coordinator)
+        _source_config.handler, "0", "0", "0", 0, 0)
     end
