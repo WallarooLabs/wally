@@ -23,6 +23,7 @@ use "wallaroo/core/invariant"
 use "wallaroo/core/topology"
 use "wallaroo/core/barrier"
 use "wallaroo/core/checkpoint"
+use "wallaroo/core/sink/connector_sink"
 
 trait SinkPhase
   fun name(): String
@@ -43,9 +44,12 @@ trait SinkPhase
   fun ref prepare_for_rollback(token: BarrierToken) =>
     _invalid_call(); Fail()
 
-  fun ref queued(): Array[_Queued] =>
+  fun ref queued(): Array[SinkPhaseQueued] =>
     _invalid_call(); Fail()
-    Array[_Queued]
+    Array[SinkPhaseQueued]
+
+  fun ref swap_barrier_to_queued(sink: ConnectorSink ref) =>
+    _invalid_call(); Fail()
 
   fun _invalid_call() =>
     @printf[I32]("Invalid call on sink phase %s\n".cstring(), name().cstring())
@@ -79,17 +83,17 @@ class NormalSinkPhase is SinkPhase
   =>
     _sink.receive_new_barrier(input_id, producer, barrier_token)
 
-  fun ref queued(): Array[_Queued] =>
-    Array[_Queued]
+  fun ref queued(): Array[SinkPhaseQueued] =>
+    Array[SinkPhaseQueued]
 
-type _Queued is (QueuedMessage | QueuedBarrier)
+type SinkPhaseQueued is (QueuedMessage | QueuedBarrier)
 
 class BarrierSinkPhase is SinkPhase
   let _sink_id: RoutingId
   let _sink: Sink ref
   var _barrier_token: BarrierToken
   let _inputs_blocking: Map[RoutingId, Producer] = _inputs_blocking.create()
-  let _queued: Array[_Queued] = _queued.create()
+  let _queued: Array[SinkPhaseQueued] = _queued.create()
 
   new create(sink_id: RoutingId, sink: Sink ref, token: BarrierToken) =>
     _sink_id = sink_id
@@ -145,15 +149,12 @@ class BarrierSinkPhase is SinkPhase
       _sink.finish_preparing_for_rollback()
     end
 
-  fun ref queued(): Array[_Queued] =>
-    let qd = Array[_Queued]
+  fun ref queued(): Array[SinkPhaseQueued] =>
+    let qd = Array[SinkPhaseQueued]
     for q in _queued.values() do
       qd.push(q)
     end
     qd
-
-  fun ref get_internal_queue(): Array[_Queued] =>
-    _queued
 
   fun ref higher_priority(token: BarrierToken): Bool =>
     token > _barrier_token
@@ -181,13 +182,16 @@ class BarrierSinkPhase is SinkPhase
       _sink.barrier_complete(_barrier_token)
     end
 
+  fun ref swap_barrier_to_queued(sink: ConnectorSink ref) =>
+    sink.swap_barrier_to_queued(_queued)
+
 class QueuingSinkPhase is SinkPhase
   let _sink_id: RoutingId
   let _sink: Sink ref
-  let _queued: Array[_Queued]
+  let _queued: Array[SinkPhaseQueued]
 
   new create(sink_id: RoutingId, sink: Sink ref,
-    q: Array[_Queued] = Array[_Queued].create())
+    q: Array[SinkPhaseQueued] = Array[SinkPhaseQueued].create())
   =>
     _sink_id = sink_id
     _sink = sink
@@ -214,8 +218,8 @@ class QueuingSinkPhase is SinkPhase
   fun ref prepare_for_rollback(token: BarrierToken) =>
     _sink.finish_preparing_for_rollback()
 
-  fun ref queued(): Array[_Queued] =>
-    let qd = Array[_Queued]
+  fun ref queued(): Array[SinkPhaseQueued] =>
+    let qd = Array[SinkPhaseQueued]
     for q in _queued.values() do
       qd.push(q)
     end

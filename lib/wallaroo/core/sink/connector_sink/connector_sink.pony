@@ -556,13 +556,7 @@ actor ConnectorSink is Sink
       // commit/abort decisions only on the range of output
       // governed by a single round of 2PC.
 
-      try
-        let queued = (_phase as BarrierSinkPhase).get_internal_queue()
-        _phase = QueuingSinkPhase(_sink_id, this, queued)
-      else
-        Fail()
-      end
-
+      _phase.swap_barrier_to_queued(this)
     | let srt: CheckpointRollbackBarrierToken =>
       _seen_checkpointbarriertoken = None
       _use_normal_processor()
@@ -577,6 +571,9 @@ actor ConnectorSink is Sink
     if ack_now then
       _barrier_coordinator.ack_barrier(this, barrier_token)
     end
+
+  fun ref swap_barrier_to_queued(queue: Array[SinkPhaseQueued]) =>
+    _phase = QueuingSinkPhase(_sink_id, this, queue)
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
     @ll(_twopc_debug, "2PC: Checkpoint complete %d at ConnectorSink %s".cstring(), checkpoint_id, _sink_id.string().cstring())
