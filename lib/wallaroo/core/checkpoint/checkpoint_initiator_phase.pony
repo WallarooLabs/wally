@@ -124,9 +124,7 @@ class _CheckpointingPhase is _CheckpointInitiatorPhase
     end
     ifdef debug then
       Invariant(checkpoint_id == _token.id)
-      ifdef "enforce_worker_invariant" then
-        Invariant(_c_initiator.workers().contains(worker))
-      end
+      Invariant(_c_initiator.workers().contains(worker))
     end
     _acked_workers.set(worker)
     ifdef "checkpoint_trace" then

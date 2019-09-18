@@ -116,7 +116,7 @@ class val TCPSinkBuilder
     reporter: MetricsReporter iso, env: Env,
     barrier_coordinator: BarrierCoordinator, checkpoint_initiator: CheckpointInitiator,
     recovering: Bool, app_name: String, worker_name: WorkerName,
-    auth_: AmbientAuth): Sink
+    auth: AmbientAuth): Sink
   =>
     @printf[I32](("Connecting to sink at " + _host + ":" + _service + "\n")
       .cstring())
