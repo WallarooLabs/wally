@@ -201,10 +201,10 @@ class ConnectorSinkNotify
     thus all non-2PC data (i.e., all Wallaroo app data that is sent
     to the sink) is filtered by this callback.
     """
-    if _connected and (not _throttled) then
+    if _connected then
       data
     else
-      @ll(_conn_debug, "Sink sentv: not connected or throttled".cstring())
+      @ll(_conn_debug, "Sink sentv: not connected".cstring())
       []
     end
 
