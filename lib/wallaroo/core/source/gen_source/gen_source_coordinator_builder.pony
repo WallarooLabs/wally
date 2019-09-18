@@ -17,7 +17,6 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
-use "wallaroo/core/barrier"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/partitioning"
@@ -46,7 +45,6 @@ class val GenSourceCoordinatorBuilder[In: Any val]
   let _auth: AmbientAuth
   let _layout_initializer: LayoutInitializer
   let _recovering: Bool
-  let _barrier_coordinator: BarrierCoordinator
   let _target_router: Router
   let _generator: GenSourceGeneratorBuilder[In]
 
@@ -57,9 +55,7 @@ class val GenSourceCoordinatorBuilder[In: Any val]
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool,
-    barrier_coordinator: BarrierCoordinator,
-    target_router: Router,
+    recovering: Bool, target_router: Router,
     generator: GenSourceGeneratorBuilder[In])
   =>
     _worker_name = worker_name
@@ -75,7 +71,6 @@ class val GenSourceCoordinatorBuilder[In: Any val]
     _auth = auth
     _layout_initializer = layout_initializer
     _recovering = recovering
-    _barrier_coordinator = barrier_coordinator
     _target_router = target_router
     _generator = generator
 
@@ -84,7 +79,7 @@ class val GenSourceCoordinatorBuilder[In: Any val]
       _runner_builder, _partitioner_builder, _router, _metrics_conn,
       _metrics_reporter.clone(), _router_registry, _outgoing_boundary_builders,
       _event_log, _auth, _layout_initializer, _recovering, _target_router,
-      _generator, _barrier_coordinator)
+      _generator)
 
 class val GenSourceCoordinatorBuilderBuilder[In: Any val]
 
@@ -100,7 +95,6 @@ class val GenSourceCoordinatorBuilderBuilder[In: Any val]
     connections: Connections,
     workers_list: Array[WorkerName] val,
     is_joining: Bool,
-    barrier_coordinator: BarrierCoordinator,
     target_router: Router = EmptyRouter):
     GenSourceCoordinatorBuilder[In]
   =>
@@ -109,13 +103,13 @@ class val GenSourceCoordinatorBuilderBuilder[In: Any val]
       GenSourceCoordinatorBuilder[In](worker_name, pipeline_name,
         runner_builder, partitioner_builder, router, metrics_conn,
         consume metrics_reporter, router_registry, outgoing_boundary_builders,
-        event_log, auth, layout_initializer, recovering, barrier_coordinator,
-        target_router, config.generator)
+        event_log, auth, layout_initializer, recovering, target_router,
+        config.generator)
     else
       Unreachable()
       GenSourceCoordinatorBuilder[In](worker_name, pipeline_name,
         runner_builder, partitioner_builder, router, metrics_conn,
         consume metrics_reporter, router_registry, outgoing_boundary_builders,
-        event_log, auth, layout_initializer, recovering, barrier_coordinator,
-        target_router, EmptyGenSourceGeneratorBuilder[In])
+        event_log, auth, layout_initializer, recovering, target_router,
+        EmptyGenSourceGeneratorBuilder[In])
     end

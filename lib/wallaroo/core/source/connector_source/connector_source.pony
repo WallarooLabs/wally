@@ -45,7 +45,6 @@ use "wallaroo/core/partitioning"
 use "wallaroo/core/recovery"
 use "wallaroo/core/registries"
 use "wallaroo/core/routing"
-use "wallaroo/core/sink"
 use "wallaroo/core/source"
 use "wallaroo/core/tcp_actor"
 use "wallaroo/core/topology"
@@ -79,8 +78,6 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     _outgoing_boundaries.create()
   let _layout_initializer: LayoutInitializer
   var _unregistered: Bool = false
-  let _barrier_coordinator: BarrierCoordinator
-  let _fake_sink: Sink
 
   let _metrics_reporter: MetricsReporter
 
@@ -120,8 +117,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     layout_initializer: LayoutInitializer,
     metrics_reporter': MetricsReporter iso,
     source_registry: SourceRegistry,
-    disposable_registry: DisposableRegistry,
-    barrier_coordinator: BarrierCoordinator)
+    disposable_registry: DisposableRegistry)
   =>
     """
     A new connection accepted on a server.
@@ -139,8 +135,6 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     _router = router
     // We must set this up first so we can pass a ref to ConsumerSender
     _consumer_sender = FailingConsumerSender(_source_id)
-    _fake_sink = EmptySink
-    _barrier_coordinator = barrier_coordinator
     _consumer_sender = ConsumerSender(_source_id, this,
       _metrics_reporter.clone())
 
@@ -163,15 +157,6 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     _update_router(router)
 
     _notify.update_boundaries(_outgoing_boundaries)
-
-    // We need to have the ability to abort a checkpoint. Sinks can do
-    // that, so let's impersonate a sink.
-    // TODO: This actor isn't a full Resilient, so it doesn't do all
-    //       the things that a sink needs to do?  For example, if we
-    //       leave all of the _barrier_coordinator calls in this actor,
-    //       then we'll hang a worker forever when it restarts. {sigh}
-    //       See also GH #3012.
-    //REGISTRY TODO _barrier_coordinator.register_sink(_fake_sink)
 
     // register resilient with event log
     _event_log.register_resilient(_source_id, this)
@@ -397,7 +382,6 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
         b.dispose()
       end
       close()
-      //REGISTRY TODO _barrier_coordinator.unregister_sink(_fake_sink)
       _muted = true
       _disposed = true
     end
@@ -451,14 +435,13 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
 
     match token
     | let sbt: CheckpointBarrierToken =>
-      if _notify.initiate_checkpoint(sbt.id) then
-        //REGISTRY TODO _barrier_coordinator.ack_barrier(_fake_sink, token)
-        checkpoint_state(sbt.id)
-      else
-        //REGISTRY TODO This abort decision is based on an earlier decision
-        // by _notify.stream_notify_result().
-        //REGISTRY TODO _barrier_coordinator.abort_barrier(token)
+      if not _notify.initiate_checkpoint(sbt.id) then
+        // TODO This abort decision is based on an earlier decision
+        // by _notify.stream_notify_result().  However, a source
+        // currently has no ability to abort a checkpoint.
         None
+      else
+        checkpoint_state(sbt.id)
       end
     end
     for (o_id, o) in _outputs.pairs() do

@@ -77,7 +77,6 @@ actor GenSourceCoordinator[In: Any val] is SourceCoordinator
   let _layout_initializer: LayoutInitializer
   let _recovering: Bool
   let _target_router: Router
-  let _barrier_coordinator: BarrierCoordinator
 
   let _sources: Array[GenSource[In]] = _sources.create()
 
@@ -89,8 +88,7 @@ actor GenSourceCoordinator[In: Any val] is SourceCoordinator
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     recovering: Bool, target_router: Router,
-    generator: GenSourceGeneratorBuilder[In],
-    barrier_coordinator: BarrierCoordinator)
+    generator: GenSourceGeneratorBuilder[In])
   =>
     _env = env
 
@@ -109,7 +107,6 @@ actor GenSourceCoordinator[In: Any val] is SourceCoordinator
     _recovering = recovering
     _target_router = target_router
     _generator = generator
-    _barrier_coordinator = barrier_coordinator
 
     match router
     | let pr: StatePartitionRouter =>
@@ -142,8 +139,7 @@ actor GenSourceCoordinator[In: Any val] is SourceCoordinator
     let source = GenSource[In](source_id, _auth, _pipeline_name,
       consume runner, selected_router, _generator, _event_log,
       _outgoing_boundary_builders, _layout_initializer,
-      _metrics_reporter.clone(), _router_registry, _router_registry,
-      _barrier_coordinator)
+      _metrics_reporter.clone(), _router_registry, _router_registry)
 
     source.mute(this)
     _router_registry.register_source(source, source_id)
