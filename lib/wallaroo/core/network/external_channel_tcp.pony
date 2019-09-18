@@ -169,13 +169,15 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
             @printf[I32](("Received ExternalShrinkRequestMsg on External " +
               "Channel\n").cstring())
           end
+
+          let reply = ExternalMsgEncoder.shrink_query_response()
+          conn.writev(reply)
+
           if m.query is true then
             _local_topology_initializer.shrinkable_query(conn)
           else
-            // _local_topology_initializer.initiate_shrink(m.node_names,
-            //   m.num_nodes, conn)
             _autoscale.try_shrink(_local_topology_initializer, m.node_names,
-              m.num_nodes, conn)
+              m.num_nodes)
           end
         | let m: ExternalPartitionQueryMsg =>
           ifdef "trace" then

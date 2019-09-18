@@ -353,8 +353,8 @@ actor Startup
       _router_registry = router_registry
 
       let autoscale = Autoscale(auth, _startup_options.worker_name,
-        autoscale_barrier_initiator, router_registry, connections, _is_joining,
-        initializer_name, checkpoint_initiator)
+        initializer_name, autoscale_barrier_initiator, router_registry,
+        connections, _is_joining, initializer_name, checkpoint_initiator)
 
       let recovery_reconnecter = RecoveryReconnecter(auth,
         _startup_options.worker_name, d_service, data_receivers,
@@ -574,8 +574,9 @@ actor Startup
       _router_registry = router_registry
 
       let autoscale = Autoscale(auth, _startup_options.worker_name,
-        autoscale_barrier_initiator, router_registry, connections, _is_joining,
-        initializer_name, checkpoint_initiator, consume non_joining_workers)
+        initializer_name, autoscale_barrier_initiator, router_registry,
+        connections, _is_joining, initializer_name, checkpoint_initiator,
+        consume non_joining_workers)
 
       let recovery_reconnecter = RecoveryReconnecter(auth,
         _startup_options.worker_name, _startup_options.my_d_service,

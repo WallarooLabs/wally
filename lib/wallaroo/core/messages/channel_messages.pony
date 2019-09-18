@@ -696,6 +696,11 @@ primitive ChannelMsgEncoder
     _encode(WorkerStateEntityCountResponseMsg(worker_name, request_id,
       worker_state_entity_count_json), auth)?
 
+  fun try_shrink_request(target_workers: Array[WorkerName] val,
+    shrink_count: U64, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(TryShrinkRequestMsg(target_workers, shrink_count), auth)?
+
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg =>
     try
@@ -1805,3 +1810,10 @@ class val WorkerStateEntityCountResponseMsg is ChannelMsg
     request_id = request_id'
     state_entity_count_json = state_entity_count_json'
 
+class val TryShrinkRequestMsg is ChannelMsg
+  let target_workers: Array[WorkerName] val
+  let shrink_count: U64
+
+  new val create(target_workers': Array[WorkerName] val, shrink_count': U64) =>
+    target_workers = target_workers'
+    shrink_count = shrink_count'

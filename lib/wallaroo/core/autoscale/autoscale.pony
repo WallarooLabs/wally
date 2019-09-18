@@ -114,6 +114,7 @@ actor Autoscale
   """
   let _auth: AmbientAuth
   let _worker_name: WorkerName
+  let _primary_worker: WorkerName
   let _autoscale_barrier_initiator: AutoscaleBarrierInitiator
   //!@<- Replace with relevant interface
   let _router_registry: RouterRegistry
@@ -125,6 +126,7 @@ actor Autoscale
   let _self: Autoscale tag = this
 
   new create(auth: AmbientAuth, worker_name: WorkerName,
+    primary_worker: WorkerName,
     autoscale_barrier_initiator: AutoscaleBarrierInitiator,
     rr: RouterRegistry, connections: Connections, is_joining: Bool,
     initializer_name: WorkerName, checkpoint_initiator: CheckpointInitiator,
@@ -133,6 +135,7 @@ actor Autoscale
   =>
     _auth = auth
     _worker_name = worker_name
+    _primary_worker = primary_worker
     _autoscale_barrier_initiator = autoscale_barrier_initiator
     _router_registry = rr
     _connections = connections
@@ -584,10 +587,21 @@ actor Autoscale
   //////////////////////////////////
 
   be try_shrink(local_topology: LocalTopologyInitializer,
-    target_workers: Array[WorkerName] val, shrink_count: U64,
-    conn: TCPConnection)
+    target_workers: Array[WorkerName] val, shrink_count: U64)
   =>
-    _phase.try_shrink(local_topology, target_workers, shrink_count, conn)
+    if (_worker_name == _primary_worker) then
+      @printf[U32]("!@ I am the primary worker and I am trying to shrink\n".cstring())
+      _phase.try_shrink(local_topology, target_workers, shrink_count)
+    else
+      @printf[U32]("!@ I am NOT the primary worker and I am asking the primary worker to try to shrink\n".cstring())
+      try
+        let msg = ChannelMsgEncoder.try_shrink_request(target_workers,
+          shrink_count, _auth)?
+        _connections.send_control(_primary_worker, msg)
+      else
+        Fail()
+      end
+    end
 
   be try_join(local_topology: LocalTopologyInitializer, conn: TCPConnection,
     worker_name: WorkerName, worker_count: USize)

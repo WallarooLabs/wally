@@ -94,12 +94,9 @@ trait _AutoscalePhase
     _invalid_call(); Fail()
 
   fun ref try_shrink(local_topology: LocalTopologyInitializer,
-    target_workers: Array[WorkerName] val, shrink_count: U64,
-    conn: TCPConnection)
+    target_workers: Array[WorkerName] val, shrink_count: U64)
   =>
-    let reply = ExternalMsgEncoder.shrink_error_response(
-      "Autoscale event currently underway, cannot shirk at this time")
-    conn.writev(reply)
+    None
 
   fun ref try_join(local_topology: LocalTopologyInitializer,
     conn: TCPConnection, worker_name: WorkerName, worker_count: USize,
@@ -156,10 +153,9 @@ class _WaitingForAutoscale is _AutoscalePhase
     _autoscale.stop_the_world_for_grow_migration(coordinator, joining_workers)
 
   fun ref try_shrink(local_topology: LocalTopologyInitializer,
-    target_workers: Array[WorkerName] val, shrink_count: U64,
-    conn: TCPConnection)
+    target_workers: Array[WorkerName] val, shrink_count: U64)
   =>
-    local_topology.initiate_shrink(target_workers, shrink_count, conn)
+    local_topology.initiate_shrink(target_workers, shrink_count)
 
   fun ref stop_the_world_for_shrink_migration_initiated(
     coordinator: WorkerName, remaining_workers: Array[WorkerName] val,
