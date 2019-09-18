@@ -194,12 +194,23 @@ class ConnectorSink2PC
     pessimistic assumption that the connector sink voted rollback/abort.
     """
     if barrier_token_at_close != barrier_token_initial then
+      @ll(_twopc_info, "2PC: Wallaroo local abort for txn_id %s barrier %s _twopc.state = %d".cstring(), txn_id_at_close.cstring(), barrier_token_at_close.string().cstring(), state())
 
+      // It's possible that barrier_token_at_close completed
+      // successfully and phase 2 commit was sent to the sink, but our
+      // connection was closed immediately after sending that commit.
+      // In that case, our attempt to abort here will be ignored:
+      // "_clear_barrier received at BarrierCoordinator for unknown
+      // barrier token CheckpointBarrierToken(NNN). Did we rollback?"
+      // That error is harmless.
+      //
+      // However, in other cases, our abort here is the right thing
+      // to do, and this barrier token will be recognized and trigger
+      // the rollback that we need.
       sink.abort_decision("TCP connection closed during 2PC",
         txn_id_at_close, barrier_token_at_close)
-      @ll(_twopc_debug, "2PC: Wallaroo local abort for txn_id %s barrier %s".cstring(), txn_id_at_close.cstring(), barrier_token_at_close.string().cstring())
 
-      // SLF TODO: if we disconnected, then that txn will be aborted
+      // NOTE: If we disconnected, then that txn will be aborted
       // by other parts of the system, e.g c_id=5.  However, we
       // should not set_state_abort() here because when it's time for
       // c_id=6, we shouldn't let 5's abort state affect 6's.
