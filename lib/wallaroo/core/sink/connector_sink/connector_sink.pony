@@ -708,7 +708,7 @@ actor ConnectorSink is Sink
       end
     end
 
-    if (_twopc.state_is_1precommit() or _twopc.state_is_2commit()) then
+    if not _twopc.state_is_start() then
       _twopc.send_phase2(this, false)
     end
     _twopc.reset_state()
