@@ -56,7 +56,6 @@ interface val SourceCoordinatorBuilderBuilder
     connections: Connections,
     workers_list: Array[WorkerName] val,
     is_joining: Bool,
-    barrier_coordinator: BarrierCoordinator,
     target_router: Router = EmptyRouter):
     SourceCoordinatorBuilder
 
