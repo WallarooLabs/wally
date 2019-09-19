@@ -96,6 +96,7 @@ crash_worker () {
 
 run_crash_sink_loop () {
     sleep 1
+    #for i in `seq 1 1`; do
     while [ 1 ]; do
         echo -n cS
         crash_sink
@@ -113,10 +114,10 @@ run_crash_worker_loop () {
         exit 1
     fi
     while [ 1 ]; do
-        sleep `random_float 4.5 0.5`
+        sleep `random_float 4.5 0`
         echo -n "c$worker"
         crash_worker $worker
-        sleep `random_float 2.5 0.5`
+        sleep `random_float 2.5 0`
         if [ $worker -eq 0 ]; then
             start_initializer
         else
