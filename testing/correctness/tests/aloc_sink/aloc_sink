@@ -699,9 +699,10 @@ class AsyncServer(asynchat.async_chat, object):
             sys.exit(66)
 
     def log_it(self, log):
-        log.insert(0, time.time())
-        self._txn_log.write(bytes("{}\n".format(log).encode('utf-8')))
-        self.flush_fsync(self._txn_log)
+        if self._txn_log is not None:
+            log.insert(0, time.time())
+            self._txn_log.write(bytes("{}\n".format(log).encode('utf-8')))
+            self.flush_fsync(self._txn_log)
 
     def write_to_s3_and_log(self, chunk_offset, chunk, txn_id, why):
         if self._s3 is not None:
