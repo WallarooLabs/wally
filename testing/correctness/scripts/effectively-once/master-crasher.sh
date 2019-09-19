@@ -125,7 +125,7 @@ run_crash_worker_loop () {
         fi
         echo -n "r$worker"
         sleep 0.25
-        poll_ready
+        poll_ready -w 2
         if [ $? -ne 0 ]; then
             echo "CRASH LOOP $worker: pause the world"
             pause_the_world
