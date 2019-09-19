@@ -27,12 +27,20 @@ stop_sink () {
 }
 
 start_initializer () {
-    echo start-initializer.sh $*
     start-initializer.sh $*
 }
 
+start_worker () {
+    start-worker.sh $*
+}
+
 poll_ready () {
-    poll-ready.sh -a -v -w 5
+    poll-ready.sh $*
+}
+
+pause_the_world () {
+    killall -STOP passthrough
+    killall -STOP master-crasher.sh
 }
 
 start_all_workers () {
@@ -43,7 +51,7 @@ start_all_workers () {
         start_worker -n $DESIRED $i
         sleep 1
     done
-    poll_ready || exit 1
+    poll_ready -a -v -w 5 || exit 1
 }
 
 start_sender () {
@@ -77,13 +85,50 @@ crash_sink () {
     ps axww | grep python3 | grep /aloc_sink | awk '{print $1}' | xargs kill -9
 }
 
+crash_worker () {
+    worker="$1"
+    if [ -z "$worker" ]; then
+        echo ERROR: $0: worker number not given
+        exit 1
+    fi
+    crash-worker.sh $worker
+}
+
 run_crash_sink_loop () {
     sleep 1
     while [ 1 ]; do
+        echo -n cS
         crash_sink
         random_sleep 2
+        echo -n rS
         start_sink
-        random_sleep 5 5
+        random_sleep 10 5
+    done
+}
+
+run_crash_worker_loop () {
+    worker="$1"
+    if [ -z "$worker" ]; then
+        echo ERROR: $0: worker number not given
+        exit 1
+    fi
+    while [ 1 ]; do
+        sleep `random_float 4.5 0.5`
+        echo -n "c$worker"
+        crash_worker $worker
+        sleep `random_float 2.5 0.5`
+        if [ $worker -eq 0 ]; then
+            start_initializer
+        else
+            start_worker $worker
+        fi
+        echo -n "r$worker"
+        sleep 0.25
+        poll_ready
+        if [ $? -ne 0 ]; then
+            echo "CRASH LOOP $worker: pause the world"
+            pause_the_world
+        fi
     done
 }
 
@@ -102,9 +147,8 @@ run_sanity_loop () {
             break
         fi
     done
-    echo "SANITY LOOP FAILURE: stop the world"
-    killall -STOP passthrough
-    killall -STOP master-crasher.sh
+    echo "SANITY LOOP FAILURE: pause the world"
+    pause_the_world
 }
 
 reset
@@ -122,6 +166,12 @@ for arg in $*; do
         no-sanity)
             echo NO RUN: run_sanity_loop
             run_sanity=false
+            ;;
+        crash[0-9]*)
+            worker=`echo $arg | sed 's/crash//'`
+            cmd="run_crash_worker_loop $worker"
+            echo RUN: $cmd
+            $cmd &
             ;;
     esac
 done
