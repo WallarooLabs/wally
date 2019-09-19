@@ -39,7 +39,7 @@ actor Main
 
     let default_par_factor: USize = 64
     var par_factor = default_par_factor
-    let help = "<Wallaroo args, see below> [--help] [--verbose] [--parallelism] [--source-decoder framed|unframed] --source tcp|connector [--key-by first-byte|random] [--stage asis|asis-state|noop]* [--sink-parallelism] --sink tcp|connector"
+    let help = "<Wallaroo args, see below> [--help] [--verbose] [--parallelism] [--source-decoder framed|unframed] --source tcp|connector [--key-by first-byte|random] [--step asis|asis-state|noop]* [--sink-parallelism] --sink tcp|connector"
     var verbose: Bool = false
     var source_decoder: FramedSourceHandler[InputBlob] val =
       recover val InputBlobDecoder end
@@ -116,7 +116,7 @@ actor Main
             if verbose then
               @printf[I32]("key by: %s\n".cstring(), kb.cstring())
             end
-          | ("stage", let stg: String) =>
+          | ("step", let stg: String) =>
             match stg
             | "asis" =>
               source = source.to[Array[U8] val](
@@ -128,11 +128,11 @@ actor Main
               source = source.to[Array[U8] val](
                 NoOp where parallelism = par_factor)
             else
-              @printf[I32]("Unknown stage: %s\n".cstring(), stg.cstring())
+              @printf[I32]("Unknown step: %s\n".cstring(), stg.cstring())
               Fail()
             end
             if verbose then
-              @printf[I32]("stage: %s, parallelism = %lu\n".cstring(),
+              @printf[I32]("step: %s, parallelism = %lu\n".cstring(),
                 stg.cstring(), par_factor)
             end
           end
@@ -197,7 +197,7 @@ actor Main
         // Pipeline flags
         .add("source", None, StringArgument, Required)
         .add("key-by", None, StringArgument, Optional)
-        .add("stage", None, StringArgument, Optional)
+        .add("step", None, StringArgument, Optional)
         .add("sink", None, StringArgument, Required)
     end
     consume o
