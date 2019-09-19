@@ -211,7 +211,7 @@ class ConnectorSinkNotify
   fun ref throttled(conn: WallarooOutgoingNetworkActor ref) =>
     if (not _throttled) or (not twopc_intro_done) then
       _throttled = true
-      if true then // TODO fix throttle strategy: real BP can cause deadlock
+      if false then // TODO fix throttle strategy: real BP can cause deadlock
         Backpressure.apply(_auth)
         @ll(_conn_info, ("ConnectorSink is experiencing back pressure, " +
         "connected = %s").cstring(), _connected.string().cstring())
@@ -224,7 +224,7 @@ class ConnectorSinkNotify
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
     if _throttled and twopc_intro_done then
       _throttled = false
-      if true then // TODO fix throttle strategy: real BP can cause deadlock
+      if false then // TODO fix throttle strategy: real BP can cause deadlock
         Backpressure.release(_auth)
         @ll(_conn_info, ("ConnectorSink is no longer experiencing" +
         " back pressure, connected = %s").cstring(),
