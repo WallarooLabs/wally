@@ -31,8 +31,10 @@ use "wallaroo/core/barrier"
 use "wallaroo/core/network"
 use "wallaroo/core/recovery"
 use "wallaroo/core/checkpoint"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 
+use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag, ...)
 
 actor DataReceiver is Producer
   let _id: RoutingId
@@ -182,6 +184,9 @@ actor DataReceiver is Producer
     end
     if seq_id > _last_id_seen then
       ifdef "resilience" and debug then
+        if (seq_id - _last_id_seen) != 1 then
+          @l(Log.crit(), Log.no_cat(), "seq_id %lu _last_id_seen %lu".cstring(), seq_id, _last_id_seen)
+        end
         Invariant((seq_id - _last_id_seen) == 1)
       end
       _ack_counter = _ack_counter + 1
