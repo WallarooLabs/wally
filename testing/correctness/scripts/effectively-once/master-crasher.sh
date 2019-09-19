@@ -116,19 +116,26 @@ run_crash_worker_loop () {
     while [ 1 ]; do
         sleep `random_float 4.5 0`
         echo -n "c$worker"
-        crash_worker $worker
+        crash_out=`crash_worker $worker`
         sleep `random_float 2.5 0`
-        if [ $worker -eq 0 ]; then
-            start_initializer
+        if [ -z "$crash_out" ]; then
+            if [ $worker -eq 0 ]; then
+                start_initializer
+            else
+                start_worker $worker
+            fi
         else
-            start_worker $worker
+            echo "Crash of $worker failed: $crash_out"
+            pause_the_world
+            break
         fi
         echo -n "r$worker"
         sleep 0.25
-        poll_ready -w 2
-        if [ $? -ne 0 ]; then
-            echo "CRASH LOOP $worker: pause the world"
+        poll_out=`poll_ready -w 2 2>&1`
+        if [ $? -ne 0 -o ! -z "$poll_out" ]; then
+            echo "CRASH LOOP $worker: pause the world: $poll_out"
             pause_the_world
+            break
         fi
     done
 }
