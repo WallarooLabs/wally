@@ -19,6 +19,7 @@ from collections import namedtuple
 from datetime import datetime
 import inspect
 import logging
+import os
 from select import select
 import socket
 import struct
@@ -167,7 +168,8 @@ def _asyncore_loop(sentinel, timeout, socket_map):
             time.sleep(timeout)
     except:
         logging.exception("_asyyncore_loop exited!")
-    logging.debug("_asyncore_loop exiting")
+    logging.info("_asyncore_loop exiting")
+    os._exit(77)
 
 
 class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
