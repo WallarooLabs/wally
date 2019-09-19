@@ -37,7 +37,8 @@ actor Main
   new create(env: Env) =>
     Log.set_defaults()
 
-    var par_factor: USize = 64
+    let default_par_factor: USize = 64
+    var par_factor = default_par_factor
     let help = "<Wallaroo args, see below> [--help] [--verbose] [--parallelism] [--source-decoder framed|unframed] --source tcp|connector [--key-by first-byte|random] [--stage asis|asis-state|noop]* [--sink-parallelism] --sink tcp|connector"
     var verbose: Bool = false
     var source_decoder: FramedSourceHandler[InputBlob] val =
@@ -47,6 +48,7 @@ actor Main
       let pipeline = recover val
         var source = recover ref
           var src: (Pipeline[InputBlob] | None) = None
+          par_factor = default_par_factor
           for o in recover ref make_options(env.args) end do
             match o
             | ("help", let arg: None) =>
@@ -96,6 +98,7 @@ actor Main
           (src as Pipeline[InputBlob])
         end
 
+        par_factor = default_par_factor
         for o in recover ref make_options(env.args) end do
           match o
           | ("parallelism", let p: U64) =>
