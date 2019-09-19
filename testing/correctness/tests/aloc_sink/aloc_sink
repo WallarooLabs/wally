@@ -179,7 +179,6 @@ class AsyncServer(asynchat.async_chat, object):
         self._abort_rules = None
         self._out = None
         self._out_offset = None
-        self._txn_state = None
         self._txn_log = None
         self._worker_name = None
         self._out_path_opath = None
@@ -218,6 +217,10 @@ class AsyncServer(asynchat.async_chat, object):
                 self._handle_frame(frame_data)
             except Exception as e:
                 logging.critical('_handle_frame error: {}'.format(e))
+                _type, _value, _traceback = sys.exc_info()
+                exc_text = ''.join(
+                        traceback.format_exception(_type, _value, _traceback)).strip()
+                logging.critical('_handle_frame error: {}'.format(exc_text))
                 sys.exit(66)
 
     def _handle_frame(self, frame):
