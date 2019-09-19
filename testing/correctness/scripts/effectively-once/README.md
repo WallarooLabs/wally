@@ -10,7 +10,7 @@ shell.
 ```
 make -C ../../../.. \
     PONYCFLAGS="--verbose=1 -d -Dresilience -Dtrace -Dcheckpoint_trace -Didentify_routing_ids" \
-    build-examples-pony-aloc_passthrough build-testing-tools-external_sender \
+    build-examples-pony-passthrough build-testing-tools-external_sender \
     build-utils-cluster_shrinker
 ```
 
@@ -25,7 +25,7 @@ logging detail is required, I recommend setting the
 example:
 
 ```
-export WALLAROO_BIN=$HOME/wallaroo/examples/pony/aloc_passthrough/aloc_passthrough 
+export WALLAROO_BIN=$HOME/wallaroo/examples/pony/passthrough/passthrough 
 export WALLAROO_THRESHOLDS='*.8'
 ```
 
@@ -177,7 +177,7 @@ dd if=testing/data/market_spread/nbbo/r3k-symbols_nbbo-fixish.msg bs=1000000 cou
 ```
 
 All lines in this ASCII file will begin with the letter "T". The
-`aloc_passthrough` Wallaroo app uses the first character of each line
+`passthrough` Wallaroo app uses the first character of each line
 as the "key" for routing in a multi-worker cluster.  Therefore, all
 lines in the file will be processed by the same worker; this property
 makes correctness checking easier.
@@ -199,7 +199,7 @@ env PYTHONPATH=$HOME/wallaroo/machida/lib:examples/python/celsius_connectors $HO
 In Window 1:
 
 ```
-while [ 1 ]; do ./1-to-1-passthrough-verify.sh /tmp/input-file.txt  ; if [ $? -ne 0 ]; then killall -STOP aloc_passthrough; echo STOPPED; break; fi ; sleep 1; done
+while [ 1 ]; do ./1-to-1-passthrough-verify.sh /tmp/input-file.txt  ; if [ $? -ne 0 ]; then killall -STOP passthrough; echo STOPPED; break; fi ; sleep 1; done
 ```
 
 ### Repeatedly crashing and restarting the sink
@@ -207,7 +207,7 @@ while [ 1 ]; do ./1-to-1-passthrough-verify.sh /tmp/input-file.txt  ; if [ $? -n
 TODO replace hack
 
 ```
-for i in `seq 1 100`; do ps axww | grep aloc_sink | grep -v grep | awk '{print $1}' | xargs kill ; amount=`date | sed -e 's/.*://' -e 's/ .*//'`; echo i is $i, amount is $amount; sleep 2.$amount ; env PYTHONPATH=$HOME/wallaroo/machida/lib $HOME/wallaroo/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 >> /tmp/sink-out/stdout-stderr 2>&1 & sleep 2 ; ./1-to-1-passthrough-verify.sh /tmp/input-file.txt ; if [ $? -eq 0 ]; then echo OK; else killall -STOP aloc_passthrough ; echo STOPPED; break; fi ; egrep -v 'DEBUG|INFO' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then killall -STOP aloc_passthrough ; echo STOP-grep; break; fi; done
+for i in `seq 1 100`; do ps axww | grep aloc_sink | grep -v grep | awk '{print $1}' | xargs kill ; amount=`date | sed -e 's/.*://' -e 's/ .*//'`; echo i is $i, amount is $amount; sleep 2.$amount ; env PYTHONPATH=$HOME/wallaroo/machida/lib $HOME/wallaroo/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 >> /tmp/sink-out/stdout-stderr 2>&1 & sleep 2 ; ./1-to-1-passthrough-verify.sh /tmp/input-file.txt ; if [ $? -eq 0 ]; then echo OK; else killall -STOP passthrough ; echo STOPPED; break; fi ; egrep -v 'DEBUG|INFO' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then killall -STOP passthrough ; echo STOP-grep; break; fi; done
 ```
 
 ### Repeatedly crashing and restarting a non-initializer worker
@@ -216,16 +216,27 @@ TODO replace hack
 
 ```
 TO_CRASH=1
-for i in `seq 1 100`; do echo -n $i; crash-worker.sh $TO_CRASH ; sleep 0.2 ; mv /tmp/wallaroo.$TO_CRASH /tmp/wallaroo.$TO_CRASH.$i ; gzip -f /tmp/wallaroo.$TOCRASH.$i & start-worker.sh $TO_CRASH ; sleep 1.2; poll-ready.sh -w 2 -a; if [ $? -ne 0 ]; then echo BREAK0; break; fi; egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then echo BREAK; break; fi; ./1-to-1-passthrough-verify.sh /tmp/input-file.txt; if [ $? -ne 0 ]; then echo BREAK2; break; fi ;sleep 0.2; done
+for i in `seq 1 100`; do echo -n $i; crash-worker.sh $TO_CRASH ; sleep 0.2 ; mv /tmp/wallaroo.$TO_CRASH /tmp/wallaroo.$TO_CRASH.$i ; gzip -f /tmp/wallaroo.$TO_CRASH.$i & start-worker.sh $TO_CRASH ; sleep 1.2; poll-ready.sh -w 2 -a; if [ $? -ne 0 ]; then echo BREAK0; break; fi; egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then echo BREAK; break; fi; ./1-to-1-passthrough-verify.sh /tmp/input-file.txt; if [ $? -ne 0 ]; then echo BREAK2; break; fi ;sleep 0.2; done
 ```
 
 ### Repeatedly crashing and restarting the initializer worker
 
 TODO replace hack
 
+NOTE: There's a limitation in the Python connector client
+w.r.t. reconnecting after a close.  Read below for more detail.
+
 ```
 for i in `seq 1 100`; do echo -n $i; crash-worker.sh 0 ; sleep 0.2 ; mv /tmp/wallaroo.0 /tmp/wallaroo.0.$i ; gzip -f /tmp/wallaroo.0.$i & start-initializer.sh ; sleep 1.2; poll-ready.sh -w 2 -a; if [ $? -ne 0 ]; then echo BREAK0; break; fi; egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then echo BREAK; break; fi; ./1-to-1-passthrough-verify.sh /tmp/input-file.txt; if [ $? -ne 0 ]; then echo BREAK2; break; fi ;sleep 0.2; done
 ```
+
+The Python connector client is not 100% reliable in reconnecting to
+Wallaroo when the Wallaroo worker that it is connected to crashes.
+(This kind of crash is handled different by the `asynchat` framework
+than when a RESTART message is received.)
+
+I recommend using a `while [ 1 ]; ... done` loop (or equivalent) to
+restart the `at_least_once_line_file_feed` script.
 
 ### Repeatedly crashing and restarting the source
 
