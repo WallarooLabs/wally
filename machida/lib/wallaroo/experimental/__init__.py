@@ -590,6 +590,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self.stream_added(new)
 
         # send to wallaroo worker
+        logging.debug("is_open=True but sending NOTIFY: {}".format(cwm.Notify(new.id,                              new.name,                              new.point_of_ref)))
         self.write(cwm.Notify(new.id,
                               new.name,
                               new.point_of_ref))
@@ -678,7 +679,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 break
             except socket.error as err:
                 if err.errno in retry_errno:
-                    logging.debug("_reconnect_common: {}}".format(err))
+                    logging.debug("_reconnect_common: {}".format(err))
                     time.sleep(1.0)
                     continue
                 else:

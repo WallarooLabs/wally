@@ -58,7 +58,7 @@ start_sender () {
     outfile=/tmp/sender.out
     rm -f $outfile
     while [ 1 ]; do
-        $HOME/wallaroo/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 41000 >> $outfile 2>&1
+        $HOME/wallaroo/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 66000 >> $outfile 2>&1
         sleep 0.1
     done
 }
