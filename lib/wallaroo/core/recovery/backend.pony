@@ -325,6 +325,7 @@ class FileBackend is Backend
 
     _writer.u8(_LogCheckpointIdEntry.encode())
     _writer.u64_be(checkpoint_id)
+    @printf[I32]("EventLog: encode_checkpoint_id: CheckpointId %s entry byte %d _writer.size %lu _file.position %lu = sum %lu\n".cstring(), checkpoint_id.string().cstring(), _LogCheckpointIdEntry.encode(), _writer.size(), _file.position(), _writer.size() + _file.position())
 
   fun ref encode_restart() =>
     ifdef "trace" then

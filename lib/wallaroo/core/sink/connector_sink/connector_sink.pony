@@ -650,7 +650,7 @@ actor ConnectorSink is Sink
       Fail()
     end
 
-    @ll(_twopc_debug, "2PC: Checkpoint state %s at ConnectorSink %s, txn-id %s".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring(), _twopc.txn_id.cstring())
+    @ll(_twopc_debug, "2PC: Checkpoint state %s at ConnectorSink %s, txn-id %s current_offset %lu acked_point_of_ref %lu _pending_writev_total %lu".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring(), _twopc.txn_id.cstring(), _twopc.current_offset.u64(), _notify.acked_point_of_ref, _pending_writev_total)
 
     let wb: Writer = wb.create()
     wb.u64_be(_twopc.current_offset.u64())
