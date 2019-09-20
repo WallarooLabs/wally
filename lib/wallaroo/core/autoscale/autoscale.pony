@@ -29,8 +29,11 @@ use "wallaroo/core/network"
 use "wallaroo/core/registries"
 use "wallaroo/core/routing"
 use "wallaroo_labs/collection_helpers"
+use "wallaroo_labs/messages"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/string_set"
+
+type TryShrinkResponseFn is {(Array[ByteSeq] val)} val
 
 actor Autoscale
   """
@@ -122,6 +125,7 @@ actor Autoscale
   let _initializer_name: WorkerName
   let _checkpoint_initiator: CheckpointInitiator
   var _phase: _AutoscalePhase = _EmptyAutoscalePhase
+  let _waiting_connections: ConnectionsStore = ConnectionsStore
 
   let _self: Autoscale tag = this
 
@@ -587,21 +591,41 @@ actor Autoscale
   //////////////////////////////////
 
   be try_shrink(local_topology: LocalTopologyInitializer,
-    target_workers: Array[WorkerName] val, shrink_count: U64)
+    target_workers: Array[WorkerName] val, shrink_count: U64,
+    response_fn: TryShrinkResponseFn)
   =>
     if (_worker_name == _primary_worker) then
       @printf[U32]("!@ I am the primary worker and I am trying to shrink\n".cstring())
-      _phase.try_shrink(local_topology, target_workers, shrink_count)
+
+      _phase.try_shrink(local_topology, target_workers, shrink_count,
+        response_fn)
     else
       @printf[U32]("!@ I am NOT the primary worker and I am asking the primary worker to try to shrink\n".cstring())
-      try
-        let msg = ChannelMsgEncoder.try_shrink_request(target_workers,
-          shrink_count, _auth)?
-        _connections.send_control(_primary_worker, msg)
-      else
-        Fail()
-      end
+      _waiting_connections.insert(
+        {(abs) =>
+          @printf[I32]("writing shrink response to client\n".cstring())
+
+          // !@ The response_fn here is assumed to be writing directly out to
+          // the client connection, but there's no check for that. We may want
+          // to consider creating separate classes for the response functions
+          // so that they can be type-checked here and fail if they are the
+          // wrong type.
+
+          response_fn(abs)
+        } val,
+        {(id) =>
+          try
+            let msg = ChannelMsgEncoder.try_shrink_request(target_workers,
+              shrink_count, _worker_name, id, _auth)?
+            _connections.send_control(_primary_worker, msg)
+          else
+            Fail()
+          end
+        } val)
     end
+
+  be respond_to_try_shrink(msg: Array[ByteSeq] val, conn_id: U128) =>
+    _waiting_connections(conn_id, msg)
 
   be try_join(local_topology: LocalTopologyInitializer, conn: TCPConnection,
     worker_name: WorkerName, worker_count: USize)

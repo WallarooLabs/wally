@@ -653,10 +653,24 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
       | let m: TryShrinkRequestMsg =>
         match _layout_initializer
         | let lti: LocalTopologyInitializer =>
-          _autoscale.try_shrink(lti, m.target_workers, m.shrink_count)
+          let response_fn =
+            {(response: Array[ByteSeq] val) =>
+              try
+                let msg = ChannelMsgEncoder.try_shrink_response(
+                  response, m.conn_id, _auth)?
+                _connections.send_control(m.worker_name, msg)
+              else
+                Fail()
+              end
+            } val
+          _autoscale.try_shrink(lti, m.target_workers, m.shrink_count,
+            response_fn)
         else
           Fail()
         end
+      | let m: TryShrinkResponseMsg =>
+        @printf[I32]("!@received shrink response control channel message\n".cstring())
+        _autoscale.respond_to_try_shrink(m.msg, m.conn_id)
       | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown channel message type.\n".cstring())
       else

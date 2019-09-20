@@ -170,14 +170,17 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
               "Channel\n").cstring())
           end
 
-          let reply = ExternalMsgEncoder.shrink_query_response()
-          conn.writev(reply)
-
           if m.query is true then
             _local_topology_initializer.shrinkable_query(conn)
           else
+            let conn': TCPConnection tag = conn
+            let response_fn =
+              {(response: Array[ByteSeq] val) =>
+                conn'.writev(response)
+              } val
+
             _autoscale.try_shrink(_local_topology_initializer, m.node_names,
-              m.num_nodes)
+              m.num_nodes, response_fn)
           end
         | let m: ExternalPartitionQueryMsg =>
           ifdef "trace" then
