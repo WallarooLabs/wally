@@ -161,7 +161,7 @@ run_sanity_loop () {
         fi
         ./1-to-1-passthrough-verify.sh /tmp/input-file.txt > $outfile 2>&1
         if [ $? -ne 0 ]; then
-            head -30 $outfile
+            head $outfile
             rm $outfile
             echo BREAK2
             break
