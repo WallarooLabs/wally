@@ -123,7 +123,7 @@ class _CheckpointingPhase is _CheckpointInitiatorPhase
         worker.cstring(), checkpoint_id.string().cstring())
     end
     ifdef debug then
-      Invariant(checkpoint_id == _token.id)
+      let fmt = "worker = %s, _c_initiator.workers() = ".clone();for w in _c_initiator.workers().values() do fmt.append(w); fmt.append(",") end; fmt.append("\n"); @printf[I32](fmt.cstring(), worker.cstring());    Invariant(checkpoint_id == _token.id)
       Invariant(_c_initiator.workers().contains(worker))
     end
     _acked_workers.set(worker)
