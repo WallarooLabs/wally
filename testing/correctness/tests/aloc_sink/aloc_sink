@@ -485,7 +485,7 @@ class AsyncServer(asynchat.async_chat, object):
             reply = cwm.TwoPCReply(str(msg2.txn_id).encode('utf-8'), success)
             reply_bytes = cwm.TwoPCFrame.encode(reply)
             msg = cwm.Message(0, 0, 0, None, reply_bytes)
-            #time.sleep(0.151)      ### TESTING ONLY! DELETE ME
+            time.sleep(0.151)      ### TESTING ONLY! DELETE ME
             self.write(msg)
 
             self._txn_commit_next = True

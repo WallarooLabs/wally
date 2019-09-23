@@ -95,7 +95,7 @@ crash_worker () {
 }
 
 run_crash_sink_loop () {
-    sleep 1
+    sleep 2 # Don't start crashing until checkpoint #1 is complete.
     #for i in `seq 1 1`; do
     while [ 1 ]; do
         echo -n cS
@@ -113,6 +113,7 @@ run_crash_worker_loop () {
         echo ERROR: $0: worker number not given
         exit 1
     fi
+    sleep 2 # Don't start crashing until checkpoint #1 is complete.
     while [ 1 ]; do
         sleep `random_float 4.5 0`
         echo -n "c$worker"
@@ -159,6 +160,50 @@ run_sanity_loop () {
     pause_the_world
 }
 
+get_worker_names () {
+    external_sender=../../../../testing/tools/external_sender/external_sender
+    initializer_external="${WALLAROO_INIT_HOST}:${WALLAROO_MY_EXTERNAL_BASE}"
+    $external_sender \
+        -e $initializer_external -t cluster-status-query 2>&1 | \
+      grep -s 'Processing messages: ' | \
+      sed -e 's/.*Workers: .//' -e 's/,|.*//' | \
+      tr ',' ' '
+}
+
+run_grow_loop () {
+    all_workers="initializer worker1 worker2 worker3 worker4 worker5"
+
+    sleep 2 # Don't start crashing until checkpoint #1 is complete.
+    while [ 1 ]; do
+        running_now=`get_worker_names`
+        for w in $all_workers; do
+            found=""
+            for running in $running_now; do
+                if [ $w = $running ]; then
+                    found=$w
+                    break;
+                fi
+            done
+            if [ -z "$found" ]; then
+                echo -n "Start $w."
+                worker_num=`echo $w | sed 's/worker//'`
+                echo -n "Start $worker_num."
+                start_worker $worker_num
+                sleep 1
+                poll_out=`poll_ready -w 2 2>&1`
+                if [ $? -ne 0 -o ! -z "$poll_out" ]; then
+                    echo "GROW LOOP $w: pause the world: $poll_out"
+                    pause_the_world
+                    break
+                fi
+                poll_ready
+                break # Don't start more than 1 worker at a time
+            fi
+        done
+        sleep 3
+    done
+}
+
 reset
 start_sink ; sleep 1
 start_all_workers
@@ -178,6 +223,11 @@ for arg in $*; do
         crash[0-9]*)
             worker=`echo $arg | sed 's/crash//'`
             cmd="run_crash_worker_loop $worker"
+            echo RUN: $cmd
+            $cmd &
+            ;;
+        grow)
+            cmd="run_grow_loop"
             echo RUN: $cmd
             $cmd &
             ;;
