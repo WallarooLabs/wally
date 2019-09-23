@@ -150,6 +150,7 @@ run_crash_worker_loop () {
 }
 
 run_sanity_loop () {
+    outfile=/tmp/sanity-loop.out
     while [ 1 ]; do
         sleep 1
         echo -n ,
@@ -158,11 +159,14 @@ run_sanity_loop () {
             echo SANITY
             break
         fi
-        ./1-to-1-passthrough-verify.sh /tmp/input-file.txt 2>&1 | head -30
+        ./1-to-1-passthrough-verify.sh /tmp/input-file.txt > $outfile 2>&1
         if [ $? -ne 0 ]; then
+            head -30 $outfile
+            rm $outfile
             echo BREAK2
             break
         fi
+        rm $outfile
     done
     echo "SANITY LOOP FAILURE: pause the world"
     pause_the_world
