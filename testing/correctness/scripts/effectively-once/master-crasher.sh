@@ -158,7 +158,7 @@ run_sanity_loop () {
             echo SANITY
             break
         fi
-        ./1-to-1-passthrough-verify.sh /tmp/input-file.txt
+        ./1-to-1-passthrough-verify.sh /tmp/input-file.txt 2>&1 | head -30
         if [ $? -ne 0 ]; then
             echo BREAK2
             break
@@ -180,10 +180,24 @@ get_worker_names () {
 
 run_grow_shrink_loop () {
     all_workers="initializer worker1 worker2 worker3 worker4 worker5"
+    do_grow=0
+    do_shrink=0
+
+    case "$1" in
+        *grow*)
+            do_grow=1
+            ;;
+    esac
+    case "$1" in
+        *shrink*)
+            do_shrink=1
+            ;;
+    esac
+    echo DBG: do_grow = $do_grow, do_shrink = $do_shrink
 
     sleep 2 # Don't start crashing until checkpoint #1 is complete.
     while [ 1 ]; do
-        if [ `random_int 10` -lt 5 ]; then
+        if [ $do_grow -eq 1 -a  `random_int 10` -lt 5 ]; then
             running_now=`get_worker_names`
             for w in $all_workers; do
                 found=""
@@ -208,7 +222,7 @@ run_grow_shrink_loop () {
                 fi
             done
         fi
-        if [ `random_int 10` -lt 5 ]; then
+        if [ $do_shrink -eq 1 -a `random_int 10` -lt 5 ]; then
             running_now=`get_worker_names`
             for running in $running_now; do
                 if [ $running = initializer ]; then
@@ -255,8 +269,13 @@ for arg in $*; do
             echo RUN: $cmd
             $cmd &
             ;;
-        grow-shrink)
-            cmd="run_grow_shrink_loop"
+        *grow*)
+            cmd="run_grow_shrink_loop $arg"
+            echo RUN: $cmd
+            $cmd &
+            ;;
+        *shrink*)
+            cmd="run_grow_shrink_loop $arg"
             echo RUN: $cmd
             $cmd &
             ;;
