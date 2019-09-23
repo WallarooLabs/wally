@@ -23,8 +23,10 @@ use "wallaroo/core/common"
 use "wallaroo/core/invariant"
 use "wallaroo/core/barrier"
 use "wallaroo_labs/collection_helpers"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 
+use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag, ...)
 
 trait _CheckpointInitiatorPhase
   fun name(): String
@@ -123,18 +125,26 @@ class _CheckpointingPhase is _CheckpointInitiatorPhase
         worker.cstring(), checkpoint_id.string().cstring())
     end
     ifdef debug then
-      let fmt = "worker = %s, _c_initiator.workers() = ".clone();for w in _c_initiator.workers().values() do fmt.append(w); fmt.append(",") end; fmt.append("\n"); @printf[I32](fmt.cstring(), worker.cstring());    Invariant(checkpoint_id == _token.id)
-      Invariant(_c_initiator.workers().contains(worker))
+      let fmt = ("worker = " + worker + ", _c_initiator.workers() = ").clone()
+      for w in _c_initiator.workers().values() do
+        fmt.append(w); fmt.append(",")
+      end
+      @l(Log.debug(), Log.checkpoint(), fmt.cstring())
+      Invariant(checkpoint_id == _token.id)
     end
-    _acked_workers.set(worker)
-    ifdef "checkpoint_trace" then
-      @printf[I32]("_CheckpointingPhase: acked_workers: %s, workers: %s\n"
-        .cstring(), _acked_workers.size().string().cstring(),
-        _c_initiator.workers().size().string().cstring())
-    end
-    if (_acked_workers.size() == _c_initiator.workers().size()) then
-      _event_log_checkpoints_complete = true
-      _check_completion()
+    if _c_initiator.workers().contains(worker) then
+      _acked_workers.set(worker)
+      ifdef "checkpoint_trace" then
+        @printf[I32]("_CheckpointingPhase: acked_workers: %s, workers: %s\n"
+          .cstring(), _acked_workers.size().string().cstring(),
+          _c_initiator.workers().size().string().cstring())
+      end
+      if (_acked_workers.size() == _c_initiator.workers().size()) then
+        _event_log_checkpoints_complete = true
+        _check_completion()
+      end
+    else
+      @l(Log.info(), Log.checkpoint(), "event_log_checkpoint_complete: worker %s not in _c_initiator set".cstring(), worker.cstring())
     end
 
   fun ref _check_completion() =>
