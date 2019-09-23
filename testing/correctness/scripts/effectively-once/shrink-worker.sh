@@ -14,11 +14,11 @@ fi
 CLUSTER_SHRINKER=../../../../utils/cluster_shrinker/cluster_shrinker
 
 case $1 in
-    1)
+    0)
         echo Error: cannot shrink the initializer worker
         exit 1
         ;;
-    [0-9]*)
+    [1-9]*)
         name=worker$1
         pattern="name worker$1"
         ;;
