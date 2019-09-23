@@ -34,6 +34,14 @@ start_worker () {
     start-worker.sh $*
 }
 
+join_worker () {
+    join-worker.sh $*
+}
+
+shrink_worker () {
+    shrink-worker.sh $*
+}
+
 poll_ready () {
     poll-ready.sh $*
 }
@@ -170,37 +178,58 @@ get_worker_names () {
       tr ',' ' '
 }
 
-run_grow_loop () {
+run_grow_shrink_loop () {
     all_workers="initializer worker1 worker2 worker3 worker4 worker5"
 
     sleep 2 # Don't start crashing until checkpoint #1 is complete.
     while [ 1 ]; do
-        running_now=`get_worker_names`
-        for w in $all_workers; do
-            found=""
-            for running in $running_now; do
-                if [ $w = $running ]; then
-                    found=$w
-                    break;
+        if [ `random_int 10` -lt 5 ]; then
+            running_now=`get_worker_names`
+            for w in $all_workers; do
+                found=""
+                for running in $running_now; do
+                    if [ $w = $running ]; then
+                        found=$w
+                        break;
+                    fi
+                done
+                if [ -z "$found" ]; then
+                    echo -n "Join $w."
+                    worker_num=`echo $w | sed 's/worker//'`
+                    join_worker -n 1 $worker_num
+                    sleep 1
+                    poll_out=`poll_ready -w 2 2>&1`
+                    if [ $? -ne 0 -o ! -z "$poll_out" ]; then
+                        echo "GROW LOOP join $w: pause the world: $poll_out"
+                        pause_the_world
+                        break
+                    fi
+                    break # Don't join more than 1 worker at a time
                 fi
             done
-            if [ -z "$found" ]; then
-                echo -n "Start $w."
-                worker_num=`echo $w | sed 's/worker//'`
-                echo -n "Start $worker_num."
-                start_worker $worker_num
-                sleep 1
-                poll_out=`poll_ready -w 2 2>&1`
-                if [ $? -ne 0 -o ! -z "$poll_out" ]; then
-                    echo "GROW LOOP $w: pause the world: $poll_out"
-                    pause_the_world
-                    break
+        fi
+        if [ `random_int 10` -lt 5 ]; then
+            running_now=`get_worker_names`
+            for running in $running_now; do
+                if [ $running = initializer ]; then
+                    continue
                 fi
-                poll_ready
-                break # Don't start more than 1 worker at a time
-            fi
-        done
-        sleep 3
+                if [ `random_int 10` -lt 5 ]; then
+                    echo -n "Shrink $running"
+                    worker_num=`echo $running | sed 's/worker//'`
+                    shrink_worker $worker_num
+                    sleep 1
+                    poll_out=`poll_ready -w 2 2>&1`
+                    if [ $? -ne 0 -o ! -z "$poll_out" ]; then
+                        echo "GROW LOOP shrink $w: pause the world: $poll_out"
+                        pause_the_world
+                        break
+                    fi
+                    break # Don't shrink more than 1 worker at a time
+                fi
+            done
+        fi
+        sleep 1
     done
 }
 
@@ -226,8 +255,8 @@ for arg in $*; do
             echo RUN: $cmd
             $cmd &
             ;;
-        grow)
-            cmd="run_grow_loop"
+        grow-shrink)
+            cmd="run_grow_shrink_loop"
             echo RUN: $cmd
             $cmd &
             ;;
