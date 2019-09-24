@@ -35,8 +35,6 @@ use "wallaroo_labs/string_set"
 
 type TryShrinkResponseFn is {(Array[ByteSeq] val)} val
 
-// type TryJoinResponseFn is {(Array[ByteSeq] val)} val
-
 trait tag TryJoinResponseFn
   be apply(response: Array[ByteSeq] val)
   be dispose()
@@ -169,7 +167,8 @@ actor Autoscale
   let _initializer_name: WorkerName
   let _checkpoint_initiator: CheckpointInitiator
   var _phase: _AutoscalePhase = _EmptyAutoscalePhase
-  let _waiting_connections: ConnectionsStore = ConnectionsStore
+  let _waiting_connections: ContinuationStore[Array[ByteSeq] val] =
+    _waiting_connections.create()
 
   let _self: Autoscale tag = this
 
