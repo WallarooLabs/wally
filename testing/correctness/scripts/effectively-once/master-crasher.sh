@@ -251,6 +251,53 @@ run_grow_shrink_loop () {
     done
 }
 
+run_custom1 () {
+    ## Assume that we are run with `./master-crasher.sh 3 no-sanity custom`
+
+    sleep 2
+
+    echo -n "Shrink worker2"
+    shrink_worker 2
+    sleep 2
+
+    echo -n "Join worker2 again"
+    join_worker 2
+    sleep 1
+
+    # We expect that this loop, now that it has been started, will
+    # fail immediately, probably because of a CRITICAL error in the
+    # sink's log output.
+    run_sanity_loop &
+
+    sleep 5
+}
+
+run_custom2 () {
+    ## Assume that we are run with `./master-crasher.sh 3 no-sanity custom`
+
+    sleep 2
+    for i in `seq 4 8`; do
+        echo -n "Join worker$i"
+        join_worker $i
+        sleep 1
+    done
+
+    echo -n "Shrink worker7"
+    shrink_worker 7
+    sleep 2
+
+    echo -n "Join worker7 again"
+    join_worker 7
+    sleep 1
+
+    # We expect that this loop, now that it has been started, will
+    # fail immediately, probably because of a CRITICAL error in the
+    # sink's log output.
+    run_sanity_loop &
+
+    sleep 5
+}
+
 reset
 start_sink ; sleep 1
 start_all_workers
@@ -283,10 +330,15 @@ for arg in $*; do
             echo RUN: $cmd
             $cmd &
             ;;
+        run_custom*)
+            cmd="$arg"
+            echo RUN: $cmd
+            $cmd &
+            ;;
     esac
 done
 
-if [ $run_sanity ]; then
+if [ $run_sanity = true ]; then
     run_sanity_loop &
 fi
 
