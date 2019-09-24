@@ -578,12 +578,6 @@ class _JoiningWorker is _AutoscalePhase
   =>
     local_topology.worker_join(worker_name, worker_count, response_fn)
 
-  fun ref worker_join(worker: WorkerName, worker_count: USize,
-    local_topology: LocalTopology, current_worker_count: USize,
-    response_fn: TryJoinResponseFn)
-  =>
-    None
-
   fun ref worker_connected_to_joining_workers(worker: WorkerName) =>
     None
 
@@ -657,12 +651,6 @@ class _WaitingForProducersList is _AutoscalePhase
   =>
     local_topology.worker_join(worker_name, worker_count, response_fn)
 
-  fun ref worker_join(worker: WorkerName, worker_count: USize,
-    local_topology: LocalTopology,_worker_count: USize,
-    response_fn: TryJoinResponseFn)
-  =>
-    None
-
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
   =>
@@ -706,12 +694,6 @@ class _WaitingForProducersToRegister is _AutoscalePhase
   =>
     local_topology.worker_join(worker_name, worker_count, response_fn)
 
-  fun ref worker_join(worker: WorkerName, worker_count: USize,
-    local_topology: LocalTopology, current_worker_count: USize,
-    response_fn: TryJoinResponseFn)
-  =>
-    None
-
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
   =>
@@ -753,12 +735,6 @@ class _WaitingForBoundariesMap is _AutoscalePhase
     response_fn: TryJoinResponseFn)
   =>
     local_topology.worker_join(worker_name, worker_count, response_fn)
-
-  fun ref worker_join(worker: WorkerName, worker_count: USize,
-    local_topology: LocalTopology, current_worker_count: USize,
-    response_fn: TryJoinResponseFn)
-  =>
-    None
 
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
@@ -807,12 +783,6 @@ class _WaitingForBoundariesToAckRegistering is _AutoscalePhase
     response_fn: TryJoinResponseFn)
   =>
     local_topology.worker_join(worker_name, worker_count, response_fn)
-
-  fun ref worker_join(worker: WorkerName, worker_count: USize,
-    local_topology: LocalTopology, current_worker_count: USize,
-    response_fn: TryJoinResponseFn)
-  =>
-    None
 
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
