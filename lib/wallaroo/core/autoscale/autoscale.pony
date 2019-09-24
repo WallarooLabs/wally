@@ -35,6 +35,50 @@ use "wallaroo_labs/string_set"
 
 type TryShrinkResponseFn is {(Array[ByteSeq] val)} val
 
+// type TryJoinResponseFn is {(Array[ByteSeq] val)} val
+
+trait tag TryJoinResponseFn
+  be apply(response: Array[ByteSeq] val)
+  be dispose()
+
+actor TryJoinConnResponseFn is TryJoinResponseFn
+  let _conn: TCPConnection
+
+  new create(conn: TCPConnection) =>
+    _conn = conn
+
+  be apply(response: Array[ByteSeq] val) =>
+    _conn.writev(response)
+
+  be dispose() =>
+    _conn.dispose()
+
+actor TryJoinProxyResponseFn is TryJoinResponseFn
+  let _connections: Connections
+  let _proxy_worker_name: WorkerName
+  let _conn_id: U128
+  let _auth: AmbientAuth
+
+  new create(connections: Connections, proxy_worker_name: WorkerName,
+    conn_id: U128, auth: AmbientAuth)
+  =>
+    _connections = connections
+    _proxy_worker_name = proxy_worker_name
+    _conn_id = conn_id
+    _auth = auth
+
+  be apply(response: Array[ByteSeq] val) =>
+    try
+      let msg = ChannelMsgEncoder.try_join_response(
+        response, _conn_id, _auth)?
+      _connections.send_control(_proxy_worker_name, msg)
+    else
+      Fail()
+    end
+
+  be dispose() =>
+    None
+
 actor Autoscale
   """
   Phases:
@@ -172,14 +216,14 @@ actor Autoscale
 
   be worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
-    current_worker_count: USize)
+    current_worker_count: USize, response_fn: TryJoinResponseFn)
   =>
     """
     Called when joining worker initially tells us it's joining. If we're
     waiting for autoscale, this will put us into join.
     """
     _phase.worker_join(conn, worker, worker_count, local_topology,
-      current_worker_count)
+      current_worker_count, response_fn)
 
   be update_checkpoint_id_for_autoscale(ids: (CheckpointId, RollbackId)) =>
     """
@@ -359,15 +403,15 @@ actor Autoscale
   ///////////////////
   fun ref wait_for_joiners(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
-    current_worker_count: USize)
+    current_worker_count: USize, response_fn: TryJoinResponseFn)
   =>
     _phase = _WaitingForJoiners(_auth, this, worker_count,
       current_worker_count)
     _phase.worker_join(conn, worker, worker_count, local_topology,
-      current_worker_count)
+      current_worker_count, response_fn)
 
   fun ref request_checkpoint_id(
-    connected_joiners: Map[WorkerName, (TCPConnection, LocalTopology)],
+    connected_joiners: Map[WorkerName, (TryJoinResponseFn, LocalTopology)],
     joining_worker_count: USize, current_worker_count: USize)
   =>
     _phase = _WaitingForCheckpointId(this, connected_joiners,
@@ -377,7 +421,7 @@ actor Autoscale
     _checkpoint_initiator.lookup_checkpoint_id(promise)
 
   fun ref inject_autoscale_barrier(
-    connected_joiners: Map[WorkerName, (TCPConnection, LocalTopology)],
+    connected_joiners: Map[WorkerName, (TryJoinResponseFn, LocalTopology)],
     joining_worker_count: USize, current_worker_count: USize,
     checkpoint_id: CheckpointId, rollback_id: RollbackId)
   =>
@@ -405,11 +449,11 @@ actor Autoscale
 
     _router_registry.initiate_stop_the_world_for_grow_migration(new_workers)
 
-  fun inform_joining_worker(conn: TCPConnection, worker: WorkerName,
+  fun inform_joining_worker(response_fn: TryJoinResponseFn, worker: WorkerName,
     local_topology: LocalTopology, checkpoint_id: CheckpointId,
     rollback_id: RollbackId)
   =>
-    _connections.inform_joining_worker(conn, worker, local_topology,
+    _connections.inform_joining_worker(response_fn, worker, local_topology,
       checkpoint_id, rollback_id, _initializer_name)
 
   fun ref wait_for_joiner_initialization(joining_worker_count: USize,
@@ -627,10 +671,37 @@ actor Autoscale
   be respond_to_try_shrink(msg: Array[ByteSeq] val, conn_id: U128) =>
     _waiting_connections(conn_id, msg)
 
+  be respond_to_try_join(msg: Array[ByteSeq] val, conn_id: U128) =>
+    _waiting_connections(conn_id, msg)
+
   be try_join(local_topology: LocalTopologyInitializer, conn: TCPConnection,
-    worker_name: WorkerName, worker_count: USize)
+    joining_worker_name: WorkerName, worker_count: USize,
+    response_fn: TryJoinResponseFn)
   =>
-    _phase.try_join(local_topology, conn, worker_name, worker_count, _auth)
+    if (_worker_name == _primary_worker) then
+      @printf[U32]("!@ I am the primary worker and I am trying allow a join\n".cstring())
+
+      _phase.try_join(local_topology, conn, joining_worker_name, worker_count, _auth,
+        response_fn)
+    else
+      @printf[U32]("!@ I am NOT the primary worker and I am asking the primary worker to try to join\n".cstring())
+
+      _waiting_connections.insert(
+        {(abs) =>
+          @printf[I32]("writing join response to client\n".cstring())
+
+          response_fn(abs)
+        } val,
+        {(id) =>
+          try
+            let msg = ChannelMsgEncoder.try_join_request(joining_worker_name,
+              worker_count, _worker_name, id, _auth)?
+            _connections.send_control(_primary_worker, msg)
+          else
+            Fail()
+          end
+        } val)
+    end
 
   be inject_shrink_autoscale_barrier(remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)

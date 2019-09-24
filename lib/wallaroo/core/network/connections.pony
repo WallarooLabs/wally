@@ -682,11 +682,11 @@ actor Connections is Cluster
       end
     end
 
-  be inform_joining_worker(conn: TCPConnection, worker: String,
+  be inform_joining_worker(response_fn: TryJoinResponseFn, worker: String,
     local_topology: LocalTopology, checkpoint_id: CheckpointId,
     rollback_id: RollbackId, primary_checkpoint_worker: String)
   =>
-    _register_disposable(conn)
+    _register_disposable(response_fn)
     if not _control_addrs.contains(worker) then
       let c_addrs = recover trn Map[String, (String, String)] end
       for (w, addr) in _control_addrs.pairs() do
@@ -706,7 +706,7 @@ actor Connections is Cluster
           checkpoint_id, rollback_id, _metrics_host, _metrics_service,
           consume c_addrs, consume d_addrs, local_topology.worker_names,
           primary_checkpoint_worker, _auth)?
-        conn.writev(inform_msg)
+        response_fn(inform_msg)
         @printf[I32](("***Worker %s attempting to join the cluster. Sent " +
           "necessary information.***\n").cstring(), worker.cstring())
       else
@@ -718,7 +718,7 @@ actor Connections is Cluster
       try
         let clean_shutdown_msg = ChannelMsgEncoder.clean_shutdown(_auth,
           "Proposed worker name is already reserved by the cluster.")?
-        conn.writev(clean_shutdown_msg)
+        response_fn(clean_shutdown_msg)
       else
         Fail()
       end

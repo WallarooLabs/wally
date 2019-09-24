@@ -37,7 +37,7 @@ trait _AutoscalePhase
 
   fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
-    current_worker_count: USize)
+    current_worker_count: USize, response_fn: TryJoinResponseFn)
   =>
     _invalid_call(); Fail()
 
@@ -103,12 +103,12 @@ trait _AutoscalePhase
 
   fun ref try_join(local_topology: LocalTopologyInitializer,
     conn: TCPConnection, worker_name: WorkerName, worker_count: USize,
-    auth: AmbientAuth)
+    auth: AmbientAuth, response_fn: TryJoinResponseFn)
   =>
     let error_msg = "Autoscale event currently underway, cannot join at this time"
     try
       let msg = ChannelMsgEncoder.inform_join_error(error_msg, auth)?
-      conn.writev(msg)
+      response_fn(msg)
     else
       Fail()
     end
@@ -170,16 +170,16 @@ class _WaitingForAutoscale is _AutoscalePhase
 
   fun ref try_join(local_topology: LocalTopologyInitializer,
     conn: TCPConnection, worker_name: WorkerName, worker_count: USize,
-    auth: AmbientAuth)
+    auth: AmbientAuth, response_fn: TryJoinResponseFn)
   =>
-    local_topology.worker_join(conn, worker_name, worker_count)
+    local_topology.worker_join(conn, worker_name, worker_count, response_fn)
 
   fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
-    current_worker_count: USize)
+    current_worker_count: USize, response_fn: TryJoinResponseFn)
   =>
     _autoscale.wait_for_joiners(conn, worker, worker_count, local_topology,
-      current_worker_count)
+      current_worker_count, response_fn)
 
 /////////////////////////////////////////////////
 // GROW PHASES
@@ -188,7 +188,7 @@ class _WaitingForJoiners is _AutoscalePhase
   let _auth: AmbientAuth
   let _autoscale: Autoscale ref
   let _joining_worker_count: USize
-  let _connected_joiners: Map[WorkerName, (TCPConnection, LocalTopology)] =
+  let _connected_joiners: Map[WorkerName, (TryJoinResponseFn, LocalTopology)] =
     _connected_joiners.create()
   var _newstep_group_routing_ids:
     Map[WorkerName, Map[RoutingId, RoutingId] val] iso =
@@ -211,13 +211,13 @@ class _WaitingForJoiners is _AutoscalePhase
 
   fun ref try_join(local_topology: LocalTopologyInitializer,
     conn: TCPConnection, worker_name: WorkerName, worker_count: USize,
-    auth: AmbientAuth)
+    auth: AmbientAuth, response_fn: TryJoinResponseFn)
   =>
-    local_topology.worker_join(conn, worker_name, worker_count)
+    local_topology.worker_join(conn, worker_name, worker_count, response_fn)
 
   fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
-    current_worker_count: USize)
+    current_worker_count: USize, response_fn: TryJoinResponseFn)
   =>
     if worker_count != _joining_worker_count then
       @printf[I32]("Join error: Joining worker supplied invalid worker count\n"
@@ -227,7 +227,7 @@ class _WaitingForJoiners is _AutoscalePhase
         ". You supplied " + worker_count.string() + "."
       try
         let msg = ChannelMsgEncoder.inform_join_error(error_msg, _auth)?
-        conn.writev(msg)
+        response_fn(msg)
       else
         Fail()
       end
@@ -238,12 +238,12 @@ class _WaitingForJoiners is _AutoscalePhase
         "than 0."
       try
         let msg = ChannelMsgEncoder.inform_join_error(error_msg, _auth)?
-        conn.writev(msg)
+        response_fn(msg)
       else
         Fail()
       end
     else
-      _connected_joiners(worker) = (conn, local_topology)
+      _connected_joiners(worker) = (response_fn, local_topology)
       if _connected_joiners.size() == _joining_worker_count then
         _autoscale.request_checkpoint_id(_connected_joiners,
           _joining_worker_count, _current_worker_count)
@@ -252,12 +252,12 @@ class _WaitingForJoiners is _AutoscalePhase
 
 class _WaitingForCheckpointId is _AutoscalePhase
   let _autoscale: Autoscale ref
-  let _connected_joiners: Map[WorkerName, (TCPConnection, LocalTopology)]
+  let _connected_joiners: Map[WorkerName, (TryJoinResponseFn, LocalTopology)]
   let _joining_worker_count: USize
   let _current_worker_count: USize
 
   new create(autoscale: Autoscale ref,
-    connected_joiners: Map[WorkerName, (TCPConnection, LocalTopology)],
+    connected_joiners: Map[WorkerName, (TryJoinResponseFn, LocalTopology)],
     joining_worker_count: USize, current_worker_count: USize)
   =>
     _autoscale = autoscale
@@ -277,7 +277,7 @@ class _WaitingForCheckpointId is _AutoscalePhase
 
 class _InjectAutoscaleBarrier is _AutoscalePhase
   let _autoscale: Autoscale ref
-  let _connected_joiners: Map[WorkerName, (TCPConnection, LocalTopology)]
+  let _connected_joiners: Map[WorkerName, (TryJoinResponseFn, LocalTopology)]
   let _initialized_workers: StringSet = _initialized_workers.create()
   var _new_step_group_routing_ids:
     Map[WorkerName, Map[RoutingId, RoutingId] val] iso =
@@ -288,7 +288,7 @@ class _InjectAutoscaleBarrier is _AutoscalePhase
   let _rollback_id: RollbackId
 
   new create(autoscale: Autoscale ref,
-    connected_joiners: Map[WorkerName, (TCPConnection, LocalTopology)],
+    connected_joiners: Map[WorkerName, (TryJoinResponseFn, LocalTopology)],
     joining_worker_count: USize, current_worker_count: USize,
     checkpoint_id: CheckpointId, rollback_id: RollbackId)
   =>
@@ -305,9 +305,9 @@ class _InjectAutoscaleBarrier is _AutoscalePhase
 
   fun ref grow_autoscale_barrier_complete() =>
     for (worker, data) in _connected_joiners.pairs() do
-      let conn = data._1
+      let response_fn = data._1
       let local_topology = data._2
-      _autoscale.inform_joining_worker(conn, worker, local_topology,
+      _autoscale.inform_joining_worker(response_fn, worker, local_topology,
         _checkpoint_id, _rollback_id)
     end
     let new_step_group_routing_ids:
@@ -574,13 +574,13 @@ class _JoiningWorker is _AutoscalePhase
 
   fun ref try_join(local_topology: LocalTopologyInitializer,
     conn: TCPConnection, worker_name: WorkerName, worker_count: USize,
-    auth: AmbientAuth)
+    auth: AmbientAuth, response_fn: TryJoinResponseFn)
   =>
-    local_topology.worker_join(conn, worker_name, worker_count)
+    local_topology.worker_join(conn, worker_name, worker_count, response_fn)
 
   fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
-    current_worker_count: USize)
+    current_worker_count: USize, response_fn: TryJoinResponseFn)
   =>
     None
 
@@ -653,13 +653,13 @@ class _WaitingForProducersList is _AutoscalePhase
 
   fun ref try_join(local_topology: LocalTopologyInitializer,
     conn: TCPConnection, worker_name: WorkerName, worker_count: USize,
-    auth: AmbientAuth)
+    auth: AmbientAuth, response_fn: TryJoinResponseFn)
   =>
-    local_topology.worker_join(conn, worker_name, worker_count)
+    local_topology.worker_join(conn, worker_name, worker_count, response_fn)
 
   fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
-    current_worker_count: USize)
+    current_worker_count: USize, response_fn: TryJoinResponseFn)
   =>
     None
 
@@ -702,13 +702,13 @@ class _WaitingForProducersToRegister is _AutoscalePhase
 
   fun ref try_join(local_topology: LocalTopologyInitializer,
     conn: TCPConnection, worker_name: WorkerName, worker_count: USize,
-    auth: AmbientAuth)
+    auth: AmbientAuth, response_fn: TryJoinResponseFn)
   =>
-    local_topology.worker_join(conn, worker_name, worker_count)
+    local_topology.worker_join(conn, worker_name, worker_count, response_fn)
 
   fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
-    current_worker_count: USize)
+    current_worker_count: USize, response_fn: TryJoinResponseFn)
   =>
     None
 
@@ -750,13 +750,13 @@ class _WaitingForBoundariesMap is _AutoscalePhase
 
   fun ref try_join(local_topology: LocalTopologyInitializer,
     conn: TCPConnection, worker_name: WorkerName, worker_count: USize,
-    auth: AmbientAuth)
+    auth: AmbientAuth, response_fn: TryJoinResponseFn)
   =>
-    local_topology.worker_join(conn, worker_name, worker_count)
+    local_topology.worker_join(conn, worker_name, worker_count, response_fn)
 
   fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
-    current_worker_count: USize)
+    current_worker_count: USize, response_fn: TryJoinResponseFn)
   =>
     None
 
@@ -804,13 +804,13 @@ class _WaitingForBoundariesToAckRegistering is _AutoscalePhase
 
   fun ref try_join(local_topology: LocalTopologyInitializer,
     conn: TCPConnection, worker_name: WorkerName, worker_count: USize,
-    auth: AmbientAuth)
+    auth: AmbientAuth, response_fn: TryJoinResponseFn)
   =>
-    local_topology.worker_join(conn, worker_name, worker_count)
+    local_topology.worker_join(conn, worker_name, worker_count, response_fn)
 
   fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
-    current_worker_count: USize)
+    current_worker_count: USize, response_fn: TryJoinResponseFn)
   =>
     None
 

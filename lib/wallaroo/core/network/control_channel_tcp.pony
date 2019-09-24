@@ -328,8 +328,9 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         ifdef "autoscale" then
           match _layout_initializer
           | let lti: LocalTopologyInitializer =>
-            // lti.worker_join(conn, m.worker_name, m.worker_count)
-            _autoscale.try_join(lti, conn, m.worker_name, m.worker_count)
+            let response_fn = TryJoinConnResponseFn(conn)
+            _autoscale.try_join(lti, conn, m.worker_name, m.worker_count,
+              response_fn)
           else
             Fail()
           end
@@ -344,6 +345,24 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             Fail()
           end
         end
+      | let m: TryJoinRequestMsg =>
+        ifdef "trace" then
+          @printf[I32]("Received JoinClusterMsg on Control Channel\n"
+            .cstring())
+        end
+
+        match _layout_initializer
+        | let lti: LocalTopologyInitializer =>
+          let response_fn = TryJoinProxyResponseFn(_connections,
+            m.proxy_worker_name, m.conn_id, _auth)
+          _autoscale.try_join(lti, conn, m.joining_worker_name, m.worker_count,
+            response_fn)
+        else
+          Fail()
+        end
+      | let m: TryJoinResponseMsg =>
+        @printf[I32]("!@received shrink response control channel message\n".cstring())
+        _autoscale.respond_to_try_join(m.msg, m.conn_id)
       | let m: AnnounceConnectionsToJoiningWorkersMsg =>
         for w in m.control_addrs.keys() do
           try
