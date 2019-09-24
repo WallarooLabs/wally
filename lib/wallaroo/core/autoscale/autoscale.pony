@@ -213,15 +213,15 @@ actor Autoscale
   // COORDINATOR
   //////////////////////////////////
 
-  be worker_join(conn: TCPConnection, worker: WorkerName,
-    worker_count: USize, local_topology: LocalTopology,
-    current_worker_count: USize, response_fn: TryJoinResponseFn)
+  be worker_join(worker: WorkerName, worker_count: USize,
+    local_topology: LocalTopology, current_worker_count: USize,
+    response_fn: TryJoinResponseFn)
   =>
     """
     Called when joining worker initially tells us it's joining. If we're
     waiting for autoscale, this will put us into join.
     """
-    _phase.worker_join(conn, worker, worker_count, local_topology,
+    _phase.worker_join(worker, worker_count, local_topology,
       current_worker_count, response_fn)
 
   be update_checkpoint_id_for_autoscale(ids: (CheckpointId, RollbackId)) =>
@@ -400,13 +400,13 @@ actor Autoscale
   ///////////////////
   // COORDINATOR
   ///////////////////
-  fun ref wait_for_joiners(conn: TCPConnection, worker: WorkerName,
-    worker_count: USize, local_topology: LocalTopology,
-    current_worker_count: USize, response_fn: TryJoinResponseFn)
+  fun ref wait_for_joiners(worker: WorkerName, worker_count: USize,
+    local_topology: LocalTopology, current_worker_count: USize,
+    response_fn: TryJoinResponseFn)
   =>
     _phase = _WaitingForJoiners(_auth, this, worker_count,
       current_worker_count)
-    _phase.worker_join(conn, worker, worker_count, local_topology,
+    _phase.worker_join(worker, worker_count, local_topology,
       current_worker_count, response_fn)
 
   fun ref request_checkpoint_id(
@@ -638,16 +638,11 @@ actor Autoscale
     response_fn: TryShrinkResponseFn)
   =>
     if (_worker_name == _primary_worker) then
-      @printf[U32]("!@ I am the primary worker and I am trying to shrink\n".cstring())
-
       _phase.try_shrink(local_topology, target_workers, shrink_count,
         response_fn)
     else
-      @printf[U32]("!@ I am NOT the primary worker and I am asking the primary worker to try to shrink\n".cstring())
       _waiting_connections.insert(
         {(abs) =>
-          @printf[I32]("writing shrink response to client\n".cstring())
-
           // !@ The response_fn here is assumed to be writing directly out to
           // the client connection, but there's no check for that. We may want
           // to consider creating separate classes for the response functions
@@ -673,18 +668,14 @@ actor Autoscale
   be respond_to_try_join(msg: Array[ByteSeq] val, conn_id: U128) =>
     _waiting_connections(conn_id, msg)
 
-  be try_join(local_topology: LocalTopologyInitializer, conn: TCPConnection,
+  be try_join(local_topology: LocalTopologyInitializer,
     joining_worker_name: WorkerName, worker_count: USize,
     response_fn: TryJoinResponseFn)
   =>
     if (_worker_name == _primary_worker) then
-      @printf[U32]("!@ I am the primary worker and I am trying allow a join\n".cstring())
-
-      _phase.try_join(local_topology, conn, joining_worker_name, worker_count, _auth,
+      _phase.try_join(local_topology, joining_worker_name, worker_count, _auth,
         response_fn)
     else
-      @printf[U32]("!@ I am NOT the primary worker and I am asking the primary worker to try to join\n".cstring())
-
       _waiting_connections.insert(
         {(abs) =>
           @printf[I32]("writing join response to client\n".cstring())

@@ -1378,21 +1378,21 @@ actor LocalTopologyInitializer is LayoutInitializer
         + " None").cstring())
     end
 
-  be worker_join(conn: TCPConnection, joining_worker_name: String,
-    joining_worker_count: USize, response_fn: TryJoinResponseFn)
+  be worker_join(joining_worker_name: String, joining_worker_count: USize,
+    response_fn: TryJoinResponseFn)
   =>
     """
     Should only be called when a new worker initially contacts the cluster to
-    join. This should not be called on any other worker than the one initially
-    contacted.
-    ^^ !@ This needs to change
+    join. It is called on the initializer, either directly because the new
+    worker joined the intializer, or because the new worker connected to a proxy
+    (non-initializer) and the proxy forwarded the request to the initializer.
     """
     match _topology
     | let t: LocalTopology =>
       let current_worker_count = t.worker_names.size()
       let new_t = local_topology_for_joining_worker(t, joining_worker_name)
-      _autoscale.worker_join(conn, joining_worker_name,
-        joining_worker_count, new_t, current_worker_count, response_fn)
+      _autoscale.worker_join(joining_worker_name, joining_worker_count, new_t,
+        current_worker_count, response_fn)
     else
       Fail()
     end

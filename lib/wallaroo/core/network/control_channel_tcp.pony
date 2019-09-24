@@ -329,7 +329,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           match _layout_initializer
           | let lti: LocalTopologyInitializer =>
             let response_fn = TryJoinConnResponseFn(conn)
-            _autoscale.try_join(lti, conn, m.worker_name, m.worker_count,
+            _autoscale.try_join(lti, m.worker_name, m.worker_count,
               response_fn)
           else
             Fail()
@@ -355,7 +355,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         | let lti: LocalTopologyInitializer =>
           let response_fn = TryJoinProxyResponseFn(_connections,
             m.proxy_worker_name, m.conn_id, _auth)
-          _autoscale.try_join(lti, conn, m.joining_worker_name, m.worker_count,
+          _autoscale.try_join(lti, m.joining_worker_name, m.worker_count,
             response_fn)
         else
           Fail()
