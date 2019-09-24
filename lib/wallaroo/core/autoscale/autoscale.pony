@@ -678,8 +678,6 @@ actor Autoscale
     else
       _waiting_connections.insert(
         {(abs) =>
-          @printf[I32]("writing join response to client\n".cstring())
-
           response_fn(abs)
         } val,
         {(id) =>

@@ -361,7 +361,6 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           Fail()
         end
       | let m: TryJoinResponseMsg =>
-        @printf[I32]("!@received shrink response control channel message\n".cstring())
         _autoscale.respond_to_try_join(m.msg, m.conn_id)
       | let m: AnnounceConnectionsToJoiningWorkersMsg =>
         for w in m.control_addrs.keys() do
@@ -688,7 +687,6 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           Fail()
         end
       | let m: TryShrinkResponseMsg =>
-        @printf[I32]("!@received shrink response control channel message\n".cstring())
         _autoscale.respond_to_try_shrink(m.msg, m.conn_id)
       | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown channel message type.\n".cstring())
