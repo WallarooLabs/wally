@@ -16,7 +16,7 @@ actor ContinuationStore[T: Any #send]
 
   be insert(continuation: {(T)} val, with_id: {(U128)} val) =>
     let this_id = _guid_generator.u128()
-    _continuations(this_id) = consume continuation
+    _continuations(this_id) = continuation
     with_id(this_id)
 
   be apply(id: U128, arg: T) =>

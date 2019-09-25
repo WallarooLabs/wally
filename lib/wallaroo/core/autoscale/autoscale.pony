@@ -33,50 +33,6 @@ use "wallaroo_labs/messages"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/string_set"
 
-type TryShrinkResponseFn is {(Array[ByteSeq] val)} val
-
-trait tag TryJoinResponseFn
-  be apply(response: Array[ByteSeq] val)
-  be dispose()
-
-actor TryJoinConnResponseFn is TryJoinResponseFn
-  let _conn: TCPConnection
-
-  new create(conn: TCPConnection) =>
-    _conn = conn
-
-  be apply(response: Array[ByteSeq] val) =>
-    _conn.writev(response)
-
-  be dispose() =>
-    _conn.dispose()
-
-actor TryJoinProxyResponseFn is TryJoinResponseFn
-  let _connections: Connections
-  let _proxy_worker_name: WorkerName
-  let _conn_id: U128
-  let _auth: AmbientAuth
-
-  new create(connections: Connections, proxy_worker_name: WorkerName,
-    conn_id: U128, auth: AmbientAuth)
-  =>
-    _connections = connections
-    _proxy_worker_name = proxy_worker_name
-    _conn_id = conn_id
-    _auth = auth
-
-  be apply(response: Array[ByteSeq] val) =>
-    try
-      let msg = ChannelMsgEncoder.try_join_response(
-        response, _conn_id, _auth)?
-      _connections.send_control(_proxy_worker_name, msg)
-    else
-      Fail()
-    end
-
-  be dispose() =>
-    None
-
 actor Autoscale
   """
   Phases:
@@ -642,14 +598,14 @@ actor Autoscale
         response_fn)
     else
       _waiting_connections.insert(
-        {(abs) =>
+        {(msg_bytes) =>
           // !@ The response_fn here is assumed to be writing directly out to
           // the client connection, but there's no check for that. We may want
           // to consider creating separate classes for the response functions
           // so that they can be type-checked here and fail if they are the
           // wrong type.
 
-          response_fn(abs)
+          response_fn(msg_bytes)
         } val,
         {(id) =>
           try
@@ -677,8 +633,8 @@ actor Autoscale
         response_fn)
     else
       _waiting_connections.insert(
-        {(abs) =>
-          response_fn(abs)
+        {(msg_bytes) =>
+          response_fn(msg_bytes)
         } val,
         {(id) =>
           try

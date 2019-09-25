@@ -576,7 +576,14 @@ class _JoiningWorker is _AutoscalePhase
     worker_name: WorkerName, worker_count: USize, auth: AmbientAuth,
     response_fn: TryJoinResponseFn)
   =>
-    local_topology.worker_join(worker_name, worker_count, response_fn)
+    let error_msg = "Contacted worker has not yet joined the cluster, " +
+      "cannot autoscale."
+    try
+      let msg = ChannelMsgEncoder.inform_join_error(error_msg, auth)?
+      response_fn(msg)
+    else
+      Fail()
+    end
 
   fun ref worker_connected_to_joining_workers(worker: WorkerName) =>
     None
@@ -645,12 +652,6 @@ class _WaitingForProducersList is _AutoscalePhase
 
   fun name(): String => "_WaitingForProducersList"
 
-  fun ref try_join(local_topology: LocalTopologyInitializer,
-    worker_name: WorkerName, worker_count: USize, auth: AmbientAuth,
-    response_fn: TryJoinResponseFn)
-  =>
-    local_topology.worker_join(worker_name, worker_count, response_fn)
-
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
   =>
@@ -688,12 +689,6 @@ class _WaitingForProducersToRegister is _AutoscalePhase
 
   fun name(): String => "_WaitingForProducersToRegister"
 
-  fun ref try_join(local_topology: LocalTopologyInitializer,
-    worker_name: WorkerName, worker_count: USize, auth: AmbientAuth,
-    response_fn: TryJoinResponseFn)
-  =>
-    local_topology.worker_join(worker_name, worker_count, response_fn)
-
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
   =>
@@ -729,12 +724,6 @@ class _WaitingForBoundariesMap is _AutoscalePhase
     _completion_action = completion_action
 
   fun name(): String => "_WaitingForBoundariesMap"
-
-  fun ref try_join(local_topology: LocalTopologyInitializer,
-    worker_name: WorkerName, worker_count: USize, auth: AmbientAuth,
-    response_fn: TryJoinResponseFn)
-  =>
-    local_topology.worker_join(worker_name, worker_count, response_fn)
 
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
@@ -777,12 +766,6 @@ class _WaitingForBoundariesToAckRegistering is _AutoscalePhase
     _completion_action = completion_action
 
   fun name(): String => "_WaitingForBoundariesToAckRegistering"
-
-  fun ref try_join(local_topology: LocalTopologyInitializer,
-    worker_name: WorkerName, worker_count: USize, auth: AmbientAuth,
-    response_fn: TryJoinResponseFn)
-  =>
-    local_topology.worker_join(worker_name, worker_count, response_fn)
 
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
