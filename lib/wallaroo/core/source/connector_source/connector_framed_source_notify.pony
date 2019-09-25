@@ -415,8 +415,8 @@ class ConnectorSourceNotify[In: Any val]
 
         // try to process message
         if not _active_streams.contains(m.stream_id) then
-          return _to_error_state(source, "Bad stream_id " +
-            m.stream_id.string())
+          return _to_error_state(source, "Bad/unregistered stream_id " +
+            m.stream_id.string() + " with message_id " + m.message_id.string())
         else
           try
             let s = _active_streams(m.stream_id)?
@@ -982,6 +982,7 @@ class ConnectorSourceNotify[In: Any val]
   //////////////////
   fun ref _to_error_state(source: ConnectorSource[In] ref, msg: String): Bool
   =>
+    @ll(_conn_info, "_to_error_state: %s".cstring(), msg.cstring())
     _send_reply(source, cwm.ErrorMsg(msg))
 
     _fsm_state = _ProtoFsmError

@@ -485,6 +485,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             # In the future, maybe this should automatically send a notify
             try:
                 if self._streams[msg.stream_id].is_open:
+                    ##logging.debug("write: encode: {}".format(msg))
                     data = cwm.Frame.encode(msg)
                     self._write(data)
                     # use up 1 credit
@@ -535,22 +536,32 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 if not isinstance(b, bytes):
                     b = b.encode()
                 if data_len + len(b) > obs:
-                    self._send(b''.join(data))
-                    data = [b]
-                    data_len = len(b)
+                    joined = b''.join(data)
+                    if len(joined) > 0:
+                        res = self._send(joined)
+                        if res != len(joined):
+                            logging.info("initiate_send: socket send 1 returned {}".format(res))
+                            return
+                        data = [b]
+                        data_len = len(b)
                 else:
                     data.append(b)
                     data_len += len(b)
             if data:
-                self._send(b''.join(data))
+                joined = b''.join(data)
+                res = self._send(joined)
+                if res != len(joined):
+                    logging.info("initiate_send: socket send 2 returned {}".format(res))
+                    return
 
     def _send(self, data):
         try:
-            self.send(data)
+            res = self.send(data)
             if self.data is not None:
                 self.data.append(data)
+            return res
         except OSError:
-            self.handle_error()
+            return self.handle_error()
 
     def pending_sends(self):
         """
@@ -666,6 +677,14 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 new = Stream(stream.id, stream.name, stream.point_of_ref, False)
                 self._streams[sid] = new
                 self.stream_closed(new)
+
+        logging.debug("Popping the producer_fifo")
+        c = 0
+        while self.producer_fifo:
+            self.producer_fifo.popleft()
+            c = c + 1
+        logging.debug("Popping the producer_fifo: count = {}".format(c))
+        self.discard_buffers()
 
     def _reconnect_common(self):
         # try to connect again
