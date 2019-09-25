@@ -1378,20 +1378,21 @@ actor LocalTopologyInitializer is LayoutInitializer
         + " None").cstring())
     end
 
-  be worker_join(conn: TCPConnection, joining_worker_name: String,
-    joining_worker_count: USize)
+  be worker_join(joining_worker_name: String, joining_worker_count: USize,
+    response_fn: TryJoinResponseFn)
   =>
     """
     Should only be called when a new worker initially contacts the cluster to
-    join. This should not be called on any other worker than the one initially
-    contacted.
+    join. It is called on the initializer, either directly because the new
+    worker joined the intializer, or because the new worker connected to a proxy
+    (non-initializer) and the proxy forwarded the request to the initializer.
     """
     match _topology
     | let t: LocalTopology =>
       let current_worker_count = t.worker_names.size()
       let new_t = local_topology_for_joining_worker(t, joining_worker_name)
-      _autoscale.worker_join(conn, joining_worker_name,
-        joining_worker_count, new_t, current_worker_count)
+      _autoscale.worker_join(joining_worker_name, joining_worker_count, new_t,
+        current_worker_count, response_fn)
     else
       Fail()
     end
@@ -1460,7 +1461,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
 
   be initiate_shrink(target_workers: Array[WorkerName] val, shrink_count: U64,
-    conn: TCPConnection)
+    response_fn: TryShrinkResponseFn)
   =>
     if target_workers.size() > 0 then
       if _are_valid_shrink_candidates(target_workers) then
@@ -1469,12 +1470,13 @@ actor LocalTopologyInitializer is LayoutInitializer
           target_workers)
         let reply = ExternalMsgEncoder.shrink_error_response(
           "Shrinking by " + target_workers.size().string() + " workers!")
-        conn.writev(reply)
+        response_fn(reply)
       else
         @printf[I32]("**Invalid shrink targets!**\n".cstring())
         let error_reply = ExternalMsgEncoder.shrink_error_response(
           "Invalid shrink targets!")
-        conn.writev(error_reply)
+
+        response_fn(error_reply)
       end
     elseif shrink_count > 0 then
       let candidates = _get_shrink_candidates(shrink_count.usize())
@@ -1489,20 +1491,21 @@ actor LocalTopologyInitializer is LayoutInitializer
         let remaining_workers = _remove_worker(candidates)
         _autoscale.inject_shrink_autoscale_barrier(remaining_workers,
           candidates)
+
         let reply = ExternalMsgEncoder.shrink_error_response(
           "Shrinking by " + candidates.size().string() + " workers!")
-        conn.writev(reply)
+        response_fn(reply)
       else
         @printf[I32]("**Cannot shrink 0 workers!**\n".cstring())
         let error_reply = ExternalMsgEncoder.shrink_error_response(
           "Cannot shrink 0 workers!")
-        conn.writev(error_reply)
+        response_fn(error_reply)
       end
     else
       @printf[I32]("**Cannot shrink 0 workers!**\n".cstring())
       let error_reply = ExternalMsgEncoder.shrink_error_response(
         "Cannot shrink 0 workers!")
-      conn.writev(error_reply)
+      response_fn(error_reply)
     end
 
   be take_over_initiate_shrink(remaining_workers: Array[WorkerName] val,

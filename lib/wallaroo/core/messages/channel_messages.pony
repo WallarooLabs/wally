@@ -696,6 +696,30 @@ primitive ChannelMsgEncoder
     _encode(WorkerStateEntityCountResponseMsg(worker_name, request_id,
       worker_state_entity_count_json), auth)?
 
+  fun try_shrink_request(target_workers: Array[WorkerName] val,
+    shrink_count: U64, worker_name: WorkerName, conn_id: U128,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(TryShrinkRequestMsg(target_workers, shrink_count, worker_name,
+      conn_id), auth)?
+
+  fun try_shrink_response(msg: Array[ByteSeq] val, conn_id: U128,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(TryShrinkResponseMsg(msg, conn_id), auth)?
+
+  fun try_join_request(joining_worker_name: WorkerName, worker_count: USize,
+    proxy_worker_name: WorkerName, conn_id: U128, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(TryJoinRequestMsg(joining_worker_name, worker_count,
+      proxy_worker_name, conn_id), auth)?
+
+  fun try_join_response(msg: Array[ByteSeq] val, conn_id: U128,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(TryJoinResponseMsg(msg, conn_id), auth)?
+
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg =>
     try
@@ -1804,4 +1828,48 @@ class val WorkerStateEntityCountResponseMsg is ChannelMsg
     worker_name = worker_name'
     request_id = request_id'
     state_entity_count_json = state_entity_count_json'
+
+class val TryShrinkRequestMsg is ChannelMsg
+  let target_workers: Array[WorkerName] val
+  let shrink_count: U64
+  let worker_name: WorkerName
+  let conn_id: U128
+
+  new val create(target_workers': Array[WorkerName] val, shrink_count': U64,
+    worker_name': WorkerName, conn_id': U128)
+  =>
+    target_workers = target_workers'
+    shrink_count = shrink_count'
+    worker_name = worker_name'
+    conn_id = conn_id'
+
+class val TryShrinkResponseMsg is ChannelMsg
+  let msg: Array[ByteSeq] val
+  let conn_id: U128
+
+  new val create(msg': Array[ByteSeq] val, conn_id': U128) =>
+    msg = msg'
+    conn_id = conn_id'
+
+class val TryJoinRequestMsg is ChannelMsg
+  let joining_worker_name: WorkerName
+  let worker_count: USize
+  let proxy_worker_name: WorkerName
+  let conn_id: U128
+
+  new val create(joining_worker_name': WorkerName, worker_count': USize,
+    proxy_worker_name': WorkerName, conn_id': U128)
+  =>
+    joining_worker_name = joining_worker_name'
+    worker_count = worker_count'
+    proxy_worker_name = proxy_worker_name'
+    conn_id = conn_id'
+
+class val TryJoinResponseMsg is ChannelMsg
+  let msg: Array[ByteSeq] val
+  let conn_id: U128
+
+  new val create(msg': Array[ByteSeq] val, conn_id': U128) =>
+    msg = msg'
+    conn_id = conn_id'
 

@@ -328,7 +328,9 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         ifdef "autoscale" then
           match _layout_initializer
           | let lti: LocalTopologyInitializer =>
-            lti.worker_join(conn, m.worker_name, m.worker_count)
+            let response_fn = TryJoinConnResponseFn(conn)
+            _autoscale.try_join(lti, m.worker_name, m.worker_count,
+              response_fn)
           else
             Fail()
           end
@@ -343,6 +345,23 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             Fail()
           end
         end
+      | let m: TryJoinRequestMsg =>
+        ifdef "trace" then
+          @printf[I32]("Received JoinClusterMsg on Control Channel\n"
+            .cstring())
+        end
+
+        match _layout_initializer
+        | let lti: LocalTopologyInitializer =>
+          let response_fn = TryJoinProxyResponseFn(_connections,
+            m.proxy_worker_name, m.conn_id, _auth)
+          _autoscale.try_join(lti, m.joining_worker_name, m.worker_count,
+            response_fn)
+        else
+          Fail()
+        end
+      | let m: TryJoinResponseMsg =>
+        _autoscale.respond_to_try_join(m.msg, m.conn_id)
       | let m: AnnounceConnectionsToJoiningWorkersMsg =>
         for w in m.control_addrs.keys() do
           try
@@ -649,6 +668,26 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _router_registry.receive_worker_state_entity_count_request_msg(m)
       | let m: WorkerStateEntityCountResponseMsg =>
         _router_registry.receive_worker_state_entity_count_response_msg(m)
+      | let m: TryShrinkRequestMsg =>
+        match _layout_initializer
+        | let lti: LocalTopologyInitializer =>
+          let response_fn =
+            {(response: Array[ByteSeq] val) =>
+              try
+                let msg = ChannelMsgEncoder.try_shrink_response(
+                  response, m.conn_id, _auth)?
+                _connections.send_control(m.worker_name, msg)
+              else
+                Fail()
+              end
+            } val
+          _autoscale.try_shrink(lti, m.target_workers, m.shrink_count,
+            response_fn)
+        else
+          Fail()
+        end
+      | let m: TryShrinkResponseMsg =>
+        _autoscale.respond_to_try_shrink(m.msg, m.conn_id)
       | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown channel message type.\n".cstring())
       else
