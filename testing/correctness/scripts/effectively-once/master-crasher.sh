@@ -141,8 +141,9 @@ run_crash_worker_loop () {
         echo -n "r$worker"
         sleep 0.25
         poll_out=`poll_ready -w 2 2>&1`
-        if [ $? -ne 0 -o ! -z "$poll_out" ]; then
-            echo "CRASH LOOP $worker: pause the world: $poll_out"
+        status=$?
+        if [ $status -ne 0 -o ! -z "$poll_out" ]; then
+            echo "CRASH LOOP $worker: pause the world: exit $status reason $poll_out"
             pause_the_world
             break
         fi
