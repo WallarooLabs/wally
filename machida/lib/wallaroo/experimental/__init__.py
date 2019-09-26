@@ -556,6 +556,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
 
     def _send(self, data):
         try:
+            # This is the call to asyncore that actually writes to the socket
             res = self.send(data)
             if self.data is not None:
                 self.data.append(data)

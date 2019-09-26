@@ -261,6 +261,7 @@ class ConnectorSinkNotify
         if credits < 2 then
           _error_and_close(conn, "HEY, too few credits: " + credits.string())
         else
+          @ll(_conn_debug, "Notify: stream_id %d stream_name %s p-o-r/message_id %lu".cstring(), stream_id, stream_name.cstring(), message_id)
           let notify = cwm.NotifyMsg(stream_id, stream_name, message_id)
           send_msg(conn, notify)
           twopc.notify1_sent = true

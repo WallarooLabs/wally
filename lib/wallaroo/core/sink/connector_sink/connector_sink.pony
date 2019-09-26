@@ -209,7 +209,15 @@ actor ConnectorSink is Sink
     _from = from
     _connect_count = 0
     _twopc = ConnectorSink2PC(_notify.stream_name)
-    _phase = NormalSinkPhase(this)
+    // Do not change sink phase yet: if we have crashed and have just
+    // restarted, Our point-of-reference/message_id is 0, *until* we get
+    // the rollback payload.
+    //
+    // Meanwhile, it's possible to get an app message via run() before
+    // we've we receive rollback() + the rollback payload that tells use
+    // what our point-of-reference/message_id is supposed to be.  If we
+    // are using the normal processing phase, then we would process that
+    // message and send it downstream with a bogus p-o-r/msg_id of 0.
 
     ifdef "identify_routing_ids" then
       @ll(_conn_info, "===ConnectorSink %s created===".cstring(),
@@ -221,20 +229,36 @@ actor ConnectorSink is Sink
   //
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    @ll(_conn_info, "Lifecycle: %s.%s at %s".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      _sink_id.string().cstring())
     _initializer = initializer
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer) =>
+    @ll(_conn_info, "Lifecycle: %s.%s at %s".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      _sink_id.string().cstring())
     initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
+    @ll(_conn_info, "Lifecycle: %s.%s at %s".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      _sink_id.string().cstring())
     _initial_connect()
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    @ll(_conn_info, "Lifecycle: %s.%s at %s".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      _sink_id.string().cstring())
     _notify.application_ready_to_work(this)
+    _use_normal_processor()
 
   be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
-    None
+    @ll(_conn_info, "Lifecycle: %s.%s at %s".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      _sink_id.string().cstring())
+    _use_normal_processor()
 
   fun ref _initial_connect() =>
     @ll(_conn_info, "ConnectorSink initializing connection to %s:%s".cstring(),
@@ -250,6 +274,9 @@ actor ConnectorSink is Sink
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    ifdef "trace" then
+      @ll(_conn_debug, "Rcvd msg at ConnectorSink.run".cstring())
+    end
     _phase.process_message[D](metric_name, pipeline_time_spent,
       data, key, event_ts, watermark_ts, i_producer_id, i_producer, msg_uid,
       frac_ids, i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
@@ -484,6 +511,13 @@ actor ConnectorSink is Sink
         barrier_token.string().cstring(), _sink_id.string().cstring(),
         input_id.string().cstring(), _phase.name().cstring())
     end
+    match _phase
+    | let x: InitialSinkPhase =>
+      // We restarted recently, and we haven't yet received one of the
+      // lifecycle messages that triggers using the normal processor.
+      // But we need the normal processor phase *now*.
+      _use_normal_processor()
+    end
     match barrier_token
     | let srt: CheckpointRollbackBarrierToken =>
       _phase.prepare_for_rollback(barrier_token)
@@ -622,14 +656,22 @@ actor ConnectorSink is Sink
     """
     2nd-half logic for barrier_fully_acked().
     """
-    let queued = _phase.queued()
-    _use_normal_processor()
-    for q in queued.values() do
-      match q
-      | let qm: QueuedMessage =>
-        qm.process_message(this)
-      | let qb: QueuedBarrier =>
-        qb.inject_barrier(this)
+    match _phase
+    | let x: InitialSinkPhase =>
+      // If we're @ InitialSinkPhase, and we've restarted after a crash,
+      // it's possible to hit checkpoint_complete() extremely early in
+      // our restart process.  There's nothing to do here.
+      None
+    else
+      let queued = _phase.queued()
+      _use_normal_processor()
+      for q in queued.values() do
+        match q
+        | let qm: QueuedMessage =>
+          qm.process_message(this)
+        | let qb: QueuedBarrier =>
+          qb.inject_barrier(this)
+        end
       end
     end
 
@@ -662,7 +704,13 @@ actor ConnectorSink is Sink
 
   be prepare_for_rollback() =>
     @ll(_conn_debug, "Prepare for checkpoint rollback at ConnectorSink %s".cstring(), _sink_id.string().cstring())
-    // Don't call _use_normal_processor() here
+    match _phase
+    | let x: InitialSinkPhase =>
+      // Rollback barriers are going to arrive soon.
+      // Get ready to receive them.
+      _use_normal_processor()
+      @ll(_conn_debug, "Prepare for checkpoint rollback at ConnectorSink %s, use normal processor phase".cstring(), _sink_id.string().cstring())
+    end
 
   fun ref finish_preparing_for_rollback() =>
     _use_normal_processor()
