@@ -65,9 +65,9 @@ for i in `seq 1 $COUNT`; do
 done
 
 if [ $i -eq $COUNT ]; then
-    if [ ! -z "$VERBOSE" ]; then
-        echo Failed
-    fi
+    $EXTERNAL_SENDER \
+        -e $initializer_external -t cluster-status-query 2>&1 | \
+    echo Failed
     exit 1
 fi
 
