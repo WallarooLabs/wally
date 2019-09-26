@@ -268,6 +268,7 @@ class AsyncServer(asynchat.async_chat, object):
                     ok = cwm.Ok(500)
                     self.write(ok)
                     active_workers_l[self._worker_name] = True
+                    logging.info("Add {} to active_workers".format(self._worker_name))
 
             arpath = self._abort_rule_path + "." + msg.instance_name
             self._abort_rules = parse_abort_rules(arpath)
@@ -510,10 +511,10 @@ class AsyncServer(asynchat.async_chat, object):
                         logging.info('2PC: truncating {} to offset {}'.format(self._out_path_opath, start_por))
 
                         ## DIAGNOSTIC: Save a copy of the file for diag purposes:
-                        #self.flush_fsync(self._out)
-                        #copy_path = "{}.{}".format(self._out_path_opath, time.time())
-                        #os.system("cp {} {}".format(self._out_path_opath, copy_path))
-                        #logging.info("flushed & copied to {}".format(copy_path))
+                        self.flush_fsync(self._out)
+                        copy_path = "{}.{}".format(self._out_path_opath, time.time())
+                        os.system("cp {} {}".format(self._out_path_opath, copy_path))
+                        logging.info("flushed & copied to {}".format(copy_path))
                         ## End DIAGNOSTIC
 
                         self.flush_fsync(self._out)
@@ -666,7 +667,7 @@ class AsyncServer(asynchat.async_chat, object):
         traceback.print_exception(_type, _value, _traceback)
 
     def close(self, delete_from_active_workers = True):
-        logging.info("Closing the connection")
+        logging.info("Closing the connection for {}, delete_from_active_workers = {}".format(self._worker_name, delete_from_active_workers))
         logging.info("last received id by stream for {}:\n\t{}".format(
             self._out_path_opath, self._streams))
         super(AsyncServer, self).close()
@@ -684,6 +685,7 @@ class AsyncServer(asynchat.async_chat, object):
                     raise Exception("Lock not active for {}"
                         .format(self._worker_name))
                 del active_workers_l[self._worker_name]
+                logging.info("Remove {} from active_workers".format(self._worker_name))
 
     def flush_fsync(self, file):
         """
