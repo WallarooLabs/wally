@@ -140,7 +140,7 @@ run_crash_worker_loop () {
         fi
         echo -n "r$worker"
         sleep 0.25
-        poll_out=`poll_ready -w 2 2>&1`
+        poll_out=`poll_ready -w 4 2>&1`
         status=$?
         if [ $status -ne 0 -o ! -z "$poll_out" ]; then
             echo "CRASH LOOP $worker: pause the world: exit $status reason $poll_out"
@@ -217,7 +217,7 @@ run_grow_shrink_loop () {
                     worker_num=`echo $w | sed 's/worker//'`
                     join_worker -n 1 $worker_num
                     sleep 1
-                    poll_out=`poll_ready -w 2 2>&1`
+                    poll_out=`poll_ready -w 4 2>&1`
                     if [ $? -ne 0 -o ! -z "$poll_out" ]; then
                         echo "GROW LOOP join $w: pause the world: $poll_out"
                         pause_the_world
@@ -238,7 +238,7 @@ run_grow_shrink_loop () {
                     worker_num=`echo $running | sed 's/worker//'`
                     shrink_worker $worker_num
                     sleep 1
-                    poll_out=`poll_ready -w 2 2>&1`
+                    poll_out=`poll_ready -w 4 2>&1`
                     if [ $? -ne 0 -o ! -z "$poll_out" ]; then
                         echo "GROW LOOP shrink $w: pause the world: $poll_out"
                         pause_the_world
