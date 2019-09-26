@@ -31,8 +31,10 @@ use "wallaroo/core/barrier"
 use "wallaroo/core/network"
 use "wallaroo/core/recovery"
 use "wallaroo/core/checkpoint"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 
+use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag, ...)
 
 actor DataReceiver is Producer
   let _id: RoutingId
@@ -181,8 +183,24 @@ actor DataReceiver is Producer
       @printf[I32]("Rcvd pipeline msg at DataReceiver\n".cstring())
     end
     if seq_id > _last_id_seen then
-      ifdef "resilience" and debug then
-        Invariant((seq_id - _last_id_seen) == 1)
+      ifdef "resilience" then
+        if not ((seq_id - _last_id_seen) == 1) then
+          if _last_id_seen == 0 then
+            // If diff != 1 but _last_id_seen is indeed 0, then we're
+            // at a case where we've received an app message very early
+            // in our startup process, i.e., we crashed and restarted
+            // but the entire cluster hasn't started its rollback
+            // process yet.  Log the condition, then drop the message.
+            @l(Log.info(), Log.routing(),
+              "DataReceiver.deliver: dropped message seq_id %lu _last_id_seen %lu".cstring(),
+              seq_id, _last_id_seen)
+          else
+            @l(Log.err(), Log.routing(),
+              "DataReceiver.deliver: seq_id %lu _last_id_seen %lu".cstring(),
+              seq_id, _last_id_seen)
+            Fail()
+          end
+        end
       end
       _ack_counter = _ack_counter + 1
       _last_id_seen = seq_id
