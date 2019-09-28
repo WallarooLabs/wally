@@ -21,20 +21,30 @@ ptpd_offset_max ?= 0.00025## ptpd offset tolerance beyond which things care cons
 
 num_instances_arg=$(shell echo $$(( $(num_leaders) + $(num_followers) )))
 resource_group_name="$(cluster_name)-$(location)_rg"
-vnet_name="$(cluster_name)-$(location)_vnet"
-subnet_name="$(cluster_name)-$(location)_snet"
+vnet_name="$(cluster_name)-$(location)-vnet"
+subnet_name="$(cluster_name)-$(location)-snet"
+firewall_name="$(cluster_name)-$(location)-fw"
 nsg_name="$(cluster_name)-$(location)_nsg"
 vmss_name="$(cluster_name)-$(location)_vmss"
 ppg_name="$(cluster_name)-$(location)_ppg"
-cluster_os_image?="Canonical:UbuntuServer:16.04-LTS:latest" ## Image to use for cluster
+cluster_os_image?="Canonical:UbuntuServer:16.04-LTS:latest" ## Image to use for Azure cluster
+
+# GCP Args
+gcp_os_image?="ubuntu-os-cloud/ubuntu-1604-lts"## Image to use for GCP cluster
+instance_template_name="$(cluster_name)-$(location)-it"
+instance_group_manager_name="$(cluster_name)-$(location)-igm"
+gcp_zone?=us-east1-b##GCP Zone to launch cluster in
+gcp_machine_type?=n1-standard-1## Machine type to use in GCP cluster
 
 ansible_playbook_path ?= ## Path to custom ansible playbook
 extra_ansible_vars ?= ## Extra ansible vars to use with custom playbook
 
-inventory_script := inventory.$(cluster_name)-$(location).yaml
+inventory_script := inventory.$(provider)-$(cluster_name)-$(location).yaml
 ansible_user ?= ubuntu
 all_instances := 'wallaroo-*'
 follower_instances := 'wallaroo-followers'
+
+gcp_project ?= wallaroo-dev-253816## GCP Project to use to deploy cluster in.
 
 # if debug shell command output requested
 ifdef DEBUG_SHELL
@@ -51,9 +61,9 @@ endif
 
 # Make sure we have a valid value for provider
 ifdef provider
-  ifeq (,$(filter $(provider),azure))
+  ifeq (,$(filter $(provider),azure gcp))
     $(error Unknown provider option "$(provider). \
-      Valid option is 'azure'")
+      Valid options are 'azure' and 'gcp'")
   endif
 endif
 
@@ -113,6 +123,24 @@ ifeq ($(use_proximity_placement_group),true)
     $(error Can't use use_proximity_placement_group=true unless using provider=azure.)
   endif
   ppg_arg := -var proximity_placement_group=wallaroo-$(cluster_name)
+endif
+
+ifeq ($(provider), azure)
+create-vnet: create-azure-vnet
+else ifeq ($(provider), gcp)
+create-vnet: create-gcp-vnet
+endif
+
+ifeq ($(provider), azure)
+up: check-cluster-name create-vnet create-ppg create-vmss import-vmss
+else ifeq ($(provider), gcp)
+up: check-cluster-name create-vnet create-gcp-cluster
+endif
+
+ifeq ($(provider), azure)
+generate-inventory: generate-azure-inventory
+else ifeq ($(provider), gcp)
+generate-inventory: generate-gcp-inventory
 endif
 
 cluster_full_pem := $(shell echo $(cluster_pem))
@@ -206,8 +234,7 @@ init-pulumi-cluster-stack: check-cluster-name ## Initialize pulumi cluster stack
 	@echo "\033[36m==> Successfully confirmed Cluster Pulumi Stack is created for location \
 '$(location)' at provider '$(provider)'!\033[0m"
 
-create-vnet: check-cluster-name ## Create vnet
-		@echo "vnet name: '$(vnet_name)'"
+create-azure-vnet: check-cluster-name ## Create vnet
 	@echo "\033[36m==> Confirming Virtual Network is created in location \
 '$(location)' at provider '$(provider)'...\033[0m"
 	cd $(provider)-vnet && pulumi up -s '$(cluster_name)-$(location)' \
@@ -219,6 +246,41 @@ create-vnet: check-cluster-name ## Create vnet
 	--config "$(provider)-vnet:project-name=$(cluster_project_name)" \
 	--yes --non-interactive
 	@echo "\033[36m==> Successfully confirmed Virtual Network is created in location \
+'$(location)' at provider '$(provider)'!\033[0m"
+
+create-gcp-vnet: check-cluster-name ## Create vnet
+	@echo "\033[36m==> Confirming Virtual Network is created in location \
+'$(location)' at provider '$(provider)'...\033[0m"
+	cd $(provider)-vnet && pulumi up -s '$(cluster_name)-$(location)' \
+	--config "$(provider)-vnet:location=$(location)" \
+	--config "$(provider)-vnet:vnet-name=$(vnet_name)" \
+	--config "$(provider)-vnet:subnet-name=$(subnet_name)" \
+	--config "$(provider)-vnet:firewall-name=$(firewall_name)" \
+	--config "$(provider)-vnet:project=$(gcp_project)" \
+	--config "$(provider)-vnet:project-name=$(cluster_project_name)" \
+	--yes --non-interactive
+	@echo "\033[36m==> Successfully confirmed Virtual Network is created in location \
+'$(location)' at provider '$(provider)'!\033[0m"
+
+create-gcp-cluster: check-cluster-name ## Create GCP Cluster
+	$(eval network_uri := $(shell cd $(provider)-vnet && pulumi stack output -j | jq ".networkURI"))
+	$(eval subnetwork_uri := $(shell cd $(provider)-vnet && pulumi stack output -j | jq ".subnetURI"))
+	@echo "\033[36m==> Confirming Cluster is created in location \
+'$(location)' at provider '$(provider)'...\033[0m"
+	cd $(provider)-cluster && pulumi up -s '$(cluster_name)-$(location)' \
+	--config "$(provider)-cluster:location=$(location)" \
+	--config "$(provider)-cluster:zone=$(gcp_zone)" \
+	--config "$(provider)-cluster:source-image=$(gcp_os_image)" \
+	--config "$(provider)-cluster:instance-template-name=$(instance_template_name)" \
+	--config "$(provider)-cluster:instance-group-manager-name=$(instance_group_manager_name)" \
+	--config "$(provider)-cluster:machine-type=$(gcp_machine_type)" \
+	--config "$(provider)-cluster:target-size=$(num_instances_arg)" \
+	--config "$(provider)-cluster:network-uri=$(network_uri)" \
+	--config "$(provider)-cluster:subnetwork-uri=$(subnetwork_uri)" \
+	--config "$(provider)-cluster:project=$(gcp_project)" \
+	--config "$(provider)-cluster:project-name=$(cluster_project_name)" \
+	--yes --non-interactive
+	@echo "\033[36m==> Successfully confirmed Cluster is created in location \
 '$(location)' at provider '$(provider)'!\033[0m"
 
 create-ppg: check-cluster-name ## Create PPG
@@ -276,6 +338,12 @@ destroy-vnet-state: check-cluster-name ## Destroy VNet Pulumi Stack state
 	cd $(provider)-vnet && pulumi stack rm '$(cluster_name)-$(location)' --yes --non-interactive
 	@echo "\033[36m==> VNet Pulumi Stack state successfully destroyed!\033[0m"
 
+destroy-cluster: check-cluster-name ## Destroy Cluster in location
+	@echo "\033[36m==> Destroying Cluster in location '$(location)' at provider '$(provider)'...\033[0m"
+	cd $(provider)-cluster && pulumi destroy -s '$(cluster_name)-$(location)' --yes
+	@echo "\033[36m==> Successfully confirmed Cluster is destroyed in location \
+'$(location)' at provider '$(provider)'!\033[0m"
+
 destroy-cluster-state: check-cluster-name ## Destroy Cluster Pulumi Stack state
 	@echo "\033[36m==> Destroying Cluster Pulumi Stack state...\033[0m"
 	cd $(provider)-cluster && pulumi stack rm '$(cluster_name)-$(location)' --yes --non-interactive
@@ -285,11 +353,14 @@ check-cluster-name: ## Check for valid cluster name
 	$(if $(cluster_name),,$(error 'cluster_name' cannot be empty!))
 	$(if $(filter $(cluster_name),$(shell echo '$(cluster_name)' | sed 's/[^-a-zA-Z0-9]//g')),,$(error 'cluster_name' can only have [-a-zA-Z0-9] in it!))
 
-generate-inventory: ## Generates inventory file
-	./generate_inventory.sh $(vmss_name) $(resource_group_name) $(num_leaders) $(num_followers) > ../ansible/inventory.$(cluster_name)-$(location).yaml
+generate-gcp-inventory: ## Generates GCP inventory file
+	./$(provider)-cluster/generate_inventory.sh $(instance_group_manager_name) $(num_leaders) $(num_followers) > ../ansible/inventory.$(provider)-$(cluster_name)-$(location).yaml
+
+generate-azure-inventory: ## Generates Azure inventory file
+	./$(provider)-cluster/generate_inventory.sh $(vmss_name) $(resource_group_name) $(num_leaders) $(num_followers) > ../ansible/inventory.$(provider)-$(cluster_name)-$(location).yaml
 
 delete-inventory-file: ## Deletes inventory file
-	rm ../ansible/inventory.$(cluster_name)-$(location).yaml
+	rm ../ansible/inventory.$(provider)-$(cluster_name)-$(location).yaml
 
 ansible-custom-playbook: check-cluster-name ## Run custom playbook on nodes
 	@echo "\033[36m==> Running ansible playbook for cluster \

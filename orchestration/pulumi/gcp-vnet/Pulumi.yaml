@@ -1,0 +1,23 @@
+name: gcp-vnet
+runtime: nodejs
+description: GCP Virtual Network and related Resources creation and management
+template:
+  config:
+    gcp-vnet:location:
+      description: The GCP location to use (`us-east1`, `eastus2`,`centralus`, `westus2`)
+      default: us-east1
+    gcp-vnet:vnet-name:
+      description: The GCP Virtual Network name to use
+      default: wallaroo-dev-vnet
+    gcp-vnet:subnet-name:
+      description: The GCP Subnet name to use
+      default: wallaroo-dev-snet
+    gcp-vnet:firewall-name:
+      description: The GCP Firewall name to use
+      default: wallaroo-dev-fw
+    gcp-vnet:project-name:
+      description: The project name for tagging purporses.
+      default: orch-dev
+    gcp-vnet:project:
+      description: The GCP project to use.
+      default: wallaroo-dev-253816

@@ -1,0 +1,33 @@
+name: gcp-cluster
+runtime: nodejs
+description: GCP Cluster and related Resources creation and management
+template:
+  config:
+    gcp-cluster:location:
+      description: The GCP location to use (`us-east1`, `eastus2`,`centralus`, `westus2`)
+      default: us-east1
+    gcp-cluster:zone:
+      description: The GCP zone to use
+      default: b
+    gcp-cluster:instance-template-name:
+      description: The GCP Instance Template name to use
+      default: wallaroo-dev-it
+    gcp-cluster:instance-group-manager-name:
+      description: The GCP Instance Group Manager name to use
+      default: wallaroo-dev-igm
+    gcp-cluster:source-image:
+      description: The GCP Source OS Image to use
+      default: ubuntu-os-cloud/ubuntu-1804-lts
+    gcp-cluster:target-size:
+      description: The Target Size to use for GCP cluster
+      default: 3
+    gcp-cluster:network-uri:
+      description: The GCP Network URI to use
+    gcp-cluster:subnetwork-uri:
+      description: The GCP Subnetwork URI to use
+    gcp-cluster:project-name:
+      description: The project name for tagging purporses.
+      default: wallaroo-dev
+    gcp-cluster:project:
+      description: The GCP project to use.
+      default: wallaroo-dev-253816

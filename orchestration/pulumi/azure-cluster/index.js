@@ -9,7 +9,3 @@ const vmssName = config.require("vmss-name");
 const vmssId = config.require("vmss-id");
 
 const vmss = azure.compute.ScaleSet.get(vmssName, vmssId);
-
-
-
-
