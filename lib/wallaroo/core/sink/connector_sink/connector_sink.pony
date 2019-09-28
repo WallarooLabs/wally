@@ -498,6 +498,9 @@ actor ConnectorSink is Sink
     barrier_token: BarrierToken)
   =>
     @ll(_conn_debug, "Receive new barrier %s at ConnectorSink %s".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
+    // TODO: LOLz, so, if we've been queuing because of AutoscaleBarrierToken,
+    // then the below will throw away the stuff that we're queueing.
+    // Bummer, right?  This idea isn't looking worse by the minute....
     _phase = BarrierSinkPhase(_sink_id, this,
       barrier_token)
     _phase.receive_barrier(input_id, producer,
@@ -591,6 +594,49 @@ actor ConnectorSink is Sink
       // governed by a single round of 2PC.
 
       _phase.swap_barrier_to_queued(this)
+    | let sat: AutoscaleBarrierToken =>
+      // This case is almost like CheckpointBarrierToken's case: we want
+      // to force a round of 2PC with the sink, be we aren't actually
+      // sending any checkpoint data to EventLog.
+      //
+      // TODO: Handle case where the sink's 2PC phase 1 reply is abort
+      // TODO: How the !@#$! else is this 2PC round going to interfere
+      //       with a checkpoint's 2PC??
+      if not (_connected and _notify.twopc_intro_done) then
+        return
+      end
+      // TODO: no: _notify.twopc_txn_id_current = _twopc.txn_id
+      match _twopc.barrier_complete(sat)
+      | None =>
+        return
+      | let msgs: Array[cwm.Message] =>
+        for msg in msgs.values() do
+          _notify.send_msg(this, msg)
+        end
+        @ll(_twopc_debug, "2PC: force phase 1 for txn_id %s, size %lu".cstring(), _twopc.txn_id.cstring(), msgs.size())
+      end
+      // Immediately send a phase 2 commit.  If the phase 1 reply was abort,
+      // then this commit request will be ignored.
+      _twopc.send_phase2(this, true)
+
+      // The _phase FSM is queuing all events, including barriers.
+      // TODO: We will probably hit problems here because the barrier
+      //       that we need to know about, e.g. rollback-related,
+      //       may arrive later, and we probably (??) need to react to
+      //       their arrival immediately? And queuing != immediate, yeah?
+      _phase.swap_barrier_to_queued(this where dont_queue_all_barriers = true)
+    | let sart: AutoscaleResumeBarrierToken =>
+      @ll(_conn_info, "TODO: QQQ: We need to know if the 2PC phase 1 reply was commit!?".cstring())
+        match _phase
+        | let p: QueuingSinkPhase =>
+          _resume_processing_messages()
+        | let p0: InitialSinkPhase =>
+          @ll(_conn_info, "_phase is InitialSinkPhase".cstring()); Fail()
+        | let p0: NormalSinkPhase =>
+          @ll(_conn_info, "_phase is NormalSinkPhase".cstring()); Fail()
+        | let p0: BarrierSinkPhase =>
+          @ll(_conn_info, "_phase is BarrierSinkPhase".cstring()); Fail()
+        end
     | let srt: CheckpointRollbackBarrierToken =>
       _seen_checkpointbarriertoken = None
       _use_normal_processor()
@@ -606,8 +652,12 @@ actor ConnectorSink is Sink
       _barrier_coordinator.ack_barrier(this, barrier_token)
     end
 
-  fun ref swap_barrier_to_queued(queue: Array[SinkPhaseQueued]) =>
-    _phase = QueuingSinkPhase(_sink_id, this, queue)
+  fun ref swap_barrier_to_queued(queue: Array[SinkPhaseQueued],
+    dont_queue_all_barriers: Bool)
+  =>
+    @ll(_conn_debug, "swap_barrier_to_queued: dont_queue_all_barriers = %s".cstring(), dont_queue_all_barriers.string().cstring())
+    _phase = QueuingSinkPhase(_sink_id, this, queue
+      where dont_queue_all_barriers = dont_queue_all_barriers)
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
     @ll(_twopc_debug, "2PC: Checkpoint complete %d at ConnectorSink %s".cstring(), checkpoint_id, _sink_id.string().cstring())

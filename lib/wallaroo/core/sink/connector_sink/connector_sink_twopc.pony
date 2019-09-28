@@ -93,7 +93,7 @@ class ConnectorSink2PC
     txn_id = "preemptive txn abort"
     barrier_token = sbt
 
-  fun ref barrier_complete(sbt: CheckpointBarrierToken,
+  fun ref barrier_complete(bt: BarrierToken,
     is_rollback: Bool = false,
     stream_id: cwm.StreamId = 223344 /* arbitrary integer != 1 or 0 */):
   (None | Array[cwm.Message])
@@ -120,8 +120,14 @@ class ConnectorSink2PC
 
       state = TwoPCFsm1Precommit
       let prefix = if is_rollback then "rollback--" else "" end
-      txn_id = prefix + make_txn_id_string(sbt.id)
-      barrier_token = sbt
+      match bt
+      | let sbt: CheckpointBarrierToken =>
+        txn_id = prefix + make_txn_id_string(sbt.id)
+        barrier_token = sbt
+      | let sat: AutoscaleBarrierToken =>
+        txn_id = prefix + sat.string()
+        // TODO: ignore barrier_token here?
+      end
       current_txn_end_offset = current_offset
     else
       @ll(_twopc_err, "2PC: ERROR: _twopc.state = %d".cstring(), state())

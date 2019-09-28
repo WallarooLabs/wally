@@ -17,6 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo/core/common"
 use "wallaroo/core/invariant"
@@ -24,6 +25,8 @@ use "wallaroo/core/topology"
 use "wallaroo/core/barrier"
 use "wallaroo/core/checkpoint"
 use "wallaroo/core/sink/connector_sink"
+
+use @ll[I32](sev_cat: U16, fmt: Pointer[U8] tag, ...)
 
 trait SinkPhase
   fun name(): String
@@ -48,7 +51,8 @@ trait SinkPhase
     _invalid_call(); Fail()
     Array[SinkPhaseQueued]
 
-  fun ref swap_barrier_to_queued(sink: ConnectorSink ref) =>
+  fun ref swap_barrier_to_queued(sink: ConnectorSink ref,
+    dont_queue_all_barriers: Bool = false) =>
     _invalid_call(); Fail()
 
   fun _invalid_call() =>
@@ -94,6 +98,7 @@ class BarrierSinkPhase is SinkPhase
   var _barrier_token: BarrierToken
   let _inputs_blocking: Map[RoutingId, Producer] = _inputs_blocking.create()
   let _queued: Array[SinkPhaseQueued] = _queued.create()
+  let _debug: LogSevCat = Log.make_sev_cat(Log.debug(), Log.conn_sink())
 
   new create(sink_id: RoutingId, sink: Sink ref, token: BarrierToken) =>
     _sink_id = sink_id
@@ -123,6 +128,7 @@ class BarrierSinkPhase is SinkPhase
     barrier_token: BarrierToken)
   =>
     if input_blocking(input_id) then
+      @ll(_debug, "BarrierSinkPhase.receive_barrier: queueing %s".cstring(), barrier_token.string().cstring())
       _queued.push(QueuedBarrier(input_id, producer, barrier_token))
     else
       ifdef debug then
@@ -182,20 +188,25 @@ class BarrierSinkPhase is SinkPhase
       _sink.barrier_complete(_barrier_token)
     end
 
-  fun ref swap_barrier_to_queued(sink: ConnectorSink ref) =>
-    sink.swap_barrier_to_queued(_queued)
+  fun ref swap_barrier_to_queued(sink: ConnectorSink ref,
+    dont_queue_all_barriers: Bool = false) =>
+    sink.swap_barrier_to_queued(_queued, dont_queue_all_barriers)
 
 class QueuingSinkPhase is SinkPhase
   let _sink_id: RoutingId
   let _sink: Sink ref
   let _queued: Array[SinkPhaseQueued]
+  let _dont_queue_all_barriers: Bool
+  let _debug: LogSevCat = Log.make_sev_cat(Log.debug(), Log.conn_sink())
 
   new create(sink_id: RoutingId, sink: Sink ref,
-    q: Array[SinkPhaseQueued] = Array[SinkPhaseQueued].create())
+    q: Array[SinkPhaseQueued] = Array[SinkPhaseQueued].create(),
+    dont_queue_all_barriers: Bool = false)
   =>
     _sink_id = sink_id
     _sink = sink
     _queued = q
+    _dont_queue_all_barriers = dont_queue_all_barriers
 
   fun name(): String => __loc.type_name()
 
@@ -213,7 +224,28 @@ class QueuingSinkPhase is SinkPhase
   fun ref receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    _queued.push(QueuedBarrier(input_id, producer, barrier_token))
+    if _dont_queue_all_barriers then
+      match barrier_token
+      | let x: (AutoscaleResumeBarrierToken |
+                CheckpointRollbackBarrierToken |
+                CheckpointRollbackResumeBarrierToken) =>
+        // TODO XX: What barrels of worms are we opening if we take these
+        // barriers out of their message flow order??
+        // CheckpointRollback*: state will be discarded, so we're ok?
+        // AutoscaleResume*: not sure??
+        @ll(_debug, "QueuingSinkPhase.receive_barrier: pass through %s".cstring(), barrier_token.string().cstring())
+        _sink.receive_new_barrier(input_id, producer, barrier_token)
+      | let x: AutoscaleBarrierToken =>
+        // This is the 2nd autoscale barrier while processing an earlier one.
+        Fail()
+      else
+        @ll(_debug, "QueuingSinkPhase.receive_barrier: A queueing %s".cstring(), barrier_token.string().cstring())
+        _queued.push(QueuedBarrier(input_id, producer, barrier_token))
+      end
+    else
+      @ll(_debug, "QueuingSinkPhase.receive_barrier: B queueing %s".cstring(), barrier_token.string().cstring())
+      _queued.push(QueuedBarrier(input_id, producer, barrier_token))
+    end
 
   fun ref prepare_for_rollback(token: BarrierToken) =>
     _sink.finish_preparing_for_rollback()
