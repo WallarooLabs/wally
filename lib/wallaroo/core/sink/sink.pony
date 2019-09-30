@@ -32,6 +32,8 @@ trait tag Sink is (Consumer & DisposableActor & BarrierProcessor)
   // for the first time.
   fun ref receive_new_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
+  fun ref peekahead_incomplete_barrier(barrier_token: BarrierToken) =>
+    None
   // Called by SinkMessageProcessor when the sink needs to do final
   // cleanup work for rollback.
   fun ref finish_preparing_for_rollback()

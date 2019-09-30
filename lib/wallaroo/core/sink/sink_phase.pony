@@ -52,7 +52,7 @@ trait SinkPhase
     Array[SinkPhaseQueued]
 
   fun ref swap_barrier_to_queued(sink: ConnectorSink ref,
-    dont_queue_all_barriers: Bool = false) =>
+    is_autoscale_selective_barrier: Bool = false) =>
     _invalid_call(); Fail()
 
   fun _invalid_call() =>
@@ -189,24 +189,25 @@ class BarrierSinkPhase is SinkPhase
     end
 
   fun ref swap_barrier_to_queued(sink: ConnectorSink ref,
-    dont_queue_all_barriers: Bool = false) =>
-    sink.swap_barrier_to_queued(_queued, dont_queue_all_barriers)
+    is_autoscale_selective_barrier: Bool = false) =>
+    sink.swap_barrier_to_queued(_queued, is_autoscale_selective_barrier)
 
 class QueuingSinkPhase is SinkPhase
   let _sink_id: RoutingId
   let _sink: Sink ref
   let _queued: Array[SinkPhaseQueued]
-  let _dont_queue_all_barriers: Bool
+  let _is_autoscale_selective_barrier: Bool
   let _debug: LogSevCat = Log.make_sev_cat(Log.debug(), Log.conn_sink())
+  let _crit: LogSevCat = Log.make_sev_cat(Log.crit(), Log.conn_sink())
 
   new create(sink_id: RoutingId, sink: Sink ref,
     q: Array[SinkPhaseQueued] = Array[SinkPhaseQueued].create(),
-    dont_queue_all_barriers: Bool = false)
+    is_autoscale_selective_barrier: Bool = false)
   =>
     _sink_id = sink_id
     _sink = sink
     _queued = q
-    _dont_queue_all_barriers = dont_queue_all_barriers
+    _is_autoscale_selective_barrier = is_autoscale_selective_barrier
 
   fun name(): String => __loc.type_name()
 
@@ -224,28 +225,12 @@ class QueuingSinkPhase is SinkPhase
   fun ref receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    if _dont_queue_all_barriers then
-      match barrier_token
-      | let x: (AutoscaleResumeBarrierToken |
-                CheckpointRollbackBarrierToken |
-                CheckpointRollbackResumeBarrierToken) =>
-        // TODO XX: What barrels of worms are we opening if we take these
-        // barriers out of their message flow order??
-        // CheckpointRollback*: state will be discarded, so we're ok?
-        // AutoscaleResume*: not sure??
-        @ll(_debug, "QueuingSinkPhase.receive_barrier: pass through %s".cstring(), barrier_token.string().cstring())
-        _sink.receive_new_barrier(input_id, producer, barrier_token)
-      | let x: AutoscaleBarrierToken =>
-        // This is the 2nd autoscale barrier while processing an earlier one.
-        Fail()
-      else
-        @ll(_debug, "QueuingSinkPhase.receive_barrier: A queueing %s".cstring(), barrier_token.string().cstring())
-        _queued.push(QueuedBarrier(input_id, producer, barrier_token))
-      end
-    else
-      @ll(_debug, "QueuingSinkPhase.receive_barrier: B queueing %s".cstring(), barrier_token.string().cstring())
-      _queued.push(QueuedBarrier(input_id, producer, barrier_token))
+    if _is_autoscale_selective_barrier then
+      @ll(_debug, "QueuingSinkPhase.receive_barrier: peek ahead %s".cstring(), barrier_token.string().cstring())
+      _sink.peekahead_incomplete_barrier(barrier_token)
     end
+    @ll(_debug, "QueuingSinkPhase.receive_barrier: queueing %s".cstring(), barrier_token.string().cstring())
+    _queued.push(QueuedBarrier(input_id, producer, barrier_token))
 
   fun ref prepare_for_rollback(token: BarrierToken) =>
     _sink.finish_preparing_for_rollback()

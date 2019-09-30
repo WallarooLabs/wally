@@ -624,19 +624,13 @@ actor ConnectorSink is Sink
       //       that we need to know about, e.g. rollback-related,
       //       may arrive later, and we probably (??) need to react to
       //       their arrival immediately? And queuing != immediate, yeah?
-      _phase.swap_barrier_to_queued(this where dont_queue_all_barriers = true)
+      _phase.swap_barrier_to_queued(this where is_autoscale_selective_barrier = true)
     | let sart: AutoscaleResumeBarrierToken =>
-      @ll(_conn_info, "TODO: QQQ: We need to know if the 2PC phase 1 reply was commit!?".cstring())
-        match _phase
-        | let p: QueuingSinkPhase =>
-          _resume_processing_messages()
-        | let p0: InitialSinkPhase =>
-          @ll(_conn_info, "_phase is InitialSinkPhase".cstring()); Fail()
-        | let p0: NormalSinkPhase =>
-          @ll(_conn_info, "_phase is NormalSinkPhase".cstring()); Fail()
-        | let p0: BarrierSinkPhase =>
-          @ll(_conn_info, "_phase is BarrierSinkPhase".cstring()); Fail()
-        end
+      // Note: We got early notification that this would be happening
+      //       via peekahead_incomplete_barrier()
+      @ll(_conn_info, "TODO: We need to know if the 2PC phase 1 reply was commit!?".cstring())
+      @ll(_conn_info, "TODO: We should only _resume_processing_messages() if we know that our autoscale-related 2PC has committed.".cstring())
+      _resume_processing_messages()
     | let srt: CheckpointRollbackBarrierToken =>
       _seen_checkpointbarriertoken = None
       _use_normal_processor()
@@ -653,11 +647,11 @@ actor ConnectorSink is Sink
     end
 
   fun ref swap_barrier_to_queued(queue: Array[SinkPhaseQueued],
-    dont_queue_all_barriers: Bool)
+    is_autoscale_selective_barrier: Bool)
   =>
-    @ll(_conn_debug, "swap_barrier_to_queued: dont_queue_all_barriers = %s".cstring(), dont_queue_all_barriers.string().cstring())
+    @ll(_conn_debug, "swap_barrier_to_queued: is_autoscale_selective_barrier = %s".cstring(), is_autoscale_selective_barrier.string().cstring())
     _phase = QueuingSinkPhase(_sink_id, this, queue
-      where dont_queue_all_barriers = dont_queue_all_barriers)
+      where is_autoscale_selective_barrier = is_autoscale_selective_barrier)
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
     @ll(_twopc_debug, "2PC: Checkpoint complete %d at ConnectorSink %s".cstring(), checkpoint_id, _sink_id.string().cstring())
@@ -727,6 +721,16 @@ actor ConnectorSink is Sink
 
   fun ref _use_normal_processor() =>
     _phase = NormalSinkPhase(this)
+
+  fun ref peekahead_incomplete_barrier(barrier_token: BarrierToken) =>
+    match barrier_token
+    | let abt: AutoscaleResumeBarrierToken =>
+      @ll(_conn_info, "TODO: peekahead: We need to know if the 2PC phase 1 reply was commit!?".cstring())
+      None
+    else
+      @ll(_conn_err, "ConnectorSink: peekahead_incomplete_barrier: got %s".cstring(), barrier_token.string().cstring())
+      Fail()
+    end
 
   ///////////////
   // CHECKPOINTS
