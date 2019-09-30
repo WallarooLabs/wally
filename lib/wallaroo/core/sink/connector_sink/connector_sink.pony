@@ -425,6 +425,15 @@ actor ConnectorSink is Sink
     This is a callback used by the ConnectorSinkNotify class to Inform
     us that it received a 2PC phase 1 reply.
     """
+    if txn_id.contains("autoscale-force--.--") then
+      @ll(_twopc_debug, "TODO QQQ yo got txn_id %s commit %s, _twopc.state_is_1precommit() %s".cstring(), txn_id.cstring(), commit.string().cstring(), _twopc.state_is_1precommit().string().cstring())
+      if _twopc.state_is_1precommit() then
+        _twopc.reset_state()
+        return
+      else
+        Fail()
+      end
+    end
     match _twopc.twopc_phase1_reply(txn_id, commit)
     | true =>
       if _twopc.barrier_token != _twopc.barrier_token_initial then
