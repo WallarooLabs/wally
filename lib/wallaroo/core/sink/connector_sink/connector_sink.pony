@@ -426,8 +426,8 @@ actor ConnectorSink is Sink
     us that it received a 2PC phase 1 reply.
     """
     if txn_id.contains("autoscale-force--.--") then
-      @ll(_twopc_debug, "TODO QQQ yo got txn_id %s commit %s, _twopc.state_is_1precommit() %s".cstring(), txn_id.cstring(), commit.string().cstring(), _twopc.state_is_1precommit().string().cstring())
-      if _twopc.state_is_1precommit() then
+      @ll(_twopc_debug, "TODO QQQ yo got txn_id %s commit %s, _twopc.state %d".cstring(), txn_id.cstring(), commit.string().cstring(), _twopc.state())
+      if _twopc.state_is_start() or _twopc.state_is_1precommit() then
         _twopc.reset_state()
         return
       else
@@ -615,18 +615,24 @@ actor ConnectorSink is Sink
         return
       end
       // TODO: no: _notify.twopc_txn_id_current = _twopc.txn_id
+
+      let old_twopc_state = _twopc.state
       match _twopc.barrier_complete(sat)
       | None =>
-        return
+        // Note this is different than the checkpoint case above
+        None
       | let msgs: Array[cwm.Message] =>
         for msg in msgs.values() do
           _notify.send_msg(this, msg)
         end
         @ll(_twopc_debug, "2PC: force phase 1 for txn_id %s, size %lu".cstring(), _twopc.txn_id.cstring(), msgs.size())
+        // Immediately send a phase 2 commit.  If the phase 1 reply was abort,
+        // then this commit request will be ignored.
+        _twopc.send_phase2(this, true)
       end
-      // Immediately send a phase 2 commit.  If the phase 1 reply was abort,
-      // then this commit request will be ignored.
-      _twopc.send_phase2(this, true)
+      _twopc.state = old_twopc_state
+      @ll(_twopc_debug, "2PC: reset 2PC state".cstring())
+      @ll(_twopc_debug, "2PC: set 2PC state => %d".cstring(), _twopc.state())
 
       // TODO: QQQ remove the is_autoscale_selective_barrier hack?
       _resume_processing_messages()
