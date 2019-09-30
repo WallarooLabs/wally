@@ -125,7 +125,7 @@ class ConnectorSink2PC
         txn_id = prefix + make_txn_id_string(sbt.id)
         barrier_token = sbt
       | let sat: AutoscaleBarrierToken =>
-        txn_id = prefix + sat.string()
+        txn_id = prefix + stream_name + ":" + sat.string()
         // TODO: ignore barrier_token here?
       end
       current_txn_end_offset = current_offset

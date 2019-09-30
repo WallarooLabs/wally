@@ -619,12 +619,8 @@ actor ConnectorSink is Sink
       // then this commit request will be ignored.
       _twopc.send_phase2(this, true)
 
-      // The _phase FSM is queuing all events, including barriers.
-      // TODO: We will probably hit problems here because the barrier
-      //       that we need to know about, e.g. rollback-related,
-      //       may arrive later, and we probably (??) need to react to
-      //       their arrival immediately? And queuing != immediate, yeah?
-      _phase.swap_barrier_to_queued(this where is_autoscale_selective_barrier = true)
+      // TODO: QQQ remove the is_autoscale_selective_barrier hack?
+      _resume_processing_messages()
     | let sart: AutoscaleResumeBarrierToken =>
       // Note: We got early notification that this would be happening
       //       via peekahead_incomplete_barrier()
