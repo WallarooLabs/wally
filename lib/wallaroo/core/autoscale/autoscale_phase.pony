@@ -322,11 +322,6 @@ class _InjectAutoscaleBarrier is _AutoscalePhase
     _autoscale.checkpoint_await_result(_joining_worker_count,
       _initialized_workers, new_step_group_routing_ids, _current_worker_count)
 
-/*** QQQ SLF was:
-    _autoscale.wait_for_joiner_initialization(_joining_worker_count,
-      _initialized_workers, new_step_group_routing_ids, _current_worker_count)
-***/
-
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
   =>
@@ -375,6 +370,15 @@ class _CheckpointAwaitResult is _AutoscalePhase
       _initialized_joining_workers, new_step_group_routing_ids,
       _current_worker_count)
 
+  fun ref joining_worker_initialized(worker: WorkerName,
+    step_group_routing_ids: Map[RoutingId, RoutingId] val)
+  =>
+    // It's possible some workers will be initialized when we're still in
+    // this phase. We need to keep track of this to hand off that info to
+    // the next phase.
+    _initialized_joining_workers.set(worker)
+    _new_step_group_routing_ids(worker) = step_group_routing_ids
+
 class _WaitingForJoinerInitialization is _AutoscalePhase
   let _autoscale: Autoscale ref
   let _joining_worker_count: USize
@@ -390,11 +394,16 @@ class _WaitingForJoinerInitialization is _AutoscalePhase
       Map[WorkerName, Map[RoutingId, RoutingId] val] val,
     current_worker_count: USize)
   =>
+/*** SLF TODO: I believe that this invariant is no longer true:
+               The checkpoint that I've added has disrupted old
+               timing assumptions.
+
     ifdef debug then
       // When this phase begins, at least one joining worker should still
       // have not notified us it was initialized.
       Invariant(initialized_workers.size() < joining_worker_count)
     end
+***/
     _autoscale = autoscale
     _joining_worker_count = joining_worker_count
     _initialized_joining_workers = initialized_workers
