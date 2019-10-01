@@ -795,7 +795,10 @@ class ConnectorSourceNotify[In: Any val]
   =>
     if not _prep_for_rollback then
       ifdef debug then
-        if checkpoint_id != _barrier_checkpoint_id then
+        if (_barrier_checkpoint_id > 0) and (checkpoint_id != _barrier_checkpoint_id) then
+          // Hack? if _barrier_checkpoint_id is 0, then perhaps we have very recently joined
+          // the cluster and have been told checkpoint_complete without having participated
+          // in the checkpoint at all.
           @ll(_conn_debug, ("ConnectorSourceNotify: Checkpoint complete for id " +
             " %s but expected %s\n").cstring(),
             checkpoint_id.string().cstring(),
