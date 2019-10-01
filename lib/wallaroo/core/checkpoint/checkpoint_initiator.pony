@@ -227,8 +227,9 @@ actor CheckpointInitiator is Initializable
 
   be force_checkpoint(promise: Promise[Bool]) =>
     _phase.initiate_checkpoint(_checkpoint_group, this)
-    @l(Log.debug(), Log.checkpoint(), "force_checkpoint: _checkpoint_group %lu".cstring(), _checkpoint_group)
-    _cp_complete_promises(_checkpoint_group.u64()) = promise
+    // _current_checkpoint_id is now the in-progress checkpoint.
+    @l(Log.debug(), Log.checkpoint(), "force_checkpoint: _current_checkpoint_id %lu".cstring(), _current_checkpoint_id)
+    _cp_complete_promises(_current_checkpoint_id.u64()) = promise
 
   be clear_pending_checkpoints(promise: Promise[None]) =>
     _clear_pending_checkpoints()
