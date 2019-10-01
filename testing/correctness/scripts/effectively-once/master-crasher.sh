@@ -184,7 +184,7 @@ get_worker_names () {
 }
 
 run_grow_shrink_loop () {
-    all_workers="initializer worker1 worker2 worker3 worker4 worker5"
+    all_workers="initializer worker1 worker2 worker3 worker4 worker5 worker6 worker7 worker8 worker9"
     do_grow=0
     do_shrink=0
 

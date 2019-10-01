@@ -31,6 +31,7 @@ use "wallaroo/core/topology"
 use "wallaroo/core/barrier"
 use "wallaroo/core/network"
 use "wallaroo/core/recovery"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/string_set"
 
@@ -87,6 +88,7 @@ actor CheckpointInitiator is Initializable
   var _is_recovering: Bool
 
   var _phase: _CheckpointInitiatorPhase = _WaitingCheckpointInitiatorPhase
+  var _clear_pending_checkpoints_promise: Promise[None] = _make_null_promise()
 
   new create(auth: AmbientAuth, worker_name: WorkerName,
     primary_worker: WorkerName, connections: Connections,
@@ -161,7 +163,7 @@ actor CheckpointInitiator is Initializable
   be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
     ifdef "resilience" then
       if _worker_name == _primary_worker then
-        _phase.start_checkpoint_timer(1_000_000_000, this)
+        _phase.start_checkpoint_timer(_time_between_checkpoints, this)
       end
     end
     _is_recovering = false
@@ -218,7 +220,17 @@ actor CheckpointInitiator is Initializable
 
   be clear_pending_checkpoints(promise: Promise[None]) =>
     _clear_pending_checkpoints()
-    promise(None)
+    match _phase
+    | let p: _WaitingCheckpointInitiatorPhase =>
+      @l(Log.debug(), Log.checkpoint(), "clear_pending_checkpoints: now fulfilling promise".cstring())
+      promise(None)
+    else
+      @l(Log.debug(), Log.checkpoint(), "clear_pending_checkpoints: delaying promise".cstring())
+      _clear_pending_checkpoints_promise = promise
+      _clear_pending_checkpoints_promise.next[None]({(_: None) =>
+        @l(Log.debug(), Log.checkpoint(), "clear_pending_checkpoints: promise fulfilled".cstring())
+      })
+    end
 
   be restart_repeating_checkpoints() =>
     _clear_pending_checkpoints()
@@ -296,6 +308,9 @@ actor CheckpointInitiator is Initializable
 
   fun ref wait_for_next_checkpoint() =>
     _phase = _WaitingCheckpointInitiatorPhase
+    _clear_pending_checkpoints_promise(None)
+    @l(Log.debug(), Log.checkpoint(), "wait_for_next_checkpoint: promise fulfilled".cstring())
+    _clear_pending_checkpoints_promise = _make_null_promise()
 
   be checkpoint_barrier_complete(token: BarrierToken) =>
     """
@@ -442,7 +457,7 @@ actor CheckpointInitiator is Initializable
             @printf[I32]("Creating _InitiateCheckpoint timer for future checkpoint %s\n".cstring(),
               (_current_checkpoint_id + 1).string().cstring())
           end
-          _phase = _WaitingCheckpointInitiatorPhase
+          wait_for_next_checkpoint()
           _phase.start_checkpoint_timer(_time_between_checkpoints, this)
         end
       else
@@ -612,6 +627,11 @@ actor CheckpointInitiator is Initializable
     @printf[I32]("Shutting down CheckpointInitiator\n".cstring())
     _clear_pending_checkpoints()
     _phase = _DisposedCheckpointInitiatorPhase
+
+  fun tag _make_null_promise(): Promise[None] =>
+    Promise[None].next[None]({(_: None) =>
+      @l(Log.debug(), Log.checkpoint(), "null promise: fulfilled".cstring())
+    })
 
 primitive LatestCheckpointId
   fun read(auth: AmbientAuth, checkpoint_id_file: String):
