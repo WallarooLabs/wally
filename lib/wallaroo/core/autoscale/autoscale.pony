@@ -433,7 +433,8 @@ actor Autoscale
     // 3. _X_ Move to _WaitingForJoinerInitialization phase.
 
     let me = recover tag this end
-    let promise = Promise[Bool].next[Bool](
+    let promise = Promise[Bool]
+    promise.next[Bool](
       {(result: Bool) =>
         @printf[I32]("QQQ CHECKPOINT GOOD STATUS WAS %s\n".cstring(), result.string().cstring())
         me.checkpoint_status_was(result)
@@ -730,6 +731,7 @@ actor Autoscale
     _phase.shrink_autoscale_barrier_complete()
 
   be checkpoint_status_was(result: Bool) =>
+    @printf[I32]("QQQ CHECKPOINT STATUS WAS %s\n".cstring(), result.string().cstring())
     _phase.checkpoint_await_result(result) 
 
   //////////////////////////////////
