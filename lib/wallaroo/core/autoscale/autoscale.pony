@@ -48,10 +48,15 @@ actor Autoscale
        workers.
     3) _InjectAutoscaleBarrier: Stop the world and inject barrier to ensure in
        flight messages are finished
-    4) _WaitingForJoinerInitialization: Waiting for all joiners to initialize
-    5) _WaitingForConnections: Waiting for current workers to connect to
+    4) _CheckpointAwaitResult: QQQ Trigger a checkpoint, wait for its result.
+       If it completes successfully, then we can continue to next step.
+       If the checkpoint is aborted, then TODO QQQ we must abort this process.
+    4b) QQQ TODO probably: move _WaitingForCheckpointId until after ^^ c.p.
+        is done??
+    5) _WaitingForJoinerInitialization: Waiting for all joiners to initialize
+    6) _WaitingForConnections: Waiting for current workers to connect to
       joiners
-    6) GOTO IV.1
+    7) GOTO IV.1
 
     II. NON-COORDINATOR:
     1) _WaitingToConnectToJoiners: After receiving the addresses for all
@@ -411,6 +416,41 @@ actor Autoscale
     _connections.inform_joining_worker(response_fn, worker, local_topology,
       checkpoint_id, rollback_id, _initializer_name)
 
+  fun ref checkpoint_await_result(joining_worker_count: USize,
+    initialized_workers: StringSet,
+    new_step_group_routing_ids:
+      Map[WorkerName, Map[RoutingId, RoutingId] val] val,
+    current_worker_count: USize)
+  =>
+    // QQQ TODO to implement
+    // 0. _X_ Base impl for _CheckpointAwaitResult
+    // 1. ___ Start a checkpoint.  Note that we have already disabled the
+    //    auto-trigger of a checkpoint and have waited (if necessary)
+    //    of an in-process checkpoint to finish.  The step's checkpoint
+    //    will be a new checkpoint, for the purpose of "flushing"
+    //    ConnectorSink output via 2PC.
+    // 2. ___ Wait for checkpoint to finish.  That's the phase's job.
+    // 3. _X_ Move to _WaitingForJoinerInitialization phase.
+
+    _checkpoint_initiator.force_checkpoint_fake()
+    this.checkpoint_status_was(true)
+
+    _phase = _CheckpointAwaitResult(this, joining_worker_count,
+      initialized_workers, new_step_group_routing_ids, current_worker_count)
+
+  fun ref checkpoint_got_result(result: Bool,
+    joining_worker_count: USize,
+    initialized_workers: StringSet,
+    new_step_group_routing_ids:
+      Map[WorkerName, Map[RoutingId, RoutingId] val] val,
+    current_worker_count: USize)
+  =>
+    @printf[I32]("AUTOSCALE: checkpoint result was %s\n".cstring(),
+      result.string().cstring())
+    @printf[I32]("AUTOSCALE: QQQ todo STUFF\n".cstring())
+    _phase = _WaitingForJoinerInitialization(this, joining_worker_count,
+      initialized_workers, new_step_group_routing_ids, current_worker_count)
+
   fun ref wait_for_joiner_initialization(joining_worker_count: USize,
     initialized_workers: StringSet,
     new_step_group_routing_ids:
@@ -677,6 +717,9 @@ actor Autoscale
 
   be shrink_autoscale_barrier_complete() =>
     _phase.shrink_autoscale_barrier_complete()
+
+  be checkpoint_status_was(result: Bool) =>
+    _phase.checkpoint_await_result(result) 
 
   //////////////////////////////////
   // NON-COORDINATOR

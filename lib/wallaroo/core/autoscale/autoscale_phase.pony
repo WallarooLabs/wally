@@ -49,6 +49,9 @@ trait _AutoscalePhase
   fun ref grow_autoscale_barrier_complete() =>
     _invalid_call(); Fail()
 
+  fun ref checkpoint_await_result(result: Bool) =>
+    _invalid_call(); Fail()
+
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
   =>
@@ -271,6 +274,7 @@ class _WaitingForCheckpointId is _AutoscalePhase
   fun ref update_checkpoint_id(checkpoint_id: CheckpointId,
     rollback_id: RollbackId)
   =>
+    @printf[I32]("AUTOSCALE: got checkpoint_id %lu rollback_id %lu\n".cstring(), checkpoint_id, rollback_id)
     _autoscale.inject_autoscale_barrier(_connected_joiners,
       _joining_worker_count, _current_worker_count, checkpoint_id,
       rollback_id)
@@ -314,8 +318,13 @@ class _InjectAutoscaleBarrier is _AutoscalePhase
       Map[WorkerName, Map[RoutingId, RoutingId] val] val =
         (_new_step_group_routing_ids =
           recover Map[WorkerName, Map[RoutingId, RoutingId] val] end)
+    _autoscale.checkpoint_await_result(_joining_worker_count,
+      _initialized_workers, new_step_group_routing_ids, _current_worker_count)
+
+/*** QQQ SLF was:
     _autoscale.wait_for_joiner_initialization(_joining_worker_count,
       _initialized_workers, new_step_group_routing_ids, _current_worker_count)
+***/
 
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
@@ -329,6 +338,41 @@ class _InjectAutoscaleBarrier is _AutoscalePhase
       // We should have already transitioned to the next phase before this.
       Fail()
     end
+
+class _CheckpointAwaitResult is _AutoscalePhase
+  let _autoscale: Autoscale ref
+  let _joining_worker_count: USize
+  var _initialized_joining_workers: StringSet
+  let _current_worker_count: USize
+  var _new_step_group_routing_ids:
+    Map[WorkerName, Map[RoutingId, RoutingId] val] iso =
+    recover Map[WorkerName, Map[RoutingId, RoutingId] val] end
+
+  new create(autoscale: Autoscale ref, joining_worker_count: USize,
+    initialized_workers: StringSet,
+    new_step_group_routing_ids:
+      Map[WorkerName, Map[RoutingId, RoutingId] val] val,
+    current_worker_count: USize)
+  =>
+    _autoscale = autoscale
+    _joining_worker_count = joining_worker_count
+    _initialized_joining_workers = initialized_workers
+    _current_worker_count = current_worker_count
+    for (w, sri) in new_step_group_routing_ids.pairs() do
+      _new_step_group_routing_ids(w) = sri
+    end
+    @printf[I32]("AUTOSCALE: Waiting for checkpoint process to finish.\n".cstring())
+
+  fun name(): String => "CheckpointAwaitResult"
+
+  fun ref checkpoint_await_result(result: Bool) =>
+    let new_step_group_routing_ids:
+      Map[WorkerName, Map[RoutingId, RoutingId] val] val =
+        (_new_step_group_routing_ids =
+          recover Map[WorkerName, Map[RoutingId, RoutingId] val] end)
+    _autoscale.checkpoint_got_result(result, _joining_worker_count,
+      _initialized_joining_workers, new_step_group_routing_ids,
+      _current_worker_count)
 
 class _WaitingForJoinerInitialization is _AutoscalePhase
   let _autoscale: Autoscale ref

@@ -218,6 +218,11 @@ actor CheckpointInitiator is Initializable
       _phase.initiate_checkpoint(checkpoint_group, this)
     end
 
+  be force_checkpoint_fake() =>
+    _last_complete_checkpoint_id = _last_complete_checkpoint_id + 1
+    _current_checkpoint_id = _current_checkpoint_id + 1
+    @l(Log.debug(), Log.checkpoint(), "force_checkpoint_fake: new values %lu and %lu\n".cstring(), _last_complete_checkpoint_id, _current_checkpoint_id)
+
   be clear_pending_checkpoints(promise: Promise[None]) =>
     _clear_pending_checkpoints()
     match _phase
@@ -430,7 +435,7 @@ actor CheckpointInitiator is Initializable
   fun ref checkpoint_complete(token: BarrierToken) =>
     """
     This is called once all workers in the cluster have committed the
-    checkpoitn id for this token.
+    checkpoint id for this token.
     """
     ifdef "resilience" then
       match token
