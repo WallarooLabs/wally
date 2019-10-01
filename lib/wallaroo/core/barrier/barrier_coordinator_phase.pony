@@ -180,10 +180,29 @@ class _BlockingBarrierCoordinatorPhase is _BarrierCoordinatorPhase
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
   =>
+    let hack: Bool =
+      match _initial_token
+      | let x: AutoscaleBarrierToken =>
+        match _wait_for_token
+        | let y: AutoscaleResumeBarrierToken =>
+          match barrier_token
+          | let z: CheckpointBarrierToken =>
+            true
+          else
+            false
+          end
+        else
+          false
+        end
+      else
+        false
+      end
     if (barrier_token == _initial_token) or
-      (barrier_token == _wait_for_token)
+      (barrier_token == _wait_for_token) or
+      hack
     then
       ifdef "checkpoint_trace" then
+        @printf[I32]("BlockPhase: hack = %s!\n".cstring(), hack.string().cstring())
         @printf[I32]("BlockPhase: Initiating barrier %s!\n".cstring(),
           barrier_token.string().cstring())
       end
@@ -192,6 +211,8 @@ class _BlockingBarrierCoordinatorPhase is _BarrierCoordinatorPhase
       ifdef "checkpoint_trace" then
         @printf[I32]("BlockPhase: Queuing barrier %s!\n".cstring(),
           barrier_token.string().cstring())
+        @printf[I32]("BlockPhase: Queuing barrier %s, _initial_token = %s, _wait_for_token = %s\n".cstring(),
+          barrier_token.string().cstring(), _initial_token.string().cstring(), _wait_for_token.string().cstring())
       end
       // TODO: We need to ensure that we don't queue checkpoints when we're
       // rolling back. This is a crude way to test that.
