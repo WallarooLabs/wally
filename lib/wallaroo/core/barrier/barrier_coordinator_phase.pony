@@ -196,6 +196,10 @@ class _BlockingBarrierCoordinatorPhase is _BarrierCoordinatorPhase
       // TODO: We need to ensure that we don't queue checkpoints when we're
       // rolling back. This is a crude way to test that.
       if not (_wait_for_token > barrier_token) then
+        ifdef "checkpoint_trace" then
+          @printf[I32]("BlockPhase: Queuing barrier %s now\n".cstring(),
+            barrier_token.string().cstring())
+        end
         _coordinator.queue_barrier(barrier_token, result_promise)
       end
     end

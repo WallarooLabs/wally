@@ -89,6 +89,8 @@ actor CheckpointInitiator is Initializable
 
   var _phase: _CheckpointInitiatorPhase = _WaitingCheckpointInitiatorPhase
   var _clear_pending_checkpoints_promise: Promise[None] = _make_null_promise()
+  let _cp_complete_promises: Map[CheckpointId, Promise[Bool]] =
+    _cp_complete_promises.create()
 
   new create(auth: AmbientAuth, worker_name: WorkerName,
     primary_worker: WorkerName, connections: Connections,
@@ -222,6 +224,11 @@ actor CheckpointInitiator is Initializable
     _last_complete_checkpoint_id = _last_complete_checkpoint_id + 1
     _current_checkpoint_id = _current_checkpoint_id + 1
     @l(Log.debug(), Log.checkpoint(), "force_checkpoint_fake: new values %lu and %lu\n".cstring(), _last_complete_checkpoint_id, _current_checkpoint_id)
+
+  be force_checkpoint(promise: Promise[Bool]) =>
+    _phase.initiate_checkpoint(_checkpoint_group, this)
+    @l(Log.debug(), Log.checkpoint(), "force_checkpoint: _checkpoint_group %lu".cstring(), _checkpoint_group)
+    _cp_complete_promises(_checkpoint_group.u64()) = promise
 
   be clear_pending_checkpoints(promise: Promise[None]) =>
     _clear_pending_checkpoints()
@@ -472,12 +479,20 @@ actor CheckpointInitiator is Initializable
       Fail()
     end
 
-  fun _propagate_checkpoint_complete(checkpoint_id: CheckpointId) =>
+  fun ref _propagate_checkpoint_complete(checkpoint_id: CheckpointId) =>
     for sc in _source_coordinators.values() do
       sc.checkpoint_complete(checkpoint_id)
     end
     for s in _sinks.values() do
       s.checkpoint_complete(checkpoint_id)
+    end
+    try
+      let p = _cp_complete_promises(checkpoint_id)?
+      @l(Log.debug(), Log.checkpoint(), "_propagate_checkpoint_complete: fulfilling promise for checkpoint_id %lu".cstring(), checkpoint_id)
+      p(true)
+      _cp_complete_promises.remove(checkpoint_id)?
+    else
+      @l(Log.debug(), Log.checkpoint(), "_propagate_checkpoint_complete: no promise for checkpoint_id %lu".cstring(), checkpoint_id)
     end
 
   be prepare_for_rollback() =>

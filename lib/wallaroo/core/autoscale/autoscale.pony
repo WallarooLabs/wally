@@ -432,8 +432,19 @@ actor Autoscale
     // 2. ___ Wait for checkpoint to finish.  That's the phase's job.
     // 3. _X_ Move to _WaitingForJoinerInitialization phase.
 
-    _checkpoint_initiator.force_checkpoint_fake()
-    this.checkpoint_status_was(true)
+    let me = recover tag this end
+    let promise = Promise[Bool].next[Bool](
+      {(result: Bool) =>
+        @printf[I32]("QQQ CHECKPOINT GOOD STATUS WAS %s\n".cstring(), result.string().cstring())
+        me.checkpoint_status_was(result)
+        result
+      },
+      {() =>
+        @printf[I32]("QQQ CHECKPOINT BAD STATUS\n".cstring())
+        me.checkpoint_status_was(false)
+        false
+      })
+    _checkpoint_initiator.force_checkpoint(promise)
 
     _phase = _CheckpointAwaitResult(this, joining_worker_count,
       initialized_workers, new_step_group_routing_ids, current_worker_count)

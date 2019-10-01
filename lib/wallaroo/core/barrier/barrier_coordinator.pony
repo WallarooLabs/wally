@@ -544,8 +544,10 @@ class _WorkerAckCount
   let _coordinator: BarrierCoordinator ref
 
   new create(t: BarrierToken, ws: StringSet, bc: BarrierCoordinator ref) =>
+    @printf[I32]("_WorkerAckCount: create: token %s _workers.size() = %lu\n".cstring(), t.string().cstring(), ws.size())
     _token = t
     for w in ws.values() do
+      @printf[I32]("_WorkerAckCount: create: token %s worker %s\n".cstring(), t.string().cstring(), w.cstring())
       _workers.set(w)
     end
     _coordinator = bc
@@ -557,7 +559,10 @@ class _WorkerAckCount
 
     _workers.unset(w)
     if _workers.size() == 0 then
+      @printf[I32]("_WorkerAckCount: fully acked by %s, new _workers.size() = %lu\n".cstring(), w.cstring(), _workers.size())
       _coordinator.barrier_fully_acked(_token)
+    else
+      @printf[I32]("_WorkerAckCount: ack by %s, new _workers.size() = %lu\n".cstring(), w.cstring(), _workers.size())
     end
 
 

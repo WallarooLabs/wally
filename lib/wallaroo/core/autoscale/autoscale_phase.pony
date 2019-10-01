@@ -308,6 +308,7 @@ class _InjectAutoscaleBarrier is _AutoscalePhase
   fun name(): String => "_InjectAutoscaleBarrier"
 
   fun ref grow_autoscale_barrier_complete() =>
+    @printf[I32]("AUTOSCALE: initial barrier is complete\n".cstring())
     for (worker, data) in _connected_joiners.pairs() do
       let response_fn = data._1
       let local_topology = data._2
