@@ -58,7 +58,7 @@ trait _AutoscalePhase
     _invalid_call(); Fail()
 
   fun ref worker_connected_to_joining_workers(worker: WorkerName) =>
-    _invalid_call(); Fail()
+    @printf[I32]("YO worker = %s\n".cstring(), worker.cstring()); _invalid_call(); Fail()
 
   fun ref stop_the_world_for_grow_migration_initiated(coordinator: WorkerName,
     joining_workers: Array[WorkerName] val)
@@ -415,6 +415,7 @@ class _WaitingForJoinerInitialization is _AutoscalePhase
       _joining_worker_count.string().cstring(),
       _initialized_joining_workers.size().string().cstring(),
       _current_worker_count.string().cstring())
+    _joining_worker_common()
 
   fun name(): String => "WaitingForJoinerInitialization"
 
@@ -423,6 +424,9 @@ class _WaitingForJoinerInitialization is _AutoscalePhase
   =>
     _initialized_joining_workers.set(worker)
     _new_step_group_routing_ids(worker) = step_group_routing_ids
+    _joining_worker_common()
+
+  fun ref _joining_worker_common() =>
     if _initialized_joining_workers.size() == _joining_worker_count then
       let nws = recover trn Array[String] end
       for w in _initialized_joining_workers.values() do
@@ -466,8 +470,10 @@ class _WaitingForConnections is _AutoscalePhase
     """
     Indicates that another worker has connected to joining workers.
     """
+    @printf[I32]("AUTOSCALE: worker %s connected\n".cstring(), worker.cstring())
     _connected_workers.set(worker)
     if _connected_workers.size() == _connecting_worker_count then
+      @printf[I32]("AUTOSCALE: worker %s connected, done!\n".cstring(), worker.cstring())
       _autoscale.prepare_grow_migration(_new_workers)
     end
 

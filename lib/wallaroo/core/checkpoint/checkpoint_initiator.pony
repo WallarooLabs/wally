@@ -35,6 +35,7 @@ use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/string_set"
 
+use @ll[I32](sev_cat: U16, fmt: Pointer[U8] tag, ...)
 
 actor CheckpointInitiator is Initializable
   """
@@ -91,6 +92,10 @@ actor CheckpointInitiator is Initializable
   var _clear_pending_checkpoints_promise: Promise[None] = _make_null_promise()
   let _cp_complete_promises: Map[CheckpointId, Promise[Bool]] =
     _cp_complete_promises.create()
+  var _pending_checkpoints_enabled: Bool = true
+
+  let _debug: U16 = Log.make_sev_cat(Log.debug(), Log.checkpoint())
+  let _info: U16 = Log.make_sev_cat(Log.info(), Log.checkpoint())
 
   new create(auth: AmbientAuth, worker_name: WorkerName,
     primary_worker: WorkerName, connections: Connections,
@@ -177,9 +182,12 @@ actor CheckpointInitiator is Initializable
     is the absolute minimum time between checkpoints. In reality, we need to
     add the time taken to actually complete the checkpoint to this time.
     """
-    let t = Timer(_InitiateCheckpoint(this, _checkpoint_group),
-      time_until_checkpoint)
-    _timers(consume t)
+    @ll(_debug, "_start_checkpoint_timer: enabled = %s".cstring(), _pending_checkpoints_enabled.string().cstring())
+    if _pending_checkpoints_enabled then
+      let t = Timer(_InitiateCheckpoint(this, _checkpoint_group),
+        time_until_checkpoint)
+      _timers(consume t)
+    end
 
   fun workers(): StringSet box => _workers
 
@@ -223,30 +231,32 @@ actor CheckpointInitiator is Initializable
   be force_checkpoint_fake() =>
     _last_complete_checkpoint_id = _last_complete_checkpoint_id + 1
     _current_checkpoint_id = _current_checkpoint_id + 1
-    @l(Log.debug(), Log.checkpoint(), "force_checkpoint_fake: new values %lu and %lu\n".cstring(), _last_complete_checkpoint_id, _current_checkpoint_id)
+    @ll(_debug, "force_checkpoint_fake: new values %lu and %lu\n".cstring(), _last_complete_checkpoint_id, _current_checkpoint_id)
 
   be force_checkpoint(promise: Promise[Bool]) =>
     _phase.initiate_checkpoint(_checkpoint_group, this)
     // _current_checkpoint_id is now the in-progress checkpoint.
-    @l(Log.debug(), Log.checkpoint(), "force_checkpoint: _current_checkpoint_id %lu".cstring(), _current_checkpoint_id)
+    @ll(_debug, "force_checkpoint: _current_checkpoint_id %lu".cstring(), _current_checkpoint_id)
     _cp_complete_promises(_current_checkpoint_id.u64()) = promise
 
   be clear_pending_checkpoints(promise: Promise[None]) =>
     _clear_pending_checkpoints()
     match _phase
     | let p: _WaitingCheckpointInitiatorPhase =>
-      @l(Log.debug(), Log.checkpoint(), "clear_pending_checkpoints: now fulfilling promise".cstring())
+      @ll(_debug, "clear_pending_checkpoints: now fulfilling promise".cstring())
       promise(None)
     else
-      @l(Log.debug(), Log.checkpoint(), "clear_pending_checkpoints: delaying promise".cstring())
+      @ll(_debug, "clear_pending_checkpoints: delaying promise".cstring())
       _clear_pending_checkpoints_promise = promise
       _clear_pending_checkpoints_promise.next[None]({(_: None) =>
-        @l(Log.debug(), Log.checkpoint(), "clear_pending_checkpoints: promise fulfilled".cstring())
+        @ll(_debug, "clear_pending_checkpoints: promise fulfilled".cstring())
       })
     end
+    _pending_checkpoints_enabled = false
 
   be restart_repeating_checkpoints() =>
     _clear_pending_checkpoints()
+    _pending_checkpoints_enabled = true
     _phase.initiate_checkpoint(_checkpoint_group, this)
 
   fun ref _initiate_checkpoint(checkpoint_group: USize) =>
@@ -322,7 +332,7 @@ actor CheckpointInitiator is Initializable
   fun ref wait_for_next_checkpoint() =>
     _phase = _WaitingCheckpointInitiatorPhase
     _clear_pending_checkpoints_promise(None)
-    @l(Log.debug(), Log.checkpoint(), "wait_for_next_checkpoint: promise fulfilled".cstring())
+    @ll(_debug, "wait_for_next_checkpoint: promise fulfilled".cstring())
     _clear_pending_checkpoints_promise = _make_null_promise()
 
   be checkpoint_barrier_complete(token: BarrierToken) =>
@@ -489,11 +499,16 @@ actor CheckpointInitiator is Initializable
     end
     try
       let p = _cp_complete_promises(checkpoint_id)?
-      @l(Log.debug(), Log.checkpoint(), "_propagate_checkpoint_complete: fulfilling promise for checkpoint_id %lu".cstring(), checkpoint_id)
-      p(true)
+      @ll(_debug, "_propagate_checkpoint_complete: fulfilling promise for checkpoint_id %lu".cstring(), checkpoint_id)
+      // SLF TODO: For debugging timing purposes, we ought to create a timer
+      // that fires after >1 seconds and only then fulfill this promise.
+      // What would that experiment discover?
+      // p(true)
+      let t = Timer(_DelayCheckpointComplete(p), 2_500_000_000)
+      _timers(consume t)
       _cp_complete_promises.remove(checkpoint_id)?
     else
-      @l(Log.debug(), Log.checkpoint(), "_propagate_checkpoint_complete: no promise for checkpoint_id %lu".cstring(), checkpoint_id)
+      @ll(_debug, "_propagate_checkpoint_complete: no promise for checkpoint_id %lu".cstring(), checkpoint_id)
     end
 
   be prepare_for_rollback() =>
@@ -690,4 +705,15 @@ class _InitiateCheckpoint is TimerNotify
 
   fun ref apply(timer: Timer, count: U64): Bool =>
     _si.initiate_checkpoint(_checkpoint_group)
+    false
+
+class _DelayCheckpointComplete is TimerNotify
+  let _p: Promise[Bool]
+
+  new iso create(p: Promise[Bool]) =>
+    _p = p
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    @l(Log.debug(), Log.checkpoint(), "_propagate_checkpoint_complete: TIMER FIRED, promise time".cstring())
+    _p(true)
     false

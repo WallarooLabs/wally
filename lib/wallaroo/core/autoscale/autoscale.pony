@@ -460,17 +460,21 @@ actor Autoscale
     @printf[I32]("AUTOSCALE: checkpoint result was %s\n".cstring(),
       result.string().cstring())
     @printf[I32]("AUTOSCALE: QQQ todo STUFF\n".cstring())
+    @printf[I32]("AUTOSCALE: move to _WaitingForJoinerInitialization line %d\n".cstring(), __loc.line())
     _phase = _WaitingForJoinerInitialization(this, joining_worker_count,
       initialized_workers, new_step_group_routing_ids, current_worker_count)
 
+/*** TODO unused? delete?
   fun ref wait_for_joiner_initialization(joining_worker_count: USize,
     initialized_workers: StringSet,
     new_step_group_routing_ids:
       Map[WorkerName, Map[RoutingId, RoutingId] val] val,
     current_worker_count: USize)
   =>
+    @printf[I32]("AUTOSCALE: move to _WaitingForJoinerInitialization line %d\n".cstring(), __loc.line())
     _phase = _WaitingForJoinerInitialization(this, joining_worker_count,
       initialized_workers, new_step_group_routing_ids, current_worker_count)
+***/
 
   fun ref wait_for_connections(
     new_workers: Array[WorkerName] val,
@@ -478,6 +482,7 @@ actor Autoscale
       Map[WorkerName, Map[RoutingId, RoutingId] val] val,
     current_worker_count: USize)
   =>
+    @printf[I32]("AUTOSCALE: move to _WaitingForConnections line %d\n".cstring(), __loc.line())
     _phase = _WaitingForConnections(this, new_workers, current_worker_count)
 
     _connections.notify_current_workers_of_joining_addresses(new_workers,
@@ -519,6 +524,7 @@ actor Autoscale
   fun ref begin_grow_migration(joining_workers: Array[WorkerName] val,
     checkpoint_id: CheckpointId)
   =>
+    @printf[I32]("AUTOSCALE: move to _WaitingForGrowMigration line %d\n".cstring(), __loc.line())
     _phase = _WaitingForGrowMigration(this, _auth, joining_workers
       where is_coordinator = false)
     _router_registry.begin_grow_migration(joining_workers,
@@ -564,6 +570,7 @@ actor Autoscale
     _router_registry.list_boundaries(promise)
 
   fun ref prepare_grow_migration(joining_workers: Array[WorkerName] val) =>
+    @printf[I32]("AUTOSCALE: move to _WaitingForGrowMigration line %d\n".cstring(), __loc.line())
     _phase = _WaitingForGrowMigration(this, _auth, joining_workers
       where is_coordinator = true)
     // TODO: For now, we're handing control of the join protocol over to
@@ -594,6 +601,7 @@ actor Autoscale
   fun ref send_migration_batch_complete(joining_workers: Array[WorkerName] val,
     is_coordinator: Bool)
   =>
+    @printf[I32]("AUTOSCALE: move to _WaitingForGrowMigration line %d\n".cstring(), __loc.line())
     _phase = _WaitingForGrowMigrationAcks(this, _auth, joining_workers,
       is_coordinator)
     if is_coordinator then
