@@ -397,7 +397,6 @@ class _WaitingForJoinerInitialization is _AutoscalePhase
 /*** SLF TODO: I believe that this invariant is no longer true:
                The checkpoint that I've added has disrupted old
                timing assumptions.
-
     ifdef debug then
       // When this phase begins, at least one joining worker should still
       // have not notified us it was initialized.
