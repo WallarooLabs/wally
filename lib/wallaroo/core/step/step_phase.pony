@@ -201,6 +201,7 @@ class _BarrierStepPhase is StepPhase
     end
 
     if input_blocking(input_id) then
+      @printf[I32]("DBG: _BarrierStepPhase: queuing %s\n".cstring(), barrier_token.string().cstring())
       _queued.push(QueuedBarrier(input_id, producer, barrier_token))
     else
       ifdef debug then
@@ -259,11 +260,13 @@ class _BarrierStepPhase is StepPhase
     if _inputs_blocking.contains(input_id) then
       try _inputs_blocking.remove(input_id)? else Unreachable() end
     end
+      @printf[I32]("DBG: _BarrierStepPhase: remove_input: got %lu! %s for Step %s\n".cstring(), _inputs_blocking.size(), _barrier_token.string().cstring(), _step_id.string().cstring())
     check_completion(_step.inputs())
 
   fun ref check_completion(inputs: Map[RoutingId, Producer] box) =>
     if inputs.size() == _inputs_blocking.size()
     then
+      @printf[I32]("DBG: _BarrierStepPhase: complete! %s for Step %s\n".cstring(), _barrier_token.string().cstring(), _step_id.string().cstring())
       for (o_id, o) in _step.outputs().pairs() do
         match o
         | let ob: OutgoingBoundary =>
@@ -275,6 +278,15 @@ class _BarrierStepPhase is StepPhase
       end
       let b_token = _barrier_token
       _step.barrier_complete(b_token)
+    else
+      @printf[I32]("DBG: _BarrierStepPhase: want %lu got %lu! %s for Step %s\n".cstring(), inputs.size(), _inputs_blocking.size(), _barrier_token.string().cstring(), _step_id.string().cstring())
+      if (inputs.size() - _inputs_blocking.size()) < 5 then
+        for k in inputs.keys() do
+          if not _inputs_blocking.contains(k) then
+            @printf[I32]("DBG: _BarrierStepPhase: missing key %s for Step %s\n".cstring(), k.string().cstring(), _step_id.string().cstring())
+          end
+        end
+      end
     end
 
 class _RecoveringStepPhase is StepPhase

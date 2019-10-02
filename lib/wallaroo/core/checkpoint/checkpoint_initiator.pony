@@ -246,6 +246,8 @@ actor CheckpointInitiator is Initializable
       @ll(_debug, "clear_pending_checkpoints: now fulfilling promise".cstring())
       promise(None)
     else
+      // There is a checkpoint underway now.  Don't reply until after
+      // this checkpoint has finished.
       @ll(_debug, "clear_pending_checkpoints: delaying promise".cstring())
       _clear_pending_checkpoints_promise = promise
       _clear_pending_checkpoints_promise.next[None]({(_: None) =>
