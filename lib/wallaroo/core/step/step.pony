@@ -363,10 +363,12 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     _routes.contains(c)
 
   be register_producer(id: RoutingId, producer: Producer) =>
+    @printf[I32]("DBG: register_producer: id %s at Step %s\n".cstring(), id.string().cstring(), _id.string().cstring())
     _inputs(id) = producer
     _upstreams.set(producer)
 
   be unregister_producer(id: RoutingId, producer: Producer) =>
+    @printf[I32]("DBG: unregister_producer: id %s at Step %s\n".cstring(), id.string().cstring(), _id.string().cstring())
     if _inputs.contains(id) then
       try
         _inputs.remove(id)?

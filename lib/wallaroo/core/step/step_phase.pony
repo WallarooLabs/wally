@@ -280,7 +280,7 @@ class _BarrierStepPhase is StepPhase
       _step.barrier_complete(b_token)
     else
       @printf[I32]("DBG: _BarrierStepPhase: want %lu got %lu! %s for Step %s\n".cstring(), inputs.size(), _inputs_blocking.size(), _barrier_token.string().cstring(), _step_id.string().cstring())
-      if (inputs.size() - _inputs_blocking.size()) < 5 then
+      if true /* (inputs.size() - _inputs_blocking.size()) < 5 */ then
         for k in inputs.keys() do
           if not _inputs_blocking.contains(k) then
             @printf[I32]("DBG: _BarrierStepPhase: missing key %s for Step %s\n".cstring(), k.string().cstring(), _step_id.string().cstring())

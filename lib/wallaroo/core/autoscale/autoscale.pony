@@ -486,18 +486,6 @@ actor Autoscale
 @printf[I32]("AUTOSCALE: NO phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     end
 
-/*** TODO unused? delete?
-  fun ref wait_for_joiner_initialization(joining_worker_count: USize,
-    initialized_workers: StringSet,
-    new_step_group_routing_ids:
-      Map[WorkerName, Map[RoutingId, RoutingId] val] val,
-    current_worker_count: USize)
-  =>
-    @printf[I32]("AUTOSCALE: move to _WaitingForJoinerInitialization line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
-    _phase = _WaitingForJoinerInitialization(this, joining_worker_count,
-      initialized_workers, new_step_group_routing_ids, current_worker_count)
-***/
-
   fun ref wait_for_connections(
     new_workers: Array[WorkerName] val,
     new_step_group_routing_ids:
