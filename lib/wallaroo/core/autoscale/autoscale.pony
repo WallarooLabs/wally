@@ -83,8 +83,11 @@ actor Autoscale
       message ordering here. Since we're requesting acks from boundaries
       after all their upstream producers, we know these acks will be sent
       after the boundaries have forwarded any register_producer messages.]
-    7) _WaitingForResumeTheWorld: Waiting for unmuting procedure to finish.
-    8) _WaitingForAutoscale: Autoscale is complete and we are back to our
+    7) _WaitingForCheckpointResult: QQQ Trigger a checkpoint, wait for its result.
+      If it completes successfully, then we can continue to next step.
+      If the checkpoint is aborted, then TODO QQQ we must abort this process.
+    8) _WaitingForResumeTheWorld: Waiting for unmuting procedure to finish.
+    9) _WaitingForAutoscale: Autoscale is complete and we are back to our
       initial waiting state.
 
     ////////////////////
@@ -293,7 +296,7 @@ actor Autoscale
   be ready_to_resume_the_world() =>
     """
     When we are ready to resume processing, we inject the autoscale resume
-    barrier.
+    barrier.  (Called by RouterRegistry.)
     """
     let promise = Promise[None]
     promise.next[None]({(_: None) =>
@@ -435,64 +438,8 @@ actor Autoscale
       initialized_workers, new_step_group_routing_ids, current_worker_count)
 @printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
 
-/****
-  fun ref checkpoint_await_result(joining_worker_count: USize,
-    initialized_workers: StringSet,
-    new_step_group_routing_ids:
-      Map[WorkerName, Map[RoutingId, RoutingId] val] val,
-    current_worker_count: USize)
-  =>
-    // QQQ TODO to implement
-    // 0. _X_ Base impl for _CheckpointAwaitResult
-    // 1. ___ Start a checkpoint.  Note that we have already disabled the
-    //    auto-trigger of a checkpoint and have waited (if necessary)
-    //    of an in-process checkpoint to finish.  The step's checkpoint
-    //    will be a new checkpoint, for the purpose of "flushing"
-    //    ConnectorSink output via 2PC.
-    // 2. ___ Wait for checkpoint to finish.  That's the phase's job.
-    // 3. _X_ Move to _WaitingForJoinerInitialization phase.
-
-    let me = recover tag this end
-    let promise = Promise[Bool]
-    promise.next[Bool](
-      {(result: Bool) =>
-        @printf[I32]("QQQ CHECKPOINT GOOD STATUS WAS %s\n".cstring(), result.string().cstring())
-        me.checkpoint_status_was(result)
-        result
-      },
-      {() =>
-        @printf[I32]("QQQ CHECKPOINT BAD STATUS\n".cstring())
-        me.checkpoint_status_was(false)
-        false
-      })
-    _checkpoint_initiator.force_checkpoint(promise)
-
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
-    _phase = _CheckpointAwaitResult(this, joining_worker_count,
-      initialized_workers, new_step_group_routing_ids, current_worker_count)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
-
-  fun ref checkpoint_got_result(result: Bool,
-    joining_worker_count: USize,
-    initialized_workers: StringSet,
-    new_step_group_routing_ids:
-      Map[WorkerName, Map[RoutingId, RoutingId] val] val,
-    current_worker_count: USize)
-  =>
-    @printf[I32]("AUTOSCALE: checkpoint result was %s\n".cstring(),
-      result.string().cstring())
-    @printf[I32]("AUTOSCALE: QQQ todo STUFF\n".cstring())
-    @printf[I32]("AUTOSCALE: move to _WaitingForJoinerInitialization line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
-    let old_phase = _phase
-    let new_phase = _WaitingForJoinerInitialization(this, joining_worker_count,
-      initialized_workers, new_step_group_routing_ids, current_worker_count)
-    if (digestof _phase) == (digestof old_phase) then
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
-      _phase = new_phase
-    else
-@printf[I32]("AUTOSCALE: NO phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
-    end
-****/
+  fun ref checkpoint_got_result(result: Bool) =>
+    None // QQQ TODO
 
   fun ref wait_for_connections(
     new_workers: Array[WorkerName] val,
@@ -529,6 +476,36 @@ actor Autoscale
 
   fun ref update_hash_partitions(hp: Map[RoutingId, HashPartitions] val) =>
     _router_registry.update_hash_partitions(hp)
+
+  fun ref trigger_checkpoint() =>
+    // QQQ TODO to implement
+    // 0. _X_ Base impl for _CheckpointAwaitResult
+    // 1. ___ Start a checkpoint.  Note that we have already disabled the
+    //    auto-trigger of a checkpoint and have waited (if necessary)
+    //    of an in-process checkpoint to finish.  The step's checkpoint
+    //    will be a new checkpoint, for the purpose of "flushing"
+    //    ConnectorSink output via 2PC.
+    // 2. ___ Wait for checkpoint to finish.  That's the phase's job.
+    // 3. _X_ Move to _WaitingForJoinerInitialization phase.
+
+    let me = recover tag this end
+    let promise = Promise[Bool]
+    promise.next[Bool](
+      {(result: Bool) =>
+        @printf[I32]("QQQ CHECKPOINT GOOD STATUS WAS %s\n".cstring(), result.string().cstring())
+        me.checkpoint_status_was(result)
+        result
+      },
+      {() =>
+        @printf[I32]("QQQ CHECKPOINT BAD STATUS\n".cstring())
+        me.checkpoint_status_was(false)
+        false
+      })
+    _checkpoint_initiator.force_checkpoint(promise)
+
+@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
+    _phase = _WaitingForCheckpointResult(this)
+@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
 
   ///////////////////
   // NON-COORDINATOR
@@ -784,7 +761,7 @@ actor Autoscale
 
   be checkpoint_status_was(result: Bool) =>
     @printf[I32]("QQQ CHECKPOINT STATUS WAS %s\n".cstring(), result.string().cstring())
-    _phase.checkpoint_await_result(result)
+    _phase.checkpoint_status_was(result)
 
   //////////////////////////////////
   // NON-COORDINATOR
