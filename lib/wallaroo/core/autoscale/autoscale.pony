@@ -48,15 +48,10 @@ actor Autoscale
        workers.
     3) _InjectAutoscaleBarrier: Stop the world and inject barrier to ensure in
        flight messages are finished
-    4) _CheckpointAwaitResult: QQQ Trigger a checkpoint, wait for its result.
-       If it completes successfully, then we can continue to next step.
-       If the checkpoint is aborted, then TODO QQQ we must abort this process.
-    4b) QQQ TODO probably: move _WaitingForCheckpointId until after ^^ c.p.
-        is done??
-    5) _WaitingForJoinerInitialization: Waiting for all joiners to initialize
-    6) _WaitingForConnections: Waiting for current workers to connect to
+    4) _WaitingForJoinerInitialization: Waiting for all joiners to initialize
+    5) _WaitingForConnections: Waiting for current workers to connect to
       joiners
-    7) GOTO IV.1
+    6) GOTO IV.1
 
     II. NON-COORDINATOR:
     1) _WaitingToConnectToJoiners: After receiving the addresses for all
@@ -429,6 +424,18 @@ actor Autoscale
     _connections.inform_joining_worker(response_fn, worker, local_topology,
       checkpoint_id, rollback_id, _initializer_name)
 
+  fun ref wait_for_joiner_initialization(joining_worker_count: USize,
+    initialized_workers: StringSet,
+    new_step_group_routing_ids:
+      Map[WorkerName, Map[RoutingId, RoutingId] val] val,
+    current_worker_count: USize)
+  =>
+@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
+    _phase = _WaitingForJoinerInitialization(this, joining_worker_count,
+      initialized_workers, new_step_group_routing_ids, current_worker_count)
+@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
+
+/****
   fun ref checkpoint_await_result(joining_worker_count: USize,
     initialized_workers: StringSet,
     new_step_group_routing_ids:
@@ -485,6 +492,7 @@ actor Autoscale
     else
 @printf[I32]("AUTOSCALE: NO phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     end
+****/
 
   fun ref wait_for_connections(
     new_workers: Array[WorkerName] val,
@@ -776,7 +784,7 @@ actor Autoscale
 
   be checkpoint_status_was(result: Bool) =>
     @printf[I32]("QQQ CHECKPOINT STATUS WAS %s\n".cstring(), result.string().cstring())
-    _phase.checkpoint_await_result(result) 
+    _phase.checkpoint_await_result(result)
 
   //////////////////////////////////
   // NON-COORDINATOR

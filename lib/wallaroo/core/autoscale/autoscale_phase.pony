@@ -319,7 +319,7 @@ class _InjectAutoscaleBarrier is _AutoscalePhase
       Map[WorkerName, Map[RoutingId, RoutingId] val] val =
         (_new_step_group_routing_ids =
           recover Map[WorkerName, Map[RoutingId, RoutingId] val] end)
-    _autoscale.checkpoint_await_result(_joining_worker_count,
+    _autoscale.wait_for_joiner_initialization(_joining_worker_count,
       _initialized_workers, new_step_group_routing_ids, _current_worker_count)
 
   fun ref joining_worker_initialized(worker: WorkerName,
@@ -335,6 +335,7 @@ class _InjectAutoscaleBarrier is _AutoscalePhase
       Fail()
     end
 
+/****
 class _CheckpointAwaitResult is _AutoscalePhase
   let _autoscale: Autoscale ref
   let _joining_worker_count: USize
@@ -378,6 +379,7 @@ class _CheckpointAwaitResult is _AutoscalePhase
     // the next phase.
     _initialized_joining_workers.set(worker)
     _new_step_group_routing_ids(worker) = step_group_routing_ids
+****/
 
 class _WaitingForJoinerInitialization is _AutoscalePhase
   let _autoscale: Autoscale ref
@@ -394,15 +396,11 @@ class _WaitingForJoinerInitialization is _AutoscalePhase
       Map[WorkerName, Map[RoutingId, RoutingId] val] val,
     current_worker_count: USize)
   =>
-/*** SLF TODO: I believe that this invariant is no longer true:
-               The checkpoint that I've added has disrupted old
-               timing assumptions.
     ifdef debug then
       // When this phase begins, at least one joining worker should still
       // have not notified us it was initialized.
       Invariant(initialized_workers.size() < joining_worker_count)
     end
-***/
     _autoscale = autoscale
     _joining_worker_count = joining_worker_count
     _initialized_joining_workers = initialized_workers
@@ -415,7 +413,6 @@ class _WaitingForJoinerInitialization is _AutoscalePhase
       _joining_worker_count.string().cstring(),
       _initialized_joining_workers.size().string().cstring(),
       _current_worker_count.string().cstring())
-    _joining_worker_common()
 
   fun name(): String => "WaitingForJoinerInitialization"
 
@@ -424,9 +421,6 @@ class _WaitingForJoinerInitialization is _AutoscalePhase
   =>
     _initialized_joining_workers.set(worker)
     _new_step_group_routing_ids(worker) = step_group_routing_ids
-    _joining_worker_common()
-
-  fun ref _joining_worker_common() =>
     if _initialized_joining_workers.size() == _joining_worker_count then
       let nws = recover trn Array[String] end
       for w in _initialized_joining_workers.values() do
