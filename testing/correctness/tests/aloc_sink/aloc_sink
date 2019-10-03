@@ -52,7 +52,7 @@ def reload_phase1_txn_state(path):
     except FileNotFoundError:
         True
     if len(txn_state) > 1:
-        logging.critical('reload_phase1_txn_state: bad txn_state: {}'.format(txn_state))
+        logging.critical('reload_phase1_txn_state: bad txn_state: {} file {}'.format(txn_state, path))
         sys.exit(66)
     return txn_state
 
@@ -66,7 +66,7 @@ def look_for_forced_abort(path):
                     res = False
                 elif a[1] == '1-ok':
                     if res == False:
-                        logging.critical('next-txn-force-abort followed by 1-ok')
+                        logging.critical('next-txn-force-abort followed by 1-ok, file {}'.format(path))
                         sys.exit(66)
                     res = True
                 elif a[1] == '1-rollback':
@@ -86,11 +86,11 @@ def look_for_orphaned_s3_phase2_data(path):
                 if op == '1-ok':
                     where_list = a[3]
                     if where_list == []:
-                        logging.critical('Empty where_list in {}'.format(l))
+                        logging.critical('Empty where_list in {} file {}'.format(l, path))
                         sys.exit(66)
                     for (stream_id, start_por, end_por) in where_list:
                         if stream_id != 1:
-                            logging.critical('Bad stream_id in {}'.format(l))
+                            logging.critical('Bad stream_id in {} file {}'.format(l, path))
                             sys.exit(66)
                     ## The first txn commit may be start=end=0.
                     ## We don't write an S3 object for 0 bytes,
@@ -104,7 +104,7 @@ def look_for_orphaned_s3_phase2_data(path):
                         orphaned[txn_id] = (txn_id, start_por, end_por, False)
                 elif op == '2-ok':
                     if not (txn_id in orphaned):
-                        logging.critical('Expected txn_id {} in {}'.format(txn_id, l))
+                        logging.critical('Expected txn_id {} in {} file {}'.format(txn_id, l, path))
                         sys.exit(66)
                     logging.debug('2-ok l = {}'.format(l))
                     logging.debug('blah = {}'.format(orphaned[txn_id]))
@@ -302,7 +302,7 @@ class AsyncServer(asynchat.async_chat, object):
                 logging.info('found zero orphaned items')
                 None
             elif len(orphaned) > 1:
-                logging.critical('expected max 1 orphaned item: {}'.format(orphaned))
+                logging.critical('expected max 1 orphaned item: {} file {}'.format(orphaned, self._out_path_opath))
                 sys.exit(66)
             else:
                 (txn_id, start_por, end_por, _) = orphaned[0]
@@ -319,11 +319,11 @@ class AsyncServer(asynchat.async_chat, object):
                 uncommitted_txn_id = list(self._txn_state.keys())[0]
                 (phase1_status, where_list) = self._txn_state[uncommitted_txn_id]
                 if len(where_list) != 1:
-                    logging.critical('Bad where_list in {}'.format(self._txn_state))
+                    logging.critical('Bad where_list in {} file {}'.format(self._txn_state, self._out_path_opath))
                     sys.exit(66)
                 (stream_id, start_por, end_por) = where_list[0]
                 if stream_id != 1:
-                    logging.critical('Bad stream_id in {}'.format(self._txn_state))
+                    logging.critical('Bad stream_id in {} file {}'.format(self._txn_state, self._out_path_opath))
                     sys.exit(66)
                 if phase1_status is True:
                     truncate_offset = end_por
@@ -543,14 +543,14 @@ class AsyncServer(asynchat.async_chat, object):
                     ## Extra sanity check
                     if self._last_committed_offset is None or \
                             offset < self._last_committed_offset:
-                        logging.fatal("2PC: _last_committed_offset {} offset {}".format(
-                            self._last_committed_offset, offset))
+                        logging.fatal("2PC: _last_committed_offset {} offset {} file {}".format(
+                            self._last_committed_offset, offset, self._out_path_opath))
                         sys.exit(66)
 
                     ## Remove when the protocol evolves to be unnecessary
                     if offset != self._out_offset:
-                        logging.critical('2PC: phase 2 offset {} != {}'.format(
-                            offset, self._out_offset))
+                        logging.critical('2PC: phase 2 offset {} != {} file {}'.format(
+                            offset, self._out_offset, self._out_path_opath))
                         sys.exit(66)
 
                     self._last_committed_offset = offset
@@ -595,7 +595,7 @@ class AsyncServer(asynchat.async_chat, object):
                 self._streams[key][2] = self._out_offset
                 logging.debug('_out_offset is now {} tell {}'.format(self._out_offset, self._out.tell()))
             elif self._out_offset < msg.message_id:
-                m = 'MISSING DATA: self._out_offset {} tell {} < msg.message_id {}'.format(self._out_offset, self._out.tell(), msg.message_id)
+                m = 'MISSING DATA: self._out_offset {} tell {} < msg.message_id {} file {}'.format(self._out_offset, self._out.tell(), msg.message_id, self._out_path_opath)
                 self._txn_commit_next = False
                 if not self._next_txn_force_abort_written:
                     self._next_txn_force_abort_written = True
