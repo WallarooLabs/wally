@@ -824,7 +824,6 @@ class _InjectShrinkAutoscaleBarrier is _AutoscalePhase
   fun name(): String => "_InjectShrinkAutoscaleBarrier"
 
   fun ref shrink_autoscale_barrier_complete() =>
-    // SLF QQQ OLD: _autoscale.initiate_shrink(_remaining_workers, _leaving_workers)
     _autoscale.shrink_force_checkpoint(_remaining_workers, _leaving_workers)
 
 class _InitiatingShrink is _AutoscalePhase

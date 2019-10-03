@@ -890,7 +890,6 @@ actor Autoscale
       @printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     else
       @printf[I32]("AUTOSCALE: Trigger checkpoint before resume-the-world is performed instead by %s\n".cstring(), _primary_worker.cstring())
-      // QQQ TODO is this right?
       initiate_shrink(remaining_workers, leaving_workers)
     end
 

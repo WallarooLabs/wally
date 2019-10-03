@@ -249,11 +249,27 @@ run_grow_shrink_loop () {
             done
         fi
         sleep 1
+        if [ ! -z "$CUSTOM_SHRINK_MANY" ]; then
+            ## echo -n Shrink-$CUSTOM_SHRINK_MANY
+            CLUSTER_SHRINKER=../../../../utils/cluster_shrinker/cluster_shrinker
+            out=`$CLUSTER_SHRINKER -e 127.0.0.1:$WALLAROO_MY_EXTERNAL_BASE -w $CUSTOM_SHRINK_MANY 2>&1 | grep -v 'Invalid shrink targets'`
+            if [ ! -z "$out" ]; then
+                # Shrink op started
+                echo $out
+                sleep 1
+                poll_out=`poll_ready -w 4 2>&1`
+                if [ $? -ne 0 -o ! -z "$poll_out" ]; then
+                    echo "custom hack $w: $poll_out"
+                    pause_the_world
+                    break
+                fi
+            fi
+        fi
     done
 }
 
 run_custom1 () {
-    ## Assume that we are run with `./master-crasher.sh 3 no-sanity custom`
+    ## Assume that we are run with `./master-crasher.sh 3 no-sanity run_custom1`
 
     sleep 2
 
@@ -274,7 +290,7 @@ run_custom1 () {
 }
 
 run_custom2 () {
-    ## Assume that we are run with `./master-crasher.sh 3 no-sanity custom`
+    ## Assume that we are run with `./master-crasher.sh 3 no-sanity run_custom2`
 
     sleep 2
     for i in `seq 4 8`; do
@@ -297,6 +313,41 @@ run_custom2 () {
     run_sanity_loop &
 
     sleep 5
+}
+
+run_custom3 () {
+    export CUSTOM_SHRINK_MANY="worker1,worker2,worker3,worker4,worker5,worker6,worker7,worker8,worker9"
+    cmd="run_grow_shrink_loop grow"
+    echo RUN: $cmd
+    $cmd &
+}
+
+run_custom4 () {
+    ## Assume that we are run with `./master-crasher.sh 9 run_custom4
+    ## Then connector sink output for key 'T' should
+    ## be sent first to worker7.
+    ## Shrink 7, then output goes to 1.
+    ## Shrink 1, then output goes to 3.
+    ## Shrink 3, then output goes to 6.
+    ## Shrink 2, then output goes to initializer.
+    ## Can't shrink initializer, so game over
+    sleep 3
+
+    for i in 7 1 3 6 2; do
+        echo -n "Shrink worker$i"
+        shrink_worker $i
+        sleep 1
+        poll_out=`poll_ready -w 4 2>&1`
+        if [ $? -ne 0 -o ! -z "$poll_out" ]; then
+            echo "custom4 shrinking worker$i: $poll_out"
+            pause_the_world
+            exit 1
+        fi
+        sleep 1.3 # Give output a chance to accumulate a bit at sink.
+    done
+    sleep 3
+    echo "Pause the world, whee. Last output should be via initializer."
+    pause_the_world
 }
 
 reset
