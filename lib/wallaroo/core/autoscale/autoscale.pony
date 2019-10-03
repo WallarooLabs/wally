@@ -155,16 +155,12 @@ actor Autoscale
     if is_joining then
       match non_joining_workers
       | let ws: Array[WorkerName] val =>
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
         _phase = _JoiningWorker(_worker_name, this, ws)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
       else
         Fail()
       end
     else
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
       _phase = _WaitingForAutoscale(this)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     end
     _router_registry.set_autoscale(this)
 
@@ -248,10 +244,8 @@ actor Autoscale
     Called when we're informed about joining workers by the coordinator. This
     puts a non-coordinator in the first autoscale phase.
     """
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingToConnectToJoiners(_auth, this, _worker_name, ws,
       coordinator)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
 
   be remote_grow_migration_request(joining_workers: Array[WorkerName] val,
     checkpoint_id: CheckpointId)
@@ -319,7 +313,6 @@ actor Autoscale
   //////////////////////////////////////////////
 
   be all_migration_complete() =>
-@printf[I32]("AUTOSCALE: all_migration_complete line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase.all_migration_complete()
 
   be receive_grow_migration_ack(target_worker: WorkerName) =>
@@ -376,10 +369,8 @@ actor Autoscale
     local_topology: LocalTopology, current_worker_count: USize,
     response_fn: TryJoinResponseFn)
   =>
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForJoiners(_auth, this, worker_count,
       current_worker_count)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase.worker_join(worker, worker_count, local_topology,
       current_worker_count, response_fn)
 
@@ -387,10 +378,8 @@ actor Autoscale
     connected_joiners: Map[WorkerName, (TryJoinResponseFn, LocalTopology)],
     joining_worker_count: USize, current_worker_count: USize)
   =>
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForCheckpointId(this, connected_joiners,
       joining_worker_count, current_worker_count)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     let promise = Promise[(CheckpointId, RollbackId)]
     promise.next[None](_self~update_checkpoint_id_for_autoscale())
     _checkpoint_initiator.lookup_checkpoint_id(promise)
@@ -405,10 +394,8 @@ actor Autoscale
       new_workers_iso.push(w)
     end
     let new_workers = consume val new_workers_iso
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _InjectAutoscaleBarrier(this, connected_joiners,
       joining_worker_count, current_worker_count, checkpoint_id, rollback_id)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
 
     try
       let msg = ChannelMsgEncoder.initiate_stop_the_world_for_grow_migration(
@@ -439,10 +426,8 @@ actor Autoscale
       Map[WorkerName, Map[RoutingId, RoutingId] val] val,
     current_worker_count: USize)
   =>
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForJoinerInitialization(this, joining_worker_count,
       initialized_workers, new_step_group_routing_ids, current_worker_count)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
 
   fun ref wait_for_connections(
     new_workers: Array[WorkerName] val,
@@ -450,9 +435,7 @@ actor Autoscale
       Map[WorkerName, Map[RoutingId, RoutingId] val] val,
     current_worker_count: USize)
   =>
-    @printf[I32]("AUTOSCALE: move to _WaitingForConnections line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForConnections(this, new_workers, current_worker_count)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
 
     _connections.notify_current_workers_of_joining_addresses(new_workers,
       new_step_group_routing_ids)
@@ -463,16 +446,12 @@ actor Autoscale
     _phase.worker_connected_to_joining_workers(_worker_name)
 
   fun ref wait_for_migration(joining_workers: Array[WorkerName] val) =>
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForMigration(this, joining_workers)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
 
   fun ref ack_all_producers_have_registered(
     non_joining_workers: SetIs[WorkerName])
   =>
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForResumeTheWorld(this, _auth, false)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     for w in non_joining_workers.values() do
       _connections.worker_completed_migration_batch(w)
     end
@@ -487,10 +466,8 @@ actor Autoscale
   fun ref stop_the_world_for_grow_migration(coordinator: WorkerName,
     joining_workers: Array[WorkerName] val)
   =>
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingToConnectToJoiners(_auth, this, _worker_name,
       joining_workers, coordinator)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     // TODO: For now, we're handing control of the join protocol over to
     // RouterRegistry at this point. Eventually, we should manage the
     // entire protocol.
@@ -499,10 +476,8 @@ actor Autoscale
   fun ref begin_grow_migration(joining_workers: Array[WorkerName] val,
     checkpoint_id: CheckpointId)
   =>
-    @printf[I32]("AUTOSCALE: move to _WaitingForGrowMigration line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForGrowMigration(this, _auth, joining_workers
       where is_coordinator = false)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _router_registry.begin_grow_migration(joining_workers,
       checkpoint_id)
 
@@ -523,9 +498,7 @@ actor Autoscale
 
   fun ref wait_for_producers_list(completion_action: CompletionAction)
   =>
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForProducersList(this, completion_action)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     let promise = Promise[SetIs[Producer] val]
     promise.next[None](_self~inform_of_producers_list())
     _router_registry.list_producers(promise)
@@ -533,9 +506,7 @@ actor Autoscale
   fun ref wait_for_producers_to_register(producers: SetIs[Producer] val,
     completion_action: CompletionAction)
   =>
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForProducersToRegister(this, producers, completion_action)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     for p in producers.values() do
       let promise = Promise[Producer]
       promise.next[None](_self~producer_acked_registering())
@@ -544,18 +515,14 @@ actor Autoscale
 
   fun ref wait_for_boundaries_map(completion_action: CompletionAction)
   =>
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForBoundariesMap(this, completion_action)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     let promise = Promise[Map[WorkerName, OutgoingBoundary] val]
     promise.next[None](_self~inform_of_boundaries_map())
     _router_registry.list_boundaries(promise)
 
   fun ref prepare_grow_migration(joining_workers: Array[WorkerName] val) =>
-    @printf[I32]("AUTOSCALE: move to _WaitingForGrowMigration line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForGrowMigration(this, _auth, joining_workers
       where is_coordinator = true)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     // TODO: For now, we're handing control of the join protocol over to
     // RouterRegistry at this point. Eventually, we should manage the
     // entire protocol.
@@ -569,10 +536,8 @@ actor Autoscale
     for b in boundaries_map.values() do
       obs.set(b)
     end
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForBoundariesToAckRegistering(this, obs,
       completion_action)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     for ob in obs.values() do
       let promise = Promise[OutgoingBoundary]
       promise.next[None](_self~boundary_acked_registering())
@@ -581,17 +546,13 @@ actor Autoscale
 
   fun ref mark_autoscale_complete() =>
     @printf[I32]("AUTOSCALE: Autoscale is complete.\n".cstring())
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForAutoscale(this)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
 
   fun ref send_migration_batch_complete(joining_workers: Array[WorkerName] val,
     is_coordinator: Bool)
   =>
-    @printf[I32]("AUTOSCALE: move to _WaitingForGrowMigration line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForGrowMigrationAcks(this, _auth, joining_workers,
       is_coordinator)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     if is_coordinator then
       _router_registry.inform_joining_workers_of_hash_partitions(
         joining_workers)
@@ -619,9 +580,7 @@ actor Autoscale
           false
         })
       _checkpoint_initiator.force_checkpoint(promise)
-      @printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
       _phase = _WaitingForGrowCheckpointResult(this, joining_workers, is_coordinator)
-      @printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     else
       @printf[I32]("AUTOSCALE: Trigger checkpoint before resume-the-world is performed instead by %s\n".cstring(), _primary_worker.cstring())
       complete_grow2(joining_workers, is_coordinator)
@@ -642,18 +601,14 @@ actor Autoscale
   fun ref complete_grow2(
     joining_workers: Array[WorkerName] val, is_coordinator: Bool)
   =>
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForResumeTheWorld(this, _auth, is_coordinator)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _router_registry.complete_grow(joining_workers, is_coordinator)
 
   /////////////////
   // COMMON
   /////////////////
   fun ref clean_shutdown() =>
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _ShuttingDown
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _router_registry.clean_shutdown()
 
   fun send_control(worker: String, msg: Array[ByteSeq] val) =>
@@ -746,10 +701,8 @@ actor Autoscale
     (or, in theory, from an internal initiation of shrink). Currently we
     only support external triggers. That trigger can be sent to any worker.
     """
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _InjectShrinkAutoscaleBarrier(this, remaining_workers,
       leaving_workers)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
 
     try
       let msg = ChannelMsgEncoder.initiate_stop_the_world_for_shrink_migration(
@@ -846,9 +799,7 @@ actor Autoscale
     behavior, we hand control for migrating state over to RouterRegistry.
     TODO: Handle migration more directly ourselves.
     """
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForLeavingMigration(this, remaining_workers)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _router_registry.begin_leaving_migration(remaining_workers,
       leaving_workers, next_checkpoint_id)
 
@@ -885,9 +836,7 @@ actor Autoscale
           false
         })
       _checkpoint_initiator.force_checkpoint(promise)
-      @printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
       _phase = _WaitingForShrinkCheckpointResult(this, remaining_workers, leaving_workers)
-      @printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     else
       @printf[I32]("AUTOSCALE: Trigger checkpoint before resume-the-world is performed instead by %s\n".cstring(), _primary_worker.cstring())
       initiate_shrink(remaining_workers, leaving_workers)
@@ -910,17 +859,13 @@ actor Autoscale
   fun ref initiate_shrink(remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _InitiatingShrink(this, remaining_workers, leaving_workers)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _router_registry.initiate_shrink(remaining_workers, leaving_workers)
 
   fun ref all_leaving_workers_finished(leaving_workers: Array[WorkerName] val,
     is_coordinator: Bool = false)
   =>
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForResumeTheWorld(this, _auth, is_coordinator)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _router_registry.all_leaving_workers_finished(leaving_workers)
 
   ///////////////////
@@ -930,9 +875,7 @@ actor Autoscale
     remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _ShrinkInProgress(this, remaining_workers, leaving_workers)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     // TODO: For now, we're handing control of the shrink protocol over to
     // RouterRegistry at this point. Eventually, we should manage the
     // entire protocol.
@@ -945,9 +888,7 @@ actor Autoscale
   fun ref wait_for_leaving_migration_acks(
     remaining_workers: Array[WorkerName] val)
   =>
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     _phase = _WaitingForLeavingMigrationAcks(this, remaining_workers)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     try
       let msg = ChannelMsgEncoder.leaving_migration_ack_request(_worker_name,
         _auth)?
