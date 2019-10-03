@@ -637,9 +637,6 @@ class _JoiningWorker is _AutoscalePhase
         | let hp: Map[RoutingId, HashPartitions] val =>
           if jw.size() == _registered_joining_workers.size() then
             let completion_action = object ref
-                // This action, when triggered, will cause state to change
-                // to _WaitingForResumeTheWorld.
-                // SLF: TODO: Update ^^^ to _WaitingForCheckpoint
                 fun ref apply() =>
                   _autoscale.ack_all_producers_have_registered(
                     _non_joining_workers)
@@ -961,16 +958,21 @@ class _ShuttingDown is _AutoscalePhase
 
 class _WaitingForCheckpointResult is _AutoscalePhase
   let _autoscale: Autoscale ref
+  let _joining_workers: Array[WorkerName] val
+  let _is_coordinator: Bool
 
-  new create(autoscale: Autoscale ref)
+  new create(autoscale: Autoscale ref,
+    joining_workers: Array[WorkerName] val, is_coordinator: Bool)
   =>
     @printf[I32]("AUTOSCALE: Waiting for checkpoint process to finish.\n".cstring())
     _autoscale = autoscale
+    _joining_workers = joining_workers
+    _is_coordinator = is_coordinator
 
   fun name(): String => "WaitingForCheckpointResult"
 
   fun ref checkpoint_status_was(result: Bool) =>
-    _autoscale.checkpoint_got_result(result)
+    _autoscale.checkpoint_got_result(result, _joining_workers, _is_coordinator)
 
 class _WaitingForResumeTheWorld is _AutoscalePhase
   let _autoscale: Autoscale ref

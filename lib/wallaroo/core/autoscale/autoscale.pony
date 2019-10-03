@@ -438,9 +438,6 @@ actor Autoscale
       initialized_workers, new_step_group_routing_ids, current_worker_count)
 @printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
 
-  fun ref checkpoint_got_result(result: Bool) =>
-    None // QQQ TODO
-
   fun ref wait_for_connections(
     new_workers: Array[WorkerName] val,
     new_step_group_routing_ids:
@@ -476,36 +473,6 @@ actor Autoscale
 
   fun ref update_hash_partitions(hp: Map[RoutingId, HashPartitions] val) =>
     _router_registry.update_hash_partitions(hp)
-
-  fun ref trigger_checkpoint() =>
-    // QQQ TODO to implement
-    // 0. _X_ Base impl for _CheckpointAwaitResult
-    // 1. ___ Start a checkpoint.  Note that we have already disabled the
-    //    auto-trigger of a checkpoint and have waited (if necessary)
-    //    of an in-process checkpoint to finish.  The step's checkpoint
-    //    will be a new checkpoint, for the purpose of "flushing"
-    //    ConnectorSink output via 2PC.
-    // 2. ___ Wait for checkpoint to finish.  That's the phase's job.
-    // 3. _X_ Move to _WaitingForJoinerInitialization phase.
-
-    let me = recover tag this end
-    let promise = Promise[Bool]
-    promise.next[Bool](
-      {(result: Bool) =>
-        @printf[I32]("QQQ CHECKPOINT GOOD STATUS WAS %s\n".cstring(), result.string().cstring())
-        me.checkpoint_status_was(result)
-        result
-      },
-      {() =>
-        @printf[I32]("QQQ CHECKPOINT BAD STATUS\n".cstring())
-        me.checkpoint_status_was(false)
-        false
-      })
-    _checkpoint_initiator.force_checkpoint(promise)
-
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
-    _phase = _WaitingForCheckpointResult(this)
-@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
 
   ///////////////////
   // NON-COORDINATOR
@@ -628,6 +595,36 @@ actor Autoscale
     end
 
   fun ref complete_grow(
+    joining_workers: Array[WorkerName] val, is_coordinator: Bool)
+  =>
+    @printf[I32]("AUTOSCALE: Trigger checkpoint before resume-the-world\n".cstring())
+    let me = recover tag this end
+    let promise = Promise[Bool]
+    promise.next[Bool](
+      {(result: Bool) =>
+        @printf[I32]("QQQ CHECKPOINT GOOD STATUS WAS %s\n".cstring(), result.string().cstring())
+        me.checkpoint_status_was(result)
+        result
+      },
+      {() =>
+        @printf[I32]("QQQ CHECKPOINT BAD STATUS\n".cstring())
+        me.checkpoint_status_was(false)
+        false
+      })
+    _checkpoint_initiator.force_checkpoint(promise)
+@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
+    _phase = _WaitingForCheckpointResult(this, joining_workers, is_coordinator)
+@printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
+
+  fun ref checkpoint_got_result(result: Bool,
+    joining_workers: Array[WorkerName] val, is_coordinator: Bool) =>
+    if result then
+      complete_grow2(joining_workers, is_coordinator)
+    else
+      Fail()
+    end
+
+  fun ref complete_grow2(
     joining_workers: Array[WorkerName] val, is_coordinator: Bool)
   =>
 @printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
