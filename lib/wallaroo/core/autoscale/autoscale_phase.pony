@@ -131,7 +131,7 @@ trait _AutoscalePhase
   fun ref producers_disposed() =>
     _invalid_call(); Fail()
 
-  fun ref checkpoint_status_was(result: Bool) =>
+  fun ref checkpoint_status_for_grow_was(result: Bool) =>
     _invalid_call(); Fail()
 
   fun ref autoscale_complete() =>
@@ -821,7 +821,8 @@ class _InjectShrinkAutoscaleBarrier is _AutoscalePhase
   fun name(): String => "_InjectShrinkAutoscaleBarrier"
 
   fun ref shrink_autoscale_barrier_complete() =>
-    _autoscale.initiate_shrink(_remaining_workers, _leaving_workers)
+    // SLF QQQ OLD: _autoscale.initiate_shrink(_remaining_workers, _leaving_workers)
+    _autoscale.shrink_force_checkpoint(_remaining_workers, _leaving_workers)
 
 class _InitiatingShrink is _AutoscalePhase
   let _autoscale: Autoscale ref
@@ -971,8 +972,8 @@ class _WaitingForCheckpointResult is _AutoscalePhase
 
   fun name(): String => "WaitingForCheckpointResult"
 
-  fun ref checkpoint_status_was(result: Bool) =>
-    _autoscale.checkpoint_got_result(result, _joining_workers, _is_coordinator)
+  fun ref checkpoint_status_for_grow_was(result: Bool) =>
+    _autoscale.checkpoint_got_result_for_grow(result, _joining_workers, _is_coordinator)
 
 class _WaitingForResumeTheWorld is _AutoscalePhase
   let _autoscale: Autoscale ref

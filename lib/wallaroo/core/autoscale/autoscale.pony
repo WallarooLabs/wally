@@ -96,10 +96,13 @@ actor Autoscale
     V. COORDINATOR:
     1) _InjectShrinkAutoscaleBarrier: Stop the world and inject barrier to
        ensure in flight messages are finished
-    2) _InitiatingShrink: RouterRegistry currently handles the details. We're
+    2) _WaitingForCheckpointResult: Trigger a checkpoint, wait for its result.
+       If it completes successfully, then we can continue to next step.
+       If the checkpoint is aborted, then TODO we must abort this process.
+    3) _InitiatingShrink: RouterRegistry currently handles the details. We're
       waiting until all steps have been migrated from leaving workers.
-    3) _WaitingForResumeTheWorld: Waiting for unmuting procedure to finish.
-    4) _WaitingForAutoscale: Autoscale is complete and we are back to our
+    4) _WaitingForResumeTheWorld: Waiting for unmuting procedure to finish.
+    5) _WaitingForAutoscale: Autoscale is complete and we are back to our
       initial waiting state.
 
     VI. NON-COORDINATOR:
@@ -604,13 +607,13 @@ actor Autoscale
       let promise = Promise[Bool]
       promise.next[Bool](
         {(result: Bool) =>
-          @printf[I32]("AUTOSCALE: Checkpoint success status was %s\n".cstring(), result.string().cstring())
-          me.checkpoint_status_was(result)
+          @printf[I32]("AUTOSCALE: Checkpoint success status for grow was %s\n".cstring(), result.string().cstring())
+          me.checkpoint_status_for_grow_was(result)
           result
         },
         {() =>
-          @printf[I32]("AUTOSCALE: Checkpoint failed\n".cstring())
-          me.checkpoint_status_was(false)
+          @printf[I32]("AUTOSCALE: Checkpoint for grow failed\n".cstring())
+          me.checkpoint_status_for_grow_was(false)
           false
         })
       _checkpoint_initiator.force_checkpoint(promise)
@@ -622,7 +625,7 @@ actor Autoscale
       complete_grow2(joining_workers, is_coordinator)
     end
 
-  fun ref checkpoint_got_result(result: Bool,
+  fun ref checkpoint_got_result_for_grow(result: Bool,
     joining_workers: Array[WorkerName] val, is_coordinator: Bool) =>
     if result then
       complete_grow2(joining_workers, is_coordinator)
@@ -766,8 +769,8 @@ actor Autoscale
   be shrink_autoscale_barrier_complete() =>
     _phase.shrink_autoscale_barrier_complete()
 
-  be checkpoint_status_was(result: Bool) =>
-    _phase.checkpoint_status_was(result)
+  be checkpoint_status_for_grow_was(result: Bool) =>
+    _phase.checkpoint_status_for_grow_was(result)
 
   //////////////////////////////////
   // NON-COORDINATOR
@@ -857,6 +860,38 @@ actor Autoscale
   ///////////////
   // COORDINATOR
   ///////////////
+
+  fun ref shrink_force_checkpoint(remaining_workers: Array[WorkerName] val,
+    leaving_workers: Array[WorkerName] val)
+  =>
+None/****
+    // QQQ TODO
+    QQQ TODO FIX CUT AND PASTE!
+    if (_worker_name == _primary_worker) then
+      @printf[I32]("AUTOSCALE: Trigger checkpoint before resume-the-world\n".cstring())
+      let me = recover tag this end
+      let promise = Promise[Bool]
+      promise.next[Bool](
+        {(result: Bool) =>
+          @printf[I32]("AUTOSCALE: Checkpoint success status for grow was %s\n".cstring(), result.string().cstring())
+          me.checkpoint_status_for_grow_was(result)
+          result
+        },
+        {() =>
+          @printf[I32]("AUTOSCALE: Checkpoint for grow failed\n".cstring())
+          me.checkpoint_status_for_grow_was(false)
+          false
+        })
+      _checkpoint_initiator.force_checkpoint(promise)
+      @printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
+      _phase = _WaitingForCheckpointResult(this, joining_workers, is_coordinator)
+      @printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
+    else
+      @printf[I32]("AUTOSCALE: Trigger checkpoint before resume-the-world is performed instead by %s\n".cstring(), _primary_worker.cstring())
+      complete_grow2(joining_workers, is_coordinator)
+    end
+****/
+
   fun ref initiate_shrink(remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
