@@ -257,20 +257,11 @@ actor CheckpointInitiator is Initializable
     _clear_pending_checkpoints()
     _pending_checkpoints_enabled = true
     @printf[I32]("DBG: Initiating checkpoint at line %d\n".cstring(), __loc.line())
-    _phase.initiate_checkpoint(_checkpoint_group, this)
+    _start_checkpoint_timer(_time_between_checkpoints)
 
   fun ref _initiate_checkpoint(checkpoint_group: USize) =>
     ifdef "resilience" then
       @printf[I32]("DBG: Initiating checkpoint at line %d\n".cstring(), __loc.line())
-      /*** TODO delete: not useful:
-      match _phase
-      | let p: _WaitingCheckpointInitiatorPhase =>
-        None
-      else
-        @printf[I32]("Initiating checkpoint: wrong phase\n".cstring())
-        return
-      end
-      ***/
       _clear_pending_checkpoints()
       _current_checkpoint_id = _current_checkpoint_id + 1
 
