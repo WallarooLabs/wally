@@ -83,7 +83,8 @@ actor Autoscale
       message ordering here. Since we're requesting acks from boundaries
       after all their upstream producers, we know these acks will be sent
       after the boundaries have forwarded any register_producer messages.]
-    7) _WaitingForCheckpointResult: Trigger a checkpoint, wait for its result.
+    7) _WaitingForGrowCheckpointResult: Trigger a checkpoint, then
+      wait for its result.
       If it completes successfully, then we can continue to next step.
       If the checkpoint is aborted, then TODO we must abort this process.
     8) _WaitingForResumeTheWorld: Waiting for unmuting procedure to finish.
@@ -96,7 +97,8 @@ actor Autoscale
     V. COORDINATOR:
     1) _InjectShrinkAutoscaleBarrier: Stop the world and inject barrier to
        ensure in flight messages are finished
-    2) _WaitingForCheckpointResult: Trigger a checkpoint, wait for its result.
+    2) _WaitingForShrinkCheckpointResult: Trigger a checkpoint, then
+       wait for its result.
        If it completes successfully, then we can continue to next step.
        If the checkpoint is aborted, then TODO we must abort this process.
     3) _InitiatingShrink: RouterRegistry currently handles the details. We're
@@ -618,7 +620,7 @@ actor Autoscale
         })
       _checkpoint_initiator.force_checkpoint(promise)
       @printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
-      _phase = _WaitingForCheckpointResult(this, joining_workers, is_coordinator)
+      _phase = _WaitingForGrowCheckpointResult(this, joining_workers, is_coordinator)
       @printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     else
       @printf[I32]("AUTOSCALE: Trigger checkpoint before resume-the-world is performed instead by %s\n".cstring(), _primary_worker.cstring())
@@ -772,6 +774,9 @@ actor Autoscale
   be checkpoint_status_for_grow_was(result: Bool) =>
     _phase.checkpoint_status_for_grow_was(result)
 
+  be checkpoint_status_for_shrink_was(result: Bool) =>
+    _phase.checkpoint_status_for_shrink_was(result)
+
   //////////////////////////////////
   // NON-COORDINATOR
   //////////////////////////////////
@@ -864,33 +869,44 @@ actor Autoscale
   fun ref shrink_force_checkpoint(remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
-None/****
-    // QQQ TODO
-    QQQ TODO FIX CUT AND PASTE!
     if (_worker_name == _primary_worker) then
       @printf[I32]("AUTOSCALE: Trigger checkpoint before resume-the-world\n".cstring())
       let me = recover tag this end
       let promise = Promise[Bool]
       promise.next[Bool](
         {(result: Bool) =>
-          @printf[I32]("AUTOSCALE: Checkpoint success status for grow was %s\n".cstring(), result.string().cstring())
-          me.checkpoint_status_for_grow_was(result)
+          @printf[I32]("AUTOSCALE: Checkpoint success status for shrink was %s\n".cstring(), result.string().cstring())
+          me.checkpoint_status_for_shrink_was(result)
           result
         },
         {() =>
-          @printf[I32]("AUTOSCALE: Checkpoint for grow failed\n".cstring())
-          me.checkpoint_status_for_grow_was(false)
+          @printf[I32]("AUTOSCALE: Checkpoint for shrink failed\n".cstring())
+          me.checkpoint_status_for_shrink_was(false)
           false
         })
       _checkpoint_initiator.force_checkpoint(promise)
       @printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
-      _phase = _WaitingForCheckpointResult(this, joining_workers, is_coordinator)
+      _phase = _WaitingForShrinkCheckpointResult(this, remaining_workers, leaving_workers)
       @printf[I32]("AUTOSCALE: phase change line %d this 0x%lx _phase 0x%lx\n".cstring(), __loc.line(), this, _phase)
     else
       @printf[I32]("AUTOSCALE: Trigger checkpoint before resume-the-world is performed instead by %s\n".cstring(), _primary_worker.cstring())
-      complete_grow2(joining_workers, is_coordinator)
+      // QQQ TODO is this right?
+      initiate_shrink(remaining_workers, leaving_workers)
     end
-****/
+
+  fun ref checkpoint_got_result_for_shrink(result: Bool,
+    remaining_workers: Array[WorkerName] val,
+    leaving_workers: Array[WorkerName] val)
+  =>
+    if result then
+      initiate_shrink(remaining_workers, leaving_workers)
+    else
+      // TODO: If this checkpoint fails, then the only way to recover
+      //       from the failure is to rollback.  But we're in the context
+      //       of an autoscale event.  Do we wish to crash, or rollback
+      //       to pre-autoscale-event state, or something else?
+      Fail()
+    end
 
   fun ref initiate_shrink(remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)

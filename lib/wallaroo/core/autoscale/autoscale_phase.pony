@@ -134,6 +134,9 @@ trait _AutoscalePhase
   fun ref checkpoint_status_for_grow_was(result: Bool) =>
     _invalid_call(); Fail()
 
+  fun ref checkpoint_status_for_shrink_was(result: Bool) =>
+    _invalid_call(); Fail()
+
   fun ref autoscale_complete() =>
     _invalid_call(); Fail()
 
@@ -957,7 +960,7 @@ class _ShuttingDown is _AutoscalePhase
 // SHARED PHASES
 /////////////////////////////////////////////////
 
-class _WaitingForCheckpointResult is _AutoscalePhase
+class _WaitingForGrowCheckpointResult is _AutoscalePhase
   let _autoscale: Autoscale ref
   let _joining_workers: Array[WorkerName] val
   let _is_coordinator: Bool
@@ -970,10 +973,29 @@ class _WaitingForCheckpointResult is _AutoscalePhase
     _joining_workers = joining_workers
     _is_coordinator = is_coordinator
 
-  fun name(): String => "WaitingForCheckpointResult"
+  fun name(): String => "WaitingForGrowCheckpointResult"
 
   fun ref checkpoint_status_for_grow_was(result: Bool) =>
     _autoscale.checkpoint_got_result_for_grow(result, _joining_workers, _is_coordinator)
+
+class _WaitingForShrinkCheckpointResult is _AutoscalePhase
+  let _autoscale: Autoscale ref
+  let _remaining_workers: Array[WorkerName] val
+  let _leaving_workers: Array[WorkerName] val
+
+  new create(autoscale: Autoscale ref, remaining_workers: Array[WorkerName] val,
+    leaving_workers: Array[WorkerName] val)
+  =>
+    @printf[I32]("AUTOSCALE: Waiting for checkpoint process to finish.\n".cstring())
+    _autoscale = autoscale
+    _remaining_workers = remaining_workers
+    _leaving_workers = leaving_workers
+
+  fun name(): String => "WaitingForShrinkCheckpointResult"
+
+  fun ref checkpoint_status_for_shrink_was(result: Bool) =>
+    _autoscale.checkpoint_got_result_for_shrink(result,
+      _remaining_workers, _leaving_workers)
 
 class _WaitingForResumeTheWorld is _AutoscalePhase
   let _autoscale: Autoscale ref
