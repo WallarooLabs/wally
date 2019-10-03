@@ -166,6 +166,8 @@ actor ConnectorSink is Sink
   // 2PC
   let _twopc: ConnectorSink2PC
   var _seen_checkpointbarriertoken: (CheckpointBarrierToken | None) = None
+  var _last_autoscale_barrier_token: AutoscaleBarrierToken =
+    AutoscaleBarrierToken("no such worker", 0, [], [])
 
   new create(sink_id: RoutingId, sink_name: String, event_log: EventLog,
     recovering: Bool, env: Env, encoder_wrapper: ConnectorEncoderWrapper,
@@ -598,8 +600,21 @@ actor ConnectorSink is Sink
       _seen_checkpointbarriertoken = None
       _resume_processing_messages()
       _twopc.reset_state()
+    | let sat: AutoscaleBarrierToken =>
+      _last_autoscale_barrier_token = sat
+      _resume_processing_messages()
+    | let sart: AutoscaleResumeBarrierToken =>
+      if sart.id() == _last_autoscale_barrier_token.id() then
+        let lws = _last_autoscale_barrier_token.leaving_workers()
+        @ll(_conn_debug, "autoscale: leaving_workers size = %lu".cstring(),
+          lws.size())
+        if (lws.size() > 0) and _connected and _notify.twopc_intro_done then
+          _twopc.send_workers_left(this, 7 /*unused by sink*/, lws)
+        end
+      end
+      _resume_processing_messages()
     else
-      // AutoscaleBarrierToken, AutoscaleResumeBarrierToken, et al.
+      // Any other remaining barrier token
       _resume_processing_messages()
     end
     if ack_now then
