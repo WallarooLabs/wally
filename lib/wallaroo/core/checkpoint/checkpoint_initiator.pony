@@ -224,16 +224,13 @@ actor CheckpointInitiator is Initializable
     p((_last_complete_checkpoint_id, _last_rollback_id))
 
   be initiate_checkpoint(checkpoint_group: USize) =>
+    @printf[I32]("DBG: BE Initiating checkpoint at line %d\n".cstring(), __loc.line())
     if checkpoint_group == _checkpoint_group then
       _phase.initiate_checkpoint(checkpoint_group, this)
     end
 
-  be force_checkpoint_fake() =>
-    _last_complete_checkpoint_id = _last_complete_checkpoint_id + 1
-    _current_checkpoint_id = _current_checkpoint_id + 1
-    @ll(_debug, "force_checkpoint_fake: new values %lu and %lu\n".cstring(), _last_complete_checkpoint_id, _current_checkpoint_id)
-
   be force_checkpoint(promise: Promise[Bool]) =>
+    @printf[I32]("DBG: BE Initiating checkpoint at line %d\n".cstring(), __loc.line())
     _phase.initiate_checkpoint(_checkpoint_group, this)
     // _current_checkpoint_id is now the in-progress checkpoint.
     @ll(_debug, "force_checkpoint: _current_checkpoint_id %lu".cstring(), _current_checkpoint_id)
@@ -259,10 +256,21 @@ actor CheckpointInitiator is Initializable
   be restart_repeating_checkpoints() =>
     _clear_pending_checkpoints()
     _pending_checkpoints_enabled = true
+    @printf[I32]("DBG: Initiating checkpoint at line %d\n".cstring(), __loc.line())
     _phase.initiate_checkpoint(_checkpoint_group, this)
 
   fun ref _initiate_checkpoint(checkpoint_group: USize) =>
     ifdef "resilience" then
+      @printf[I32]("DBG: Initiating checkpoint at line %d\n".cstring(), __loc.line())
+      /*** TODO delete: not useful:
+      match _phase
+      | let p: _WaitingCheckpointInitiatorPhase =>
+        None
+      else
+        @printf[I32]("Initiating checkpoint: wrong phase\n".cstring())
+        return
+      end
+      ***/
       _clear_pending_checkpoints()
       _current_checkpoint_id = _current_checkpoint_id + 1
 
@@ -313,6 +321,7 @@ actor CheckpointInitiator is Initializable
       ifdef "resilience" then
         let promise = Promise[BarrierToken]
         promise.next[None]({(t: BarrierToken) =>
+    @printf[I32]("DBG: Initiating checkpoint at line %d\n".cstring(), __loc.line())
           _self.initiate_checkpoint(_checkpoint_group)})
         _barrier_coordinator.inject_barrier(
           CheckpointRollbackResumeBarrierToken(_last_rollback_id,
@@ -706,6 +715,7 @@ class _InitiateCheckpoint is TimerNotify
     _checkpoint_group = checkpoint_group
 
   fun ref apply(timer: Timer, count: U64): Bool =>
+    @printf[I32]("DBG: Initiating checkpoint at line %d\n".cstring(), __loc.line())
     _si.initiate_checkpoint(_checkpoint_group)
     false
 

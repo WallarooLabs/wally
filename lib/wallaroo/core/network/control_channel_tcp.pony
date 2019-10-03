@@ -545,6 +545,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             Fail()
           end
         })
+        @printf[I32]("DBG: _event_log.initiate_checkpoint line %d\n".cstring(), __loc.line())
         _event_log.initiate_checkpoint(m.checkpoint_id, promise)
       | let m: EventLogWriteCheckpointIdMsg =>
         let promise = Promise[CheckpointId]
