@@ -502,14 +502,16 @@ actor CheckpointInitiator is Initializable
     try
       let p = _cp_complete_promises(checkpoint_id)?
       @ll(_debug, "_propagate_checkpoint_complete: fulfilling promise for checkpoint_id %lu".cstring(), checkpoint_id)
-      // SLF TODO: For debugging timing purposes, we ought to create a timer
+      p(true)
+      // TODO: For debugging timing purposes, we ought to create a timer
       // that fires after >1 seconds and only then fulfill this promise.
       // What would that experiment discover? Answer: lots.  ^_^
       // TODO remove this timer hack or replace with adjustable timer delay.
-      // p(true)
+      /********
       let t = Timer(_DelayCheckpointComplete(p), 1_500_000_000)
       _timers(consume t)
       _cp_complete_promises.remove(checkpoint_id)?
+      ********/
     else
       @ll(_debug, "_propagate_checkpoint_complete: no promise for checkpoint_id %lu".cstring(), checkpoint_id)
     end
