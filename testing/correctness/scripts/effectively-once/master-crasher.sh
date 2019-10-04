@@ -323,7 +323,7 @@ run_custom3 () {
 }
 
 run_custom4 () {
-    ## Assume that we are run with `./master-crasher.sh 9 run_custom4
+    ## Assume that we are run with `./master-crasher.sh 9 run_custom4`
     ## Then connector sink output for key 'T' should
     ## be sent first to worker7.
     ## Shrink 7, then output goes to 1.
@@ -348,6 +348,31 @@ run_custom4 () {
     sleep 3
     echo "Pause the world, whee. Last output should be via initializer."
     pause_the_world
+}
+
+run_custom5 () {
+    ## Assume that we are run with `./master-crasher.sh 3 run_custom5`
+    ## Ouput for key 'T' should go to worker2 in an initializer/1/2 cluster.
+    sleep 2
+
+    for i in `seq 1 2`; do
+        for cmd in "shrink_worker 2" "shrink_worker 1" \
+                   "join_worker 1" "join_worker 2"; do
+            echo -n $cmd
+            $cmd
+            sleep 1
+            poll_out=`poll_ready -w 4 2>&1`
+            if [ $? -ne 0 -o ! -z "$poll_out" ]; then
+                echo "custom5 cmd $cmd: $poll_out"
+                pause_the_world
+                exit 1
+            fi
+            sleep 1.5
+        done
+    done
+    echo -n "join_worker 3"
+    join_worker 3
+    sleep 3
 }
 
 reset

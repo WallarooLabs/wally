@@ -3,6 +3,7 @@
 import asyncore
 import asynchat
 import logging
+import math
 import os
 import random
 import re
@@ -570,6 +571,41 @@ class AsyncServer(asynchat.async_chat, object):
                 logging.info('2PC: Phase 2 got unknown txn_id {} commit {}'.format(msg2.txn_id, msg2.commit))
                 self.log_it(['2-error', msg2.txn_id, 'unknown txn_id, commit {}'.format(msg2.commit)])
             # No reply is required for Phase 2
+        elif isinstance(msg2, cwm.WorkersLeft):
+            None
+            # Handling this message is a bit tricky because we may have
+            # connections from multiple Wallaroo workers, and each one of
+            # them will send the same WorkersLeft message.  Let's assume
+            # that we'll be processing all of those identical messages in
+            # a big race.
+            #
+            # TODO: The deletion step from self._streams is probably
+            # not safe 100% of the time?  I.e., there might be a race with
+            # a worker with the same name joining again?  That's very
+            # unlikely in the current Wallaroo implementation, but possible.
+            #
+            # The file naming convention we use is "output.workername.TS"
+            # and "output.workername.TS.txnlog".  This scheme is compatible
+            # with the "1-to-1-passthrough-verify.sh" script: it examines the
+            # sink output dir for all files with ".txnlog" suffix and then
+            # chops off that suffix to find the corresponding output file.
+            # After that, all of "1-to-1-passthrough-verify.sh" output
+            # order mapping is done by 2PC commit timestamps.
+            now = math.trunc(time.time()*1000000)
+            for w in msg2.leaving_workers:
+                opath = self._out_path + "." + w
+                mv_path1 = "{}.{}".format(opath, time.time())
+                cmd1 = "mv {} {} > /dev/null 2>&1".format(opath, mv_path1)
+                cmd2 = "mv {}.txnlog {}.txnlog > /dev/null 2>&1".format(opath, mv_path1)
+                logging.info("leaving worker: run: {}".format(cmd1))
+                logging.info("leaving worker: run: {}".format(cmd2))
+                os.system(cmd1)
+                os.system(cmd2)
+                key = (opath, 1)
+                try:
+                    del self._streams[key]
+                except KeyError:
+                    None
         else:
             raise Exception("Stream ID 0 not implemented, msg2 = {}".format(msg2))
 
