@@ -739,8 +739,8 @@ actor ConnectorSink is Sink
     We may need to re-send phase2=commit for this checkpoint_id.
     (But that's async from our point of view, beware tricksy bugs....)
     """
-    @ll(_conn_debug, "Rollback to %s at ConnectorSink %s".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring())
-    @ll(_twopc_debug, "2PC: Rollback: twopc_state %d txn_id %s.".cstring(), _twopc.state(), _twopc.txn_id.cstring())
+    @ll(_conn_info, "Rollback to %s at ConnectorSink %s".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring())
+    @ll(_twopc_info, "2PC: Rollback: twopc_state %d txn_id %s.".cstring(), _twopc.state(), _twopc.txn_id.cstring())
 
     // If we were disconnected + perform a local abort, then we
     // arrive here with _twopc.txn_id="".  The last transaction,
@@ -768,8 +768,27 @@ actor ConnectorSink is Sink
       end
     end
 
+    let rollback_to_c_id = _twopc.make_txn_id_string(checkpoint_id)
     if not _twopc.state_is_start() then
-      _twopc.send_phase2(this, false)
+      if rollback_to_c_id == _twopc.txn_id then
+        // This is an interesting case: we are rolling back to but have not
+        // committed with phase 2.  This is possible when initializer has
+        // determined that the checkpoint has committed globally, writes
+        // commit record to event log, then initializer crashes & restarts.
+        //
+        // Double-check that we have voted to commit/commit fast for
+        // the transaction.  This ought to be true, so it is definitely
+        // worth a crash if it's not true.
+        if _twopc.state_is_2commit() or _twopc.state_is_2commit_fast() then
+          @ll(_twopc_info, "Txn id %s may need phase 2 commit, sending!".cstring(), _twopc.txn_id.cstring())
+          _twopc.send_phase2(this, true)
+        else
+          Fail()
+        end
+      else
+       @ll(_twopc_info, "Txn id %s needs phase 2 abort, sending!".cstring(), _twopc.txn_id.cstring())
+        _twopc.send_phase2(this, false)
+      end
     end
     _twopc.reset_state()
 
@@ -785,8 +804,7 @@ actor ConnectorSink is Sink
     // we didn't know if the txn-in-progress had committed globally.
     // When rollback() is called here, we now know the global txn
     // commit status: commit for checkpoint_id, all greater are invalid.
-    _notify.twopc_txn_id_last_committed =
-      _twopc.make_txn_id_string(checkpoint_id)
+    _notify.twopc_txn_id_last_committed = rollback_to_c_id
     @ll(_twopc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
     _notify.twopc_current_txn_aborted = _notify.process_uncommitted_list(this)
 

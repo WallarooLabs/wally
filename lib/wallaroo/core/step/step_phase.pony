@@ -311,8 +311,8 @@ class _RecoveringStepPhase is StepPhase
   fun ref receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    @printf[I32]("Ignoring non-rollback barrier in _RecoveringStepPhase\n"
-      .cstring())
+    @printf[I32]("Ignoring non-rollback barrier in _RecoveringStepPhase: %s\n"
+      .cstring(), barrier_token.string().cstring())
 
   fun ref queued(): Array[_Queued] =>
     Array[_Queued]

@@ -98,8 +98,6 @@ class ConnectorSinkNotify
     conn.set_nodelay(true)
     conn.expect(4)
 
-    // TODO: configure connector v2 program string
-    // TODO: configure connector v2 instance_name string
     let hello = cwm.HelloMsg(_protocol_version, _cookie,
       _app_name, _worker_name)
     send_msg(conn, hello)
