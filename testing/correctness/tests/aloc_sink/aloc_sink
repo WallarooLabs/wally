@@ -147,6 +147,7 @@ HACK = 0
 
 class AsyncServer(asynchat.async_chat, object):
     def __init__(self, handler_id, sock, out_path, abort_rule_path, s3_scheme, s3_bucket, s3_prefix, streams=None):
+        logging.info("QQQ AsyncServer.__init__: {} {}".format(handler_id, sock))
         logging.debug("AsyncServer.__init__: {} {}".format(handler_id, sock))
         self._id = handler_id
         self._conn = sock
@@ -230,6 +231,7 @@ class AsyncServer(asynchat.async_chat, object):
         # Hello, Ok, Error, Notify, NotifyAck, Message, Ack, Restart
         self.count = 0
         if isinstance(msg, cwm.Hello):
+            logging.info("QQQ: got HelloMsg: {} on {}".format(msg, self._conn))
             if msg.version != "v0.0.1":
                 logging.critical('bad protocol version: {}'.format(msg.version))
                 sys.exit(66)
@@ -395,7 +397,7 @@ class AsyncServer(asynchat.async_chat, object):
 
             self.log_it(['list-uncommitted', uncommitted])
         elif isinstance(msg2, cwm.TwoPCPhase1):
-            logging.debug('2PC: Phase 1 got {}'.format(msg2))
+            logging.info('2PC: Phase 1 got {}'.format(msg2))
             logging.debug('2PC: Phase 1 txn_state = {}'.format(self._txn_state))
 
             # Sanity checks
@@ -415,8 +417,8 @@ class AsyncServer(asynchat.async_chat, object):
                         .format(start_por, end_por))
                 if end_por > self._out_offset:
                     self._txn_commit_next = False
-                    m = '2PC: Phase 1 invalid end_por {} self._out_offset {} file size {} commit id {}'.format(
-                        end_por, self._out_offset, self._out.tell(), msg2.txn_id)
+                    m = '2PC: Phase 1 invalid end_por {} self._out_offset {} file size {} msg2 {}'.format(
+                        end_por, self._out_offset, self._out.tell(), msg2)
                     if self._out_offset == start_por:
                         ## We probably restarted, we've truncated uncommitted
                         ## bytes at the end of the file, and here's Wallaroo
@@ -500,7 +502,7 @@ class AsyncServer(asynchat.async_chat, object):
         elif isinstance(msg2, cwm.TwoPCReply):
             raise Exception("Bad stream ID 0 message: {}".format(msg2))
         elif isinstance(msg2, cwm.TwoPCPhase2):
-            logging.debug('2PC: Phase 2 got {}'.format(msg2))
+            logging.info('2PC: Phase 2 got {}'.format(msg2))
             logging.debug('2PC: Phase 2 pre txn_state = {}'.format(self._txn_state))
             if msg2.txn_id in self._txn_state:
                 (phase1_status, where_list) = self._txn_state[msg2.txn_id]
@@ -510,11 +512,12 @@ class AsyncServer(asynchat.async_chat, object):
                             raise Exception('Phase 2 abort: bad stream_id {}'.
                                 format(stream_id))
                         logging.info('2PC: truncating {} to offset {}'.format(self._out_path_opath, start_por))
+                        logging.debug('2PC: Phase 2 got {}'.format(msg2))
 
                         ## DIAGNOSTIC: Save a copy of the file for diag purposes:
                         self.flush_fsync(self._out)
                         copy_path = "{}.{}".format(self._out_path_opath, time.time())
-                        os.system("cp {} {}".format(self._out_path_opath, copy_path))
+                        os.system("cp {} {}.diag".format(self._out_path_opath, copy_path))
                         logging.info("flushed & copied to {}".format(copy_path))
                         ## End DIAGNOSTIC
 
@@ -822,4 +825,5 @@ logging.debug("abort_rule_path: {}".format(abort_rule_path))
 server = SinkServer('127.0.0.1', listen_port, out_path, abort_rule_path, s3_scheme, s3_bucket, s3_prefix)
 logging.debug("server: {}".format(server))
 logging.debug("asyncore file: {}".format(asyncore.__file__))
+logging.info("QQQ Process started")
 asyncore.loop(timeout=0.001)
