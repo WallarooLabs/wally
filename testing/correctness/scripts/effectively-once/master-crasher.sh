@@ -375,6 +375,28 @@ run_custom5 () {
     sleep 3
 }
 
+run_custom3006 () {
+    ## Assume that we are run with `./master-crasher.sh 2 run_custom306`
+    ## See https://github.com/WallarooLabs/wallaroo/issues/3006
+    sleep 2
+
+    while [ 1 ]; do
+        echo -n c0
+        ./crash-worker.sh 0
+        sleep 0.2
+        mv /tmp/wallaroo.0 /tmp/wallaroo.0.`date +%s`
+        echo -n s0
+        ./start-initializer.sh
+        poll_out=`poll_ready -w 4 2>&1`
+        if [ $? -ne 0 -o ! -z "$poll_out" ]; then
+            echo "custom3006 cmd $cmd: $poll_out"
+            pause_the_world
+            exit 1
+        fi
+        sleep 1.5
+    done
+}
+
 reset
 start_sink ; sleep 1
 start_all_workers
