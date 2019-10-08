@@ -883,7 +883,7 @@ class ConnectorSourceNotify[In: Any val]
     for s_map in [_active_streams ; _pending_close].values() do
       @ll(_conn_debug, "s_map.size = %lu".cstring(), s_map.size())
       for s in s_map.values() do
-        _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_seen))
+        _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
       end
     end
     _relinquish_streams()
