@@ -414,6 +414,26 @@ run_custom3006 () {
     done
 }
 
+run_custom_tcp_crash0 () {
+    ## Assume that we are run with `./master-crasher.sh 2 run_custom_tcp_crash0
+    ## See 
+    sleep 2
+
+    echo -n c0
+    ./crash-worker.sh 0
+    sleep 0.2
+    mv /tmp/wallaroo.0 /tmp/wallaroo.0.`date +%s`
+
+    echo -n s0
+    ./start-initializer.sh
+    poll_out=`poll_ready -w 4 2>&1`
+    if [ $? -ne 0 -o ! -z "$poll_out" ]; then
+        echo "custom3006 cmd $cmd: $poll_out"
+        pause_the_world
+        exit 1
+    fi
+}
+
 reset
 start_sink ; sleep 1
 start_all_workers
