@@ -7,6 +7,22 @@ shell.
 
 ## Build prerequisites
 
+* I've only run this stuff on Linux.  OS X will probably break in a few
+  cases, e.g., "tail" arguments working differently than Linux; I don't
+  recommend it.
+
+    * I've been using an Ubuntu Xenial/16.04 LTS virtual machine with
+      2 virtual CPUs and 4GB RAM.
+
+* Docker on the Linux host.  Start the metrics UI app via the
+  following command, and aim a Web browser at http://linux-ip-addr:4000/.
+
+```
+sudo docker kill mui; sudo docker rm mui; sudo docker run -d -u root --privileged  -v /usr/bin:/usr/bin:ro   -v /var/run/docker.sock:/var/run/docker.sock -v /bin:/bin:ro  -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/apps/metrics_reporter_ui/log  -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 --name mui -h mui --net=host wallaroolabs/wallaroo-metrics-ui:0.4.0
+```
+
+* Build the Wallaroo app & related utilities.
+
 ```
 make -C ../../../.. \
     PONYCFLAGS="--verbose=1 -d -Dresilience -Dtrace -Dcheckpoint_trace -Didentify_routing_ids" \
@@ -181,6 +197,11 @@ All lines in this ASCII file will begin with the letter "T". The
 as the "key" for routing in a multi-worker cluster.  Therefore, all
 lines in the file will be processed by the same worker; this property
 makes correctness checking easier.
+
+Note that the metrics UI will only report stats from the worker that
+is assigned the "T" key; all other workers will be reporting no
+activity because there is no data in the /tmp/input-file.txt file with
+another key.
 
 ### Run without errors
 
