@@ -22,12 +22,12 @@ reset () {
 
 start_sink () {
     $HOME/wallaroo/utils/data_receiver/data_receiver \
-        --listen 0.0.0.0:$WALLAROO_OUT_PORT \
-        > /tmp/sink-out/output 2>&1 &
+        --listen 0.0.0.0:$WALLAROO_OUT_PORT --ponythreads=1 \
+        >> /tmp/sink-out/output 2>&1 &
 }
 
 stop_sink () {
-    ps axww | grep -v grep | grep data_receiver | awk '{print $1}' | xargs kill
+    ps axww | grep -v grep | grep data_receiver | awk '{print $1}' | xargs kill -9
 }
 
 start_initializer () {
@@ -73,7 +73,7 @@ start_sender () {
         $HOME/wallaroo/testing/tools/fixed_length_message_blaster/fixed_length_message_blaster \
             --host localhost:$WALLAROO_IN_BASE --file /tmp/input-file.txt \
             --msg-size 53 --batch-size 6 \
-            --msec-interval 5 --report-interval 1000000 \
+            --msec-interval 5 --report-interval 1000000 --ponythreads=1 \
             >> $outfile 2>&1
         sleep 0.1
     done
@@ -102,7 +102,7 @@ random_sleep () {
 }
 
 crash_sink () {
-    ps axww | grep python3 | grep /aloc_sink | awk '{print $1}' | xargs kill -9
+    stop_sink
 }
 
 crash_worker () {
