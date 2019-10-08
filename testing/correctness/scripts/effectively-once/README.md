@@ -7,11 +7,16 @@ shell.
 
 ## Build prerequisites
 
+I've only run this stuff on Linux.  OS X will probably break in a few
+cases, e.g., "tail" arguments working differently than Linux; I don't
+recommend it.
+
 ```
 make -C ../../../.. \
     PONYCFLAGS="--verbose=1 -d -Dresilience -Dtrace -Dcheckpoint_trace -Didentify_routing_ids" \
     build-examples-pony-passthrough build-testing-tools-external_sender \
-    build-utils-cluster_shrinker
+    build-utils-cluster_shrinker build-utils-data_receiver \
+    build-testing-tools-fixed_length_message_blaster
 ```
 
 ## Basic command use
@@ -173,7 +178,7 @@ Let's restart 1 worker, `worker5`.
 Create a large input file, approx 12MB, using the command:
 
 ```
-dd if=testing/data/market_spread/nbbo/r3k-symbols_nbbo-fixish.msg bs=1000000 count=4 | od -x | sed 's/^/T/' > /tmp/input-file.txt
+dd if=$HOME/wallaroo/testing/data/market_spread/nbbo/r3k-symbols_nbbo-fixish.msg bs=1000000 count=1 | od -x | sed 's/^/T/' | sed -n '1,/T3641060/p' | perl -ne 'print "\0\0\0"; print "1"; print' > /tmp/input-file.txt
 ```
 
 All lines in this ASCII file will begin with the letter "T". The

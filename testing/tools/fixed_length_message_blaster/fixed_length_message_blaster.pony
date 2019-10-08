@@ -184,7 +184,8 @@ actor Sender
     _catch_up = catch_up
 
   be start() =>
-    // @printf[I32]("Sender: nsec_interval = %lu\n".cstring(), _nsec_interval)
+    @printf[I32]("Sender: nsec_interval = %lu\n".cstring(), _nsec_interval)
+    @printf[I32]("Sender: report_interval = %lu\n".cstring(), _report_interval)
     let t = Timer(TriggerSend(this), 0, _nsec_interval)
     _timers(consume t)
     if _report_interval > 0 then

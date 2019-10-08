@@ -15,15 +15,19 @@ export WALLAROO_THRESHOLDS='*.8'
 
 reset () {
     reset.sh
-    ps axww | grep master-crasher.sh | grep -v $$ | awk '{print $1}' | xargs kill -9
+    ps axww | grep master-crasher.sh | grep -v $$ | awk '{print $1}' | xargs kill -9  > /dev/null 2>&1
+    stop_sink > /dev/null 2>&1
+    stop_sender > /dev/null 2>&1
 }
 
 start_sink () {
-    ~/wallaroo/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 >> /tmp/sink-out/stdout-stderr 2>&1 &
+    $HOME/wallaroo/utils/data_receiver/data_receiver \
+        --listen 0.0.0.0:$WALLAROO_OUT_PORT \
+        > /tmp/sink-out/output 2>&1 &
 }
 
 stop_sink () {
-    ps axww | grep python | grep aloc_sink | awk '{print $1}' | xargs kill
+    ps axww | grep -v grep | grep data_receiver | awk '{print $1}' | xargs kill
 }
 
 start_initializer () {
@@ -66,9 +70,17 @@ start_sender () {
     outfile=/tmp/sender.out
     rm -f $outfile
     while [ 1 ]; do
-        $HOME/wallaroo/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 66000 >> $outfile 2>&1
+        $HOME/wallaroo/testing/tools/fixed_length_message_blaster/fixed_length_message_blaster \
+            --host localhost:$WALLAROO_IN_BASE --file /tmp/input-file.txt \
+            --msg-size 53 --batch-size 6 \
+            --msec-interval 5 --report-interval 1000000 \
+            >> $outfile 2>&1
         sleep 0.1
     done
+}
+
+stop_sender () {
+    ps axww | grep -v grep | grep fixed_length_message_blaster | awk '{print $1}' | xargs kill
 }
 
 random_float () {
@@ -152,23 +164,27 @@ run_crash_worker_loop () {
 }
 
 run_sanity_loop () {
+    ##echo run_sanity_loop: not valid for TCP source and sink, skipping
     outfile=/tmp/sanity-loop.out
     while [ 1 ]; do
         sleep 1
         echo -n ,
-        egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr
-        if [ $? -eq 0 ]; then
-            echo SANITY
-            break
-        fi
-        ./1-to-1-passthrough-verify.sh /tmp/input-file.txt > $outfile 2>&1
-        if [ $? -ne 0 ]; then
-            head $outfile
-            rm $outfile
-            echo BREAK2
-            break
-        fi
-        rm $outfile
+        ## stdout-stderr does not exist
+        #egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr
+        #if [ $? -eq 0 ]; then
+        #    echo SANITY
+        #    break
+        #fi
+        
+        ## verification script's assumptions are not met by TCPSink
+        #./1-to-1-passthrough-verify.sh /tmp/input-file.txt > $outfile 2>&1
+        #if [ $? -ne 0 ]; then
+        #    head $outfile
+        #    rm $outfile
+        #    echo BREAK2
+        #    break
+        #fi
+        rm -f $outfile
     done
     echo "SANITY LOOP FAILURE: pause the world"
     pause_the_world

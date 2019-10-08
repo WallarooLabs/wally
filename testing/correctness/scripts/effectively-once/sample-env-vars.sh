@@ -12,17 +12,18 @@ export WALLAROO_DATA_BASE=7102
 export WALLAROO_MY_EXTERNAL_BASE=7103
 export WALLAROO_MY_CONTROL_BASE=7104
 export WALLAROO_MY_DATA_BASE=7105
+export WALLAROO_OUT_PORT=7200
 
 ## export WALLAROO_BIN="./examples/pony/passthrough/passthrough"
-export WALLAROO_ARG_IN="InputBlobs@__IN_HOST__:__IN_PORT__:Dragons-Love-Tacos:500:50"
-export WALLAROO_ARG_OUT="${WALLAROO_OUT_HOST}:7200"
+export WALLAROO_ARG_IN="InputBlobs@__IN_HOST__:__IN_PORT__"
+export WALLAROO_ARG_OUT="${WALLAROO_OUT_HOST}:${WALLAROO_OUT_PORT}"
 export WALLAROO_ARG_METRICS="${WALLAROO_METRICS_HOST}:5001"
 export WALLAROO_ARG_CONTROL="${WALLAROO_INIT_HOST}:${WALLAROO_CONTROL_BASE}"
 export WALLAROO_ARG_DATA="${WALLAROO_INIT_HOST}:${WALLAROO_DATA_BASE}"
 export WALLAROO_ARG_RESILIENCE="--run-with-resilience"
 export WALLAROO_ARG_PONY="--ponynoblock --ponythreads=1 --ponyminthreads=9999"
 
-export WALLAROO_ARG_PT="--verbose --parallelism 2 --source connector --step asis-state --sink connector"
+export WALLAROO_ARG_PT="--verbose --parallelism 2 --source tcp --step asis-state --sink tcp"
 
 export WALLAROO_BASE_ARGS="$WALLAROO_ARG_PT --out $WALLAROO_ARG_OUT --metrics $WALLAROO_ARG_METRICS --control $WALLAROO_ARG_CONTROL $WALLAROO_ARG_RESILIENCE"
 

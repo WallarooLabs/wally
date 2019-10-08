@@ -216,6 +216,7 @@ class SourceTCPHandler is TestableTCPHandler
     if qty <= _max_size then
       _expect = qty
     else
+      @printf[I32]("expect: invalid qty = %lu\n".cstring(), qty)
       Fail()
     end
 
