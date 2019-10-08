@@ -100,7 +100,7 @@ actor ReconnectingMetricsSink
 
   new create(host: String, service: String, application_name: String,
     worker_name: String, from: String = "", init_size: USize = 64,
-    max_size: USize = 16384, reconnect_pause: U64 = 10_000_000_000)
+    max_size: USize = 16384, reconnect_pause: U64 = 250_000_000 /**10_000_000_000**/)
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
