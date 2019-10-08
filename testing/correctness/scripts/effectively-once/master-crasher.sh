@@ -126,8 +126,9 @@ run_crash_worker_loop () {
         sleep `random_float 4.5 0`
         echo -n "c$worker"
         crash_out=`crash_worker $worker`
-        sleep `random_float 2.5 0`
+        mv /tmp/wallaroo.$worker /tmp/wallaroo.$worker.`date +%s` && gzip /tmp/wallaroo.$worker.`date +%s` &
         if [ -z "$crash_out" ]; then
+            sleep `random_float 2.5 0`
             if [ $worker -eq 0 ]; then
                 start_initializer
             else
