@@ -18,6 +18,7 @@ Copyright 2018 The Wallaroo Authors.
 
 use "collections"
 use "promises"
+use "time" // QQQ HACK
 use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
 use "wallaroo/core/initialization"
@@ -66,6 +67,7 @@ actor Recovery
   let _data_receivers: DataReceivers
   // The checkpoint id we are recovering to if we're recovering
   var _checkpoint_id: (CheckpointId | None) = None
+  let _timers: Timers = Timers // QQQ HACK
 
   new create(auth: AmbientAuth, worker_name: WorkerName, event_log: EventLog,
     recovery_reconnecter: RecoveryReconnecter,
@@ -271,6 +273,10 @@ actor Recovery
       promise.next[None](recover this~rollback_complete(_worker_name) end)
       _event_log.initiate_rollback(token, promise)
 
+      let t = Timer(_DelayInitiateRollback( // QQQ HACK
+        token, _worker_name, _auth, _workers, _connections), 0_700_000_000)
+      _timers(consume t) // QQQ HACK
+      /**** QQQ HACK
       try
         let msg = ChannelMsgEncoder.event_log_initiate_rollback(token,
           _worker_name, _auth)?
@@ -280,6 +286,7 @@ actor Recovery
       else
         Fail()
       end
+      QQQ HACK ****/
     end
 
   fun ref _recovery_complete() =>
@@ -325,3 +332,33 @@ actor Recovery
       Fail()
     end
     _recovery_phase = _RecoveryOverrideAccepted
+
+class _DelayInitiateRollback is TimerNotify
+  let _token: CheckpointRollbackBarrierToken
+  let _worker_name: String
+  let _auth: AmbientAuth
+  let _workers: Array[WorkerName] val
+  let _connections: Connections
+
+  new iso create(token: CheckpointRollbackBarrierToken, worker_name: String,
+    auth: AmbientAuth, workers: Array[WorkerName] val,
+    connections: Connections)
+  =>
+    _token = token
+    _worker_name = worker_name
+    _auth = auth
+    _workers = workers
+    _connections = connections
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    @printf[I32]("_DelayInitiateRollback: TIMER FIRED\n".cstring())
+    try
+      let msg = ChannelMsgEncoder.event_log_initiate_rollback(_token,
+        _worker_name, _auth)?
+      for w in _workers.values() do
+        _connections.send_control(w, msg)
+      end
+    else
+      Fail()
+    end
+    false
