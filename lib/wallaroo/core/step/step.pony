@@ -509,11 +509,13 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       queued = _phase.queued()
       _phase = _NormalStepPhase(this)
     end
+    @printf[I32]("DBG: Step.barrier_complete: Step %s, queued size = %lu\n".cstring(), _id.string().cstring(), queued.size())
     for q in queued.values() do
       match q
       | let qm: QueuedMessage =>
         qm.process_message(this)
       | let qb: QueuedBarrier =>
+      @printf[I32]("DBG: Step.barrier_complete: Step %s, inject some barrier\n".cstring(), _id.string().cstring())
         qb.inject_barrier(this)
       end
     end

@@ -424,6 +424,7 @@ class ConnectorSourceNotify[In: Any val]
 
             if (msg_id > 0) and (msg_id <= s.last_seen) then
               // skip processing of an already seen message
+              @ll(_conn_debug, "Skip m.message_id %lu <= last_seen %lu".cstring(), msg_id, s.last_seen)
               return _continue_perhaps(source)
             end
 
@@ -554,6 +555,7 @@ class ConnectorSourceNotify[In: Any val]
     match message_id
     | let m_id: PointOfReference =>
       s.last_seen = m_id
+      @ll(_conn_debug, "DBG: update point_of_ref last_seen = %lu".cstring(), s.last_seen)
     end
 
     if is_finished then
