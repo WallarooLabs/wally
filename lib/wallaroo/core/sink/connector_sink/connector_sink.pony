@@ -943,6 +943,10 @@ actor ConnectorSink is Sink
 
     var data_size: USize = 0
     for bytes in _notify.sentv(this, data).values() do
+      ifdef "trace" then
+        @ll(_conn_debug, "TRACE: ConnectorSink._writev: %s\n".cstring(), _print_array[U8](
+          bytes).cstring())
+      end
       _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
       _pending_writev_total = _pending_writev_total + bytes.size()
       _pending.push((bytes, 0))
@@ -1363,3 +1367,10 @@ class PauseBeforeReconnectConnectorSink is TimerNotify
   fun ref apply(timer: Timer, count: U64): Bool =>
     _tcp_sink.reconnect()
     false
+
+  fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
+    """
+    Generate a printable string of the contents of the given readseq to use in
+    error messages.
+    """
+    "[len=" + array.size().string() + ": " + ", ".join(array.values()) + "]"
