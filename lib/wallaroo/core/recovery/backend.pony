@@ -185,6 +185,8 @@ class FileBackend is Backend
     var replay_buffer: Array[(RoutingId, ByteSeq val, Bool)] ref =
       replay_buffer.create()
     var current_checkpoint_id: CheckpointId = 0
+    var offset_start: USize = 0
+    var offset_end: USize = 0
     var target_checkpoint_offset_start: USize = 0
     var target_checkpoint_offset_end: USize = 0
     var target_checkpoint_found: Bool = false
@@ -200,7 +202,7 @@ class FileBackend is Backend
       | _LogDataEntry =>
         if not first_data_entry_found then
           first_data_entry_found = true
-          target_checkpoint_offset_start = _file.position() - 1
+          offset_start = _file.position() - 1
         end
         // First skip is_last_found byte and resilient_id
         _file.seek(17)
@@ -210,18 +212,23 @@ class FileBackend is Backend
         // Skip payload
         _file.seek(size.isize())
       | _LogCheckpointIdEntry =>
-        target_checkpoint_offset_end = _file.position() - 1
+        offset_end = _file.position() - 1
         r.append(_file.read(8))
         current_checkpoint_id = try r.u64_be()? else Fail(); 0 end
         if current_checkpoint_id == checkpoint_id then
+          // We want to find the last checkpoint in the log, because
+          // the one we've found at this position may have been aborted,
+          // and another entry with checkpoint_id may appear later in
+          // the file.
           target_checkpoint_found = true
-          break
+          target_checkpoint_offset_start = offset_start
+          target_checkpoint_offset_end = offset_end
         end
         first_data_entry_found = false
-        target_checkpoint_offset_start = _file.position()
+        offset_start = _file.position()
       | _LogRestartEntry =>
-        target_checkpoint_offset_start = (_file.position() - 1) + _restart_len
-        _file.seek_start(target_checkpoint_offset_start)
+        offset_start = (_file.position() - 1) + _restart_len
+        _file.seek_start(offset_start)
       end
     end
     if not target_checkpoint_found then
