@@ -13,6 +13,8 @@ export WALLAROO_BIN=$HOME/wallaroo/examples/pony/passthrough/passthrough
 export WALLAROO_THRESHOLDS='*.8'
 . ./sample-env-vars.sh
 
+SENDER_OUTFILE=/tmp/sender.out
+
 reset () {
     reset.sh
     ps axww | grep master-crasher.sh | grep -v $$ | awk '{print $1}' | xargs kill -9
@@ -63,10 +65,9 @@ start_all_workers () {
 }
 
 start_sender () {
-    outfile=/tmp/sender.out
-    rm -f $outfile
+    rm -f $SENDER_OUTFILE
     while [ 1 ]; do
-        $HOME/wallaroo/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 66000 >> $outfile 2>&1
+        $HOME/wallaroo/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 66000 >> $SENDER_OUTFILE 2>&1
         sleep 0.1
     done
 }
@@ -169,6 +170,13 @@ run_sanity_loop () {
             break
         fi
         rm $outfile
+        res=`logtail $SENDER_OUTFILE | egrep 'MultiSourceConnector closed Stream.*, point_of_ref=12368928, is_open=False'`
+        if [ ! -z "$res" ]; then
+            echo "SANITY LOOP SUCCESS: EOF found!"
+            echo "SANITY LOOP SUCCESS: EOF found!" >> /tmp/res
+            echo $res >> /tmp/res
+            pause_the_world
+        fi
     done
     echo "SANITY LOOP FAILURE: pause the world"
     pause_the_world
