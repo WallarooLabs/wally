@@ -385,7 +385,8 @@ run_custom3006 () {
         echo -n c0
         ./crash-worker.sh 0
         sleep 0.2
-        mv /tmp/wallaroo.0 /tmp/wallaroo.0.`date +%s`
+        new=/tmp/wallaroo.0.`date +%s`
+        mv /tmp/wallaroo.0 $new && gzip $new &
         echo -n s0
         ./start-initializer.sh
         poll_out=`poll_ready -w 4 2>&1`
