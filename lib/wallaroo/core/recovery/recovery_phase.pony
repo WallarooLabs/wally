@@ -49,13 +49,21 @@ trait _RecoveryPhase
   fun ref worker_ack_local_keys_rollback(w: WorkerName,
     checkpoint_id: CheckpointId)
   =>
-    _invalid_call(); Fail()
+    // This is called directly in response to a control message received.
+    // But we can't guarantee that this message is not a straggler in the case
+    // that we crashed during an earlier round of recovery/rollback. So we
+    // can only log and ignore here.
+    _unexpected_call("worker_ack_local_keys_rollback()")
 
   fun ref worker_ack_register_producers(w: WorkerName) =>
     _invalid_call(); Fail()
 
   fun ref receive_rollback_id(rollback_id: RollbackId) =>
-    _invalid_call(); Fail()
+    // This is called directly in response to a control message received.
+    // But we can't guarantee that this message is not a straggler in the case
+    // that we crashed during an earlier round of recovery/rollback. So we
+    // can only log and ignore here.
+    _unexpected_call("receive_rollback_id()")
 
   fun ref rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
     _invalid_call(); Fail()
@@ -64,12 +72,20 @@ trait _RecoveryPhase
     _invalid_call(); Fail()
 
   fun ref ack_recovery_initiated(w: WorkerName) =>
-    _invalid_call(); Fail()
+    // This is called directly in response to a control message received.
+    // But we can't guarantee that this message is not a straggler in the case
+    // that we crashed during an earlier round of recovery/rollback. So we
+    // can only log and ignore here.
+    _unexpected_call("ack_recovery_initiated()")
 
   fun ref rollback_complete(worker: WorkerName,
     token: CheckpointRollbackBarrierToken)
   =>
-    _invalid_call(); Fail()
+    // This is called directly in response to a control message received.
+    // But we can't guarantee that this message is not a straggler in the case
+    // that we crashed during an earlier round of recovery/rollback. So we
+    // can only log and ignore here.
+    _unexpected_call("rollback_complete()")
 
   fun ref try_override_recovery(worker: WorkerName,
     rollback_id: RollbackId, recovery: Recovery ref,
@@ -81,6 +97,25 @@ trait _RecoveryPhase
   fun _invalid_call() =>
     @printf[I32]("Invalid call on recovery phase %s\n".cstring(),
       name().cstring())
+
+  fun _unexpected_call(call: String) =>
+    """
+    Only call this for phase methods that are called directly in response to
+    control messages received. That's because we can't be sure in that case if
+    we had crashed and recovered during an earlier recovery/rollback round, in
+    which case any control messages related to that earlier round are simply
+    outdated. We shouldn't Fail() in this case because we can expect control
+    messages to go out of sync in this way in this kind of scenario.
+
+    TODO: All such control messages could be tagged with a rollback id,
+    enabling us to determine at the Recovery actor level if we should drop
+    such a message or send it to our current phase. This would mean we'd have
+    to ignore anything we receive before we get an initial rollback id, which
+    takes place after at least one phase that waits for a control message, so
+    there are problems to be solved in order to do this safely.
+    """
+    @printf[I32]("Unexpected call to %s on recovery phase %s. Ignoring!\n"
+      .cstring(), call.cstring(), name().cstring())
 
 class _AwaitRecovering is _RecoveryPhase
   fun name(): String => "_AwaitRecovering"
