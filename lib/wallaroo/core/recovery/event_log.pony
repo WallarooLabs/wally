@@ -313,6 +313,7 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
   be prepare_for_rollback(origin: (Recovery | Promise[None]),
     checkpoint_initiator: CheckpointInitiator)
   =>
+    @printf[I32]("EventLog.prepare_for_rollback: top\n".cstring())
     checkpoint_initiator.prepare_for_rollback()
     for r in _resilients.values() do
       r.prepare_for_rollback()
@@ -329,6 +330,7 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
   be initiate_rollback(token: CheckpointRollbackBarrierToken,
     promise: Promise[CheckpointRollbackBarrierToken])
   =>
+    @printf[I32]("EventLog.initiate_rollback: %s\n".cstring(), token.string().cstring())
     _phase = _RollbackEventLogPhase(this, token, promise)
 
     // If we have no resilients on this worker for some reason, then we
@@ -351,6 +353,7 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
     try
       let resilient = _resilients(resilient_id)?
       if is_last_entry then
+        @printf[I32]("EventLog.rollback_from_log_entry: resilient.rollback(%lu, ...)\n".cstring(), resilient_id)
         resilient.rollback(payload, this, checkpoint_id)
       else
         resilient.incremental_rollback(payload, this, checkpoint_id)

@@ -39,6 +39,7 @@ primitive StepRollbacker
           ifdef "checkpoint_trace" then
             @printf[I32]("Step rolling back!\n".cstring())
           end
+          @printf[I32]("StepRollbacker.apply: r.rollback(%lu, ...)\n".cstring(), step)
           r.rollback(consume state_bytes)
         else
           @printf[I32]("Trying to rollback on a non-rollbackable runner!"

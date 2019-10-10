@@ -20,6 +20,7 @@ use "buffered"
 use "serialise"
 use "net"
 use "collections"
+use "time"
 use "wallaroo/core/barrier"
 use "wallaroo/core/boundary"
 use "wallaroo/core/checkpoint"
@@ -735,6 +736,7 @@ primitive ChannelMsgDecoder
     end
 
 trait val ChannelMsg
+  fun val string(): String
 
 trait val SourceCoordinatorMsg is ChannelMsg
   fun source_name(): String
@@ -742,6 +744,7 @@ trait val SourceCoordinatorMsg is ChannelMsg
 class val UnknownChannelMsg is ChannelMsg
   let data: Array[U8] val
 
+  fun val string(): String => __loc.type_name()
   new val create(d: Array[U8] val) =>
     data = d
 
@@ -749,6 +752,7 @@ class val IdentifyControlPortMsg is ChannelMsg
   let worker_name: WorkerName
   let service: String
 
+  fun val string(): String => __loc.type_name()
   new val create(name: WorkerName, s: String) =>
     worker_name = name
     service = s
@@ -757,6 +761,7 @@ class val IdentifyDataPortMsg is ChannelMsg
   let worker_name: WorkerName
   let service: String
 
+  fun val string(): String => __loc.type_name()
   new val create(name: WorkerName, s: String) =>
     worker_name = name
     service = s
@@ -765,6 +770,7 @@ class val ReconnectDataPortMsg is ChannelMsg
   let worker_name: WorkerName
   let service: String
 
+  fun val string(): String => __loc.type_name()
   new val create(name: WorkerName, s: String) =>
     worker_name = name
     service = s
@@ -772,6 +778,7 @@ class val ReconnectDataPortMsg is ChannelMsg
 class val SpinUpLocalTopologyMsg is ChannelMsg
   let local_topology: LocalTopology
 
+  fun val string(): String => __loc.type_name()
   new val create(lt: LocalTopology) =>
     local_topology = lt
 
@@ -779,6 +786,7 @@ class val SpinUpStepMsg is ChannelMsg
   let step_id: U64
   let step_builder: StepBuilder
 
+  fun val string(): String => __loc.type_name()
   new val create(s_id: U64, s_builder: StepBuilder) =>
     step_id = s_id
     step_builder = s_builder
@@ -786,6 +794,7 @@ class val SpinUpStepMsg is ChannelMsg
 class val TopologyReadyMsg is ChannelMsg
   let worker_name: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(name: WorkerName) =>
     worker_name = name
 
@@ -793,6 +802,7 @@ class val CreateConnectionsMsg is ChannelMsg
   let control_addrs: Map[String, (String, String)] val
   let data_addrs: Map[String, (String, String)] val
 
+  fun val string(): String => __loc.type_name()
   new val create(c_addrs: Map[String, (String, String)] val,
     d_addrs: Map[String, (String, String)] val)
   =>
@@ -802,6 +812,7 @@ class val CreateConnectionsMsg is ChannelMsg
 class val ConnectionsReadyMsg is ChannelMsg
   let worker_name: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(name: WorkerName) =>
     worker_name = name
 
@@ -809,6 +820,7 @@ class val ConnectorNewLeaderMsg is SourceCoordinatorMsg
   let leader_name: WorkerName
   let _source_name: String
 
+  fun val string(): String => __loc.type_name()
   new val create(leader_name': WorkerName, source_name': String) =>
     leader_name = leader_name'
     _source_name = source_name'
@@ -820,6 +832,7 @@ class val ConnectorLeaderStateReceivedAckMsg is SourceCoordinatorMsg
   let leader_name: WorkerName
   let _source_name: String
 
+  fun val string(): String => __loc.type_name()
   new val create(leader_name': WorkerName, source_name': String) =>
     leader_name = leader_name'
     _source_name = source_name'
@@ -833,6 +846,7 @@ class val ConnectorAddSourceAddrMsg is SourceCoordinatorMsg
   let host: String
   let service: String
 
+  fun val string(): String => __loc.type_name()
   new val create(worker_name': WorkerName, source_name': String,
     host': String, service': String)
   =>
@@ -851,6 +865,7 @@ class val ConnectorLeadershipRelinquishMsg is SourceCoordinatorMsg
   let inactive_streams: Map[StreamId, StreamTuple] val
   let source_addrs: Map[WorkerName, (String, String)] val
 
+  fun val string(): String => __loc.type_name()
   new val create(worker_name': WorkerName, source_name': String,
     active_streams': Map[StreamId, WorkerName] val,
     inactive_streams': Map[StreamId, StreamTuple] val,
@@ -870,6 +885,7 @@ class val ConnectorStreamsRelinquishMsg is SourceCoordinatorMsg
   let _source_name: String
   let streams: Array[StreamTuple] val
 
+  fun val string(): String => __loc.type_name()
   new val create(worker_name': WorkerName, source_name': String,
     streams': Array[StreamTuple] val)
   =>
@@ -884,6 +900,7 @@ class val ConnectorWorkerShrinkCompleteMsg is SourceCoordinatorMsg
   let worker_name: WorkerName
   let _source_name: String
 
+  fun val string(): String => __loc.type_name()
   new val create(source_name': String, worker_name': WorkerName) =>
     worker_name = worker_name'
     _source_name = source_name'
@@ -898,6 +915,7 @@ class val ConnectorStreamsShrinkMsg is SourceCoordinatorMsg
   let streams: Array[StreamTuple] val
   let source_id: RoutingId
 
+  fun val string(): String => __loc.type_name()
   new val create(worker_name': WorkerName, source_name': String,
     streams': Array[StreamTuple] val, source_id': RoutingId)
   =>
@@ -916,6 +934,7 @@ class val ConnectorStreamsShrinkResponseMsg is SourceCoordinatorMsg
   let service: String
   let source_id: RoutingId
 
+  fun val string(): String => __loc.type_name()
   new val create(source_name': String, streams': Array[StreamTuple] val,
     host': String, service': String, source_id': RoutingId)
   =>
@@ -934,6 +953,7 @@ class val ConnectorStreamNotifyMsg is SourceCoordinatorMsg
   let stream: StreamTuple
   let request_id: ConnectorStreamNotifyId
 
+  fun val string(): String => __loc.type_name()
   new val create(worker_name': WorkerName, source_name': String,
     stream': StreamTuple,
     request_id': ConnectorStreamNotifyId)
@@ -952,6 +972,7 @@ class val ConnectorStreamNotifyResponseMsg is SourceCoordinatorMsg
   let request_id: ConnectorStreamNotifyId
   let success: Bool
 
+  fun val string(): String => __loc.type_name()
   new val create(source_name': String, success': Bool, stream': StreamTuple,
     request_id': ConnectorStreamNotifyId)
   =>
@@ -967,6 +988,7 @@ class val ConnectorLeaderNameRequestMsg is SourceCoordinatorMsg
   let _source_name: String
   let worker_name: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(worker_name': WorkerName, source_name': String) =>
     _source_name = source_name'
     worker_name = worker_name'
@@ -978,6 +1000,7 @@ class val ConnectorLeaderNameResponseMsg is SourceCoordinatorMsg
   let _source_name: String
   let leader_name: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(leader_name': WorkerName, source_name': String) =>
     _source_name = source_name'
     leader_name = leader_name'
@@ -988,14 +1011,17 @@ class val ConnectorLeaderNameResponseMsg is SourceCoordinatorMsg
 class val ReportWorkerReadyToWorkMsg is ChannelMsg
   let worker_name: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(name: WorkerName) =>
     worker_name = name
 
 primitive AllWorkersReadyToWorkMsg is ChannelMsg
+  fun val string(): String => __loc.type_name()
 
 class val CreateDataChannelListener is ChannelMsg
   let workers: Array[String] val
 
+  fun val string(): String => __loc.type_name()
   new val create(ws: Array[String] val) =>
     workers = ws
 
@@ -1004,6 +1030,7 @@ class val DataConnectMsg is ChannelMsg
   let sender_boundary_id: U128
   let highest_seq_id: SeqId
 
+  fun val string(): String => __loc.type_name()
   new val create(sender_name': String, sender_boundary_id': U128,
     highest_seq_id': SeqId)
   =>
@@ -1012,25 +1039,31 @@ class val DataConnectMsg is ChannelMsg
     highest_seq_id = highest_seq_id'
 
 primitive DataDisconnectMsg is ChannelMsg
+  fun val string(): String => __loc.type_name()
 
 class val AckDataConnectMsg is ChannelMsg
   let last_id_seen: SeqId
 
+  fun val string(): String => __loc.type_name()
   new val create(last_id_seen': SeqId) =>
     last_id_seen = last_id_seen'
 
 class val StartNormalDataSendingMsg is ChannelMsg
   let last_id_seen: SeqId
 
+  fun val string(): String => __loc.type_name()
   new val create(last_id_seen': SeqId) =>
     last_id_seen = last_id_seen'
 
 primitive DataReceiverAckImmediatelyMsg is ChannelMsg
+  fun val string(): String => __loc.type_name()
 primitive ImmediateAckMsg is ChannelMsg
+  fun val string(): String => __loc.type_name()
 
 class val RequestBoundaryCountMsg is ChannelMsg
   let sender_name: String
 
+  fun val string(): String => __loc.type_name()
   new val create(from: String) =>
     sender_name = from
 
@@ -1038,6 +1071,7 @@ class val InformOfBoundaryCountMsg is ChannelMsg
   let sender_name: String
   let boundary_count: USize
 
+  fun val string(): String => __loc.type_name()
   new val create(from: String, count: USize) =>
     sender_name = from
     boundary_count = count
@@ -1046,6 +1080,7 @@ class val ReplayCompleteMsg is ChannelMsg
   let sender_name: String
   let boundary_id: U128
 
+  fun val string(): String => __loc.type_name()
   new val create(from: String, b_id: U128) =>
     sender_name = from
     boundary_id = b_id
@@ -1058,6 +1093,7 @@ class val KeyMigrationMsg is ChannelMsg
   let _state: ByteSeq val
   let _worker: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(step_group': RoutingId, key': Key,
     checkpoint_id': CheckpointId, state': ByteSeq val, worker': WorkerName)
   =>
@@ -1076,30 +1112,35 @@ class val KeyMigrationMsg is ChannelMsg
 class val MigrationBatchCompleteMsg is ChannelMsg
   let sender_name: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(sender: WorkerName) =>
     sender_name = sender
 
 class val WorkerCompletedMigrationBatch is ChannelMsg
   let sender_name: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(sender: WorkerName) =>
     sender_name = sender
 
 class val MuteRequestMsg is ChannelMsg
   let originating_worker: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(worker: WorkerName) =>
     originating_worker = worker
 
 class val UnmuteRequestMsg is ChannelMsg
   let originating_worker: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(worker: WorkerName) =>
     originating_worker = worker
 
 class val KeyMigrationCompleteMsg is ChannelMsg
   let key: Key
 
+  fun val string(): String => __loc.type_name()
   new val create(k: Key)
   =>
     key = k
@@ -1108,6 +1149,7 @@ class val BeginLeavingMigrationMsg is ChannelMsg
   let remaining_workers: Array[String] val
   let leaving_workers: Array[String] val
 
+  fun val string(): String => __loc.type_name()
   new val create(remaining_workers': Array[String] val,
     leaving_workers': Array[String] val)
   =>
@@ -1118,6 +1160,7 @@ class val InitiateShrinkMsg is ChannelMsg
   let remaining_workers: Array[String] val
   let leaving_workers: Array[String] val
 
+  fun val string(): String => __loc.type_name()
   new val create(remaining_workers': Array[String] val,
     leaving_workers': Array[String] val)
   =>
@@ -1128,6 +1171,7 @@ class val PrepareShrinkMsg is ChannelMsg
   let remaining_workers: Array[String] val
   let leaving_workers: Array[String] val
 
+  fun val string(): String => __loc.type_name()
   new val create(remaining_workers': Array[String] val,
     leaving_workers': Array[String] val)
   =>
@@ -1137,12 +1181,14 @@ class val PrepareShrinkMsg is ChannelMsg
 class val LeavingMigrationAckRequestMsg is ChannelMsg
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName) =>
     sender = sender'
 
 class val LeavingMigrationAckMsg is ChannelMsg
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName) =>
     sender = sender'
 
@@ -1151,6 +1197,7 @@ class val AckDataReceivedMsg is ChannelMsg
   let sender_step_id: RoutingId
   let seq_id: SeqId
 
+  fun val string(): String => __loc.type_name()
   new val create(sender_name': WorkerName, sender_step_id': U128,
     seq_id': SeqId)
   =>
@@ -1167,6 +1214,7 @@ class val DataMsg is ChannelMsg
   let metrics_id: U16
   let metric_name: String
 
+  fun val string(): String => __loc.type_name()
   new val create(msg: DeliveryMsg, producer_id': RoutingId,
     pipeline_time_spent': U64, seq_id': SeqId, latest_ts': U64,
     metrics_id': U16, metric_name': String)
@@ -1209,6 +1257,7 @@ class val ForwardMsg[D: Any val] is DeliveryMsg
   fun frac_ids(): FractionalMessageId => _frac_ids
   fun event_ts(): U64 => _event_ts
 
+  fun val string(): String => __loc.type_name()
   new val create(t_id: RoutingId, from: String,
     m_data: D, k: Key, e_ts: U64, w_ts: U64, m_name: String,
     proxy_address: ProxyAddress, msg_uid': MsgId,
@@ -1260,6 +1309,7 @@ class val ForwardStatePartitionMsg[D: Any val] is DeliveryMsg
   fun frac_ids(): FractionalMessageId => _frac_ids
   fun event_ts(): U64 => _event_ts
 
+  fun val string(): String => __loc.type_name()
   new val create(step_group: RoutingId, from: String, m_data: D, k: Key,
     e_ts: U64, w_ts: U64, m_name: String, msg_uid': MsgId,
     frac_ids': FractionalMessageId)
@@ -1314,6 +1364,7 @@ class val ForwardStatelessPartitionMsg[D: Any val] is DeliveryMsg
   fun frac_ids(): FractionalMessageId => _frac_ids
   fun event_ts(): U64 => _event_ts
 
+  fun val string(): String => __loc.type_name()
   new val create(target_p_id: RoutingId, from: String, m_data: D, k: Key,
     e_ts: U64, w_ts: U64, m_name: String, msg_uid': MsgId,
     frac_ids': FractionalMessageId)
@@ -1357,6 +1408,7 @@ class val RequestRecoveryInfoMsg is ChannelMsg
   """
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName) =>
     sender = sender'
 
@@ -1367,6 +1419,7 @@ class val InformRecoveringWorkerMsg is ChannelMsg
   let sender: WorkerName
   let checkpoint_id: CheckpointId
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName, s_id: CheckpointId) =>
     sender = sender'
     checkpoint_id = s_id
@@ -1379,6 +1432,7 @@ class val JoinClusterMsg is ChannelMsg
   let worker_name: WorkerName
   let worker_count: USize
 
+  fun val string(): String => __loc.type_name()
   new val create(w: WorkerName, wc: USize) =>
     worker_name = w
     worker_count = wc
@@ -1400,6 +1454,7 @@ class val InformJoiningWorkerMsg is ChannelMsg
   // The worker currently in control of checkpoints
   let primary_checkpoint_worker: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(sender: WorkerName, app: String, l_topology: LocalTopology,
     checkpoint_id': CheckpointId, rollback_id': RollbackId,
     m_host: String, m_service: String,
@@ -1423,6 +1478,7 @@ class val InformJoiningWorkerMsg is ChannelMsg
 class val InformJoinErrorMsg is ChannelMsg
   let message: String
 
+  fun val string(): String => __loc.type_name()
   new val create(m: String) =>
     message = m
 
@@ -1433,6 +1489,7 @@ class val JoiningWorkerInitializedMsg is ChannelMsg
   let data_addr: (String, String)
   let step_group_routing_ids: Map[RoutingId, RoutingId] val
 
+  fun val string(): String => __loc.type_name()
   new val create(name: WorkerName, c_addr: (String, String),
     d_addr: (String, String), s_routing_ids: Map[RoutingId, RoutingId] val)
   =>
@@ -1445,6 +1502,7 @@ class val InitiateStopTheWorldForGrowMigrationMsg is ChannelMsg
   let sender: WorkerName
   let new_workers: Array[String] val
 
+  fun val string(): String => __loc.type_name()
   new val create(s: WorkerName, ws: Array[String] val) =>
     sender = s
     new_workers = ws
@@ -1453,6 +1511,7 @@ class val InitiateGrowMigrationMsg is ChannelMsg
   let new_workers: Array[String] val
   let checkpoint_id: CheckpointId
 
+  fun val string(): String => __loc.type_name()
   new val create(ws: Array[String] val, s_id: CheckpointId) =>
     new_workers = ws
     checkpoint_id = s_id
@@ -1460,16 +1519,19 @@ class val InitiateGrowMigrationMsg is ChannelMsg
 class val PreRegisterJoiningWorkersMsg is ChannelMsg
   let joining_workers: Array[String] val
 
+  fun val string(): String => __loc.type_name()
   new val create(ws: Array[String] val) =>
     joining_workers = ws
 
 primitive AutoscaleCompleteMsg is ChannelMsg
+  fun val string(): String => __loc.type_name()
 
 class val InitiateStopTheWorldForShrinkMigrationMsg is ChannelMsg
   let sender: WorkerName
   let remaining_workers: Array[String] val
   let leaving_workers: Array[String] val
 
+  fun val string(): String => __loc.type_name()
   new val create(s: WorkerName, r_ws: Array[String] val,
     l_ws: Array[String] val)
   =>
@@ -1480,6 +1542,7 @@ class val InitiateStopTheWorldForShrinkMigrationMsg is ChannelMsg
 class val LeavingWorkerDoneMigratingMsg is ChannelMsg
   let worker_name: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(name: WorkerName)
   =>
     worker_name = name
@@ -1490,6 +1553,7 @@ class val AnnounceConnectionsToJoiningWorkersMsg is ChannelMsg
   let new_step_group_routing_ids:
     Map[WorkerName, Map[RoutingId, RoutingId] val] val
 
+  fun val string(): String => __loc.type_name()
   new val create(c_addrs: Map[String, (String, String)] val,
     d_addrs: Map[String, (String, String)] val,
     sri: Map[WorkerName, Map[RoutingId, RoutingId] val] val)
@@ -1505,6 +1569,7 @@ class val AnnounceJoiningWorkersMsg is ChannelMsg
   let new_step_group_routing_ids:
     Map[WorkerName, Map[RoutingId, RoutingId] val] val
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName,
     c_addrs: Map[String, (String, String)] val,
     d_addrs: Map[String, (String, String)] val,
@@ -1520,6 +1585,7 @@ class val AnnounceHashPartitionsGrowMsg is ChannelMsg
   let joining_workers: Array[String] val
   let hash_partitions: Map[RoutingId, HashPartitions] val
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName, joining_workers': Array[String] val,
     hash_partitions': Map[RoutingId, HashPartitions] val)
   =>
@@ -1530,6 +1596,7 @@ class val AnnounceHashPartitionsGrowMsg is ChannelMsg
 class val ConnectedToJoiningWorkersMsg is ChannelMsg
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName) =>
     sender = sender'
 
@@ -1541,6 +1608,7 @@ class val AnnounceNewSourceMsg is ChannelMsg
   let sender: WorkerName
   let source_id: RoutingId
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName, id: RoutingId) =>
     sender = sender'
     source_id = id
@@ -1549,10 +1617,12 @@ primitive RotateLogFilesMsg is ChannelMsg
   """
   This message is sent to a worker instructing it to rotate its log files.
   """
+  fun val string(): String => __loc.type_name()
 
 class val CleanShutdownMsg is ChannelMsg
   let msg: String
 
+  fun val string(): String => __loc.type_name()
   new val create(m: String) =>
     msg = m
 
@@ -1560,6 +1630,7 @@ class val ForwardInjectBarrierMsg is ChannelMsg
   let token: BarrierToken
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(token': BarrierToken, sender': WorkerName) =>
     token = token'
     sender = sender'
@@ -1569,6 +1640,7 @@ class val ForwardInjectBlockingBarrierMsg is ChannelMsg
   let wait_for_token: BarrierToken
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(token': BarrierToken, wait_for_token': BarrierToken,
     sender': WorkerName)
   =>
@@ -1579,12 +1651,14 @@ class val ForwardInjectBlockingBarrierMsg is ChannelMsg
 class val ForwardedInjectBarrierFullyAckedMsg is ChannelMsg
   let token: BarrierToken
 
+  fun val string(): String => __loc.type_name()
   new val create(token': BarrierToken) =>
     token = token'
 
 class val ForwardedInjectBarrierAbortedMsg is ChannelMsg
   let token: BarrierToken
 
+  fun val string(): String => __loc.type_name()
   new val create(token': BarrierToken) =>
     token = token'
 
@@ -1592,6 +1666,7 @@ class val RemoteInitiateBarrierMsg is ChannelMsg
   let sender: WorkerName
   let token: BarrierToken
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName, token': BarrierToken) =>
     sender = sender'
     token = token'
@@ -1600,6 +1675,7 @@ class val RemoteAbortBarrierMsg is ChannelMsg
   let sender: WorkerName
   let token: BarrierToken
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName, token': BarrierToken) =>
     sender = sender'
     token = token'
@@ -1608,6 +1684,7 @@ class val WorkerAckBarrierMsg is ChannelMsg
   let sender: WorkerName
   let token: BarrierToken
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName, token': BarrierToken) =>
     sender = sender'
     token = token'
@@ -1616,6 +1693,7 @@ class val WorkerAbortBarrierMsg is ChannelMsg
   let sender: WorkerName
   let token: BarrierToken
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName, token': BarrierToken) =>
     sender = sender'
     token = token'
@@ -1627,6 +1705,7 @@ class val ForwardBarrierMsg is ChannelMsg
   // Seq id assigned by boundary
   let seq_id: SeqId
 
+  fun val string(): String => __loc.type_name()
   new val create(target_id': RoutingId, origin_id': RoutingId,
     token': BarrierToken, seq_id': SeqId)
   =>
@@ -1639,6 +1718,7 @@ class val AbortCheckpointMsg is ChannelMsg
   let checkpoint_id: CheckpointId
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(checkpoint_id': CheckpointId, sender': WorkerName) =>
     checkpoint_id = checkpoint_id'
     sender = sender'
@@ -1647,6 +1727,7 @@ class val EventLogInitiateCheckpointMsg is ChannelMsg
   let checkpoint_id: CheckpointId
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(checkpoint_id': CheckpointId, sender': WorkerName) =>
     checkpoint_id = checkpoint_id'
     sender = sender'
@@ -1655,6 +1736,7 @@ class val EventLogWriteCheckpointIdMsg is ChannelMsg
   let checkpoint_id: CheckpointId
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(checkpoint_id': CheckpointId, sender': WorkerName) =>
     checkpoint_id = checkpoint_id'
     sender = sender'
@@ -1663,6 +1745,7 @@ class val EventLogAckCheckpointMsg is ChannelMsg
   let checkpoint_id: CheckpointId
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(checkpoint_id': CheckpointId, sender': WorkerName) =>
     checkpoint_id = checkpoint_id'
     sender = sender'
@@ -1671,6 +1754,7 @@ class val EventLogAckCheckpointIdWrittenMsg is ChannelMsg
   let checkpoint_id: CheckpointId
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(checkpoint_id': CheckpointId, sender': WorkerName) =>
     checkpoint_id = checkpoint_id'
     sender = sender'
@@ -1680,6 +1764,7 @@ class val CommitCheckpointIdMsg is ChannelMsg
   let rollback_id: RollbackId
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(checkpoint_id': CheckpointId, rollback_id': RollbackId,
     sender': WorkerName)
   =>
@@ -1690,12 +1775,14 @@ class val CommitCheckpointIdMsg is ChannelMsg
 class val RequestRollbackIdMsg is ChannelMsg
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName) =>
     sender = sender'
 
 class val AnnounceRollbackIdMsg is ChannelMsg
   let rollback_id: RollbackId
 
+  fun val string(): String => __loc.type_name()
   new val create(rollback_id': RollbackId) =>
     rollback_id = rollback_id'
 
@@ -1703,6 +1790,7 @@ class val RecoveryInitiatedMsg is ChannelMsg
   let rollback_id: RollbackId
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(rollback_id': RollbackId, sender': WorkerName) =>
     rollback_id = rollback_id'
     sender = sender'
@@ -1710,6 +1798,7 @@ class val RecoveryInitiatedMsg is ChannelMsg
 class val AckRecoveryInitiatedMsg is ChannelMsg
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName) =>
     sender = sender'
 
@@ -1717,6 +1806,7 @@ class val EventLogInitiateRollbackMsg is ChannelMsg
   let token: CheckpointRollbackBarrierToken
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(token': CheckpointRollbackBarrierToken, sender': WorkerName) =>
     token = token'
     sender = sender'
@@ -1724,7 +1814,9 @@ class val EventLogInitiateRollbackMsg is ChannelMsg
 class val EventLogAckRollbackMsg is ChannelMsg
   let token: CheckpointRollbackBarrierToken
   let sender: WorkerName
+  let nanos: U64 = Time.nanos()
 
+  fun val string(): String => __loc.type_name() + "." + nanos.string()
   new val create(token': CheckpointRollbackBarrierToken, sender': WorkerName) =>
     token = token'
     sender = sender'
@@ -1733,6 +1825,7 @@ class val InitiateRollbackBarrierMsg is ChannelMsg
   let recovering_worker: WorkerName
   let rollback_id: RollbackId
 
+  fun val string(): String => __loc.type_name()
   new val create(recovering_worker': WorkerName, rollback_id': RollbackId) =>
     recovering_worker = recovering_worker'
     rollback_id = rollback_id'
@@ -1740,6 +1833,7 @@ class val InitiateRollbackBarrierMsg is ChannelMsg
 class val PrepareForRollbackMsg is ChannelMsg
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName) =>
     sender = sender'
 
@@ -1747,6 +1841,7 @@ class val RollbackLocalKeysMsg is ChannelMsg
   let sender: WorkerName
   let checkpoint_id: CheckpointId
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName, s_id: CheckpointId) =>
     sender = sender'
     checkpoint_id = s_id
@@ -1755,6 +1850,7 @@ class val AckRollbackLocalKeysMsg is ChannelMsg
   let sender: WorkerName
   let checkpoint_id: CheckpointId
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName, s_id: CheckpointId) =>
     sender = sender'
     checkpoint_id = s_id
@@ -1763,6 +1859,7 @@ class val RollbackBarrierFullyAckedMsg is ChannelMsg
   let token: CheckpointRollbackBarrierToken
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(token': CheckpointRollbackBarrierToken, sender': WorkerName) =>
     token = token'
     sender = sender'
@@ -1770,12 +1867,14 @@ class val RollbackBarrierFullyAckedMsg is ChannelMsg
 class val ResumeCheckpointMsg is ChannelMsg
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName) =>
     sender = sender'
 
 class val ResumeProcessingMsg is ChannelMsg
   let sender: WorkerName
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName) =>
     sender = sender'
 
@@ -1784,6 +1883,7 @@ class val RegisterProducerMsg is ChannelMsg
   let source_id: RoutingId
   let target_id: RoutingId
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName, source_id': RoutingId,
     target_id': RoutingId)
   =>
@@ -1796,6 +1896,7 @@ class val UnregisterProducerMsg is ChannelMsg
   let source_id: RoutingId
   let target_id: RoutingId
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName, source_id': RoutingId,
     target_id': RoutingId)
   =>
@@ -1806,6 +1907,7 @@ class val UnregisterProducerMsg is ChannelMsg
 class val ReportStatusMsg is ChannelMsg
   let code: ReportStatusCode
 
+  fun val string(): String => __loc.type_name()
   new val create(c: ReportStatusCode) =>
     code = c
 
@@ -1813,6 +1915,7 @@ class val WorkerStateEntityCountRequestMsg is ChannelMsg
   let requester: WorkerName
   let request_id: RequestId
 
+  fun val string(): String => __loc.type_name()
   new val create(requester': WorkerName, request_id': RequestId) =>
     requester = requester'
     request_id = request_id'
@@ -1822,6 +1925,7 @@ class val WorkerStateEntityCountResponseMsg is ChannelMsg
   let request_id: RequestId
   let state_entity_count_json: String
 
+  fun val string(): String => __loc.type_name()
   new val create(worker_name': WorkerName, request_id': RequestId,
     state_entity_count_json': String)
   =>
@@ -1835,6 +1939,7 @@ class val TryShrinkRequestMsg is ChannelMsg
   let worker_name: WorkerName
   let conn_id: U128
 
+  fun val string(): String => __loc.type_name()
   new val create(target_workers': Array[WorkerName] val, shrink_count': U64,
     worker_name': WorkerName, conn_id': U128)
   =>
@@ -1847,6 +1952,7 @@ class val TryShrinkResponseMsg is ChannelMsg
   let msg: Array[ByteSeq] val
   let conn_id: U128
 
+  fun val string(): String => __loc.type_name()
   new val create(msg': Array[ByteSeq] val, conn_id': U128) =>
     msg = msg'
     conn_id = conn_id'
@@ -1857,6 +1963,7 @@ class val TryJoinRequestMsg is ChannelMsg
   let proxy_worker_name: WorkerName
   let conn_id: U128
 
+  fun val string(): String => __loc.type_name()
   new val create(joining_worker_name': WorkerName, worker_count': USize,
     proxy_worker_name': WorkerName, conn_id': U128)
   =>
@@ -1869,6 +1976,7 @@ class val TryJoinResponseMsg is ChannelMsg
   let msg: Array[ByteSeq] val
   let conn_id: U128
 
+  fun val string(): String => __loc.type_name()
   new val create(msg': Array[ByteSeq] val, conn_id': U128) =>
     msg = msg'
     conn_id = conn_id'

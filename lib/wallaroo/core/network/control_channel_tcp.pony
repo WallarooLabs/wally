@@ -198,10 +198,10 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         @printf[I32]("Error reading header on control channel\n".cstring())
       end
     else
-      ifdef "trace" then
-        @printf[I32]("Received msg on Control Channel\n".cstring())
-      end
       let msg = ChannelMsgDecoder(consume data, _auth)
+      ifdef "trace" then
+        @printf[I32]("Received msg on Control Channel: %s\n".cstring(), msg.string().cstring())
+      end
       match msg
       | let m: IdentifyControlPortMsg =>
         ifdef "trace" then

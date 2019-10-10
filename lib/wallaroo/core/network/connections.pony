@@ -219,19 +219,49 @@ actor Connections is Cluster
       if _control_conns.contains(worker) then
         _control_conns(worker)?.writev(data)
         ifdef debug then
-          @printf[I32](("Sent control message to " + worker + "\n").cstring())
+          let d = recover trn Array[U8] end
+          var first_seen: Bool = false
+          for q in data.values() do
+            if first_seen then
+              d.append(q)
+            end
+            first_seen = true
+          end
+          let x: ChannelMsg = ChannelMsgDecoder(consume d, _auth)
+          @printf[I32](("Sent control message to %s: %s\n").cstring(), worker.cstring(), x.string().cstring())
         end
       else
         @printf[I32](("No control connection for worker " + worker + ". " +
           "Queuing to send later.\n").cstring())
+        ifdef debug then
+          let d = recover trn Array[U8] end
+          var first_seen: Bool = false
+          for q in data.values() do
+            if first_seen then
+              d.append(q)
+            end
+            first_seen = true
+          end
+          let x: ChannelMsg = ChannelMsgDecoder(consume d, _auth)
+          @printf[I32](("No control connection for worker " + worker + ". " +
+          "Queuing to send later: %s\n").cstring(), x.string().cstring())
+        end
         if not _pending_control_messages.contains(worker) then
           _pending_control_messages(worker) = Array[Array[ByteSeq] val]
         end
         _pending_control_messages(worker)?.push(data)
       end
     else
+      @printf[I32]("_send_control: Unreachable\n".cstring())
       Unreachable()
     end
+
+  fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
+    """
+    Generate a printable string of the contents of the given readseq to use in
+    error messages.
+    """
+    "[len=" + array.size().string() + ": " + ", ".join(array.values()) + "]"
 
   be send_control_to_cluster(data: Array[ByteSeq] val) =>
     _send_control_to_cluster(data)
