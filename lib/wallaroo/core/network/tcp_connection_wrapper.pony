@@ -30,7 +30,7 @@ actor ControlConnection
   let _connections: Connections
   var _identified: Bool = false
   var _control_sender: _TCPConnectionControlSender =
-    _PreTCPConnectionControlSender
+    _PreTCPConnectionControlSender(where queue_pending = true)
 
   new create(auth: AmbientAuth, worker_name: WorkerName,
     target_name: WorkerName, c_service: String, connections: Connections)
@@ -48,7 +48,9 @@ actor ControlConnection
     if not _identified then _identify_control_port() end
 
   be closed(conn: TCPConnection) =>
-    _control_sender = _PreTCPConnectionControlSender
+    // This connection is closed.  Any subsequent connections should
+    // not queue control messages while we attempt to reconnect.
+    _control_sender = _PreTCPConnectionControlSender(where queue_pending = false)
 
   be write(data: ByteSeq) =>
     _control_sender.write(data)
@@ -78,14 +80,28 @@ trait _TCPConnectionControlSender
 
 class _PreTCPConnectionControlSender is _TCPConnectionControlSender
   let _pending: Array[ByteSeq] = _pending.create()
+  let _queue_pending: Bool
+
+  new create(queue_pending: Bool) =>
+    _queue_pending = queue_pending
 
   fun ref write(data: ByteSeq) =>
-    _pending.push(data)
+    if _queue_pending then
+      _pending.push(data)
+    else
+      @printf[I32]("_PreTCPConnectionControlSender: write skip: %s\n".cstring(), _print_array[U8](data).cstring())
+    end
     recover Array[U8] end
 
   fun ref writev(data: ByteSeqIter) =>
-    for bytes in data.values() do
-      _pending.push(bytes)
+    if _queue_pending then
+      for bytes in data.values() do
+        _pending.push(bytes)
+      end
+    else
+      for bytes in data.values() do
+        @printf[I32]("_PreTCPConnectionControlSender: writev skip: %s\n".cstring(), _print_array[U8](bytes).cstring())
+      end
     end
     recover Array[ByteSeq] end
 
@@ -96,6 +112,13 @@ class _PreTCPConnectionControlSender is _TCPConnectionControlSender
 
   fun dispose() =>
     None
+
+  fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
+    """
+    Generate a printable string of the contents of the given readseq to use in
+    error messages.
+    """
+    "[len=" + array.size().string() + ": " + ", ".join(array.values()) + "]"
 
 class _PostTCPConnectionControlSender is _TCPConnectionControlSender
   let _conn: TCPConnection
