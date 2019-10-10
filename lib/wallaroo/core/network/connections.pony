@@ -219,7 +219,7 @@ actor Connections is Cluster
       if _control_conns.contains(worker) then
         _control_conns(worker)?.writev(data)
         ifdef debug then
-          let d = recover trn Array[U8] end
+          let d = recover iso Array[U8] end
           var first_seen: Bool = false
           for q in data.values() do
             if first_seen then
@@ -227,8 +227,9 @@ actor Connections is Cluster
             end
             first_seen = true
           end
-          let x: ChannelMsg = ChannelMsgDecoder(consume d, _auth)
-          @printf[I32](("Sent control message to %s: %s\n").cstring(), worker.cstring(), x.string().cstring())
+          let dd = recover val consume d end
+          let x: ChannelMsg = ChannelMsgDecoder(dd, _auth)
+          @printf[I32](("Sent control message to %s: %s: %s\n").cstring(), worker.cstring(), x.string().cstring(), _print_array[U8](dd).cstring())
         end
       else
         @printf[I32](("No control connection for worker " + worker + ". " +
