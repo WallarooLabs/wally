@@ -296,6 +296,7 @@ actor Connections is Cluster
 
   be disconnect_from(worker: WorkerName) =>
     try
+      @printf[I32]("Connections.disconnect_from: %s\n".cstring(), worker.cstring())
       (_, let d) = _data_conns.remove(worker)?
       d.dispose()
       (_, let c) = _control_conns.remove(worker)?
@@ -505,6 +506,7 @@ actor Connections is Cluster
 
   be remove_worker_connection_info(worker: WorkerName) =>
     try
+      @printf[I32]("Connections.remove_worker_connection_info: %s\n".cstring(), worker.cstring())
       _control_addrs.remove(worker)?
       _data_addrs.remove(worker)?
       _control_conns.remove(worker)?
@@ -630,12 +632,16 @@ actor Connections is Cluster
       let tcp_conn_wrapper =
         if _control_conns.contains(target_name) then
           try
+            let qqq =
             _control_conns(target_name)?
+            @printf[I32]("Connections._create_control_connection: old %s\n".cstring(), target_name.cstring())
+            qqq
           else
             Unreachable(); ControlConnection(_auth, _worker_name, target_name,
               _my_control_addr._2, this)
           end
         else
+          @printf[I32]("Connections._create_control_connection: new %s\n".cstring(), target_name.cstring())
           ControlConnection(_auth, _worker_name, target_name,
             _my_control_addr._2, this)
         end
