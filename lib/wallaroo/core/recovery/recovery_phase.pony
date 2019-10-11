@@ -114,7 +114,7 @@ trait _RecoveryPhase
     takes place after at least one phase that waits for a control message, so
     there are problems to be solved in order to do this safely.
     """
-    @printf[I32]("Unexpected call to %s on recovery phase %s. Ignoring!\n"
+    @printf[I32]("UNEXPECTED CALL to %s on recovery phase %s. Ignoring!\n"
       .cstring(), call.cstring(), name().cstring())
 
 class _AwaitRecovering is _RecoveryPhase
