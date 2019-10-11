@@ -52,10 +52,13 @@ pause_the_world () {
 }
 
 start_all_workers () {
+    echo Initially starting initializer
     start_initializer -n $DESIRED
     sleep 1
     DESIRED_1=`expr $DESIRED - 1`
+    echo Iterating up to $DESIRED_1
     for i in `seq 1 $DESIRED_1`; do
+        echo Initially starting worker $i
         start_worker -n $DESIRED $i
         sleep 1
     done
