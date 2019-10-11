@@ -50,20 +50,36 @@ trait _CheckpointInitiatorPhase
   fun ref event_log_checkpoint_complete(worker: WorkerName,
     checkpoint_id: CheckpointId)
   =>
-    _invalid_call(); Fail()
+    // This is called directly in response to a control message received.
+    // But we can't guarantee that this message is not a straggler in the case
+    // that we crashed and recovered/are recovering. So we can only log and
+    // ignore here.
+    _unexpected_call("event_log_checkpoint_complete()")
 
   fun ref event_log_id_written(worker: WorkerName,
     checkpoint_id: CheckpointId)
   =>
-    _invalid_call(); Fail()
+    // This is called directly in response to a control message received.
+    // But we can't guarantee that this message is not a straggler in the case
+    // that we crashed and recovered/are recovering. So we can only log and
+    // ignore here.
+    _unexpected_call("event_log_id_written()")
 
   fun ref resume_checkpointing_from_rollback() =>
-    _invalid_call(); Fail()
+    // This is called directly in response to a control message received.
+    // But we can't guarantee that this message is not a straggler in the case
+    // that we crashed and recovered/are recovering. So we can only log and
+    // ignore here.
+    _unexpected_call("resume_checkpointing_from_rollback()")
 
   fun ref abort_checkpoint(checkpoint_id: CheckpointId,
     checkpoint_initiator: CheckpointInitiator ref)
   =>
-    checkpoint_initiator._abort_checkpoint(checkpoint_id)
+    // This is called directly in response to a control message received.
+    // But we can't guarantee that this message is not a straggler in the case
+    // that we crashed and recovered/are recovering. So we can only log and
+    // ignore here.
+    _unexpected_call("abort_checkpoint()")
 
   fun ref initiate_rollback(
     recovery_promise: Promise[CheckpointRollbackBarrierToken],
@@ -76,6 +92,25 @@ trait _CheckpointInitiatorPhase
   fun _invalid_call() =>
     @printf[I32]("Invalid call on checkpoint initiator phase %s\n".cstring(),
       name().cstring())
+
+  fun _unexpected_call(call: String) =>
+    """
+    Only call this for phase methods that are called directly in response to
+    control messages received. That's because we can't be sure in that case if
+    we had crashed and recovered during an earlier recovery/rollback round, in
+    which case any control messages related to that earlier round are simply
+    outdated. We shouldn't Fail() in this case because we can expect control
+    messages to go out of sync in this way in this kind of scenario.
+
+    TODO: All such control messages could be tagged with a rollback id,
+    enabling us to determine at the Recovery actor level if we should drop
+    such a message or send it to our current phase. This would mean we'd have
+    to ignore anything we receive before we get an initial rollback id, which
+    takes place after at least one phase that waits for a control message, so
+    there are problems to be solved in order to do this safely.
+    """
+    @printf[I32]("Unexpected call to %s on recovery phase %s. Ignoring!\n"
+      .cstring(), call.cstring(), name().cstring())
 
 class _WaitingCheckpointInitiatorPhase is _CheckpointInitiatorPhase
   fun name(): String => "_WaitingCheckpointInitiatorPhase"
