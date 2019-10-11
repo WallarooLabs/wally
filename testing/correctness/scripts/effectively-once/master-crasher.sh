@@ -8,8 +8,8 @@ fi
 shift
 
 export PATH=.:$PATH
-export PYTHONPATH=$HOME/wallaroo/machida/lib:$HOME/wallaroo/examples/python/celsius_connectors:$PYTHONPATH
-export WALLAROO_BIN=$HOME/wallaroo/examples/pony/passthrough/passthrough
+export PYTHONPATH=$HOME/dev/wallaroo/machida/lib:$HOME/dev/wallaroo/examples/python/celsius_connectors:$PYTHONPATH
+export WALLAROO_BIN=$HOME/dev/wallaroo/examples/pony/passthrough/passthrough
 export WALLAROO_THRESHOLDS='*.8'
 . ./sample-env-vars.sh
 
@@ -19,7 +19,7 @@ reset () {
 }
 
 start_sink () {
-    ~/wallaroo/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 >> /tmp/sink-out/stdout-stderr 2>&1 &
+    ~/dev/wallaroo/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 >> /tmp/sink-out/stdout-stderr 2>&1 &
 }
 
 stop_sink () {
@@ -66,7 +66,7 @@ start_sender () {
     outfile=/tmp/sender.out
     rm -f $outfile
     while [ 1 ]; do
-        $HOME/wallaroo/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 66000 >> $outfile 2>&1
+        $HOME/dev/wallaroo/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 66000 >> $outfile 2>&1
         sleep 0.1
     done
 }
