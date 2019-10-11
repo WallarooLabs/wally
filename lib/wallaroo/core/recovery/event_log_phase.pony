@@ -327,6 +327,12 @@ class _RollbackEventLogPhase is _EventLogPhase
 
   fun ref ack_rollback(resilient_id: RoutingId) =>
     ifdef debug then
+      if not _resilients_acked.contains(resilient_id) then
+        @printf[I32]("ERROR: resilient_id = %s, _resilients_acked size = %lu\n".cstring(), resilient_id.string().cstring(), _resilients_acked.size())
+        for r in _resilients_acked.values() do
+          @printf[I32]("    _resilients_acked = %s\n".cstring(), r.string().cstring())
+        end
+      end
       Invariant(not _resilients_acked.contains(resilient_id))
     end
     _resilients_acked.set(resilient_id)
