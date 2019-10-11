@@ -508,39 +508,33 @@ actor CheckpointInitiator is Initializable
     worker: WorkerName, rollback_id: RollbackId)
   =>
     if (_primary_worker == _worker_name) then
-      if rollback_id == _last_rollback_id then
-        _clear_pending_checkpoints()
+      _clear_pending_checkpoints()
 
-        ifdef "checkpoint_trace" then
-          @printf[I32](("CheckpointInitiator: initiate_rollback %s on " +
-            " behalf of %s\n").cstring(), rollback_id.string().cstring(),
-            worker.cstring())
-        end
-
-        let token = CheckpointRollbackBarrierToken(rollback_id,
-          _last_complete_checkpoint_id)
-        if _current_checkpoint_id < _last_complete_checkpoint_id then
-          _current_checkpoint_id = _last_complete_checkpoint_id
-        end
-        let barrier_promise = Promise[BarrierToken]
-        barrier_promise.next[None]({(t: BarrierToken) =>
-          match t
-          | let srbt: CheckpointRollbackBarrierToken =>
-            recovery_promise(srbt)
-            _self.rollback_complete(srbt.rollback_id)
-          else
-            Fail()
-          end
-        })
-        let resume_token = CheckpointRollbackResumeBarrierToken(rollback_id,
-          _last_complete_checkpoint_id)
-        _barrier_coordinator.inject_blocking_barrier(token, barrier_promise,
-          resume_token)
-      else
-        @printf[I32](("Skipping rollback for %s, because %s is lower than " +
-          "current rollback id %s\n").cstring(), worker.cstring(),
-          rollback_id.string().cstring(), _last_rollback_id.string().cstring())
+      ifdef "checkpoint_trace" then
+        @printf[I32](("CheckpointInitiator: initiate_rollback %s on " +
+          " behalf of %s\n").cstring(), rollback_id.string().cstring(),
+          worker.cstring())
       end
+
+      let token = CheckpointRollbackBarrierToken(rollback_id,
+        _last_complete_checkpoint_id)
+      if _current_checkpoint_id < _last_complete_checkpoint_id then
+        _current_checkpoint_id = _last_complete_checkpoint_id
+      end
+      let barrier_promise = Promise[BarrierToken]
+      barrier_promise.next[None]({(t: BarrierToken) =>
+        match t
+        | let srbt: CheckpointRollbackBarrierToken =>
+          recovery_promise(srbt)
+          _self.rollback_complete(srbt.rollback_id)
+        else
+          Fail()
+        end
+      })
+      let resume_token = CheckpointRollbackResumeBarrierToken(rollback_id,
+        _last_complete_checkpoint_id)
+      _barrier_coordinator.inject_blocking_barrier(token, barrier_promise,
+        resume_token)
     else
       try
         let msg = ChannelMsgEncoder.initiate_rollback_barrier(worker,
