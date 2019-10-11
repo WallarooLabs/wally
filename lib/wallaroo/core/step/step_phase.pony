@@ -311,15 +311,8 @@ class _RecoveringStepPhase is StepPhase
   fun ref receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    match barrier_token
-    | let x: CheckpointRollbackBarrierToken =>
-      @printf[I32]("Got another barrier %s in _RecoveringStepPhase, process it as a new barrier\n".cstring(),
-        barrier_token.string().cstring())
-      _step.receive_new_barrier(step_id, producer, barrier_token)
-    else
-      @printf[I32]("Ignoring non-rollback barrier in _RecoveringStepPhase: %s\n"
-        .cstring(), barrier_token.string().cstring())
-    end
+    @printf[I32]("Ignoring non-rollback barrier in _RecoveringStepPhase: %s\n"
+      .cstring(), barrier_token.string().cstring())
 
   fun ref queued(): Array[_Queued] =>
     Array[_Queued]
