@@ -261,7 +261,7 @@ class AsyncServer(asynchat.async_chat, object):
                     ##    sink instance that represents that same part of the
                     ##    pipeline topology before & after the restart.
                     txt = "Hello message from worker {}: already active".format(self._worker_name)
-                    logging.error(txt)
+                    logging.info(txt)
                     err = cwm.Error(txt)
                     self.write(err)
                     self.close(delete_from_active_workers = False)
