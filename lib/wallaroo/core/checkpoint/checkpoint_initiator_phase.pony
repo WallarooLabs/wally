@@ -77,11 +77,7 @@ trait _CheckpointInitiatorPhase
   fun ref abort_checkpoint(checkpoint_id: CheckpointId,
     checkpoint_initiator: CheckpointInitiator ref)
   =>
-    // This is called directly in response to a control message received.
-    // But we can't guarantee that this message is not a straggler in the case
-    // that we crashed and recovered/are recovering. So we can only log and
-    // ignore here.
-    _unexpected_call("abort_checkpoint()")
+    checkpoint_initiator._abort_checkpoint(checkpoint_id)
 
   fun ref initiate_rollback(
     recovery_promise: Promise[CheckpointRollbackBarrierToken],
