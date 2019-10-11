@@ -105,6 +105,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
     _connected_sources.create()
   let _available_sources: Array[(RoutingId, ConnectorSource[In])] =
     _available_sources.create()
+  var _initial_checkpoint_complete: Bool
 
   // Stream Registry for managing updates to local and global stream state
   let _stream_registry: LocalConnectorStreamRegistry[In]
@@ -217,6 +218,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
 
       _available_sources.push((source_id, source))
     end
+    _initial_checkpoint_complete = false
 
     _event_log.register_resilient(_id, this)
 
@@ -492,7 +494,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
     for (_, s) in _available_sources.values() do
       s.checkpoint_complete(checkpoint_id)
     end
-    if checkpoint_id == 1 then
+    if not _initial_checkpoint_complete then
       for (_, s) in _connected_sources.values() do
         s.first_checkpoint_complete()
       end
@@ -500,6 +502,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
         s.first_checkpoint_complete()
       end
       _start_sources()
+      _initial_checkpoint_complete = true
     end
 
   //////////////
