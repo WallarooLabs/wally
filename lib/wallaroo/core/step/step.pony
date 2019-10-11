@@ -504,7 +504,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     var queued = Array[_Queued]
     match barrier_token
     | let crbt: CheckpointRollbackBarrierToken =>
-      _phase = _RecoveringStepPhase(this)
+      _phase = _RecoveringStepPhase(this, crbt)
     else
       queued = _phase.queued()
       _phase = _NormalStepPhase(this)

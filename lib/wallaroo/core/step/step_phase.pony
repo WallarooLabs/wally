@@ -291,11 +291,23 @@ class _BarrierStepPhase is StepPhase
 
 class _RecoveringStepPhase is StepPhase
   let _step: Step ref
+  let _token: (CheckpointRollbackBarrierToken | None)
 
-  new create(s: Step ref) =>
+  new create(s: Step ref,
+    token: (CheckpointRollbackBarrierToken | None) = None)
+  =>
     _step = s
+    _token = token
 
   fun name(): String => __loc.type_name()
+
+  fun ref higher_priority(token: BarrierToken): Bool =>
+    match _token
+    | let b: BarrierToken =>
+      token > b
+    else
+      true
+    end
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, key: Key, event_ts: U64, watermark_ts: U64,
@@ -311,8 +323,13 @@ class _RecoveringStepPhase is StepPhase
   fun ref receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    @printf[I32]("Ignoring non-rollback barrier in _RecoveringStepPhase: %s\n"
+    @printf[I32]("Ignoring non-rollback barrier %s in _RecoveringStepPhase\n"
       .cstring(), barrier_token.string().cstring())
+
+  fun ref prepare_for_rollback(token: BarrierToken) =>
+    if higher_priority(token) then
+      _step.finish_preparing_for_rollback()
+    end
 
   fun ref queued(): Array[_Queued] =>
     Array[_Queued]
