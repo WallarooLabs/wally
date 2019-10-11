@@ -508,7 +508,10 @@ actor CheckpointInitiator is Initializable
     worker: WorkerName, rollback_id: RollbackId)
   =>
     if (_primary_worker == _worker_name) then
-      if rollback_id == _last_rollback_id then
+      //!@ Can we rely on ordering to be respected elsewhere, and thus avoid
+      // races around the coordinator crashing before assigning a rollback id
+      // to a different recovering worker?
+      // if rollback_id == _last_rollback_id then
         _clear_pending_checkpoints()
 
         ifdef "checkpoint_trace" then
@@ -536,11 +539,14 @@ actor CheckpointInitiator is Initializable
           _last_complete_checkpoint_id)
         _barrier_coordinator.inject_blocking_barrier(token, barrier_promise,
           resume_token)
-      else
-        @printf[I32](("Skipping rollback for %s, because %s is lower than " +
-          "current rollback id %s\n").cstring(), worker.cstring(),
-          rollback_id.string().cstring(), _last_rollback_id.string().cstring())
-      end
+      //!@ Can we rely on ordering to be respected elsewhere, and thus avoid
+      // races around the coordinator crashing before assigning a rollback id
+      // to a different recovering worker?
+      // else
+      //   @printf[I32](("Skipping rollback for %s, because %s is lower than " +
+      //     "current rollback id %s\n").cstring(), worker.cstring(),
+      //     rollback_id.string().cstring(), _last_rollback_id.string().cstring())
+      // end
     else
       try
         let msg = ChannelMsgEncoder.initiate_rollback_barrier(worker,

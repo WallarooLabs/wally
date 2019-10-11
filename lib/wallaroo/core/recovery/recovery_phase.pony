@@ -234,28 +234,35 @@ class _AwaitRollbackId is _RecoveryPhase
   fun name(): String => "_AwaitRollbackId"
 
   fun ref receive_rollback_id(rollback_id: RollbackId) =>
-    match _abort_promise
-    | let p: Promise[None] =>
-      if _highest_rival_rollback_id > rollback_id then
-        p(None)
-        _recovery._abort_early(_override_worker)
-        return
-      end
-    end
+    //!@ Remove this because the other worker has gotten there first
+    // match _abort_promise
+    // | let p: Promise[None] =>
+    //   if _highest_rival_rollback_id > rollback_id then
+    //     p(None)
+    //     _recovery._abort_early(_override_worker)
+    //     return
+    //   end
+    // end
     _recovery.request_recovery_initiated_acks(rollback_id)
 
   fun ref try_override_recovery(worker: WorkerName,
     rollback_id: RollbackId, recovery: Recovery ref,
     abort_promise: Promise[None])
   =>
-    @printf[I32](("RECOVERY: Received override recovery message during " +
-      "_AwaitRollbackId. Waiting to cede control until " +
-      "we determine if we have priority.\n").cstring())
-    if rollback_id > _highest_rival_rollback_id then
-      _highest_rival_rollback_id = rollback_id
-      _abort_promise = abort_promise
-      _override_worker = worker
-    end
+    // Another worker has made it past the request rollback id phase before
+    // us, and has managed to inform us, so we should simply cede control to
+    // it.
+    abort_promise(None)
+    _recovery._abort_early(worker)
+    //!@ Remove this because the other worker has gotten there first
+    // @printf[I32](("RECOVERY: Received override recovery message during " +
+    //   "_AwaitRollbackId. Waiting to cede control until " +
+    //   "we determine if we have priority.\n").cstring())
+    // if rollback_id > _highest_rival_rollback_id then
+    //   _highest_rival_rollback_id = rollback_id
+    //   _abort_promise = abort_promise
+    //   _override_worker = worker
+    // end
 
 class _AwaitRecoveryInitiatedAcks is _RecoveryPhase
   let _workers: Array[WorkerName] val
