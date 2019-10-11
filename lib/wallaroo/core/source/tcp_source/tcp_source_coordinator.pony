@@ -96,6 +96,7 @@ actor TCPSourceCoordinator[In: Any val] is SourceCoordinator
 
   let _connected_sources: SetIs[TCPSource[In]] = _connected_sources.create()
   let _available_sources: Array[TCPSource[In]] = _available_sources.create()
+  var _initial_checkpoint_complete: Bool
 
   // Lifecycle
   var _initializer: (LocalTopologyInitializer | None) = None
@@ -189,6 +190,7 @@ actor TCPSourceCoordinator[In: Any val] is SourceCoordinator
 
       _available_sources.push(source)
     end
+    _initial_checkpoint_complete = false
 
   fun ref _start_listening() =>
     if _valid then
@@ -410,7 +412,7 @@ actor TCPSourceCoordinator[In: Any val] is SourceCoordinator
     for s in _available_sources.values() do
       s.checkpoint_complete(checkpoint_id)
     end
-    if checkpoint_id == 1 then
+    if not _initial_checkpoint_complete then
       for s in _connected_sources.values() do
         s.first_checkpoint_complete()
       end
@@ -418,6 +420,7 @@ actor TCPSourceCoordinator[In: Any val] is SourceCoordinator
         s.first_checkpoint_complete()
       end
       _start_sources()
+      _initial_checkpoint_complete = true
     end
 
   //////////////
