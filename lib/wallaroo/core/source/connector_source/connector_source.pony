@@ -163,9 +163,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
 
     _mute()
     ifdef "resilience" then
-      // ConnectorSourceCoordinator will take care of muting and unmuting
-      // us when necessary
-      None
+      _mute_local()
     end
 
     ifdef "identify_routing_ids" then
@@ -193,9 +191,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     In case we pop into existence midway through a checkpoint, we need to
     wait until this is called to start processing.
     """
-    // ConnectorSourceCoordinator will take care of muting and unmuting
-    // us when necessary
-    None
+    _unmute_local()
 
   fun ref metrics_reporter(): MetricsReporter =>
     _metrics_reporter
@@ -423,7 +419,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
   //////////////
   be initiate_barrier(token: BarrierToken) =>
     if not _disposed then
-      @l(Log.debug(), Log.conn_source(), "ConnectorSource 0x%lx received initiate_barrier %s\n".cstring(), this, token.string().cstring())
+      @l(Log.debug(), Log.conn_source(), "ConnectorSource received initiate_barrier %s\n".cstring(), token.string().cstring())
       _initiate_barrier(token)
     end
 
@@ -493,9 +489,6 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     _next_checkpoint_id = checkpoint_id + 1
     event_log.ack_rollback(_source_id)
 
-    // ConnectorSourceCoordinator will take care of muting and unmuting
-    // us when necessary
-
   ///////////////
   // WATERMARKS
   ///////////////
@@ -560,6 +553,17 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     end
     _muted = false
     _tcp_handler.unmute()
+
+  fun ref _mute_local() =>
+    _muted_by.set(this)
+    _mute()
+
+  fun ref _unmute_local() =>
+    _muted_by.unset(this)
+
+    if _muted_by.size() == 0 then
+      _unmute()
+    end
 
   be mute(a: Any tag) =>
     _muted_by.set(a)
