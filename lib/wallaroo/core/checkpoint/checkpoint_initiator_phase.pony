@@ -209,20 +209,11 @@ class _WaitingForEventLogIdWrittenPhase is _CheckpointInitiatorPhase
 
 class _RollbackCheckpointInitiatorPhase is _CheckpointInitiatorPhase
   let _c_initiator: CheckpointInitiator ref
-  var _pending_checkpoint_timer: (U64 | None) = None
 
   new create(c_initiator: CheckpointInitiator ref) =>
     _c_initiator = c_initiator
 
   fun name(): String => "_RollbackCheckpointInitiatorPhase"
-
-  fun ref start_checkpoint_timer(time_until_next_checkpoint: U64,
-    checkpoint_initiator: CheckpointInitiator ref)
-  =>
-    """
-    We're rolling back, so we should not initiate a checkpoint timer yet.
-    """
-    _pending_checkpoint_timer = time_until_next_checkpoint
 
   fun ref _initiate_checkpoint(checkpoint_group: USize,
     checkpoint_initiator: CheckpointInitiator ref)
@@ -255,7 +246,7 @@ class _RollbackCheckpointInitiatorPhase is _CheckpointInitiatorPhase
     None
 
   fun ref resume_checkpointing_from_rollback() =>
-    _c_initiator.wait_for_next_checkpoint(_pending_checkpoint_timer)
+    _c_initiator.wait_for_next_checkpoint()
 
   fun ref abort_checkpoint(checkpoint_id: CheckpointId,
     checkpoint_initiator: CheckpointInitiator ref)
