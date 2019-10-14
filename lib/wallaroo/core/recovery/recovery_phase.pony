@@ -53,7 +53,7 @@ trait _RecoveryPhase
     // But we can't guarantee that this message is not a straggler in the case
     // that we crashed during an earlier round of recovery/rollback. So we
     // can only log and ignore here.
-    _unexpected_call("worker_ack_local_keys_rollback()")
+    _unexpected_call(__loc.method_name())
 
   fun ref worker_ack_register_producers(w: WorkerName) =>
     _invalid_call(); Fail()
@@ -63,7 +63,7 @@ trait _RecoveryPhase
     // But we can't guarantee that this message is not a straggler in the case
     // that we crashed during an earlier round of recovery/rollback. So we
     // can only log and ignore here.
-    _unexpected_call("receive_rollback_id()")
+    _unexpected_call(__loc.method_name())
 
   fun ref rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
     _invalid_call(); Fail()
@@ -76,7 +76,7 @@ trait _RecoveryPhase
     // But we can't guarantee that this message is not a straggler in the case
     // that we crashed during an earlier round of recovery/rollback. So we
     // can only log and ignore here.
-    _unexpected_call("ack_recovery_initiated()")
+    _unexpected_call(__loc.method_name())
 
   fun ref rollback_complete(worker: WorkerName,
     token: CheckpointRollbackBarrierToken)
@@ -85,7 +85,7 @@ trait _RecoveryPhase
     // But we can't guarantee that this message is not a straggler in the case
     // that we crashed during an earlier round of recovery/rollback. So we
     // can only log and ignore here.
-    _unexpected_call("rollback_complete()")
+    _unexpected_call(__loc.method_name())
 
   fun ref try_override_recovery(worker: WorkerName,
     rollback_id: RollbackId, recovery: Recovery ref,

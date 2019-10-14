@@ -54,7 +54,7 @@ trait _CheckpointInitiatorPhase
     // But we can't guarantee that this message is not a straggler in the case
     // that we crashed and recovered/are recovering. So we can only log and
     // ignore here.
-    _unexpected_call("event_log_checkpoint_complete()")
+    _unexpected_call(__loc.method_name())
 
   fun ref event_log_id_written(worker: WorkerName,
     checkpoint_id: CheckpointId)
@@ -63,14 +63,14 @@ trait _CheckpointInitiatorPhase
     // But we can't guarantee that this message is not a straggler in the case
     // that we crashed and recovered/are recovering. So we can only log and
     // ignore here.
-    _unexpected_call("event_log_id_written()")
+    _unexpected_call(__loc.method_name())
 
   fun ref resume_checkpointing_from_rollback() =>
     // This is called directly in response to a control message received.
     // But we can't guarantee that this message is not a straggler in the case
     // that we crashed and recovered/are recovering. So we can only log and
     // ignore here.
-    _unexpected_call("resume_checkpointing_from_rollback()")
+    _unexpected_call(__loc.method_name())
 
   fun ref abort_checkpoint(checkpoint_id: CheckpointId,
     checkpoint_initiator: CheckpointInitiator ref)

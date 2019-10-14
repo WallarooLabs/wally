@@ -38,7 +38,7 @@ trait _EventLogPhase
     // But we can't guarantee that this message is not a straggler in the case
     // that we crashed and recovered/are recovering. So we can only log and
     // ignore here.
-    _unexpected_call("initiate_checkpoint()")
+    _unexpected_call(__loc.method_name())
 
   fun ref checkpoint_state(resilient_id: RoutingId,
     checkpoint_id: CheckpointId, payload: Array[ByteSeq] val,
@@ -62,7 +62,7 @@ trait _EventLogPhase
     // But we can't guarantee that this message is not a straggler in the case
     // that we crashed and recovered/are recovering. So we can only log and
     // ignore here.
-    _unexpected_call("write_checkpoint_id()")
+    _unexpected_call(__loc.method_name())
 
   fun ref checkpoint_id_written(checkpoint_id: CheckpointId,
     promise: Promise[CheckpointId])
