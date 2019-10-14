@@ -179,29 +179,39 @@ actor DataReceiver is Producer
     pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
+    var process_ack: Bool = false
+
     ifdef "trace" then
       @printf[I32]("Rcvd pipeline msg at DataReceiver\n".cstring())
     end
-    if seq_id > _last_id_seen then
-      if (seq_id - _last_id_seen) == 1 then
-        _ack_counter = _ack_counter + 1
-        _last_id_seen = seq_id
-        _router.route(d, pipeline_time_spent, producer_id, this, seq_id,
-          latest_ts, metrics_id, worker_ingress_ts)
-        _maybe_ack()
-      elseif _last_id_seen == 0 then
-        // If diff != 1 but _last_id_seen is indeed 0, then we're
-        // at a case where we've received an app message very early
-        // in our startup process, i.e., we crashed and restarted
-        // but the entire cluster hasn't started its rollback
-        // process yet.  Log the condition, then drop the message.
-        @l(Log.info(), Log.routing(),
-          "DataReceiver.deliver: dropped message seq_id %lu _last_id_seen %lu".cstring(),
-          seq_id, _last_id_seen)
-      else
-        // This gap is bad, abort.
-        Fail()
+    ifdef "resilience" then
+      if seq_id > _last_id_seen then
+        if (seq_id - _last_id_seen) == 1 then
+          process_ack = true
+        elseif _last_id_seen == 0 then
+          // If diff != 1 but _last_id_seen is indeed 0, then we're
+          // at a case where we've received an app message very early
+          // in our startup process, i.e., we crashed and restarted
+          // but the entire cluster hasn't started its rollback
+          // process yet.  Log the condition, then drop the message.
+          @l(Log.info(), Log.routing(),
+            "DataReceiver.deliver: dropped message seq_id %lu _last_id_seen %lu".cstring(),
+            seq_id, _last_id_seen)
+          process_ack = false
+        else
+          // This gap is bad, abort.
+          Fail()
+        end
       end
+    else // resilience
+      process_ack = true
+    end
+    if process_ack then
+      _ack_counter = _ack_counter + 1
+      _last_id_seen = seq_id
+      _router.route(d, pipeline_time_spent, producer_id, this, seq_id,
+        latest_ts, metrics_id, worker_ingress_ts)
+      _maybe_ack()
     end
 
   fun ref _maybe_ack() =>
