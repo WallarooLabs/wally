@@ -169,7 +169,17 @@ def _asyncore_loop(sentinel, timeout, socket_map):
     except:
         logging.exception("_asyyncore_loop exited!")
     logging.info("_asyncore_loop exiting")
-    os._exit(77)
+    if os.environ.get("ERROR_9_SHOULD_EXIT") is not None:
+        ## See commit 5937dfe088
+        ## Asyncore can have a race where a "error: ( 9, 'Bad file descriptor' )"
+        ## happens, and the rest of the client hangs.  Until that bug has a
+        ## work-around, we will force a Python exit here.
+        os._exit(77)
+    else:
+        ## We are probably running in a Python test environment.  Do not
+        ## halt everything here with a forced exit(); instead, let the test
+        ## harness clean up.
+        None
 
 
 class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):

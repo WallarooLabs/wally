@@ -67,7 +67,7 @@ start_all_workers () {
 start_sender () {
     rm -f $SENDER_OUTFILE
     while [ 1 ]; do
-        $HOME/wallaroo/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 66000 >> $SENDER_OUTFILE 2>&1
+        env ERROR_9_SHOULD_EXIT=true $HOME/wallaroo/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 66000 >> $SENDER_OUTFILE 2>&1
         sleep 0.1
     done
 }
