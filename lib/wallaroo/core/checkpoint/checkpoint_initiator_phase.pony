@@ -95,16 +95,6 @@ class _WaitingCheckpointInitiatorPhase is _CheckpointInitiatorPhase
   fun ref resume_checkpointing_from_rollback() =>
     None
 
-  fun ref event_log_checkpoint_complete(worker: WorkerName,
-    checkpoint_id: CheckpointId)
-  =>
-    """
-    This would be an error if we were participating in the full protocol.
-    However, we probably just started a few milliseconds ago.
-    """
-    @printf[I32]("Unexpected call to %s on checkpoint phase %s. Ignoring!\n"
-      .cstring(), __loc.method_name().cstring(), __loc.type_name().cstring())
-
 class _CheckpointingPhase is _CheckpointInitiatorPhase
   let _token: CheckpointBarrierToken
   let _c_initiator: CheckpointInitiator ref
