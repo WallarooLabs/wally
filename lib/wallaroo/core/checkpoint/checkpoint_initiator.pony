@@ -294,12 +294,8 @@ actor CheckpointInitiator is Initializable
       end
     end
 
-  fun ref wait_for_next_checkpoint(pending_checkpoint_timer: (U64 | None)) =>
+  fun ref wait_for_next_checkpoint() =>
     _phase = _WaitingCheckpointInitiatorPhase
-    match pending_checkpoint_timer
-    | let time_until_checkpoint: U64 =>
-      _phase.start_checkpoint_timer(time_until_checkpoint, this)
-    end
 
   be checkpoint_barrier_complete(token: BarrierToken) =>
     """
