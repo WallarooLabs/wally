@@ -690,6 +690,9 @@ actor ConnectorSink is Sink
       end
     end
 
+  fun ref use_normal_processor() =>
+    _use_normal_processor()
+
   fun ref _use_normal_processor() =>
     _phase = NormalSinkPhase(this)
 
@@ -719,13 +722,7 @@ actor ConnectorSink is Sink
 
   be prepare_for_rollback() =>
     @ll(_conn_debug, "Prepare for checkpoint rollback at ConnectorSink %s".cstring(), _sink_id.string().cstring())
-    match _phase
-    | let x: InitialSinkPhase =>
-      // Rollback barriers are going to arrive soon.
-      // Get ready to receive them.
-      _use_normal_processor()
-      @ll(_conn_debug, "Prepare for checkpoint rollback at ConnectorSink %s, use normal processor phase".cstring(), _sink_id.string().cstring())
-    end
+    _phase.early_prepare_for_rollback()
 
   fun ref finish_preparing_for_rollback() =>
     _use_normal_processor()
