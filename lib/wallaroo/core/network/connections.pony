@@ -220,13 +220,11 @@ actor Connections is Cluster
         _control_conns(worker)?.writev(data)
         ifdef debug then
           let d = recover iso Array[U8] end
-          var first_seen: Bool = false
           for q in data.values() do
-            if first_seen then
-              d.append(q)
-            end
-            first_seen = true
+            d.append(q)
           end
+          // Shift away 4 byte len header
+          d.shift()?; d.shift()?; d.shift()?; d.shift()?
           let dd = recover val consume d end
           let x: ChannelMsg = ChannelMsgDecoder(dd, _auth)
           @printf[I32](("Sent control message to %s: %s: %s\n").cstring(), worker.cstring(), x.string().cstring(), _print_array[U8](dd).cstring())
