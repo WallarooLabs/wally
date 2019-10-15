@@ -967,7 +967,9 @@ class _WaitingForGrowCheckpointResult is _AutoscalePhase
   new create(autoscale: Autoscale ref,
     joining_workers: Array[WorkerName] val, is_coordinator: Bool)
   =>
-    @printf[I32]("AUTOSCALE: Waiting for checkpoint process to finish.\n".cstring())
+    ifdef "resilience" then
+      @printf[I32]("AUTOSCALE: Waiting for checkpoint process to finish.\n".cstring())
+    end
     _autoscale = autoscale
     _joining_workers = joining_workers
     _is_coordinator = is_coordinator
@@ -985,7 +987,9 @@ class _WaitingForShrinkCheckpointResult is _AutoscalePhase
   new create(autoscale: Autoscale ref, remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
-    @printf[I32]("AUTOSCALE: Waiting for checkpoint process to finish.\n".cstring())
+    ifdef "resilience" then
+      @printf[I32]("AUTOSCALE: Waiting for checkpoint process to finish.\n".cstring())
+    end
     _autoscale = autoscale
     _remaining_workers = remaining_workers
     _leaving_workers = leaving_workers

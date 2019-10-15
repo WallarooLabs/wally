@@ -564,26 +564,32 @@ actor Autoscale
   fun ref complete_grow(
     joining_workers: Array[WorkerName] val, is_coordinator: Bool)
   =>
-    if (_worker_name == _primary_worker) then
-      @printf[I32]("AUTOSCALE: Trigger checkpoint before resume-the-world\n".cstring())
-      let me = recover tag this end
-      let promise = Promise[Bool]
-      promise.next[Bool](
-        {(result: Bool) =>
-          @printf[I32]("AUTOSCALE: Checkpoint success status for grow was %s\n".cstring(), result.string().cstring())
-          me.checkpoint_status_for_grow_was(result)
-          result
-        },
-        {() =>
-          @printf[I32]("AUTOSCALE: Checkpoint for grow failed\n".cstring())
-          me.checkpoint_status_for_grow_was(false)
-          false
-        })
-      _checkpoint_initiator.force_checkpoint(promise)
-      _phase = _WaitingForGrowCheckpointResult(this, joining_workers, is_coordinator)
+    ifdef "resilience" then
+      if (_worker_name == _primary_worker) then
+        @printf[I32]("AUTOSCALE: Trigger checkpoint before resume-the-world\n".cstring())
+        let me = recover tag this end
+        let promise = Promise[Bool]
+        promise.next[Bool](
+          {(result: Bool) =>
+            @printf[I32]("AUTOSCALE: Checkpoint success status for grow was %s\n".cstring(), result.string().cstring())
+            me.checkpoint_status_for_grow_was(result)
+            result
+          },
+          {() =>
+            @printf[I32]("AUTOSCALE: Checkpoint for grow failed\n".cstring())
+            me.checkpoint_status_for_grow_was(false)
+            false
+          })
+        _checkpoint_initiator.force_checkpoint(promise)
+        _phase = _WaitingForGrowCheckpointResult(this, joining_workers, is_coordinator)
+      else
+        @printf[I32]("AUTOSCALE: Trigger checkpoint before resume-the-world is performed instead by %s\n".cstring(), _primary_worker.cstring())
+        complete_grow2(joining_workers, is_coordinator)
+      end
     else
-      @printf[I32]("AUTOSCALE: Trigger checkpoint before resume-the-world is performed instead by %s\n".cstring(), _primary_worker.cstring())
-      complete_grow2(joining_workers, is_coordinator)
+      @printf[I32]("AUTOSCALE: skip checkpoint\n".cstring())
+      _phase = _WaitingForGrowCheckpointResult(this, joining_workers, is_coordinator)
+      this.checkpoint_status_for_grow_was(true)
     end
 
   fun ref checkpoint_got_result_for_grow(result: Bool,
@@ -820,26 +826,32 @@ actor Autoscale
   fun ref shrink_force_checkpoint(remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
-    if (_worker_name == _primary_worker) then
-      @printf[I32]("AUTOSCALE: Trigger checkpoint before resume-the-world\n".cstring())
-      let me = recover tag this end
-      let promise = Promise[Bool]
-      promise.next[Bool](
-        {(result: Bool) =>
-          @printf[I32]("AUTOSCALE: Checkpoint success status for shrink was %s\n".cstring(), result.string().cstring())
-          me.checkpoint_status_for_shrink_was(result)
-          result
-        },
-        {() =>
-          @printf[I32]("AUTOSCALE: Checkpoint for shrink failed\n".cstring())
-          me.checkpoint_status_for_shrink_was(false)
-          false
-        })
-      _checkpoint_initiator.force_checkpoint(promise)
-      _phase = _WaitingForShrinkCheckpointResult(this, remaining_workers, leaving_workers)
+    ifdef "resilience" then
+      if (_worker_name == _primary_worker) then
+        @printf[I32]("AUTOSCALE: Trigger checkpoint before resume-the-world\n".cstring())
+        let me = recover tag this end
+        let promise = Promise[Bool]
+        promise.next[Bool](
+          {(result: Bool) =>
+            @printf[I32]("AUTOSCALE: Checkpoint success status for shrink was %s\n".cstring(), result.string().cstring())
+            me.checkpoint_status_for_shrink_was(result)
+            result
+          },
+          {() =>
+            @printf[I32]("AUTOSCALE: Checkpoint for shrink failed\n".cstring())
+            me.checkpoint_status_for_shrink_was(false)
+            false
+          })
+        _checkpoint_initiator.force_checkpoint(promise)
+        _phase = _WaitingForShrinkCheckpointResult(this, remaining_workers, leaving_workers)
+      else
+        @printf[I32]("AUTOSCALE: Trigger checkpoint before resume-the-world is performed instead by %s\n".cstring(), _primary_worker.cstring())
+        initiate_shrink(remaining_workers, leaving_workers)
+      end
     else
-      @printf[I32]("AUTOSCALE: Trigger checkpoint before resume-the-world is performed instead by %s\n".cstring(), _primary_worker.cstring())
-      initiate_shrink(remaining_workers, leaving_workers)
+      @printf[I32]("AUTOSCALE: skip checkpoint\n".cstring())
+      _phase = _WaitingForShrinkCheckpointResult(this, remaining_workers, leaving_workers)
+      this.checkpoint_status_for_shrink_was(true)
     end
 
   fun ref checkpoint_got_result_for_shrink(result: Bool,
