@@ -739,54 +739,64 @@ actor ConnectorSink is Sink
     @ll(_conn_info, "Rollback to %s at ConnectorSink %s".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring())
     @ll(_twopc_info, "2PC: Rollback: twopc_state %d txn_id %s.".cstring(), _twopc.state(), _twopc.txn_id.cstring())
 
-    // If we were disconnected + perform a local abort, then we
-    // arrive here with _twopc.txn_id="".  The last transaction,
-    // named by _twopc.txn_id_at_close, has already been aborted
-    // during the twopc_intro portion of the connector sink protocol.
-
-    if _twopc.txn_id == "" then
-      // We may have sent data to the sink that has not been committed,
-      // and also we haven't sent a phase1 message.  Do that now,
-      // and we'll immediately abort it below.
-      let bt = CheckpointBarrierToken(checkpoint_id)
-      match _twopc.barrier_complete(bt where
-        is_rollback = true, stream_id = _notify.stream_id)
-      | None =>
-        // No data has been processed by the sink since the last
-        // checkpoint.
-        @ll(_twopc_debug, "no data written during this checkpoint interval, skipping phase 1".cstring())
-        _twopc.txn_id = "skip--.--" + bt.string()
-      | let msgs: Array[cwm.Message] =>
-        for msg in msgs.values() do
-          _notify.send_msg(this, msg)
-        end
-        _twopc.set_state_1precommit()
-        @ll(_twopc_debug, "sent rollback phase 1 for txn_id %s, size %lu".cstring(), _twopc.txn_id.cstring(), msgs.size())
-      end
-    end
-
     let rollback_to_c_id = _twopc.make_txn_id_string(checkpoint_id)
-    if not _twopc.state_is_start() then
-      if rollback_to_c_id == _twopc.txn_id then
-        // This is an interesting case: we are rolling back to but have not
-        // committed with phase 2.  This is possible when initializer has
-        // determined that the checkpoint has committed globally, writes
-        // commit record to event log, then initializer crashes & restarts.
-        //
-        // Double-check that we have voted to commit/commit fast for
-        // the transaction.  This ought to be true, so it is definitely
-        // worth a crash if it's not true.
-        if _twopc.state_is_2commit() or _twopc.state_is_2commit_fast() then
-          @ll(_twopc_info, "Txn id %s may need phase 2 commit, sending!".cstring(), _twopc.txn_id.cstring())
-          _twopc.send_phase2(this, true)
-        else
-          Fail()
+    if _connected and _notify.twopc_intro_done then
+      // If we were disconnected + perform a local abort, then we
+      // arrive here with _twopc.txn_id="".  The last transaction,
+      // named by _twopc.txn_id_at_close, has already been aborted
+      // during the twopc_intro portion of the connector sink protocol.
+
+      if _twopc.txn_id == "" then
+        // We may have sent data to the sink that has not been committed,
+        // and also we haven't sent a phase1 message.  Do that now,
+        // and we'll immediately abort it below.
+        let bt = CheckpointBarrierToken(checkpoint_id)
+        match _twopc.barrier_complete(bt where
+          is_rollback = true, stream_id = _notify.stream_id)
+        | None =>
+          // No data has been processed by the sink since the last
+          // checkpoint.
+          @ll(_twopc_debug, "no data written during this checkpoint interval, skipping phase 1".cstring())
+          _twopc.txn_id = "skip--.--" + bt.string()
+        | let msgs: Array[cwm.Message] =>
+          for msg in msgs.values() do
+            _notify.send_msg(this, msg)
+          end
+          _twopc.set_state_1precommit()
+          @ll(_twopc_debug, "sent rollback phase 1 for txn_id %s, size %lu".cstring(), _twopc.txn_id.cstring(), msgs.size())
         end
-      else
-       @ll(_twopc_info, "Txn id %s needs phase 2 abort, sending!".cstring(), _twopc.txn_id.cstring())
-        _twopc.send_phase2(this, false)
       end
+
+      if not _twopc.state_is_start() then
+        if rollback_to_c_id == _twopc.txn_id then
+          // This is an interesting case: we are rolling back to but have not
+          // committed with phase 2.  This is possible when initializer has
+          // determined that the checkpoint has committed globally, writes
+          // commit record to event log, then initializer crashes & restarts.
+          //
+          // Double-check that we have voted to commit/commit fast for
+          // the transaction.  This ought to be true, so it is definitely
+          // worth a crash if it's not true.
+          if _twopc.state_is_2commit() or _twopc.state_is_2commit_fast() then
+            @ll(_twopc_info, "Txn id %s may need phase 2 commit, sending!".cstring(), _twopc.txn_id.cstring())
+            _twopc.send_phase2(this, true)
+          else
+            Fail()
+          end
+        else
+         @ll(_twopc_info, "Txn id %s needs phase 2 abort, sending!".cstring(), _twopc.txn_id.cstring())
+          _twopc.send_phase2(this, false)
+        end
+      end
+    else
+      // We aren't connector and/or 2PC intro is not done.
+      // When we are finally are connected & 2PC intro done, then
+      // any 2PC actions that need doing will be done at that time.
+      @ll(_conn_info, "TODO any other info to log here?".cstring())
+      @ll(_conn_info, "Rollback to %s at ConnectorSink %s".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring())
+      @ll(_twopc_info, "_connected %s twopc_intro_done %s".cstring(), _connected.string().cstring(), _notify.twopc_intro_done.string().cstring())
     end
+
     _twopc.reset_state()
 
     let r = Reader
@@ -802,10 +812,10 @@ actor ConnectorSink is Sink
     // When rollback() is called here, we now know the global txn
     // commit status: commit for checkpoint_id, all greater are invalid.
     _notify.twopc_txn_id_last_committed = rollback_to_c_id
-    @ll(_twopc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
+    @ll(_twopc_debug, "2PC: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
     _notify.twopc_current_txn_aborted = _notify.process_uncommitted_list(this)
 
-    @ll(_twopc_debug, "DBGDBG: 2PC: twopc_current_txn_aborted = %s.".cstring(), _notify.twopc_current_txn_aborted.string().cstring())
+    @ll(_twopc_debug, "2PC: twopc_current_txn_aborted = %s.".cstring(), _notify.twopc_current_txn_aborted.string().cstring())
     @ll(_twopc_debug, "2PC: Rollback: _twopc.last_offset %lu _twopc.current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s".cstring(), _twopc.last_offset, _twopc.current_offset, _notify.acked_point_of_ref, _notify.twopc_txn_id_last_committed_helper().cstring(), _sink_id.string().cstring())
 
     event_log.ack_rollback(_sink_id)
