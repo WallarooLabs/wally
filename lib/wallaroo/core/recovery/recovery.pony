@@ -172,7 +172,7 @@ actor Recovery
 
       _recovery_phase = _PrepareRollback(this)
     else
-      _recovery_complete()
+      _recovery_complete(0, 0)
     end
 
   fun ref _rollback_local_keys() =>
@@ -202,7 +202,7 @@ actor Recovery
         Fail()
       end
     else
-      _recovery_complete()
+      _recovery_complete(0, 0)
     end
 
   fun ref _local_keys_rollback_complete() =>
@@ -213,7 +213,7 @@ actor Recovery
       promise.next[None](_self~receive_rollback_id())
       _checkpoint_initiator.request_rollback_id(promise)
     else
-      _recovery_complete()
+      _recovery_complete(0, 0)
     end
 
   be receive_rollback_id(rollback_id: RollbackId) =>
@@ -233,7 +233,7 @@ actor Recovery
         rollback_id)
       _recovery_phase.ack_recovery_initiated(_worker_name)
     else
-      _recovery_complete()
+      _recovery_complete(0, 0)
     end
 
   fun ref _recovery_initiated_acks_complete(rollback_id: RollbackId) =>
@@ -249,7 +249,7 @@ actor Recovery
       _checkpoint_initiator.initiate_rollback(promise, _worker_name,
         rollback_id)
     else
-      _recovery_complete()
+      _recovery_complete(0, 0)
     end
 
   fun ref _rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
@@ -282,7 +282,9 @@ actor Recovery
       end
     end
 
-  fun ref _recovery_complete() =>
+  fun ref _recovery_complete(rollback_id: RollbackId,
+    checkpoint_id: CheckpointId)
+  =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery COMPLETE - ~~|\n".cstring())
     end
@@ -299,7 +301,8 @@ actor Recovery
       Fail()
     end
 
-    _checkpoint_initiator.resume_checkpointing_from_rollback()
+    _checkpoint_initiator.resume_checkpointing_from_rollback(rollback_id,
+      checkpoint_id)
 
   fun ref _abort_early(worker: WorkerName) =>
     """

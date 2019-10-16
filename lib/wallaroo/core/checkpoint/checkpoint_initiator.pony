@@ -266,7 +266,9 @@ actor CheckpointInitiator is Initializable
       _phase = _CheckpointingPhase(token, this)
     end
 
-  be resume_checkpointing_from_rollback() =>
+  be resume_checkpointing_from_rollback(rollback_id: RollbackId,
+    checkpoint_id: CheckpointId)
+  =>
     ifdef "checkpoint_trace" then
       @printf[I32]("CheckpointInitiator: resume_checkpointing_from_rollback()\n"
         .cstring())
@@ -278,14 +280,15 @@ actor CheckpointInitiator is Initializable
         promise.next[None]({(t: BarrierToken) =>
           _self.initiate_checkpoint(_checkpoint_group)})
         _barrier_coordinator.inject_barrier(
-          CheckpointRollbackResumeBarrierToken(_last_rollback_id,
-            _last_complete_checkpoint_id), promise)
+          CheckpointRollbackResumeBarrierToken(rollback_id,
+            checkpoint_id), promise)
         _phase.resume_checkpointing_from_rollback()
       end
     else
       try
         ifdef "resilience" then
-          let msg = ChannelMsgEncoder.resume_checkpoint(_worker_name, _auth)?
+          let msg = ChannelMsgEncoder.resume_checkpoint(_worker_name,
+            rollback_id, checkpoint_id, _auth)?
           _connections.send_control(_primary_worker, msg)
           _phase.resume_checkpointing_from_rollback()
         end
