@@ -348,6 +348,12 @@ class _Rollback is _RecoveryPhase
     _acked_workers.set(worker)
     if _acked_workers.size() == _workers.size() then
       _recovery._recovery_complete()
+    else
+      ifdef "checkpoint_trace" then
+        @printf[I32]("_Rollback: %s acked out of %s (latest is %s)\n".cstring(),
+          _acked_workers.size().string().cstring(),
+          _workers.size().string().cstring(), worker.cstring())
+      end
     end
 
   fun ref try_override_recovery(worker: WorkerName,
