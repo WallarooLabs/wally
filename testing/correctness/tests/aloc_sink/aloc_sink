@@ -163,7 +163,6 @@ class AsyncServer(asynchat.async_chat, object):
         self.received_count = 0
         self._reset_count = {}
         self._using_2pc = True
-        self._txn_state = {}
         self._txn_stream_content = []
         self._next_txn_force_abort_written = False
         if s3_scheme == 'fake-s3':
