@@ -257,8 +257,8 @@ actor BarrierCoordinator is Initializable
     """
     if not _disposed then
       ifdef "checkpoint_trace" then
-        @printf[I32]("Injecting blocking barrier %s\n".cstring(),
-          barrier_token.string().cstring())
+        @printf[I32]("Injecting blocking barrier %s with blocking completion token %s\n".cstring(),
+          barrier_token.string().cstring(), wait_for_token.string().cstring())
       end
       if _primary_worker == _worker_name then
         // We handle rollback barrier token as a special case. That's because

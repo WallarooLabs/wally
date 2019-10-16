@@ -336,7 +336,7 @@ class _Rollback is _RecoveryPhase
     end
     _acked_workers.set(worker)
     if _acked_workers.size() == _workers.size() then
-      _recovery._recovery_complete()
+      _recovery._recovery_complete(token.rollback_id, token.checkpoint_id)
     end
 
   fun ref try_override_recovery(worker: WorkerName,

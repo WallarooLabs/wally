@@ -583,10 +583,10 @@ primitive ChannelMsgEncoder
   =>
     _encode(EventLogAckRollbackMsg(token, sender), auth)?
 
-  fun resume_checkpoint(sender: WorkerName, auth: AmbientAuth):
-    Array[ByteSeq] val ?
+  fun resume_checkpoint(sender: WorkerName, rollback_id: RollbackId,
+    checkpoint_id: CheckpointId, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(ResumeCheckpointMsg(sender), auth)?
+    _encode(ResumeCheckpointMsg(sender, rollback_id, checkpoint_id), auth)?
 
   fun resume_processing(sender: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -1769,9 +1769,13 @@ class val RollbackBarrierFullyAckedMsg is ChannelMsg
 
 class val ResumeCheckpointMsg is ChannelMsg
   let sender: WorkerName
+  let rollback_id: RollbackId
+  let checkpoint_id: CheckpointId
 
-  new val create(sender': WorkerName) =>
+  new val create(sender': WorkerName, r_id: RollbackId, c_id: CheckpointId) =>
     sender = sender'
+    rollback_id = r_id
+    checkpoint_id = c_id
 
 class val ResumeProcessingMsg is ChannelMsg
   let sender: WorkerName
