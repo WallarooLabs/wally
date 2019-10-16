@@ -271,10 +271,10 @@ actor Recovery
 
       let promise = Promise[CheckpointRollbackBarrierToken]
       promise.next[None](recover this~rollback_complete(_worker_name) end)
-      _event_log.initiate_rollback(token, promise)
 
       let t = Timer(_DelayInitiateRollback( // QQQ HACK
-        token, _worker_name, _auth, _workers, _connections), 0_700_000_000)
+        token, _worker_name, _auth, _workers, _connections,
+        _event_log, promise), 0_700_000_000)
       _timers(consume t) // QQQ HACK
       /**** QQQ HACK
       try
@@ -339,20 +339,26 @@ class _DelayInitiateRollback is TimerNotify
   let _auth: AmbientAuth
   let _workers: Array[WorkerName] val
   let _connections: Connections
+  let _event_log: EventLog
+  let _promise: Promise[CheckpointRollbackBarrierToken]
 
   new iso create(token: CheckpointRollbackBarrierToken, worker_name: String,
     auth: AmbientAuth, workers: Array[WorkerName] val,
-    connections: Connections)
+    connections: Connections, event_log: EventLog,
+    promise: Promise[CheckpointRollbackBarrierToken])
   =>
     _token = token
     _worker_name = worker_name
     _auth = auth
     _workers = workers
     _connections = connections
+    _event_log = event_log
+    _promise = promise
 
   fun ref apply(timer: Timer, count: U64): Bool =>
     @printf[I32]("_DelayInitiateRollback: TIMER FIRED\n".cstring())
     try
+      _event_log.initiate_rollback(_token, _promise)
       let msg = ChannelMsgEncoder.event_log_initiate_rollback(_token,
         _worker_name, _auth)?
       for w in _workers.values() do
