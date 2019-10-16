@@ -88,6 +88,7 @@ trait _CheckpointInitiatorPhase
   fun _invalid_call() =>
     @printf[I32]("Invalid call on checkpoint initiator phase %s\n".cstring(),
       name().cstring())
+    Fail()
 
   fun _unexpected_call(call: String) =>
     """
