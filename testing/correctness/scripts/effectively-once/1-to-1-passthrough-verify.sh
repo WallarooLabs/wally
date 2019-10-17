@@ -12,9 +12,6 @@
 # 3. The input file has all lines beginning with the same character,
 #    e.g., ASCII "T".
 #
-# 4. For small Wallaroo clusters, the lines beginning with the
-#    character "T" will always be routed to worker2.
-#
 # 5. We follow the TCP port and file input/output naming conventions
 #    of the scripts in this directory.
 #
@@ -22,20 +19,19 @@
 #    mkdir -p /tmp/sink-output
 #    env PYTHONPATH=~/wallaroo/machida/lib ~/wallaroo/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 > /tmp/sink-out/stdout-stderr 2>&1
 #
-# 7. We can use brute force shell script fu to find the end offset of
-#    the last committed transaction (or assume that the committed
-#    offset is 0) without resorting to parsing the aloc_sink's
-#    output.worker2.txnlog file with Python to be accurate.
+# 7. We rely on the small Python script `concat-sink-output.py` to
+#    concatenate chunks of data from various sink files, in the order
+#    that they were written by Wallaroo, into a single ordered file.
 #
 # 8. Tools like "dd" and "cmp" are sufficient to verify that the
 #    output that the aloc_sink gets is correct.
 #
-# 9. This script will be for 1-time verification use.
+# 9. This script will be for point-in-time verification use.
 
 INPUT=$1
 OUTPUT_DIR=/tmp/sink-out
-OUTPUT=`ls -l /tmp/sink-out/output.* | grep -v txnlog | sort -nr -k 5 | head -1 | awk '{ print $9 }'`
-OUTPUT_TXNLOG=$OUTPUT.txnlog
+OUTPUT=$OUTPUT_DIR/output.concatenated
+
 TMP_INPUT=`mktemp /tmp/first-bytes-of-input.XXXXX`
 TMP_OUTPUT=`mktemp /tmp/first-bytes-of-output.XXXXX`
 rm -f $TMP_INPUT $TMP_OUTPUT
@@ -46,24 +42,16 @@ if [ ! -f $INPUT ]; then
     echo "File '$INPUT' does not exist"
     exit 1
 fi
-if [ ! -f $OUTPUT -o ! -f $OUTPUT_TXNLOG ]; then
-    echo Error: calculated file $OUTPUT and/or $OUTPUT_TXNLOG does not exist
-    exit 1
-fi
 
-sink_offset=0
-tmp=`grep "2-ok" $OUTPUT_TXNLOG | tail -1 | \
-     sed -e 's/.*, //' -e 's/\].*//'`
-if [ ! -z "$tmp" ]; then
-    sink_offset=$tmp
-fi
+./concat-sink-output.py $OUTPUT_DIR/*.txnlog > $OUTPUT 2> $OUTPUT.mapping
+output_size=`ls -l $OUTPUT | awk '{print $5}'`
 
-cmp -n $sink_offset $INPUT $OUTPUT
+cmp -n $output_size $INPUT $OUTPUT
 if [ $? -eq 0 ]; then
     exit 0
 else
-    dd if=$INPUT bs=$sink_offset count=1 > $TMP_INPUT 2> /dev/null
-    dd if=$OUTPUT bs=$sink_offset count=1 > $TMP_OUTPUT 2> /dev/null
+    dd if=$INPUT bs=$output_size count=1 > $TMP_INPUT 2> /dev/null
+    dd if=$OUTPUT bs=$output_size count=1 > $TMP_OUTPUT 2> /dev/null
     ls -l $TMP_INPUT $TMP_OUTPUT
     diff -u $TMP_INPUT $TMP_OUTPUT
     echo ERROR
