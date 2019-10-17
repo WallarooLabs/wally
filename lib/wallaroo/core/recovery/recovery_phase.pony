@@ -346,13 +346,16 @@ class _Rollback is _RecoveryPhase
       Invariant(ArrayHelpers[String].contains[String](_workers, worker))
     end
     _acked_workers.set(worker)
+    ifdef "checkpoint_trace" then
+      @printf[I32]("_Rollback: %s acked out of %s (latest is %s)\n".cstring(),
+        _acked_workers.size().string().cstring(),
+        _workers.size().string().cstring(), worker.cstring())
+    end
     if _acked_workers.size() == _workers.size() then
       _recovery._recovery_complete()
     else
       ifdef "checkpoint_trace" then
-        @printf[I32]("_Rollback: %s acked out of %s (latest is %s)\n".cstring(),
-          _acked_workers.size().string().cstring(),
-          _workers.size().string().cstring(), worker.cstring())
+        @printf[I32]("_Rollback: _acked_workers = %s, _workers = %s\n".cstring(), ",".join(_acked_workers.values()).cstring(), ",".join(_workers.values()).cstring())
       end
     end
 
