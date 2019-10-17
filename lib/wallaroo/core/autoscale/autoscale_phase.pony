@@ -46,6 +46,9 @@ trait _AutoscalePhase
   =>
     _invalid_call(); Fail()
 
+  fun ref grow_checkpoint_barrier_complete() =>
+    _invalid_call(); Fail()
+
   fun ref grow_autoscale_barrier_complete() =>
     _invalid_call(); Fail()
 
@@ -148,7 +151,7 @@ class _WaitingForAutoscale is _AutoscalePhase
     @printf[I32]("AUTOSCALE: Waiting for new autoscale event.\n".cstring())
     _autoscale = autoscale
 
-  fun name(): String => "WaitingForAutoscale"
+  fun name(): String => __loc.type_name()
 
   fun ref stop_the_world_for_grow_migration_initiated(coordinator: WorkerName,
     joining_workers: Array[WorkerName] val)
@@ -207,7 +210,7 @@ class _WaitingForJoiners is _AutoscalePhase
       _joining_worker_count.string().cstring(),
       _current_worker_count.string().cstring())
 
-  fun name(): String => "WaitingForJoiners"
+  fun name(): String => __loc.type_name()
 
   fun ref try_join(local_topology: LocalTopologyInitializer,
     worker_name: WorkerName, worker_count: USize, auth: AmbientAuth,
@@ -266,16 +269,67 @@ class _WaitingForCheckpointId is _AutoscalePhase
     _current_worker_count = current_worker_count
     @printf[I32](("AUTOSCALE: Waiting for next checkpoint id\n").cstring())
 
-  fun name(): String => "_WaitingForCheckpointId"
+  fun name(): String => __loc.type_name()
 
   fun ref update_checkpoint_id(checkpoint_id: CheckpointId,
     rollback_id: RollbackId)
   =>
-    _autoscale.inject_autoscale_barrier(_connected_joiners,
+    _autoscale.inject_grow_checkpoint_barrier(_connected_joiners,
       _joining_worker_count, _current_worker_count, checkpoint_id,
       rollback_id)
 
-class _InjectAutoscaleBarrier is _AutoscalePhase
+class _InjectGrowCheckpointBarrier is _AutoscalePhase
+  """
+  If we are not in resilience mode, we should skip this phase.
+  """
+  let _autoscale: Autoscale ref
+  let _connected_joiners: Map[WorkerName, (TryJoinResponseFn, LocalTopology)]
+  let _initialized_workers: StringSet = _initialized_workers.create()
+  var _new_step_group_routing_ids:
+    Map[WorkerName, Map[RoutingId, RoutingId] val] iso =
+    recover Map[WorkerName, Map[RoutingId, RoutingId] val] end
+  let _joining_worker_count: USize
+  let _current_worker_count: USize
+  let _checkpoint_id: CheckpointId
+  let _rollback_id: RollbackId
+
+  new create(autoscale: Autoscale ref,
+    connected_joiners: Map[WorkerName, (TryJoinResponseFn, LocalTopology)],
+    joining_worker_count: USize, current_worker_count: USize,
+    checkpoint_id: CheckpointId, rollback_id: RollbackId)
+  =>
+    Invariant(ifdef "resilience" then true else false end)
+    _autoscale = autoscale
+    _connected_joiners = connected_joiners
+    _joining_worker_count = joining_worker_count
+    _current_worker_count = current_worker_count
+    _checkpoint_id = checkpoint_id
+    _rollback_id = rollback_id
+    @printf[I32](("AUTOSCALE: Stopping the world, cancelling checkpoint " +
+      "timers and injecting last checkpoint barrier before autoscale\n")
+      .cstring())
+
+  fun name(): String => __loc.type_name()
+
+  fun ref grow_checkpoint_barrier_complete() =>
+    _autoscale.inject_grow_autoscale_barrier(_connected_joiners,
+      _joining_worker_count, _current_worker_count, _checkpoint_id,
+      _rollback_id)
+
+  fun ref joining_worker_initialized(worker: WorkerName,
+    step_group_routing_ids: Map[RoutingId, RoutingId] val)
+  =>
+    // It's possible some workers will be initialized when we're still in
+    // this phase. We need to keep track of this to hand off that info to
+    // the next phase.
+    _initialized_workers.set(worker)
+    _new_step_group_routing_ids(worker) = step_group_routing_ids
+    if _initialized_workers.size() >= _joining_worker_count then
+      // We should have already transitioned to the next phase before this.
+      Fail()
+    end
+
+class _InjectGrowAutoscaleBarrier is _AutoscalePhase
   let _autoscale: Autoscale ref
   let _connected_joiners: Map[WorkerName, (TryJoinResponseFn, LocalTopology)]
   let _initialized_workers: StringSet = _initialized_workers.create()
@@ -301,7 +355,7 @@ class _InjectAutoscaleBarrier is _AutoscalePhase
     @printf[I32](("AUTOSCALE: Stopping the world and injecting autoscale " +
       "barrier\n").cstring())
 
-  fun name(): String => "_InjectAutoscaleBarrier"
+  fun name(): String => __loc.type_name()
 
   fun ref grow_autoscale_barrier_complete() =>
     for (worker, data) in _connected_joiners.pairs() do
@@ -363,7 +417,7 @@ class _WaitingForJoinerInitialization is _AutoscalePhase
       _initialized_joining_workers.size().string().cstring(),
       _current_worker_count.string().cstring())
 
-  fun name(): String => "WaitingForJoinerInitialization"
+  fun name(): String => __loc.type_name()
 
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
@@ -407,7 +461,7 @@ class _WaitingForConnections is _AutoscalePhase
       "to joining workers.\n").cstring(),
       _connecting_worker_count.string().cstring())
 
-  fun name(): String => "WaitingForConnections"
+  fun name(): String => __loc.type_name()
 
   fun ref worker_connected_to_joining_workers(worker: WorkerName) =>
     """
@@ -474,7 +528,7 @@ class _WaitingForMigration is _AutoscalePhase
     @printf[I32]("AUTOSCALE: Waiting for signal to begin migration\n"
       .cstring())
 
-  fun name(): String => "WaitingForMigration"
+  fun name(): String => __loc.type_name()
 
   fun ref grow_migration_initiated(checkpoint_id: CheckpointId) =>
     _autoscale.begin_grow_migration(_joining_workers, checkpoint_id)
@@ -499,7 +553,7 @@ class _WaitingForGrowMigration is _AutoscalePhase
     _joining_workers = joining_workers
     _is_coordinator = is_coordinator
 
-  fun name(): String => "WaitingForGrowMigration"
+  fun name(): String => __loc.type_name()
 
   fun ref all_migration_complete() =>
     @printf[I32]("--Sending migration batch complete msg to new workers\n"
@@ -527,7 +581,7 @@ class _WaitingForGrowMigrationAcks is _AutoscalePhase
       _migration_target_ack_list.set(w)
     end
 
-  fun name(): String => "WaitingForGrowMigrationAcks"
+  fun name(): String => __loc.type_name()
 
   fun ref receive_grow_migration_ack(worker: WorkerName) =>
     _migration_target_ack_list.unset(worker)
@@ -570,7 +624,7 @@ class _JoiningWorker is _AutoscalePhase
     end
     Invariant(_non_joining_workers.size() > 0)
 
-  fun name(): String => "JoiningWorker"
+  fun name(): String => __loc.type_name()
 
   fun ref try_join(local_topology: LocalTopologyInitializer,
     worker_name: WorkerName, worker_count: USize, auth: AmbientAuth,
@@ -650,7 +704,7 @@ class _WaitingForProducersList is _AutoscalePhase
     _autoscale = autoscale
     _completion_action = completion_action
 
-  fun name(): String => "_WaitingForProducersList"
+  fun name(): String => __loc.type_name()
 
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
@@ -687,7 +741,7 @@ class _WaitingForProducersToRegister is _AutoscalePhase
     Invariant(_producers.size() > 0)
     _completion_action = completion_action
 
-  fun name(): String => "_WaitingForProducersToRegister"
+  fun name(): String => __loc.type_name()
 
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
@@ -723,7 +777,7 @@ class _WaitingForBoundariesMap is _AutoscalePhase
     _autoscale = autoscale
     _completion_action = completion_action
 
-  fun name(): String => "_WaitingForBoundariesMap"
+  fun name(): String => __loc.type_name()
 
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
@@ -765,7 +819,7 @@ class _WaitingForBoundariesToAckRegistering is _AutoscalePhase
     Invariant(_boundaries.size() > 0)
     _completion_action = completion_action
 
-  fun name(): String => "_WaitingForBoundariesToAckRegistering"
+  fun name(): String => __loc.type_name()
 
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
@@ -811,7 +865,7 @@ class _InjectShrinkAutoscaleBarrier is _AutoscalePhase
     _remaining_workers = remaining_workers
     _leaving_workers = leaving_workers
 
-  fun name(): String => "_InjectShrinkAutoscaleBarrier"
+  fun name(): String => __loc.type_name()
 
   fun ref shrink_autoscale_barrier_complete() =>
     _autoscale.initiate_shrink(_remaining_workers, _leaving_workers)
@@ -835,7 +889,7 @@ class _InitiatingShrink is _AutoscalePhase
       _leaving_workers_waiting_list.set(w)
     end
 
-  fun name(): String => "InitiatingShrink"
+  fun name(): String => __loc.type_name()
 
   fun ref leaving_worker_finished_migration(worker: WorkerName) =>
     @printf[I32]("Leaving worker %s reported migration complete\n".cstring(),
@@ -867,7 +921,7 @@ class _ShrinkInProgress is _AutoscalePhase
       _leaving_workers_waiting_list.set(w)
     end
 
-  fun name(): String => "ShrinkInProgress"
+  fun name(): String => __loc.type_name()
 
   fun ref leaving_worker_finished_migration(worker: WorkerName) =>
     ifdef debug then
@@ -893,7 +947,7 @@ class _WaitingForLeavingMigration is _AutoscalePhase
     _autoscale = autoscale
     _remaining_workers = remaining_workers
 
-  fun name(): String => "WaitingForLeavingMigration"
+  fun name(): String => __loc.type_name()
 
   fun ref leaving_worker_finished_migration(worker: WorkerName) =>
     None
@@ -920,7 +974,7 @@ class _WaitingForLeavingMigrationAcks is _AutoscalePhase
       _worker_waiting_list.set(w)
     end
 
-  fun name(): String => "WaitingForLeavingMigrationAcks"
+  fun name(): String => __loc.type_name()
 
   fun ref leaving_worker_finished_migration(worker: WorkerName) =>
     None
@@ -940,7 +994,7 @@ class _ShuttingDown is _AutoscalePhase
   new create() =>
     @printf[I32]("AUTOSCALE: Shutting down.\n".cstring())
 
-  fun name(): String => "ShuttingDown"
+  fun name(): String => __loc.type_name()
 
   fun ref autoscale_complete() =>
     None
@@ -961,7 +1015,7 @@ class _WaitingForResumeTheWorld is _AutoscalePhase
     _auth = auth
     _is_coordinator = is_coordinator
 
-  fun name(): String => "WaitingForResumeTheWorld"
+  fun name(): String => __loc.type_name()
 
   fun ref autoscale_complete() =>
     if _is_coordinator then

@@ -30,11 +30,13 @@ trait _CheckpointInitiatorPhase
   fun name(): String
 
   fun ref start_checkpoint_timer(time_until_next_checkpoint: U64,
-    checkpoint_initiator: CheckpointInitiator ref)
+    checkpoint_group: USize, checkpoint_initiator: CheckpointInitiator ref,
+    checkpoint_promise: (Promise[None] | None) = None)
   =>
     _invalid_call(); Fail()
 
   fun ref initiate_checkpoint(checkpoint_group: USize,
+    checkpoint_promise: Promise[None],
     checkpoint_initiator: CheckpointInitiator ref)
   =>
     """
@@ -42,6 +44,8 @@ trait _CheckpointInitiatorPhase
     timer goes off while one is in progress, we ignore it for now. We only
     initiate a checkpoint from _WaitingCheckpointInitiatorPhase.
     """
+    @printf[I32](("CheckpointInitiator: Attempted to initiate checkpoint in " +
+      "phase " + name() + "\n").cstring())
     None
 
   fun ref checkpoint_barrier_complete(token: BarrierToken) =>
@@ -113,29 +117,35 @@ class _WaitingCheckpointInitiatorPhase is _CheckpointInitiatorPhase
   fun name(): String => "_WaitingCheckpointInitiatorPhase"
 
   fun ref start_checkpoint_timer(time_until_next_checkpoint: U64,
-    checkpoint_initiator: CheckpointInitiator ref)
+    checkpoint_group: USize, checkpoint_initiator: CheckpointInitiator ref,
+    checkpoint_promise: (Promise[None] | None) = None)
   =>
-    checkpoint_initiator._start_checkpoint_timer(time_until_next_checkpoint)
+    checkpoint_initiator._start_checkpoint_timer(time_until_next_checkpoint,
+      checkpoint_group, checkpoint_promise)
 
   fun ref initiate_checkpoint(checkpoint_group: USize,
+    checkpoint_promise: Promise[None],
     checkpoint_initiator: CheckpointInitiator ref)
   =>
-    checkpoint_initiator._initiate_checkpoint(checkpoint_group)
+    checkpoint_initiator._initiate_checkpoint(checkpoint_group,
+      checkpoint_promise)
 
   fun ref resume_checkpointing_from_rollback() =>
     None
 
 class _CheckpointingPhase is _CheckpointInitiatorPhase
   let _token: CheckpointBarrierToken
+  let _checkpoint_promise: Promise[None]
   let _c_initiator: CheckpointInitiator ref
   var _barrier_complete: Bool = false
   var _event_log_checkpoints_complete: Bool = false
   let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
 
   new create(token: CheckpointBarrierToken,
-    c_initiator: CheckpointInitiator ref)
+    c_promise: Promise[None], c_initiator: CheckpointInitiator ref)
   =>
     _token = token
+    _checkpoint_promise = c_promise
     _c_initiator = c_initiator
 
   fun name(): String => "_CheckpointingPhase"
@@ -171,18 +181,21 @@ class _CheckpointingPhase is _CheckpointInitiatorPhase
 
   fun ref _check_completion() =>
     if _barrier_complete and _event_log_checkpoints_complete then
-      _c_initiator.event_log_write_checkpoint_id(_token.id, _token)
+      _c_initiator.event_log_write_checkpoint_id(_token.id, _token,
+        _checkpoint_promise)
     end
 
 class _WaitingForEventLogIdWrittenPhase is _CheckpointInitiatorPhase
   let _token: CheckpointBarrierToken
+  let _checkpoint_promise: Promise[None]
   let _c_initiator: CheckpointInitiator ref
   let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
 
   new create(token: CheckpointBarrierToken,
-    c_initiator: CheckpointInitiator ref)
+    c_promise: Promise[None], c_initiator: CheckpointInitiator ref)
   =>
     _token = token
+    _checkpoint_promise = c_promise
     _c_initiator = c_initiator
 
   fun name(): String => "_WaitingForEventLogIdWrittenPhase"
@@ -205,7 +218,7 @@ class _WaitingForEventLogIdWrittenPhase is _CheckpointInitiatorPhase
         _c_initiator.workers().size().string().cstring())
     end
     if (_acked_workers.size() == _c_initiator.workers().size()) then
-      _c_initiator.checkpoint_complete(_token)
+      _c_initiator.checkpoint_complete(_token, _checkpoint_promise)
     end
 
 class _RollbackCheckpointInitiatorPhase is _CheckpointInitiatorPhase
@@ -216,7 +229,8 @@ class _RollbackCheckpointInitiatorPhase is _CheckpointInitiatorPhase
 
   fun name(): String => "_RollbackCheckpointInitiatorPhase"
 
-  fun ref _initiate_checkpoint(checkpoint_group: USize,
+  fun ref initiate_checkpoint(checkpoint_group: USize,
+    checkpoint_promise: Promise[None],
     checkpoint_initiator: CheckpointInitiator ref)
   =>
     """
@@ -257,7 +271,8 @@ class _RollbackCheckpointInitiatorPhase is _CheckpointInitiatorPhase
 class _DisposedCheckpointInitiatorPhase is _CheckpointInitiatorPhase
   fun name(): String => "_DisposedCheckpointInitiatorPhase"
 
-  fun ref _initiate_checkpoint(checkpoint_group: USize,
+  fun ref initiate_checkpoint(checkpoint_group: USize,
+    checkpoint_promise: Promise[None],
     checkpoint_initiator: CheckpointInitiator ref)
   =>
     None
