@@ -281,7 +281,9 @@ actor Recovery
         let msg = ChannelMsgEncoder.event_log_initiate_rollback(token,
           _worker_name, _auth)?
         for w in _workers.values() do
-          _connections.send_control(w, msg)
+          if w != _worker_name then
+            _connections.send_control(w, msg)
+          end
         end
       else
         Fail()
@@ -362,7 +364,9 @@ class _DelayInitiateRollback is TimerNotify
       let msg = ChannelMsgEncoder.event_log_initiate_rollback(_token,
         _worker_name, _auth)?
       for w in _workers.values() do
-        _connections.send_control(w, msg)
+        if w != _worker_name then
+          _connections.send_control(w, msg)
+        end
       end
     else
       Fail()
