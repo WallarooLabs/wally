@@ -52,12 +52,12 @@ trait _CheckpointInitiatorPhase
   fun ref event_log_checkpoint_complete(worker: WorkerName,
     checkpoint_id: CheckpointId)
   =>
-    _invalid_call(); Fail()
+    _unexpected_call(__loc.method_name()) // SLF: honest race @ early startup
 
   fun ref event_log_id_written(worker: WorkerName,
     checkpoint_id: CheckpointId)
   =>
-    _invalid_call(__loc.method_name()); Fail()
+    _unexpected_call(__loc.method_name()) // SLF: honest race @ early startup
 
   fun ref resume_checkpointing_from_rollback() =>
     _unexpected_call(__loc.method_name())
