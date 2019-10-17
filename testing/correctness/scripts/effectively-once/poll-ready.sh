@@ -65,9 +65,9 @@ for i in `seq 1 $COUNT`; do
 done
 
 if [ $i -eq $COUNT ]; then
-    if [ ! -z "$VERBOSE" ]; then
-        echo Failed
-    fi
+    $EXTERNAL_SENDER \
+        -e $initializer_external -t cluster-status-query 2>&1
+    echo Failed
     exit 1
 fi
 
@@ -100,8 +100,9 @@ if [ ! -z "$ALL_RUNNING" ]; then
             echo -n port = $port
         fi
         for i in `seq 1 $COUNT`; do
-            $EXTERNAL_SENDER \
-                -e 127.0.0.1:$port -t cluster-status-query 2>&1 | \
+            output=`$EXTERNAL_SENDER \
+                -e 127.0.0.1:$port -t cluster-status-query 2>&1`
+            echo "$output" | \
                 grep -s 'Processing messages: true' > /dev/null 2>&1
             if [ $? -eq 0 ]; then
                 if [ ! -z "$VERBOSE" ]; then
@@ -124,7 +125,7 @@ fi
 
 if [ $i -eq $COUNT ]; then
     if [ ! -z "$VERBOSE" ]; then
-        echo Failed
+        echo Failed for count $COUNT on worker $worker: $output
     fi
     exit 1
 else
