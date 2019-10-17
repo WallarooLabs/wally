@@ -34,7 +34,7 @@ trait _CheckpointInitiatorPhase
   fun ref start_checkpoint_timer(time_until_next_checkpoint: U64,
     checkpoint_initiator: CheckpointInitiator ref)
   =>
-    _invalid_call(); Fail()
+    _unexpected_call(__loc.method_name())
 
   fun ref initiate_checkpoint(checkpoint_group: USize,
     checkpoint_initiator: CheckpointInitiator ref)
@@ -47,7 +47,7 @@ trait _CheckpointInitiatorPhase
     None
 
   fun ref checkpoint_barrier_complete(token: BarrierToken) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref event_log_checkpoint_complete(worker: WorkerName,
     checkpoint_id: CheckpointId)
@@ -57,10 +57,10 @@ trait _CheckpointInitiatorPhase
   fun ref event_log_id_written(worker: WorkerName,
     checkpoint_id: CheckpointId)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref resume_checkpointing_from_rollback() =>
-    _invalid_call(); Fail()
+    _unexpected_call(__loc.method_name())
 
   fun ref abort_checkpoint(checkpoint_id: CheckpointId,
     checkpoint_initiator: CheckpointInitiator ref)
@@ -75,9 +75,22 @@ trait _CheckpointInitiatorPhase
     checkpoint_initiator.finish_initiating_rollback(recovery_promise, worker,
       rollback_id)
 
-  fun _invalid_call() =>
-    @printf[I32]("Invalid call on checkpoint initiator phase %s\n".cstring(),
-      name().cstring())
+  fun _invalid_call(call: String) =>
+    @l(Log.crit(), Log.checkpoint(), "Invalid call to %s on checkpoint initiator phase %s\n".cstring(),
+      call.cstring(), name().cstring())
+    Fail()
+
+  fun _unexpected_call(call: String) =>
+    """
+    Only call this for phase methods that are called directly in response to
+    control messages received. That's because we can't be sure in that case if
+    we had crashed and recovered during an earlier recovery/rollback round, in
+    which case any control messages related to that earlier round are simply
+    outdated. We shouldn't Fail() in this case because we can expect control
+    messages to go out of sync in this way in this kind of scenario.
+    """
+    @l(Log.notice(), Log.checkpoint(), "UNEXPECTED CALL to %s on checkpoint initiator phase %s. Ignoring!\n"
+      .cstring(), call.cstring(), name().cstring())
 
 class _WaitingCheckpointInitiatorPhase is _CheckpointInitiatorPhase
   fun name(): String => "_WaitingCheckpointInitiatorPhase"
