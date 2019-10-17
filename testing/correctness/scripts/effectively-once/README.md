@@ -1,9 +1,11 @@
 
 # Usage notes, tips, etc.
 
-This doc assumes that the Wallaroo source repo is at `$HOME/wallaroo`
-and that your login shell is either the Bourne shell or the Bash
+This doc assumes that your login shell is either the Bourne shell or the Bash
 shell.
+
+Also, we assume that the value of the environment variable
+`WALLAROO_TOP` is set correctly; please follow the advice below.
 
 ## Build prerequisites
 
@@ -34,6 +36,15 @@ make -C ../../../.. \
 
 ### Prerequisites
 
+The environment variable `WALLAROO_TOP` should be defined to be the
+path to the top of your Wallaroo source repo.  If this environment
+variable is not set, then the `sample-env-vars.sh` script will define
+that variable to be:
+
+```
+export WALLAROO_TOP=$HOME/wallaroo
+```
+
 The environment variable `WALLAROO_BIN` must contain the path to the
 Wallaroo executable that you wish to test.  Also, when additional
 logging detail is required, I recommend setting the
@@ -41,8 +52,11 @@ logging detail is required, I recommend setting the
 example:
 
 ```
-export WALLAROO_BIN=$HOME/wallaroo/examples/pony/passthrough/passthrough 
-export WALLAROO_THRESHOLDS='*.8'
+export WALLAROO_BIN=$HOME/wallaroo/examples/pony/passthrough/passthrough
+    or else
+export WALLAROO_BIN=$WALLAROO_TOP/examples/pony/passthrough/passthrough
+
+export WALLAROO_THRESHOLDS='*.8' # Turns on verbose logging @ debug level
 ```
 
 Finally, all of the Bourne/Bash shell variables in the
@@ -64,8 +78,8 @@ Their values may be tweaked to fit your use case, hence the prefix
 ### Prerequisite: Start Wallaroo's sink
 
 ```
-export PYTHONPATH=$HOME/wallaroo/machida/lib
-~/wallaroo/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 > /tmp/sink-out/stdout-stderr 2>&1 &
+export PYTHONPATH=$WALLAROO_TOP/machida/lib
+$WALLAROO_TOP/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 > /tmp/sink-out/stdout-stderr 2>&1 &
 ```
 
 ### Start a 1-worker Wallaroo cluster
@@ -214,7 +228,7 @@ In Window 1:
 In Window 2:
 
 ```
-env PYTHONPATH=$HOME/wallaroo/machida/lib:examples/python/celsius_connectors $HOME/wallaroo/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 21222 |& tee /tmp/feed.out
+env PYTHONPATH=$WALLAROO_TOP/machida/lib:examples/python/celsius_connectors $WALLAROO_TOP/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 21222 |& tee /tmp/feed.out
 ```
 
 In Window 1:
@@ -228,7 +242,7 @@ while [ 1 ]; do ./1-to-1-passthrough-verify.sh /tmp/input-file.txt  ; if [ $? -n
 TODO replace hack
 
 ```
-for i in `seq 1 100`; do ps axww | grep aloc_sink | grep -v grep | awk '{print $1}' | xargs kill ; amount=`date | sed -e 's/.*://' -e 's/ .*//'`; echo i is $i, amount is $amount; sleep 2.$amount ; env PYTHONPATH=$HOME/wallaroo/machida/lib $HOME/wallaroo/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 >> /tmp/sink-out/stdout-stderr 2>&1 & sleep 2 ; ./1-to-1-passthrough-verify.sh /tmp/input-file.txt ; if [ $? -eq 0 ]; then echo OK; else killall -STOP passthrough ; echo STOPPED; break; fi ; egrep -v 'DEBUG|INFO' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then killall -STOP passthrough ; echo STOP-grep; break; fi; done
+for i in `seq 1 100`; do ps axww | grep aloc_sink | grep -v grep | awk '{print $1}' | xargs kill ; amount=`date | sed -e 's/.*://' -e 's/ .*//'`; echo i is $i, amount is $amount; sleep 2.$amount ; env PYTHONPATH=$WALLAROO_TOP/machida/lib $WALLAROO_TOP/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 >> /tmp/sink-out/stdout-stderr 2>&1 & sleep 2 ; ./1-to-1-passthrough-verify.sh /tmp/input-file.txt ; if [ $? -eq 0 ]; then echo OK; else killall -STOP passthrough ; echo STOPPED; break; fi ; egrep -v 'DEBUG|INFO' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then killall -STOP passthrough ; echo STOP-grep; break; fi; done
 ```
 
 ### Repeatedly crashing and restarting a non-initializer worker
@@ -264,5 +278,5 @@ restart the `at_least_once_line_file_feed` script.
 TODO replace hack
 
 ```
-while [ 1 ]; do env PYTHONPATH=$HOME/wallaroo/machida/lib:$HOME/wallaroo/examples/python/celsius_connectors $HOME/wallaroo/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 41000 & amount=`date | sed -e 's/.*://' -e 's/ .*//'`; echo amount is $amount; sleep 1.$amount ; kill -9 `ps axww | grep -v grep | grep feed | awk '{print $1}'`; sleep 0.$amount; done
+while [ 1 ]; do env PYTHONPATH=$WALLAROO_TOP/machida/lib:$WALLAROO_TOP/examples/python/celsius_connectors $WALLAROO_TOP/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 41000 & amount=`date | sed -e 's/.*://' -e 's/ .*//'`; echo amount is $amount; sleep 1.$amount ; kill -9 `ps axww | grep -v grep | grep feed | awk '{print $1}'`; sleep 0.$amount; done
 ```

@@ -7,11 +7,11 @@ if [ -z "$DESIRED" ]; then
 fi
 shift
 
-export PATH=.:$PATH
-export PYTHONPATH=$HOME/wallaroo/machida/lib:$HOME/wallaroo/examples/python/celsius_connectors:$PYTHONPATH
-export WALLAROO_BIN=$HOME/wallaroo/examples/pony/passthrough/passthrough
-export WALLAROO_THRESHOLDS='*.8'
 . ./sample-env-vars.sh
+export PATH=.:$PATH
+export PYTHONPATH=$WALLAROO_TOP/machida/lib:$WALLAROO_TOP/examples/python/celsius_connectors:$PYTHONPATH
+export WALLAROO_BIN=$WALLAROO_TOP/examples/pony/passthrough/passthrough
+export WALLAROO_THRESHOLDS='*.8'
 
 SENDER_OUTFILE=/tmp/sender.out
 
@@ -21,7 +21,7 @@ reset () {
 }
 
 start_sink () {
-    $HOME/wallaroo/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 >> /tmp/sink-out/stdout-stderr 2>&1 &
+    $WALLAROO_TOP/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 >> /tmp/sink-out/stdout-stderr 2>&1 &
 }
 
 stop_sink () {
@@ -67,7 +67,7 @@ start_all_workers () {
 start_sender () {
     rm -f $SENDER_OUTFILE
     while [ 1 ]; do
-        env ERROR_9_SHOULD_EXIT=true $HOME/wallaroo/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 66000 >> $SENDER_OUTFILE 2>&1
+        env ERROR_9_SHOULD_EXIT=true $WALLAROO_TOP/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 66000 >> $SENDER_OUTFILE 2>&1
         sleep 0.1
     done
 }
