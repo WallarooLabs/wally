@@ -278,6 +278,7 @@ actor Recovery
       _timers(consume t) // QQQ HACK
       /**** QQQ HACK
       try
+        _event_log.initiate_rollback(token, promise)
         let msg = ChannelMsgEncoder.event_log_initiate_rollback(token,
           _worker_name, _auth)?
         for w in _workers.values() do
