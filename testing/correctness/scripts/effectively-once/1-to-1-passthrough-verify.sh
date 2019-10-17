@@ -17,7 +17,7 @@
 #
 # 6. We start the ALOC sink like this:
 #    mkdir -p /tmp/sink-output
-#    env PYTHONPATH=~/wallaroo/machida/lib ~/wallaroo/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 > /tmp/sink-out/stdout-stderr 2>&1
+#    env PYTHONPATH=$WALLAROO_TOP/machida/lib $WALLAROO_TOP/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 > /tmp/sink-out/stdout-stderr 2>&1
 #
 # 7. We rely on the small Python script `concat-sink-output.py` to
 #    concatenate chunks of data from various sink files, in the order
