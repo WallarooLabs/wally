@@ -46,12 +46,18 @@ actor Autoscale
     1) _WaitingForJoiners: Waiting for provided number of workers to connect
     2) _WaitingForCheckpointId: Get checkpoint id to inform new
        workers.
-    3) _InjectAutoscaleBarrier: Stop the world and inject barrier to ensure in
-       flight messages are finished
-    4) _WaitingForJoinerInitialization: Waiting for all joiners to initialize
-    5) _WaitingForConnections: Waiting for current workers to connect to
+    3) _InjectGrowCheckpointBarrier: Stop the world, cancel pending checkpoint
+       timers, then inject barrier to ensure in flight messages are finished,
+       and to take last checkpoint before autoscale and allow 2PC sinks to
+       flush. [If we're not in resilience mode, skip to I.4 without injecting
+       checkpoint barrier]
+    4) _InjectGrowAutoscaleBarrier: Inject blocking barrier to initiate
+       autoscale preparation. If we're not in resilience mode, this barrier
+       will also be used to ensure in flight messages are finished.
+    5) _WaitingForJoinerInitialization: Waiting for all joiners to initialize
+    6) _WaitingForConnections: Waiting for current workers to connect to
       joiners
-    6) GOTO IV.1
+    7) GOTO IV.1
 
     II. NON-COORDINATOR:
     1) _WaitingToConnectToJoiners: After receiving the addresses for all
@@ -187,6 +193,12 @@ actor Autoscale
     """
     (let checkpoint_id, let rollback_id) = ids
     _phase.update_checkpoint_id(checkpoint_id, rollback_id)
+
+  be grow_checkpoint_barrier_complete() =>
+    """
+    Called when the pausing checkpoint barrier is complete.
+    """
+    _phase.grow_checkpoint_barrier_complete()
 
   be grow_autoscale_barrier_complete() =>
     """
@@ -375,19 +387,19 @@ actor Autoscale
     promise.next[None](_self~update_checkpoint_id_for_autoscale())
     _checkpoint_initiator.lookup_checkpoint_id(promise)
 
-  fun ref inject_autoscale_barrier(
+  fun ref inject_grow_checkpoint_barrier(
     connected_joiners: Map[WorkerName, (TryJoinResponseFn, LocalTopology)],
     joining_worker_count: USize, current_worker_count: USize,
     checkpoint_id: CheckpointId, rollback_id: RollbackId)
   =>
+    _phase = _InjectGrowCheckpointBarrier(this, connected_joiners,
+      joining_worker_count, current_worker_count, checkpoint_id, rollback_id)
+
     let new_workers_iso = recover iso Array[WorkerName] end
     for w in connected_joiners.keys() do
       new_workers_iso.push(w)
     end
     let new_workers = consume val new_workers_iso
-    _phase = _InjectAutoscaleBarrier(this, connected_joiners,
-      joining_worker_count, current_worker_count, checkpoint_id, rollback_id)
-
     try
       let msg = ChannelMsgEncoder.initiate_stop_the_world_for_grow_migration(
         _worker_name, new_workers, _auth)?
@@ -396,13 +408,38 @@ actor Autoscale
       Fail()
     end
 
+    ifdef "resilience" then
+      let promise = Promise[None]
+      promise.next[None]({(_: None) =>
+        _self.grow_checkpoint_barrier_complete()})
+      _checkpoint_initiator.initiate_pausing_checkpoint(promise)
+    else
+      // If we're not in resilience mode, we skip right to the autoscale
+      // barrier.
+      inject_grow_autoscale_barrier(connected_joiners, joining_worker_count,
+        current_worker_count, checkpoint_id, rollback_id)
+    end
+
+    _router_registry.initiate_stop_the_world_for_grow_migration(new_workers)
+
+  fun ref inject_grow_autoscale_barrier(
+    connected_joiners: Map[WorkerName, (TryJoinResponseFn, LocalTopology)],
+    joining_worker_count: USize, current_worker_count: USize,
+    checkpoint_id: CheckpointId, rollback_id: RollbackId)
+  =>
+    _phase = _InjectGrowAutoscaleBarrier(this, connected_joiners,
+      joining_worker_count, current_worker_count, checkpoint_id, rollback_id)
+
     let promise = Promise[None]
     promise.next[None]({(_: None) =>
       _self.grow_autoscale_barrier_complete()})
+    let new_workers_iso = recover iso Array[WorkerName] end
+    for w in connected_joiners.keys() do
+      new_workers_iso.push(w)
+    end
+    let new_workers = consume val new_workers_iso
     _autoscale_barrier_initiator.initiate_autoscale(promise
       where joining_workers = new_workers)
-
-    _router_registry.initiate_stop_the_world_for_grow_migration(new_workers)
 
   fun inform_joining_worker(response_fn: TryJoinResponseFn, worker: WorkerName,
     local_topology: LocalTopology, checkpoint_id: CheckpointId,

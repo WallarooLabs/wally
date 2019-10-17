@@ -347,7 +347,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         end
       | let m: TryJoinRequestMsg =>
         ifdef "trace" then
-          @printf[I32]("Received JoinClusterMsg on Control Channel\n"
+          @printf[I32]("Received TryJoinRequestMsg on Control Channel\n"
             .cstring())
         end
 
@@ -380,6 +380,34 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             Fail()
           end
         end
+
+      // !@ ADD THIS STUFF vvvv
+
+      // | let m: InitiatePausingCheckpointRequestMsg =>
+      //   ifdef "trace" then
+      //     @printf[I32](("Received InitiatePausingCheckpointRequestMsg on " +
+      //       " Control Channel\n").cstring())
+      //   end
+
+      //   let promise = Promise[None]
+      //   promise.next[None]({(_: None) =>
+      //     try
+      //       let msg = ChannelMsgEncoder.pending_promise_complete(
+      //         m.promise_id, _auth)?
+      //       _connections.send_control(m.sender, msg)
+      //     else
+      //       Fail()
+      //     end
+      //   })
+
+      //   _checkpoint_initiator.initiate_pausing_checkpoint(promise)
+      // | let m: PendingPromiseCompleteMsg =>
+      //   ifdef "trace" then
+      //     @printf[I32](("Received InitiatePausingCheckpointResponseMsg on " +
+      //       " Control Channel\n").cstring())
+      //   end
+
+
       | let m: AnnounceJoiningWorkersMsg =>
         match _layout_initializer
         | let lti: LocalTopologyInitializer =>
