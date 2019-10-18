@@ -222,7 +222,7 @@ class ThrottledFileReader(BaseIter, BaseSource):
             self.time_1st_iter = now - 0.001
 
         self.bytes_read += len(b)
-        #logging.info("b = {}".format(b))
+        ##logging.debug("__next__ b = {}".format(b))
         return (b, read_offset)
 
     def wallaroo_acked(self, point_of_ref):
