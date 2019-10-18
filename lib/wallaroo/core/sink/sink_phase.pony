@@ -41,6 +41,9 @@ trait SinkPhase
   =>
     _invalid_call(); Fail()
 
+  fun ref early_prepare_for_rollback() =>
+    None
+
   fun ref prepare_for_rollback(token: BarrierToken) =>
     _invalid_call(); Fail()
 
@@ -74,6 +77,9 @@ class NormalSinkPhase is SinkPhase
     _sink.process_message[D](metric_name, pipeline_time_spent, data, key,
       event_ts, watermark_ts, i_producer_id, i_producer, msg_uid, frac_ids,
       i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
+
+  fun ref early_prepare_for_rollback() =>
+    _sink.use_normal_processor()
 
   fun ref prepare_for_rollback(token: BarrierToken) =>
     None

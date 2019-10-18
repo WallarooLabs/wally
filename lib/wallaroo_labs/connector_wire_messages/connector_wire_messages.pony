@@ -34,6 +34,7 @@ primitive FrameTag
     | 6 => AckMsg.decode(consume rb)?
     | 7 => RestartMsg.decode(consume rb)?
     | 8 => EosMessageMsg.decode(consume rb)?
+    | 9 => WorkersLeftMsg.decode(consume rb)?
     else
       error
     end
@@ -49,6 +50,7 @@ primitive FrameTag
     | let m: AckMsg => 6
     | let m: RestartMsg => 7
     | let m: EosMessageMsg => 8
+    | let m: WorkersLeftMsg => 9
     end
 
 // Framing
@@ -60,6 +62,7 @@ type EventTimeType is I64
 type MessageId is U64
 type MessageBytes is ByteSeq
 type KeyBytes is ByteSeq
+type WorkerName is String
 // TODO [post-source-migration]: deprecate these types
 type SourceName is String
 type SourceAddress is String
@@ -74,7 +77,8 @@ type Message is ( HelloMsg |
                   MessageMsg |
                   EosMessageMsg |
                   AckMsg |
-                  RestartMsg)
+                  RestartMsg |
+                  WorkersLeftMsg)
 
 trait MessageTrait
   fun encode(wb: Writer = Writer): Writer ?
@@ -332,7 +336,8 @@ type TwoPCMessage is ( ListUncommittedMsg |
                        ReplyUncommittedMsg |
                        TwoPCPhase1Msg |
                        TwoPCReplyMsg |
-                       TwoPCPhase2Msg)
+                       TwoPCPhase2Msg |
+                       WorkersLeftMsg )
 
 primitive TwoPCFrame
   fun encode(msg: TwoPCMessage, wb: Writer = Writer): Array[U8] val =>
@@ -363,6 +368,7 @@ primitive TwoPCFrameTag
     | 203 => TwoPCPhase1Msg.decode(consume rb)?
     | 204 => TwoPCReplyMsg.decode(consume rb)?
     | 205 => TwoPCPhase2Msg.decode(consume rb)?
+    | 206 => WorkersLeftMsg.decode(consume rb)?
     else
       error
     end
@@ -374,6 +380,7 @@ primitive TwoPCFrameTag
     | let m: TwoPCPhase1Msg => 203
     | let m: TwoPCReplyMsg => 204
     | let m: TwoPCPhase2Msg => 205
+    | let m: WorkersLeftMsg => 206
     end
 
 class ListUncommittedMsg is MessageTrait
@@ -417,6 +424,35 @@ class ReplyUncommittedMsg is MessageTrait
       wb.write(txn_id)
     end
     wb
+
+class WorkersLeftMsg is MessageTrait
+  let rtag: U64
+  let leaving_workers: Array[WorkerName val] val
+
+  new create(rtag': U64, leaving_workers': Array[WorkerName val] val) =>
+    rtag = rtag'
+    leaving_workers = leaving_workers'
+
+  new decode(rb: Reader)? =>
+    let rtag' = rb.u64_be()?
+    let a_len = rb.u32_be()?
+    let leaving_workers' = recover trn Array[String] end
+    for i in col.Range[U32](0, a_len) do
+      let length = rb.u16_be()?.usize()
+      leaving_workers'.push(String.from_array(rb.block(length)?))
+    end
+    rtag = rtag'
+    leaving_workers = consume leaving_workers'
+
+  fun encode(wb: Writer = Writer): Writer =>
+    wb.u64_be(rtag)
+    wb.u32_be(leaving_workers.size().u32())
+    for w in leaving_workers.values() do
+      wb.u16_be(w.size().u16())
+      wb.write(w)
+    end
+    wb
+
 
 type WhereList is Array[(U64, U64, U64)]
 
