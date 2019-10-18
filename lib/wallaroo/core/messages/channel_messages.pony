@@ -731,6 +731,9 @@ primitive ChannelMsgEncoder
   =>
     _encode(PausingCheckpointInitiatedMsg(id), auth)?
 
+  fun restart_repeating_checkpoints(auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(RestartRepeatingCheckpointsMsg, auth)?
+
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg =>
     try
@@ -2008,3 +2011,5 @@ class val PausingCheckpointInitiatedMsg is ChannelMsg
 
   new val create(id': U128) =>
     id = id'
+
+primitive RestartRepeatingCheckpointsMsg is ChannelMsg
