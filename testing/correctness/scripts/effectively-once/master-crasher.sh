@@ -7,7 +7,13 @@ if [ -z "$DESIRED" ]; then
 fi
 shift
 
-. ./sample-env-vars.sh
+
+if [ -z "$WALLAROO_INIT_HOST" ]; then
+    echo "ERROR: please set vars in sample-env-vars.sh.tcp-source+sink or in"
+    echo "       sample-env-vars.sh file before running this script"
+    exit 1
+fi
+
 export PATH=.:$PATH
 export PYTHONPATH=$WALLAROO_TOP/machida/lib:$WALLAROO_TOP/examples/python/celsius_connectors:$PYTHONPATH
 export WALLAROO_BIN=$WALLAROO_TOP/examples/pony/passthrough/passthrough
@@ -17,15 +23,27 @@ SENDER_OUTFILE=/tmp/sender.out
 
 reset () {
     reset.sh
-    ps axww | grep master-crasher.sh | grep -v $$ | awk '{print $1}' | xargs kill -9
+    ps axww | grep master-crasher.sh | grep -v $$ | awk '{print $1}' | xargs kill -9 > /dev/null 2&>1
+    stop_sink > /dev/null 2>&1
+    stop_sender > /dev/null 2>&1
 }
 
 start_sink () {
-    $WALLAROO_TOP/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 >> /tmp/sink-out/stdout-stderr 2>&1 &
+    if [ "$WALLAROO_TCP_SOURCE_SINK" = "true" ]; then
+        $WALLAROO_TOP/utils/data_receiver/data_receiver \
+            --listen 0.0.0.0:$WALLAROO_OUT_PORT --ponythreads=1 \
+            >> /tmp/sink-out/output 2>&1 &
+    else
+        $WALLAROO_TOP/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 >> /tmp/sink-out/stdout-stderr 2>&1 &
+    fi
 }
 
 stop_sink () {
-    ps axww | grep python | grep aloc_sink | awk '{print $1}' | xargs kill
+    if [ "$WALLAROO_TCP_SOURCE_SINK" = "true" ]; then
+        ps axww | grep -v grep | grep data_receiver | awk '{print $1}' | xargs kill -9
+    else
+        ps axww | grep python | grep aloc_sink | awk '{print $1}' | xargs kill
+    fi
 }
 
 start_initializer () {
@@ -67,9 +85,25 @@ start_all_workers () {
 start_sender () {
     rm -f $SENDER_OUTFILE
     while [ 1 ]; do
-        env ERROR_9_SHOULD_EXIT=true $WALLAROO_TOP/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 66000 >> $SENDER_OUTFILE 2>&1
+        if [ "$WALLAROO_TCP_SOURCE_SINK" = "true" ]; then
+            $WALLAROO_TOP/testing/tools/fixed_length_message_blaster/fixed_length_message_blaster \
+            --host localhost:$WALLAROO_IN_BASE --file /tmp/input-file.txt \
+            --msg-size 53 --batch-size 6 \
+            --msec-interval 5 --report-interval 1000000 --ponythreads=1 \
+            >> $SENDER_OUTFILE 2>&1
+        else
+            env ERROR_9_SHOULD_EXIT=true $WALLAROO_TOP/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 66000 >> $SENDER_OUTFILE 2>&1
+        fi
         sleep 0.1
     done
+}
+
+stop_sender () {
+    if [ "$WALLAROO_TCP_SOURCE_SINK" = "true" ]; then
+        ps axww | grep -v grep | grep fixed_length_message_blaster | awk '{print $1}' | xargs kill > /dev/null 2>&1
+    else
+        ps axww | grep -v grep | grep at_least_once_line_file_feed | awk '{print $1}' | xargs kill > /dev/null 2>&1
+    fi
 }
 
 random_float () {
@@ -91,7 +125,7 @@ random_sleep () {
 }
 
 crash_sink () {
-    ps axww | grep python3 | grep /aloc_sink | awk '{print $1}' | xargs kill -9
+    stop_sink
 }
 
 crash_worker () {
@@ -157,6 +191,10 @@ run_sanity_loop () {
     while [ 1 ]; do
         sleep 1
         echo -n ,
+        if [ "$WALLAROO_TCP_SOURCE_SINK" = "true" ]; then
+            ## verification script's assumptions are not met by TCPSink
+            continue
+        fi
         egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr
         if [ $? -eq 0 ]; then
             echo SANITY
@@ -405,6 +443,25 @@ run_custom3006 () {
         fi
         sleep 1.5
     done
+}
+
+run_custom_tcp_crash0 () {
+    ## Assume that we are run with `./master-crasher.sh 2 run_custom_tcp_crash0
+    sleep 2
+
+    echo -n c0
+    ./crash-worker.sh 0
+    sleep 0.2
+    mv /tmp/wallaroo.0 /tmp/wallaroo.0.`date +%s`
+
+    echo -n s0
+    ./start-initializer.sh
+    poll_out=`poll_ready -w 4 2>&1`
+    if [ $? -ne 0 -o ! -z "$poll_out" ]; then
+        echo "custom3006 cmd $cmd: $poll_out"
+        pause_the_world
+        exit 1
+    fi
 }
 
 reset
