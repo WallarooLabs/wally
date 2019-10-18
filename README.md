@@ -162,3 +162,4 @@ Wallaroo is licensed under the [Apache version 2][apache-2-license] license.
 [wallaroo-license-readme]: #license
 [wally-up]: https://docs.wallaroolabs.com/python-installation/python-wallaroo-up-installation-guide/
 [faq]: https://www.wallaroolabs.com/faq
+
