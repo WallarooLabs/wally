@@ -97,12 +97,6 @@ actor DataReceivers
         let new_dr = DataReceiver(_auth, id, _worker_name, sender_name,
           _data_router, _metrics_reporter.clone(), _initialized,
           _is_recovering)
-        match _router_registry
-        | let rr: RouterRegistry =>
-          rr.register_data_receiver(sender_name, new_dr)
-        else
-          Fail()
-        end
         _data_receivers(boundary_id) = new_dr
         _connections.register_disposable(new_dr)
         new_dr

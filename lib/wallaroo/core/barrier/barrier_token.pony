@@ -87,7 +87,10 @@ class val AutoscaleBarrierToken is BarrierToken
     end
 
   fun string(): String =>
-    "AutoscaleBarrierToken(" + _worker + ", " + _id.string() + ")"
+    "AutoscaleBarrierToken(" + _worker + ", " + _id.string() +
+      ", joining=[" + ",".join(_joining_workers.values()) +
+      "], leaving=[" + ",".join(_leaving_workers.values()) +
+      "])"
 
 class val AutoscaleResumeBarrierToken is BarrierToken
   let _worker: String

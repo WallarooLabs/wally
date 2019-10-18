@@ -72,8 +72,6 @@ actor RouterRegistry is (KeyRegistry & SourceRegistry & DisposableRegistry &
     _partition_routers.create()
   let _stateless_partition_routers: Map[RoutingId, StatelessPartitionRouter] =
     _stateless_partition_routers.create()
-  let _data_receiver_map: Map[WorkerName, DataReceiver] =
-    _data_receiver_map.create()
 
   // TODO: Remove this. This is here to be threaded to joining workers as
   // the primary checkpoint initiator worker. We need to enable this role to
@@ -454,9 +452,6 @@ actor RouterRegistry is (KeyRegistry & SourceRegistry & DisposableRegistry &
       source.add_boundary_builders(new_boundary_builders_sendable)
     end
 
-  be register_data_receiver(worker: WorkerName, dr: DataReceiver) =>
-    _data_receiver_map(worker) = dr
-
   be register_key(step_group: RoutingId, key: Key,
     checkpoint_id: (CheckpointId | None) = None)
   =>
@@ -558,11 +553,6 @@ actor RouterRegistry is (KeyRegistry & SourceRegistry & DisposableRegistry &
     end
 
   fun ref _remove_worker(worker: WorkerName) =>
-    try
-      _data_receiver_map.remove(worker)?
-    else
-      Fail()
-    end
     _distribute_boundary_removal(worker)
 
   fun ref _distribute_boundary_removal(worker: WorkerName) =>
