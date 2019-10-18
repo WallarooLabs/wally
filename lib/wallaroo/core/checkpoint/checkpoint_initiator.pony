@@ -291,8 +291,12 @@ actor CheckpointInitiator is Initializable
       let p = StartTimerPromise(this, _checkpoint_group)
       _phase.initiate_checkpoint(_checkpoint_group, p, this)
     else
-      //!@ This should be a message send to the primary worker
-      Fail()
+      try
+        let msg = ChannelMsgEncoder.restart_repeating_checkpoints(_auth)?
+        _connections.send_control(_primary_worker, msg)
+      else
+        Fail()
+      end
     end
 
   fun ref _initiate_checkpoint(checkpoint_group: USize,

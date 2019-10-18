@@ -402,6 +402,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             " Control Channel\n").cstring())
         end
         _checkpoint_initiator.pausing_checkpoint_initiated(m.id)
+      | let m: RestartRepeatingCheckpointsMsg =>
+        _checkpoint_initiator.restart_repeating_checkpoints()
       | let m: AnnounceJoiningWorkersMsg =>
         match _layout_initializer
         | let lti: LocalTopologyInitializer =>
