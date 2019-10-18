@@ -1466,8 +1466,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     if target_workers.size() > 0 then
       if _are_valid_shrink_candidates(target_workers) then
         let remaining_workers = _remove_worker(target_workers)
-        _autoscale.inject_shrink_autoscale_barrier(remaining_workers,
-          target_workers)
+        _autoscale.begin_shrink(remaining_workers, target_workers)
         let reply = ExternalMsgEncoder.shrink_error_response(
           "Shrinking by " + target_workers.size().string() + " workers!")
         response_fn(reply)
@@ -1489,8 +1488,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       end
       if candidates.size() > 0 then
         let remaining_workers = _remove_worker(candidates)
-        _autoscale.inject_shrink_autoscale_barrier(remaining_workers,
-          candidates)
+        _autoscale.begin_shrink(remaining_workers, candidates)
 
         let reply = ExternalMsgEncoder.shrink_error_response(
           "Shrinking by " + candidates.size().string() + " workers!")
@@ -1512,8 +1510,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     leaving_workers: Array[WorkerName] val)
   =>
     _remove_worker(leaving_workers)
-    _autoscale.inject_shrink_autoscale_barrier(remaining_workers,
-      leaving_workers)
+    _autoscale.begin_shrink(remaining_workers, leaving_workers)
 
   be prepare_shrink(remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)

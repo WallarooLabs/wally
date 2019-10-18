@@ -122,6 +122,9 @@ trait _AutoscalePhase
   =>
     _invalid_call(); Fail()
 
+  fun ref shrink_checkpoint_barrier_complete() =>
+    _invalid_call(); Fail()
+
   fun ref shrink_autoscale_barrier_complete() =>
     _invalid_call(); Fail()
 
@@ -305,9 +308,8 @@ class _InjectGrowCheckpointBarrier is _AutoscalePhase
     _current_worker_count = current_worker_count
     _checkpoint_id = checkpoint_id
     _rollback_id = rollback_id
-    @printf[I32](("AUTOSCALE: Stopping the world, cancelling checkpoint " +
-      "timers and injecting last checkpoint barrier before autoscale\n")
-      .cstring())
+    @printf[I32](("AUTOSCALE: Cancelling checkpoint timers and injecting " +
+      "last checkpoint barrier before autoscale\n").cstring())
 
   fun name(): String => __loc.type_name()
 
@@ -352,8 +354,7 @@ class _InjectGrowAutoscaleBarrier is _AutoscalePhase
     _current_worker_count = current_worker_count
     _checkpoint_id = checkpoint_id
     _rollback_id = rollback_id
-    @printf[I32](("AUTOSCALE: Stopping the world and injecting autoscale " +
-      "barrier\n").cstring())
+    @printf[I32](("AUTOSCALE: Injecting autoscale barrier\n").cstring())
 
   fun name(): String => __loc.type_name()
 
@@ -850,6 +851,27 @@ class _WaitingForBoundariesToAckRegistering is _AutoscalePhase
 /////////////////////////////////////////////////
 // SHRINK PHASES
 /////////////////////////////////////////////////
+class _InjectShrinkCheckpointBarrier is _AutoscalePhase
+  let _autoscale: Autoscale ref
+  let _remaining_workers: Array[WorkerName] val
+  let _leaving_workers: Array[WorkerName] val
+
+  new create(autoscale: Autoscale ref,
+    remaining_workers: Array[WorkerName] val,
+    leaving_workers: Array[WorkerName] val)
+  =>
+    @printf[I32](("AUTOSCALE: Injecting shrink checkpoint barrier.\n")
+      .cstring())
+    _autoscale = autoscale
+    _remaining_workers = remaining_workers
+    _leaving_workers = leaving_workers
+
+  fun name(): String => __loc.type_name()
+
+  fun ref shrink_checkpoint_barrier_complete() =>
+    _autoscale.inject_shrink_autoscale_barrier(_remaining_workers,
+      _leaving_workers)
+
 class _InjectShrinkAutoscaleBarrier is _AutoscalePhase
   let _autoscale: Autoscale ref
   let _remaining_workers: Array[WorkerName] val
@@ -859,8 +881,8 @@ class _InjectShrinkAutoscaleBarrier is _AutoscalePhase
     remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
-    @printf[I32](("AUTOSCALE: Stopping the world and injecting shrink " +
-      "autoscale barrier.\n").cstring())
+    @printf[I32](("AUTOSCALE: Injecting shrink autoscale barrier.\n")
+      .cstring())
     _autoscale = autoscale
     _remaining_workers = remaining_workers
     _leaving_workers = leaving_workers
