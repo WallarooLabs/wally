@@ -55,6 +55,23 @@ actor CheckpointInitiator is Initializable
 
     _DisposedCheckpointInitiatorPhase: This actor is disposed, so we ignore all
       activity.
+
+  Checkpoints are triggered at user-configurable intervals. The chosen
+  interval represents the time between checkpoints. When a checkpoint is
+  complete, we set a timer for the interval to trigger the next checkpoint.
+
+  There are cases where we need to clear pending checkpoints. In order to do
+  this in light of asynchronous timer behavior, we use "checkpoint group"
+  epochs. We only react to initiate checkpoint calls that fall within the scope
+  of our current checkpoint group. If we need to clear pending checkpoints, we
+  simply increment the epoch so that the timer with an outdated checkpoint
+  group will be ignored.
+
+  When a checkpoint is complete, we use a promise to determine what to do next.
+  Ordinarily we start the next checkpoint timer. But in the case of a "pausing
+  checkpoint" initiated from outside this actor, we use the provided promise
+  instead. It will then be the responsibility of whoever initiated the pausing
+  checkpoint to initiate the next one.
   """
   let _self: CheckpointInitiator tag = this
 
@@ -161,20 +178,35 @@ actor CheckpointInitiator is Initializable
   be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
     ifdef "resilience" then
       if _worker_name == _primary_worker then
-        _phase.start_checkpoint_timer(1_000_000_000, this)
+        _phase.start_checkpoint_timer(1_000_000_000, _checkpoint_group, this)
       end
     end
     _is_recovering = false
 
-  fun ref _start_checkpoint_timer(time_until_checkpoint: U64) =>
+  be start_checkpoint_timer(checkpoint_group: USize,
+    promise: (Promise[None] | None) = None)
+  =>
+    _phase.start_checkpoint_timer(_time_between_checkpoints,
+      checkpoint_group, this, promise)
+
+  fun ref _start_checkpoint_timer(time_until_checkpoint: U64,
+    checkpoint_group: USize, checkpoint_promise: (Promise[None] | None) = None)
+  =>
     """
     Ignoring the initial checkpoint, we only set a new checkpoint timer once
     the last checkpoint is complete. That means that "time_until_checkpoint"
     is the absolute minimum time between checkpoints. In reality, we need to
     add the time taken to actually complete the checkpoint to this time.
     """
-    let t = Timer(_InitiateCheckpoint(this, _checkpoint_group),
-      time_until_checkpoint)
+    let promise =
+      match checkpoint_promise
+      | let p: Promise[None] => p
+      else
+        let p = Promise[None]
+        p.next[None](_self~start_checkpoint_timer(checkpoint_group))
+        p
+      end
+    let t = Timer(_InitiateCheckpoint(this, checkpoint_group, promise), time_until_checkpoint)
     _timers(consume t)
 
   fun workers(): StringSet box => _workers
@@ -211,9 +243,38 @@ actor CheckpointInitiator is Initializable
   be lookup_checkpoint_id(p: Promise[(CheckpointId, RollbackId)]) =>
     p((_last_complete_checkpoint_id, _last_rollback_id))
 
-  be initiate_checkpoint(checkpoint_group: USize) =>
+  be initiate_checkpoint(checkpoint_group: USize,
+    checkpoint_promise: Promise[None])
+  =>
     if checkpoint_group == _checkpoint_group then
-      _phase.initiate_checkpoint(checkpoint_group, this)
+      _phase.initiate_checkpoint(checkpoint_group, checkpoint_promise, this)
+    end
+
+  be initiate_pausing_checkpoint(promise: Promise[None]) =>
+    if _worker_name == _primary_worker then
+      _clear_pending_checkpoints()
+      _start_checkpoint_timer(_time_between_checkpoints, _checkpoint_group,
+        promise)
+    else
+      //!@
+      Fail()
+
+      // We need to send a proxy promise to the coordinator, which when
+      // triggered will trigger ours.
+
+      // _waiting_connections.insert(
+      //   {(msg_bytes) =>
+      //     response_fn(msg_bytes)
+      //   } val,
+      //   {(id) =>
+      //     try
+      //       let msg = ChannelMsgEncoder.try_join_request(joining_worker_name,
+      //         worker_count, _worker_name, id, _auth)?
+      //       _connections.send_control(_primary_worker, msg)
+      //     else
+      //       Fail()
+      //     end
+      //   } val)
     end
 
   be clear_pending_checkpoints(promise: Promise[None]) =>
@@ -222,9 +283,13 @@ actor CheckpointInitiator is Initializable
 
   be restart_repeating_checkpoints() =>
     _clear_pending_checkpoints()
-    _phase.initiate_checkpoint(_checkpoint_group, this)
+    let p = Promise[None]
+    p.next[None](_self~start_checkpoint_timer(_checkpoint_group))
+    _phase.initiate_checkpoint(_checkpoint_group, p, this)
 
-  fun ref _initiate_checkpoint(checkpoint_group: USize) =>
+  fun ref _initiate_checkpoint(checkpoint_group: USize,
+    checkpoint_promise: Promise[None])
+  =>
     ifdef "resilience" then
       _clear_pending_checkpoints()
       _current_checkpoint_id = _current_checkpoint_id + 1
@@ -263,7 +328,7 @@ actor CheckpointInitiator is Initializable
         recover this~abort_checkpoint(_current_checkpoint_id) end)
       _barrier_coordinator.inject_barrier(token, barrier_promise)
 
-      _phase = _CheckpointingPhase(token, this)
+      _phase = _CheckpointingPhase(token, checkpoint_promise, this)
     end
 
   be resume_checkpointing_from_rollback(rollback_id: RollbackId,
@@ -278,7 +343,9 @@ actor CheckpointInitiator is Initializable
       ifdef "resilience" then
         let promise = Promise[BarrierToken]
         promise.next[None]({(t: BarrierToken) =>
-          _self.initiate_checkpoint(_checkpoint_group)})
+          let p = Promise[None]
+          p.next[None](_self~start_checkpoint_timer(_checkpoint_group))
+          _self.initiate_checkpoint(_checkpoint_group, p)})
         _barrier_coordinator.inject_barrier(
           CheckpointRollbackResumeBarrierToken(rollback_id,
             checkpoint_id), promise)
@@ -388,7 +455,7 @@ actor CheckpointInitiator is Initializable
   // fun ref event_log_write_checkpoint_id(checkpoint_id: CheckpointId,
   //   token: CheckpointBarrierToken, repeating: Bool)
   fun ref event_log_write_checkpoint_id(checkpoint_id: CheckpointId,
-    token: CheckpointBarrierToken)
+    token: CheckpointBarrierToken, checkpoint_promise: Promise[None])
   =>
     ifdef "checkpoint_trace" then
       @printf[I32]("CheckpointInitiator: event_log_write_checkpoint_id()\n"
@@ -413,12 +480,15 @@ actor CheckpointInitiator is Initializable
       end
     end
 
-    _phase = _WaitingForEventLogIdWrittenPhase(token, this)
+    _phase = _WaitingForEventLogIdWrittenPhase(token,
+      checkpoint_promise, this)
 
-  fun ref checkpoint_complete(token: BarrierToken) =>
+  fun ref checkpoint_complete(token: BarrierToken,
+    checkpoint_promise: Promise[None])
+  =>
     """
     This is called once all workers in the cluster have committed the
-    checkpoitn id for this token.
+    checkpoint id for this token.
     """
     ifdef "resilience" then
       match token
@@ -446,7 +516,12 @@ actor CheckpointInitiator is Initializable
               (_current_checkpoint_id + 1).string().cstring())
           end
           _phase = _WaitingCheckpointInitiatorPhase
-          _phase.start_checkpoint_timer(_time_between_checkpoints, this)
+
+          // We call the checkpoint promise here to determine what to do
+          // next. The normal thing is to start the next checkpoint timer,
+          // but in the case of a pausing checkpoint, we relinquish control
+          // to whoever triggered it via the promise.
+          checkpoint_promise(None)
         end
       else
         Fail()
@@ -639,11 +714,15 @@ primitive LatestCheckpointId
 class _InitiateCheckpoint is TimerNotify
   let _si: CheckpointInitiator
   let _checkpoint_group: USize
+  let _checkpoint_promise: Promise[None]
 
-  new iso create(si: CheckpointInitiator, checkpoint_group: USize) =>
+  new iso create(si: CheckpointInitiator, checkpoint_group: USize,
+    checkpoint_promise: Promise[None])
+  =>
     _si = si
     _checkpoint_group = checkpoint_group
+    _checkpoint_promise = checkpoint_promise
 
   fun ref apply(timer: Timer, count: U64): Bool =>
-    _si.initiate_checkpoint(_checkpoint_group)
+    _si.initiate_checkpoint(_checkpoint_group, _checkpoint_promise)
     false
