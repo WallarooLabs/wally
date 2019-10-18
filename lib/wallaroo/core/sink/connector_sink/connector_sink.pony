@@ -166,6 +166,8 @@ actor ConnectorSink is Sink
   // 2PC
   let _twopc: ConnectorSink2PC
   var _seen_checkpointbarriertoken: (CheckpointBarrierToken | None) = None
+  var _last_autoscale_barrier_token: AutoscaleBarrierToken =
+    AutoscaleBarrierToken("no such worker", 0, [], [])
 
   new create(sink_id: RoutingId, sink_name: String, event_log: EventLog,
     recovering: Bool, env: Env, encoder_wrapper: ConnectorEncoderWrapper,
@@ -209,7 +211,15 @@ actor ConnectorSink is Sink
     _from = from
     _connect_count = 0
     _twopc = ConnectorSink2PC(_notify.stream_name)
-    _phase = NormalSinkPhase(this)
+    // Do not change sink phase yet: if we have crashed and have just
+    // restarted, Our point-of-reference/message_id is 0, *until* we get
+    // the rollback payload.
+    //
+    // Meanwhile, it's possible to get an app message via run() before
+    // we've we receive rollback() + the rollback payload that tells use
+    // what our point-of-reference/message_id is supposed to be.  If we
+    // are using the normal processing phase, then we would process that
+    // message and send it downstream with a bogus p-o-r/msg_id of 0.
 
     ifdef "identify_routing_ids" then
       @ll(_conn_info, "===ConnectorSink %s created===".cstring(),
@@ -221,20 +231,36 @@ actor ConnectorSink is Sink
   //
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    @ll(_conn_info, "Lifecycle: %s.%s at %s".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      _sink_id.string().cstring())
     _initializer = initializer
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer) =>
+    @ll(_conn_info, "Lifecycle: %s.%s at %s".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      _sink_id.string().cstring())
     initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
+    @ll(_conn_info, "Lifecycle: %s.%s at %s".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      _sink_id.string().cstring())
     _initial_connect()
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    @ll(_conn_info, "Lifecycle: %s.%s at %s".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      _sink_id.string().cstring())
     _notify.application_ready_to_work(this)
+    _use_normal_processor()
 
   be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
-    None
+    @ll(_conn_info, "Lifecycle: %s.%s at %s".cstring(),
+      __loc.type_name().cstring(), __loc.method_name().cstring(),
+      _sink_id.string().cstring())
+    _use_normal_processor()
 
   fun ref _initial_connect() =>
     @ll(_conn_info, "ConnectorSink initializing connection to %s:%s".cstring(),
@@ -250,6 +276,9 @@ actor ConnectorSink is Sink
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    ifdef "trace" then
+      @ll(_conn_debug, "Rcvd msg at ConnectorSink.run".cstring())
+    end
     _phase.process_message[D](metric_name, pipeline_time_spent,
       data, key, event_ts, watermark_ts, i_producer_id, i_producer, msg_uid,
       frac_ids, i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
@@ -484,6 +513,13 @@ actor ConnectorSink is Sink
         barrier_token.string().cstring(), _sink_id.string().cstring(),
         input_id.string().cstring(), _phase.name().cstring())
     end
+    match _phase
+    | let x: InitialSinkPhase =>
+      // We restarted recently, and we haven't yet received one of the
+      // lifecycle messages that triggers using the normal processor.
+      // But we need the normal processor phase *now*.
+      _use_normal_processor()
+    end
     match barrier_token
     | let srt: CheckpointRollbackBarrierToken =>
       _phase.prepare_for_rollback(barrier_token)
@@ -564,8 +600,21 @@ actor ConnectorSink is Sink
       _seen_checkpointbarriertoken = None
       _resume_processing_messages()
       _twopc.reset_state()
+    | let sat: AutoscaleBarrierToken =>
+      _last_autoscale_barrier_token = sat
+      _resume_processing_messages()
+    | let sart: AutoscaleResumeBarrierToken =>
+      if sart.id() == _last_autoscale_barrier_token.id() then
+        let lws = _last_autoscale_barrier_token.leaving_workers()
+        @ll(_conn_debug, "autoscale: leaving_workers size = %lu".cstring(),
+          lws.size())
+        if (lws.size() > 0) and _connected and _notify.twopc_intro_done then
+          _twopc.send_workers_left(this, 7 /*unused by sink*/, lws)
+        end
+      end
+      _resume_processing_messages()
     else
-      // AutoscaleBarrierToken, AutoscaleResumeBarrierToken, et al.
+      // Any other remaining barrier token
       _resume_processing_messages()
     end
     if ack_now then
@@ -622,16 +671,27 @@ actor ConnectorSink is Sink
     """
     2nd-half logic for barrier_fully_acked().
     """
-    let queued = _phase.queued()
-    _use_normal_processor()
-    for q in queued.values() do
-      match q
-      | let qm: QueuedMessage =>
-        qm.process_message(this)
-      | let qb: QueuedBarrier =>
-        qb.inject_barrier(this)
+    match _phase
+    | let x: InitialSinkPhase =>
+      // If we're @ InitialSinkPhase, and we've restarted after a crash,
+      // it's possible to hit checkpoint_complete() extremely early in
+      // our restart process.  There's nothing to do here.
+      None
+    else
+      let queued = _phase.queued()
+      _use_normal_processor()
+      for q in queued.values() do
+        match q
+        | let qm: QueuedMessage =>
+          qm.process_message(this)
+        | let qb: QueuedBarrier =>
+          qb.inject_barrier(this)
+        end
       end
     end
+
+  fun ref use_normal_processor() =>
+    _use_normal_processor()
 
   fun ref _use_normal_processor() =>
     _phase = NormalSinkPhase(this)
@@ -650,7 +710,7 @@ actor ConnectorSink is Sink
       Fail()
     end
 
-    @ll(_twopc_debug, "2PC: Checkpoint state %s at ConnectorSink %s, txn-id %s".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring(), _twopc.txn_id.cstring())
+    @ll(_twopc_debug, "2PC: Checkpoint state %s at ConnectorSink %s, txn-id %s current_offset %lu acked_point_of_ref %lu _pending_writev_total %lu".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring(), _twopc.txn_id.cstring(), _twopc.current_offset.u64(), _notify.acked_point_of_ref, _pending_writev_total)
 
     let wb: Writer = wb.create()
     wb.u64_be(_twopc.current_offset.u64())
@@ -662,7 +722,7 @@ actor ConnectorSink is Sink
 
   be prepare_for_rollback() =>
     @ll(_conn_debug, "Prepare for checkpoint rollback at ConnectorSink %s".cstring(), _sink_id.string().cstring())
-    // Don't call _use_normal_processor() here
+    _phase.early_prepare_for_rollback()
 
   fun ref finish_preparing_for_rollback() =>
     _use_normal_processor()
@@ -676,38 +736,67 @@ actor ConnectorSink is Sink
     We may need to re-send phase2=commit for this checkpoint_id.
     (But that's async from our point of view, beware tricksy bugs....)
     """
-    @ll(_conn_debug, "Rollback to %s at ConnectorSink %s".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring())
-    @ll(_twopc_debug, "2PC: Rollback: twopc_state %d txn_id %s.".cstring(), _twopc.state(), _twopc.txn_id.cstring())
+    @ll(_conn_info, "Rollback to %s at ConnectorSink %s".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring())
+    @ll(_twopc_info, "2PC: Rollback: twopc_state %d txn_id %s.".cstring(), _twopc.state(), _twopc.txn_id.cstring())
 
-    // If we were disconnected + perform a local abort, then we
-    // arrive here with _twopc.txn_id="".  The last transaction,
-    // named by _twopc.txn_id_at_close, has already been aborted
-    // during the twopc_intro portion of the connector sink protocol.
+    let rollback_to_c_id = _twopc.make_txn_id_string(checkpoint_id)
+    if _connected and _notify.twopc_intro_done then
+      // If we were disconnected + perform a local abort, then we
+      // arrive here with _twopc.txn_id="".  The last transaction,
+      // named by _twopc.txn_id_at_close, has already been aborted
+      // during the twopc_intro portion of the connector sink protocol.
 
-    if _twopc.txn_id == "" then
-      // We may have sent data to the sink that has not been committed,
-      // and also we haven't sent a phase1 message.  Do that now,
-      // and we'll immediately abort it below.
-      let bt = CheckpointBarrierToken(checkpoint_id)
-      match _twopc.barrier_complete(bt where
-        is_rollback = true, stream_id = _notify.stream_id)
-      | None =>
-        // No data has been processed by the sink since the last
-        // checkpoint.
-        @ll(_twopc_debug, "no data written during this checkpoint interval, skipping phase 1".cstring())
-        _twopc.txn_id = "skip--.--" + bt.string()
-      | let msgs: Array[cwm.Message] =>
-        for msg in msgs.values() do
-          _notify.send_msg(this, msg)
+      if _twopc.txn_id == "" then
+        // We may have sent data to the sink that has not been committed,
+        // and also we haven't sent a phase1 message.  Do that now,
+        // and we'll immediately abort it below.
+        let bt = CheckpointBarrierToken(checkpoint_id)
+        match _twopc.barrier_complete(bt where
+          is_rollback = true, stream_id = _notify.stream_id)
+        | None =>
+          // No data has been processed by the sink since the last
+          // checkpoint.
+          @ll(_twopc_debug, "no data written during this checkpoint interval, skipping phase 1".cstring())
+          _twopc.txn_id = "skip--.--" + bt.string()
+        | let msgs: Array[cwm.Message] =>
+          for msg in msgs.values() do
+            _notify.send_msg(this, msg)
+          end
+          _twopc.set_state_1precommit()
+          @ll(_twopc_debug, "sent rollback phase 1 for txn_id %s, size %lu".cstring(), _twopc.txn_id.cstring(), msgs.size())
         end
-        _twopc.set_state_1precommit()
-        @ll(_twopc_debug, "sent rollback phase 1 for txn_id %s, size %lu".cstring(), _twopc.txn_id.cstring(), msgs.size())
       end
+
+      if not _twopc.state_is_start() then
+        if rollback_to_c_id == _twopc.txn_id then
+          // This is an interesting case: we are rolling back to but have not
+          // committed with phase 2.  This is possible when initializer has
+          // determined that the checkpoint has committed globally, writes
+          // commit record to event log, then initializer crashes & restarts.
+          //
+          // Double-check that we have voted to commit/commit fast for
+          // the transaction.  This ought to be true, so it is definitely
+          // worth a crash if it's not true.
+          if _twopc.state_is_2commit() or _twopc.state_is_2commit_fast() then
+            @ll(_twopc_info, "Txn id %s may need phase 2 commit, sending!".cstring(), _twopc.txn_id.cstring())
+            _twopc.send_phase2(this, true)
+          else
+            Fail()
+          end
+        else
+         @ll(_twopc_info, "Txn id %s needs phase 2 abort, sending!".cstring(), _twopc.txn_id.cstring())
+          _twopc.send_phase2(this, false)
+        end
+      end
+    else
+      // We aren't connector and/or 2PC intro is not done.
+      // When we are finally are connected & 2PC intro done, then
+      // any 2PC actions that need doing will be done at that time.
+      @ll(_conn_info, "TODO any other info to log here?".cstring())
+      @ll(_conn_info, "Rollback to %s at ConnectorSink %s".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring())
+      @ll(_twopc_info, "_connected %s twopc_intro_done %s".cstring(), _connected.string().cstring(), _notify.twopc_intro_done.string().cstring())
     end
 
-    if not _twopc.state_is_start() then
-      _twopc.send_phase2(this, false)
-    end
     _twopc.reset_state()
 
     let r = Reader
@@ -722,12 +811,11 @@ actor ConnectorSink is Sink
     // we didn't know if the txn-in-progress had committed globally.
     // When rollback() is called here, we now know the global txn
     // commit status: commit for checkpoint_id, all greater are invalid.
-    _notify.twopc_txn_id_last_committed =
-      _twopc.make_txn_id_string(checkpoint_id)
-    @ll(_twopc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
+    _notify.twopc_txn_id_last_committed = rollback_to_c_id
+    @ll(_twopc_debug, "2PC: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
     _notify.twopc_current_txn_aborted = _notify.process_uncommitted_list(this)
 
-    @ll(_twopc_debug, "DBGDBG: 2PC: twopc_current_txn_aborted = %s.".cstring(), _notify.twopc_current_txn_aborted.string().cstring())
+    @ll(_twopc_debug, "2PC: twopc_current_txn_aborted = %s.".cstring(), _notify.twopc_current_txn_aborted.string().cstring())
     @ll(_twopc_debug, "2PC: Rollback: _twopc.last_offset %lu _twopc.current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s".cstring(), _twopc.last_offset, _twopc.current_offset, _notify.acked_point_of_ref, _notify.twopc_txn_id_last_committed_helper().cstring(), _sink_id.string().cstring())
 
     event_log.ack_rollback(_sink_id)
@@ -862,6 +950,10 @@ actor ConnectorSink is Sink
 
     var data_size: USize = 0
     for bytes in _notify.sentv(this, data).values() do
+      ifdef "trace" then
+        @ll(_conn_debug, "TRACE: ConnectorSink._writev: %s\n".cstring(), _print_array[U8](
+          bytes).cstring())
+      end
       _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
       _pending_writev_total = _pending_writev_total + bytes.size()
       _pending.push((bytes, 0))
@@ -1282,3 +1374,10 @@ class PauseBeforeReconnectConnectorSink is TimerNotify
   fun ref apply(timer: Timer, count: U64): Bool =>
     _tcp_sink.reconnect()
     false
+
+  fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
+    """
+    Generate a printable string of the contents of the given readseq to use in
+    error messages.
+    """
+    "[len=" + array.size().string() + ": " + ", ".join(array.values()) + "]"

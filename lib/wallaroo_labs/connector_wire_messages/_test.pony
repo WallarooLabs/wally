@@ -17,6 +17,7 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 use "buffered"
+use "collections"
 use "ponytest"
 
 actor Main is TestList
@@ -36,6 +37,7 @@ actor Main is TestList
     test(_TestEosMessageMsg)
     test(_TestAckMsg)
     test(_TestRestartMsg)
+    test(_TestWorkersLeftMsg)
 
 class iso _TestHelloMsg is UnitTest
   fun name(): String => "connector_wire_messages/_TestHelloMsg"
@@ -207,3 +209,22 @@ class iso _TestRestartMsg is UnitTest
     let b = m as RestartMsg
     h.assert_eq[String](a.address, addr)
     h.assert_eq[String](b.address, addr)
+
+class iso _TestWorkersLeftMsg is UnitTest
+  fun name(): String => "connector_wire_messages/_TestWorkersLeftMsg"
+
+  fun apply(h: TestHelper) ? =>
+    let rtag: U64 = 9923853
+    let leaving_workers = recover val ["w3"; "w2"] end
+    let a = WorkersLeftMsg(rtag, leaving_workers)
+    let encoded = Frame.encode(a)
+    let m = Frame.decode(encoded)?
+    let b = m as WorkersLeftMsg
+    h.assert_eq[U64](a.rtag, rtag)
+    h.assert_eq[U64](b.rtag, rtag)
+    h.assert_eq[USize](a.leaving_workers.size(), leaving_workers.size())
+    h.assert_eq[USize](b.leaving_workers.size(), leaving_workers.size())
+    for i in Range[USize](0, leaving_workers.size()) do
+      h.assert_eq[String](a.leaving_workers(i)?, leaving_workers(i)?)
+      h.assert_eq[String](b.leaving_workers(i)?, leaving_workers(i)?)
+    end

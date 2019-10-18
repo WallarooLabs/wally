@@ -256,3 +256,12 @@ class ConnectorSink2PC
     let msg: cwm.MessageMsg = cwm.MessageMsg(0, 0, 0, None, bs)
     sink.send_msg(sink, msg)
     @ll(_twopc_debug, "2PC: sent phase 2 commit=%s for txn_id %s".cstring(), commit.string().cstring(), txn_id.cstring())
+
+  fun send_workers_left(sink: ConnectorSink ref,
+    rtag: U64, leaving_workers: Array[cwm.WorkerName val] val)
+  =>
+    let bs: Array[U8] val = TwoPCEncode.workers_left(rtag, leaving_workers)
+    let msg: cwm.MessageMsg = cwm.MessageMsg(0, 0, 0, None, bs)
+    sink.send_msg(sink, msg)
+    @ll(_twopc_debug, "2PC: sent leaving_workers %s/%s".cstring(),
+      rtag.string().cstring(), ",".join(leaving_workers.values()))

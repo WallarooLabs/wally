@@ -98,8 +98,6 @@ class ConnectorSinkNotify
     conn.set_nodelay(true)
     conn.expect(4)
 
-    // TODO: configure connector v2 program string
-    // TODO: configure connector v2 instance_name string
     let hello = cwm.HelloMsg(_protocol_version, _cookie,
       _app_name, _worker_name)
     send_msg(conn, hello)
@@ -211,7 +209,7 @@ class ConnectorSinkNotify
   fun ref throttled(conn: WallarooOutgoingNetworkActor ref) =>
     if (not _throttled) or (not twopc_intro_done) then
       _throttled = true
-      if true then // TODO fix throttle strategy: real BP can cause deadlock
+      if false then // TODO fix throttle strategy: real BP can cause deadlock
         Backpressure.apply(_auth)
         @ll(_conn_info, ("ConnectorSink is experiencing back pressure, " +
         "connected = %s").cstring(), _connected.string().cstring())
@@ -224,7 +222,7 @@ class ConnectorSinkNotify
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
     if _throttled and twopc_intro_done then
       _throttled = false
-      if true then // TODO fix throttle strategy: real BP can cause deadlock
+      if false then // TODO fix throttle strategy: real BP can cause deadlock
         Backpressure.release(_auth)
         @ll(_conn_info, ("ConnectorSink is no longer experiencing" +
         " back pressure, connected = %s").cstring(),
@@ -261,6 +259,7 @@ class ConnectorSinkNotify
         if credits < 2 then
           _error_and_close(conn, "HEY, too few credits: " + credits.string())
         else
+          @ll(_conn_debug, "Notify: stream_id %d stream_name %s p-o-r/message_id %lu".cstring(), stream_id, stream_name.cstring(), message_id)
           let notify = cwm.NotifyMsg(stream_id, stream_name, message_id)
           send_msg(conn, notify)
           twopc.notify1_sent = true
