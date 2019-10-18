@@ -415,8 +415,8 @@ class ConnectorSourceNotify[In: Any val]
 
         // try to process message
         if not _active_streams.contains(m.stream_id) then
-          return _to_error_state(source, "Bad stream_id " +
-            m.stream_id.string())
+          return _to_error_state(source, "Bad/unregistered stream_id " +
+            m.stream_id.string() + " with message_id " + m.message_id.string())
         else
           try
             let s = _active_streams(m.stream_id)?
@@ -424,6 +424,7 @@ class ConnectorSourceNotify[In: Any val]
 
             if (msg_id > 0) and (msg_id <= s.last_seen) then
               // skip processing of an already seen message
+              @ll(_conn_debug, "Skip m.message_id %lu <= last_seen %lu".cstring(), msg_id, s.last_seen)
               return _continue_perhaps(source)
             end
 
@@ -554,6 +555,7 @@ class ConnectorSourceNotify[In: Any val]
     match message_id
     | let m_id: PointOfReference =>
       s.last_seen = m_id
+      @ll(_conn_debug, "DBG: update point_of_ref last_seen = %lu".cstring(), s.last_seen)
     end
 
     if is_finished then
@@ -795,7 +797,15 @@ class ConnectorSourceNotify[In: Any val]
   =>
     if not _prep_for_rollback then
       ifdef debug then
-        if checkpoint_id != _barrier_checkpoint_id then
+        if (_barrier_checkpoint_id > 0) and (checkpoint_id != _barrier_checkpoint_id) then
+          // TODO In the future, we should not be sending checkpoint
+          // complete messages to new autoscale participants until they
+          // have participated in at least one complete checkpoint.
+          //
+          // If _barrier_checkpoint_id is 0, then perhaps we have very
+          // recently joined the cluster and have been told
+          // checkpoint_complete without having participated in the
+          // checkpoint at all.
           @ll(_conn_debug, ("ConnectorSourceNotify: Checkpoint complete for id " +
             " %s but expected %s\n").cstring(),
             checkpoint_id.string().cstring(),
@@ -878,7 +888,7 @@ class ConnectorSourceNotify[In: Any val]
     for s_map in [_active_streams ; _pending_close].values() do
       @ll(_conn_debug, "s_map.size = %lu".cstring(), s_map.size())
       for s in s_map.values() do
-        _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_seen))
+        _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
       end
     end
     _relinquish_streams()
@@ -982,6 +992,7 @@ class ConnectorSourceNotify[In: Any val]
   //////////////////
   fun ref _to_error_state(source: ConnectorSource[In] ref, msg: String): Bool
   =>
+    @ll(_conn_info, "_to_error_state: %s".cstring(), msg.cstring())
     _send_reply(source, cwm.ErrorMsg(msg))
 
     _fsm_state = _ProtoFsmError
