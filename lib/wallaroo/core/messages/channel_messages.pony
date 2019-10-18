@@ -721,6 +721,16 @@ primitive ChannelMsgEncoder
   =>
     _encode(TryJoinResponseMsg(msg, conn_id), auth)?
 
+  fun initiate_pausing_checkpoint(sender: WorkerName, id: U128,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(InitiatePausingCheckpointMsg(sender, id), auth)?
+
+  fun pausing_checkpoint_initiated(id: U128, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(PausingCheckpointInitiatedMsg(id), auth)?
+
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg =>
     try
@@ -1985,3 +1995,16 @@ class val TryJoinResponseMsg is ChannelMsg
     msg = msg'
     conn_id = conn_id'
 
+class val InitiatePausingCheckpointMsg is ChannelMsg
+  let sender: WorkerName
+  let id: U128
+
+  new val create(sender': WorkerName, id': U128) =>
+    sender = sender'
+    id = id'
+
+class val PausingCheckpointInitiatedMsg is ChannelMsg
+  let id: U128
+
+  new val create(id': U128) =>
+    id = id'

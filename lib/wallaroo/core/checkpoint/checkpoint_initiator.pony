@@ -31,6 +31,7 @@ use "wallaroo/core/topology"
 use "wallaroo/core/barrier"
 use "wallaroo/core/network"
 use "wallaroo/core/recovery"
+use "wallaroo_labs/continuations"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/string_set"
 
@@ -104,6 +105,9 @@ actor CheckpointInitiator is Initializable
   var _is_recovering: Bool
 
   var _phase: _CheckpointInitiatorPhase = _WaitingCheckpointInitiatorPhase
+
+  let _waiting_connections: ContinuationStore[None] =
+    _waiting_connections.create()
 
   new create(auth: AmbientAuth, worker_name: WorkerName,
     primary_worker: WorkerName, connections: Connections,
@@ -259,9 +263,23 @@ actor CheckpointInitiator is Initializable
       _start_checkpoint_timer(_time_between_checkpoints, _checkpoint_group,
         promise)
     else
-      //!@ Send proxy promise to primary worker
-      Fail()
+      _waiting_connections.insert(
+        {(_) =>
+          promise(None)
+        },
+        {(continuation_id) =>
+          try
+            let msg = ChannelMsgEncoder.initiate_pausing_checkpoint(
+              _worker_name, continuation_id, _auth)?
+            _connections.send_control(_primary_worker, msg)
+          else
+            Fail()
+          end
+        })
     end
+
+  be pausing_checkpoint_initiated(continuation_id: U128) =>
+    _waiting_connections(continuation_id, None)
 
   be clear_pending_checkpoints(promise: Promise[None]) =>
     _clear_pending_checkpoints()
