@@ -399,9 +399,6 @@ actor Autoscale
     joining_worker_count: USize, current_worker_count: USize,
     checkpoint_id: CheckpointId, rollback_id: RollbackId)
   =>
-    _phase = _InjectGrowCheckpointBarrier(this, connected_joiners,
-      joining_worker_count, current_worker_count, checkpoint_id, rollback_id)
-
     @printf[I32](("AUTOSCALE: Stopping the world.\n").cstring())
     let new_workers_iso = recover iso Array[WorkerName] end
     for w in connected_joiners.keys() do
@@ -417,6 +414,8 @@ actor Autoscale
     end
 
     ifdef "resilience" then
+      _phase = _InjectGrowCheckpointBarrier(this, connected_joiners,
+        joining_worker_count, current_worker_count, checkpoint_id, rollback_id)
       let promise = Promise[None]
       promise.next[None]({(_: None) =>
         _self.grow_checkpoint_barrier_complete()})
