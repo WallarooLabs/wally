@@ -147,7 +147,7 @@ actor Main
 
 actor Sender
   let _err: OutStream
-  let _tcp: TCPConnection
+  var _tcp: TCPConnection
   let _data_chunks: Array[Array[U8] val] val
   var _data_chunk_index: USize = 0
   let _timers: Timers = Timers
@@ -161,6 +161,11 @@ actor Sender
   var _start_sec: I64 = 0
   var _start_nsec: I64 = 0
   let _catch_up: Bool
+  var _start_count: USize = 0
+  let _throttle_messages: Bool
+  let _ambient: AmbientAuth
+  let _host: String
+  let _port: String
 
   new create(ambient: AmbientAuth,
     err: OutStream,
@@ -174,30 +179,41 @@ actor Sender
     catch_up: Bool)
   =>
     let notifier = Notifier(err, this, report_interval > 0, throttle_messages)
-    _tcp = TCPConnection(ambient, consume notifier,
-      host, port)
+    _tcp = TCPConnection(ambient, consume notifier, host, port)
     _data_chunks = data_chunks
     _err = err
     _nsec_interval = nsec_interval
     _report_interval = report_interval
     _time_limit = time_limit
     _catch_up = catch_up
+    _throttle_messages = throttle_messages
+    _ambient = ambient
+    _host = host
+    _port = port
 
   be start() =>
-    // @printf[I32]("Sender: nsec_interval = %lu\n".cstring(), _nsec_interval)
-    let t = Timer(TriggerSend(this), 0, _nsec_interval)
-    _timers(consume t)
-    if _report_interval > 0 then
-      let t2 = Timer(TriggerReport(this, _report_interval > 0),
-        _report_interval, _report_interval)
-      _timers(consume t2)
+    //@printf[I32]("Sender: nsec_interval = %lu\n".cstring(), _nsec_interval)
+    //@printf[I32]("Sender: report_interval = %lu\n".cstring(), _report_interval)
+    _start_count = _start_count + 1
+    if _start_count == 1 then
+      let t = Timer(TriggerSend(this), 0, _nsec_interval)
+      _timers(consume t)
+      if _report_interval > 0 then
+        let t2 = Timer(TriggerReport(this, _report_interval > 0),
+          _report_interval, _report_interval)
+        _timers(consume t2)
+      end
+      let term = SignalHandler(TermHandler(this, _report_interval > 0), Sig.term())
+      SignalHandler(TermHandler(this, _report_interval > 0), Sig.int())
+      SignalHandler(TermHandler(this, _report_interval > 0), Sig.hup())
+      if _time_limit > 0 then
+        let t3 = Timer(TriggerTerm(term, _report_interval > 0), _time_limit, 0)
+        _timers(consume t3)
+      end
     end
-    let term = SignalHandler(TermHandler(this, _report_interval > 0), Sig.term())
-    SignalHandler(TermHandler(this, _report_interval > 0), Sig.int())
-    SignalHandler(TermHandler(this, _report_interval > 0), Sig.hup())
-    if _time_limit > 0 then
-      let t3 = Timer(TriggerTerm(term, _report_interval > 0), _time_limit, 0)
-      _timers(consume t3)
+    if _start_count > 1 then
+      let notifier = Notifier(_err, this, _report_interval > 0, _throttle_messages)
+      _tcp = TCPConnection(_ambient, consume notifier, _host, _port)
     end
 
   be send() =>
@@ -291,13 +307,18 @@ class Notifier is TCPConnectionNotify
 
   fun ref connect_failed(conn: TCPConnection ref) =>
     @printf[I32]("* %s unable to connect\n".cstring(), _Time())
-    @exit[None](I32(1))
+    @sleep[None](U32(1))
+    _sender.start()
 
   fun ref closed(conn: TCPConnection ref) =>
     if _verbose then
       @printf[I32]("* %s closed\n".cstring(), _Time())
     end
-    _sender.report(true, _verbose)
+    _sender.report(false, _verbose)
+    throttled(conn)
+    conn.dispose()
+    @sleep[None](U32(1))
+    _sender.start()
 
   fun ref throttled(conn: TCPConnection ref) =>
     if _throttle_messages then
