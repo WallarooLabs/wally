@@ -380,34 +380,28 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             Fail()
           end
         end
-
-      // !@ ADD THIS STUFF vvvv
-
-      // | let m: InitiatePausingCheckpointRequestMsg =>
-      //   ifdef "trace" then
-      //     @printf[I32](("Received InitiatePausingCheckpointRequestMsg on " +
-      //       " Control Channel\n").cstring())
-      //   end
-
-      //   let promise = Promise[None]
-      //   promise.next[None]({(_: None) =>
-      //     try
-      //       let msg = ChannelMsgEncoder.pending_promise_complete(
-      //         m.promise_id, _auth)?
-      //       _connections.send_control(m.sender, msg)
-      //     else
-      //       Fail()
-      //     end
-      //   })
-
-      //   _checkpoint_initiator.initiate_pausing_checkpoint(promise)
-      // | let m: PendingPromiseCompleteMsg =>
-      //   ifdef "trace" then
-      //     @printf[I32](("Received InitiatePausingCheckpointResponseMsg on " +
-      //       " Control Channel\n").cstring())
-      //   end
-
-
+      | let m: InitiatePausingCheckpointMsg =>
+        ifdef "trace" then
+          @printf[I32](("Received InitiatePausingCheckpointMsg on " +
+            " Control Channel\n").cstring())
+        end
+        let promise = Promise[None]
+        promise.next[None]({(_: None) =>
+          try
+            let msg = ChannelMsgEncoder.pausing_checkpoint_initiated(m.id,
+              _auth)?
+            _connections.send_control(m.sender, msg)
+          else
+            Fail()
+          end
+        })
+        _checkpoint_initiator.initiate_pausing_checkpoint(promise)
+      | let m: PausingCheckpointInitiatedMsg =>
+        ifdef "trace" then
+          @printf[I32](("Received PausingCheckpointInitiatedMsg on " +
+            " Control Channel\n").cstring())
+        end
+        _checkpoint_initiator.pausing_checkpoint_initiated(m.id)
       | let m: AnnounceJoiningWorkersMsg =>
         match _layout_initializer
         | let lti: LocalTopologyInitializer =>

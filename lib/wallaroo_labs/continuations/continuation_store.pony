@@ -1,6 +1,6 @@
 use "collections"
-use "wallaroo_labs/guid"
-use "wallaroo_labs/mort"
+use "../guid"
+use "../mort"
 
 actor ContinuationStore[T: Any #send]
   """
