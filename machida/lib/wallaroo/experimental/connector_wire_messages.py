@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 import struct
 import itertools
+import logging
 
 try:
     from StringIO import StringIO
@@ -743,12 +744,49 @@ class TwoPCPhase2(object):
         (txn_id, commit) = decode_phase2r(bs)
         return TwoPCPhase2(txn_id, commit)
 
+class WorkersLeft(object):
+    """
+    ListUncommitted(rtag: U64)
+    """
+    def __init__(self, rtag, leaving_workers):
+        self.rtag = rtag
+        self.leaving_workers = leaving_workers
+
+    def __str__(self):
+        return "WorkersLeft(rtag={!r},leaving_workers={!r})".format(
+            self.rtag, self.leaving_workers)
+
+    def __eq__(self, other):
+        return (self.rtag == other.rtag) and \
+            (self.leaving_workers == other.leaving_workers)
+
+    def encode(self):
+        return (struct.pack('>QI', self.rtag, len(self.leaving_workers)) +
+                b''.join((
+                    struct.pack('>H{}s'.format(len(w)),
+                        len(w), w.encode("utf-8"))
+                    for w in self.leaving_workers)))
+
+    @staticmethod
+    def decode(bs):
+        reader = StringIO(bs)
+        rtag = struct.unpack(">Q", reader.read(8))[0]
+        leaving_workers = []
+        length = struct.unpack(">I", reader.read(4))[0]
+        for i in range(0, length):
+            w_length = struct.unpack(">H", reader.read(2))[0]
+            w = reader.read(w_length).decode()
+            leaving_workers.append(w)
+        return WorkersLeft(rtag, leaving_workers)
+
+
 class TwoPCFrame(object):
     _FRAME_TYPE_TUPLES = [(201, ListUncommitted) ,
                           (202, ReplyUncommitted) ,
                           (203, TwoPCPhase1),
                           (204, TwoPCReply),
-                          (205, TwoPCPhase2)
+                          (205, TwoPCPhase2),
+                          (206, WorkersLeft)
                           ]
     _FRAME_TYPE_MAP = dict([(v, t) for v, t in _FRAME_TYPE_TUPLES] +
                            [(t, v) for v, t in _FRAME_TYPE_TUPLES])

@@ -31,7 +31,7 @@ done
 # because test timing can affect how many checkpoints may follow.
 # Also, 18 is the last checkpoint that aloc_sink.abort-rules
 # will affect.
-for c in 1 2 4 5 7 8 10 11 12 13 14 16 17 18; do
+for c in 1 2 4 5 7 8 11 12 13 14 16 17 18; do
 	pat="c_id=$c.,"
 	egrep $pat $IN | grep '2-rollback' > /dev/null 2>&1
 	if [ $? -eq 0 ]; then
