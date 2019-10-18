@@ -19,6 +19,7 @@ from collections import namedtuple
 from datetime import datetime
 import inspect
 import logging
+import os
 from select import select
 import socket
 import struct
@@ -167,7 +168,18 @@ def _asyncore_loop(sentinel, timeout, socket_map):
             time.sleep(timeout)
     except:
         logging.exception("_asyyncore_loop exited!")
-    logging.debug("_asyncore_loop exiting")
+    logging.info("_asyncore_loop exiting")
+    if os.environ.get("ERROR_9_SHOULD_EXIT") is not None:
+        ## See commit 5937dfe088
+        ## Asyncore can have a race where a "error: ( 9, 'Bad file descriptor' )"
+        ## happens, and the rest of the client hangs.  Until that bug has a
+        ## work-around, we will force a Python exit here.
+        os._exit(77)
+    else:
+        ## We are probably running in a Python test environment.  Do not
+        ## halt everything here with a forced exit(); instead, let the test
+        ## harness clean up.
+        None
 
 
 class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
@@ -483,6 +495,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             # In the future, maybe this should automatically send a notify
             try:
                 if self._streams[msg.stream_id].is_open:
+                    ##logging.debug("write: encode: {}".format(msg))
                     data = cwm.Frame.encode(msg)
                     self._write(data)
                     # use up 1 credit
@@ -533,22 +546,33 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 if not isinstance(b, bytes):
                     b = b.encode()
                 if data_len + len(b) > obs:
-                    self._send(b''.join(data))
-                    data = [b]
-                    data_len = len(b)
+                    joined = b''.join(data)
+                    if len(joined) > 0:
+                        res = self._send(joined)
+                        if res != len(joined):
+                            logging.info("initiate_send: socket send 1 returned {}".format(res))
+                            return
+                        data = [b]
+                        data_len = len(b)
                 else:
                     data.append(b)
                     data_len += len(b)
             if data:
-                self._send(b''.join(data))
+                joined = b''.join(data)
+                res = self._send(joined)
+                if res != len(joined):
+                    logging.info("initiate_send: socket send 2 returned {}".format(res))
+                    return
 
     def _send(self, data):
         try:
-            self.send(data)
+            # This is the call to asyncore that actually writes to the socket
+            res = self.send(data)
             if self.data is not None:
                 self.data.append(data)
+            return res
         except OSError:
-            self.handle_error()
+            return self.handle_error()
 
     def pending_sends(self):
         """
@@ -588,6 +612,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self.stream_added(new)
 
         # send to wallaroo worker
+        logging.debug("is_open=True but sending NOTIFY: {}".format(cwm.Notify(new.id,                              new.name,                              new.point_of_ref)))
         self.write(cwm.Notify(new.id,
                               new.name,
                               new.point_of_ref))
@@ -664,6 +689,14 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 self._streams[sid] = new
                 self.stream_closed(new)
 
+        logging.debug("Popping the producer_fifo")
+        c = 0
+        while self.producer_fifo:
+            self.producer_fifo.popleft()
+            c = c + 1
+        logging.debug("Popping the producer_fifo: count = {}".format(c))
+        self.discard_buffers()
+
     def _reconnect_common(self):
         # try to connect again
         self._in_reconnect_loop = True
@@ -676,7 +709,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 break
             except socket.error as err:
                 if err.errno in retry_errno:
-                    logging.debug("_reconnect_common: {}}".format(err))
+                    logging.debug("_reconnect_common: {}".format(err))
                     time.sleep(1.0)
                     continue
                 else:
