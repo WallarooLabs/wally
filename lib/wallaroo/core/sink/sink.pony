@@ -37,6 +37,8 @@ trait tag Sink is (Consumer & DisposableActor & BarrierProcessor)
   fun ref finish_preparing_for_rollback()
   fun ref receive_immediate_ack() =>
     None
+  fun ref use_normal_processor() =>
+    None
 
 interface val SinkConfig[Out: Any val]
   fun apply(parallelism: USize): SinkBuilder

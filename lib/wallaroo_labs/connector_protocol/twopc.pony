@@ -52,3 +52,9 @@ primitive TwoPCEncode
     let m = cwm.TwoPCPhase2Msg(txn_id, commit)
     cwm.TwoPCFrame.encode(m, wb)
 
+  fun workers_left(rtag: U64, leaving_workers: Array[cwm.WorkerName val] val)
+    : Array[U8] val
+  =>
+    let wb: Writer = wb.create()
+    let m = cwm.WorkersLeftMsg(rtag, leaving_workers)
+    cwm.TwoPCFrame.encode(m, wb)
