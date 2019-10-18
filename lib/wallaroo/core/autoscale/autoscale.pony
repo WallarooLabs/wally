@@ -97,12 +97,18 @@ actor Autoscale
     // SHRINK AUTOSCALE
     ////////////////////
     V. COORDINATOR:
-    1) _InjectShrinkAutoscaleBarrier: Stop the world and inject barrier to
-       ensure in flight messages are finished
-    2) _InitiatingShrink: RouterRegistry currently handles the details. We're
+    1) _InjectShrinkCheckpointBarrier: Stop the world, cancel pending
+      checkpoint timers, then inject barrier to ensure in flight messages are
+      finished, and to take last checkpoint before autoscale and allow 2PC
+      sinks to flush. [If we're not in resilience mode, skip to I.2 without
+      injecting checkpoint barrier]
+    2) _InjectShrinkAutoscaleBarrier: Inject blocking barrier to initiate
+      autoscale preparation. If we're not in resilience mode, this barrier
+      will also be used to ensure in flight messages are finished.
+    3) _InitiatingShrink: RouterRegistry currently handles the details. We're
       waiting until all steps have been migrated from leaving workers.
-    3) _WaitingForResumeTheWorld: Waiting for unmuting procedure to finish.
-    4) _WaitingForAutoscale: Autoscale is complete and we are back to our
+    4) _WaitingForResumeTheWorld: Waiting for unmuting procedure to finish.
+    5) _WaitingForAutoscale: Autoscale is complete and we are back to our
       initial waiting state.
 
     VI. NON-COORDINATOR:
@@ -395,6 +401,7 @@ actor Autoscale
     _phase = _InjectGrowCheckpointBarrier(this, connected_joiners,
       joining_worker_count, current_worker_count, checkpoint_id, rollback_id)
 
+    @printf[I32](("AUTOSCALE: Stopping the world.\n").cstring())
     let new_workers_iso = recover iso Array[WorkerName] end
     for w in connected_joiners.keys() do
       new_workers_iso.push(w)
@@ -684,7 +691,13 @@ actor Autoscale
         } val)
     end
 
-  be inject_shrink_autoscale_barrier(remaining_workers: Array[WorkerName] val,
+  be begin_shrink(remaining_workers: Array[WorkerName] val,
+    leaving_workers: Array[WorkerName] val)
+  =>
+    inject_shrink_checkpoint_barrier(remaining_workers, leaving_workers)
+
+  fun ref inject_shrink_checkpoint_barrier(
+    remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
     """
@@ -692,9 +705,10 @@ actor Autoscale
     (or, in theory, from an internal initiation of shrink). Currently we
     only support external triggers. That trigger can be sent to any worker.
     """
-    _phase = _InjectShrinkAutoscaleBarrier(this, remaining_workers,
+    _phase = _InjectShrinkCheckpointBarrier(this, remaining_workers,
       leaving_workers)
 
+    @printf[I32](("AUTOSCALE: Stopping the world.\n").cstring())
     try
       let msg = ChannelMsgEncoder.initiate_stop_the_world_for_shrink_migration(
         _worker_name, remaining_workers, leaving_workers, _auth)?
@@ -703,14 +717,33 @@ actor Autoscale
       Fail()
     end
 
+    ifdef "resilience" then
+      let promise = Promise[None]
+      promise.next[None]({(_: None) =>
+        _self.shrink_checkpoint_barrier_complete()})
+      _checkpoint_initiator.initiate_pausing_checkpoint(promise)
+    else
+      inject_shrink_autoscale_barrier(remaining_workers, leaving_workers)
+    end
+
+    _router_registry.initiate_stop_the_world_for_shrink_migration(
+      remaining_workers, leaving_workers)
+
+  fun ref inject_shrink_autoscale_barrier(
+    remaining_workers: Array[WorkerName] val,
+    leaving_workers: Array[WorkerName] val)
+  =>
+    _phase = _InjectShrinkAutoscaleBarrier(this, remaining_workers,
+      leaving_workers)
+
     let promise = Promise[None]
     promise.next[None]({(_: None) =>
       _self.shrink_autoscale_barrier_complete()})
     _autoscale_barrier_initiator.initiate_autoscale(promise
       where leaving_workers = leaving_workers)
 
-    _router_registry.initiate_stop_the_world_for_shrink_migration(
-      remaining_workers, leaving_workers)
+  be shrink_checkpoint_barrier_complete() =>
+    _phase.shrink_checkpoint_barrier_complete()
 
   be shrink_autoscale_barrier_complete() =>
     _phase.shrink_autoscale_barrier_complete()
