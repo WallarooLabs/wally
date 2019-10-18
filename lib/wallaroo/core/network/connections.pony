@@ -219,18 +219,34 @@ actor Connections is Cluster
       if _control_conns.contains(worker) then
         _control_conns(worker)?.writev(data)
         ifdef debug then
-          @printf[I32](("Sent control message to " + worker + "\n").cstring())
+          @printf[I32](("Sent control message to %s: %s\n").cstring(), worker.cstring(), _msg_fmt(data).cstring())
         end
       else
         @printf[I32](("No control connection for worker " + worker + ". " +
-          "Queuing to send later.\n").cstring())
+          "Queuing to send later: %s\n").cstring(), _msg_fmt(data).cstring())
         if not _pending_control_messages.contains(worker) then
           _pending_control_messages(worker) = Array[Array[ByteSeq] val]
         end
         _pending_control_messages(worker)?.push(data)
       end
     else
+      @printf[I32]("_send_control: Unreachable\n".cstring())
       Unreachable()
+    end
+
+  fun _msg_fmt(data: Array[ByteSeq] val): String val =>
+    try
+      let d = recover iso Array[U8] end
+      for q in data.values() do
+        d.append(q)
+      end
+      // Shift away 4 byte len header
+      d.shift()?; d.shift()?; d.shift()?; d.shift()?
+      let dd = recover val consume d end
+      let x: ChannelMsg = ChannelMsgDecoder(dd, _auth)
+      x.string()
+    else
+      "unknown msg type"
     end
 
   be send_control_to_cluster(data: Array[ByteSeq] val) =>
@@ -266,6 +282,7 @@ actor Connections is Cluster
 
   be disconnect_from(worker: WorkerName) =>
     try
+      @printf[I32]("Connections.disconnect_from: %s\n".cstring(), worker.cstring())
       (_, let d) = _data_conns.remove(worker)?
       d.dispose()
       (_, let c) = _control_conns.remove(worker)?
@@ -475,6 +492,7 @@ actor Connections is Cluster
 
   be remove_worker_connection_info(worker: WorkerName) =>
     try
+      @printf[I32]("Connections.remove_worker_connection_info: %s\n".cstring(), worker.cstring())
       _control_addrs.remove(worker)?
       _data_addrs.remove(worker)?
       _control_conns.remove(worker)?
@@ -600,12 +618,16 @@ actor Connections is Cluster
       let tcp_conn_wrapper =
         if _control_conns.contains(target_name) then
           try
+            let qqq =
             _control_conns(target_name)?
+            @printf[I32]("Connections._create_control_connection: old %s\n".cstring(), target_name.cstring())
+            qqq
           else
             Unreachable(); ControlConnection(_auth, _worker_name, target_name,
               _my_control_addr._2, this)
           end
         else
+          @printf[I32]("Connections._create_control_connection: new %s\n".cstring(), target_name.cstring())
           ControlConnection(_auth, _worker_name, target_name,
             _my_control_addr._2, this)
         end

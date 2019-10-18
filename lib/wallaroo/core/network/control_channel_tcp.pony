@@ -198,10 +198,10 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         @printf[I32]("Error reading header on control channel\n".cstring())
       end
     else
-      ifdef "trace" then
-        @printf[I32]("Received msg on Control Channel\n".cstring())
-      end
       let msg = ChannelMsgDecoder(consume data, _auth)
+      ifdef "trace" then
+        @printf[I32]("Received msg on Control Channel: %s\n".cstring(), msg.string().cstring())
+      end
       match msg
       | let m: IdentifyControlPortMsg =>
         ifdef "trace" then
@@ -545,6 +545,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             Fail()
           end
         })
+        @printf[I32]("DBG: _event_log.initiate_checkpoint line %d\n".cstring(), __loc.line())
         _event_log.initiate_checkpoint(m.checkpoint_id, promise)
       | let m: EventLogWriteCheckpointIdMsg =>
         let promise = Promise[CheckpointId]
