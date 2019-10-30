@@ -216,7 +216,10 @@ class SourceTCPHandler is TestableTCPHandler
     if qty <= _max_size then
       _expect = qty
     else
-      Fail()
+      @printf[I32](("SourceTCPHandler: Received unexpected expect of size: " +
+        qty.string() + ", exceeds max: " + _max_size.string() +
+        ". Closed connection.\n").cstring())
+      close()
     end
 
   fun ref set_nodelay(state: Bool) =>
@@ -353,6 +356,10 @@ class SourceTCPHandler is TestableTCPHandler
         // distribute and data we've already read that is in the `read_buf`
         // and able to be distributed
         while (_read_buf_offset >= _expect) and (_read_buf_offset > 0) do
+          if _shutdown_peer then
+            _reading = false
+            return
+          end
           // get data to be distributed and update `_read_buf_offset`
           let data =
             if _expect == 0 then
