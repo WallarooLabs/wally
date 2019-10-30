@@ -216,7 +216,10 @@ class SourceTCPHandler is TestableTCPHandler
     if qty <= _max_size then
       _expect = qty
     else
-      Fail()
+      @printf[I32](("SourceTCPHandler: Received unexpected expect of size: " +
+        qty.string() + ", exceeds max: " + _max_size.string() +
+        ". Closed connection.\n").cstring())
+      close()
     end
 
   fun ref set_nodelay(state: Bool) =>
