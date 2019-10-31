@@ -261,6 +261,11 @@ class _DataReceiver is _DataReceiverWrapper
       ifdef "trace" then
         @printf[I32]("Received DataMsg on Data Channel\n".cstring())
       end
+      let network_time = (ingest_ts - data_msg.latest_ts)
+      if (network_time < 0) or (network_time > 1000000000) then
+          @printf[I32](("Network time: " + network_time.string() +
+            "\n").cstring())
+      end
       _metrics_reporter.step_metric(data_msg.metric_name,
         "Before receive on data channel (network time)", data_msg.metrics_id,
         data_msg.latest_ts, ingest_ts)
