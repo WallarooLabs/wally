@@ -618,16 +618,12 @@ actor Connections is Cluster
       let tcp_conn_wrapper =
         if _control_conns.contains(target_name) then
           try
-            let qqq =
             _control_conns(target_name)?
-            @printf[I32]("Connections._create_control_connection: old %s\n".cstring(), target_name.cstring())
-            qqq
           else
             Unreachable(); ControlConnection(_auth, _worker_name, target_name,
               _my_control_addr._2, this)
           end
         else
-          @printf[I32]("Connections._create_control_connection: new %s\n".cstring(), target_name.cstring())
           ControlConnection(_auth, _worker_name, target_name,
             _my_control_addr._2, this)
         end
