@@ -1,7 +1,14 @@
 #!/bin/sh
 
 DESIRED=$1
-if [ -z "$DESIRED" -o "$DESIRED" -lt 1 ]; then
+if [ -z "$DESIRED" ]; then
+    usage=yes
+elif [ "$DESIRED" -lt 1 ]; then
+    usage=yes
+else
+    usage=no
+fi
+if [ $usage = yes ]; then
     echo "Usage: $0 num-desired [crash options...]"
     exit 1
 fi
