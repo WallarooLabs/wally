@@ -21,6 +21,10 @@ to `true`.
     * I've been using an Ubuntu Xenial/16.04 LTS virtual machine with
       2 virtual CPUs and 4GB RAM.
 
+* You'll need the `logtail` utility installed.  Download
+  https://github.com/kadashu/logtail/blob/master/logtail and put it
+  into your $PATH somewhere (MacOS) or install with `apt install logtail` (Linux).
+
 * Docker on the Linux host.  Start the metrics UI app via the
   following command, and aim a Web browser at http://linux-ip-addr:4000/.
 
