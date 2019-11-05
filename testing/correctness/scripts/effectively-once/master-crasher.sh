@@ -1,7 +1,7 @@
 #!/bin/sh
 
 DESIRED=$1
-if [ -z "$DESIRED" ]; then
+if [ -z "$DESIRED" -o "$DESIRED" -lt 1 ]; then
     echo "Usage: $0 num-desired [crash options...]"
     exit 1
 fi
@@ -42,7 +42,7 @@ stop_sink () {
     if [ "$WALLAROO_TCP_SOURCE_SINK" = "true" ]; then
         ps axww | grep -v grep | grep data_receiver | awk '{print $1}' | xargs kill -9
     else
-        ps axww | grep python | grep aloc_sink | awk '{print $1}' | xargs kill
+        ps axww | grep python | grep aloc_sink | awk '{print $1}' | xargs kill -9
     fi
 }
 
@@ -68,17 +68,25 @@ poll_ready () {
 
 pause_the_world () {
     killall -STOP passthrough
-    killall -STOP master-crasher.sh
+    if [ `uname -s` = Linux ]; then
+        killall -STOP master-crasher.sh
+    fi
+    if [ `uname -s` = Darwin ]; then
+        ps axww | grep -v grep | grep '/bin/sh ./master-crasher.sh' | \
+            awk '{print $1}' | xargs kill -STOP
+    fi
 }
 
 start_all_workers () {
     start_initializer -n $DESIRED
     sleep 1
     DESIRED_1=`expr $DESIRED - 1`
-    for i in `seq 1 $DESIRED_1`; do
-        start_worker -n $DESIRED $i
-        sleep 1
-    done
+    if [ $DESIRED_1 -ge 1 ]; then
+        for i in `seq 1 $DESIRED_1`; do
+            start_worker -n $DESIRED $i
+            sleep 1
+        done
+    fi
     poll_ready -a -v -w 5 || exit 1
 }
 
@@ -115,6 +123,7 @@ random_int () {
 }
 
 random_sleep () {
+  (
     base=`random_float $1`
     if [ -z "$2" ]; then
         extra=0.0
@@ -122,6 +131,7 @@ random_sleep () {
         extra=$2
     fi
     sleep `python -c "print $base + $extra"`
+  ) > /dev/null 2>&1
 }
 
 crash_sink () {
@@ -138,13 +148,13 @@ crash_worker () {
 }
 
 run_crash_sink_loop () {
-    sleep 2 # Don't start crashing until checkpoint #1 is complete.
+    sleep 3 # Don't start crashing until checkpoint #1 is complete.
     #for i in `seq 1 1`; do
     while [ 1 ]; do
-        echo -n cS
+        /bin/echo -n cS
         crash_sink
         random_sleep 2
-        echo -n rS
+        /bin/echo -n rS
         start_sink
         random_sleep 10 5
     done
@@ -159,7 +169,7 @@ run_crash_worker_loop () {
     sleep 2 # Don't start crashing until checkpoint #1 is complete.
     while [ 1 ]; do
         sleep `random_float 4.5 0`
-        echo -n "c$worker"
+        /bin/echo -n "c$worker"
         crash_out=`crash_worker $worker`
         mv /tmp/wallaroo.$worker /tmp/wallaroo.$worker.`date +%s` && gzip /tmp/wallaroo.$worker.`date +%s` > /dev/null 2>&1 &
         if [ -z "$crash_out" ]; then
@@ -174,7 +184,7 @@ run_crash_worker_loop () {
             pause_the_world
             break
         fi
-        echo -n "r$worker"
+        /bin/echo -n "r$worker"
         sleep 0.25
         poll_out=`poll_ready -w 4 2>&1`
         status=$?
@@ -190,7 +200,7 @@ run_sanity_loop () {
     outfile=/tmp/sanity-loop.out
     while [ 1 ]; do
         sleep 1
-        echo -n ,
+        /bin/echo -n ,
         if [ "$WALLAROO_TCP_SOURCE_SINK" = "true" ]; then
             ## verification script's assumptions are not met by TCPSink
             continue
@@ -260,7 +270,7 @@ run_grow_shrink_loop () {
                     fi
                 done
                 if [ -z "$found" ]; then
-                    echo -n "Join $w."
+                    /bin/echo -n "Join $w."
                     worker_num=`echo $w | sed 's/worker//'`
                     join_worker -n 1 $worker_num
                     sleep 1
@@ -281,7 +291,7 @@ run_grow_shrink_loop () {
                     continue
                 fi
                 if [ `random_int 10` -lt 5 ]; then
-                    echo -n "Shrink $running"
+                    /bin/echo -n "Shrink $running"
                     worker_num=`echo $running | sed 's/worker//'`
                     shrink_worker $worker_num
                     sleep 1
@@ -297,7 +307,7 @@ run_grow_shrink_loop () {
         fi
         sleep 1
         if [ ! -z "$CUSTOM_SHRINK_MANY" ]; then
-            ## echo -n Shrink-$CUSTOM_SHRINK_MANY
+            ## /bin/echo -n Shrink-$CUSTOM_SHRINK_MANY
             CLUSTER_SHRINKER=../../../../utils/cluster_shrinker/cluster_shrinker
             out=`$CLUSTER_SHRINKER -e 127.0.0.1:$WALLAROO_MY_EXTERNAL_BASE -w $CUSTOM_SHRINK_MANY 2>&1 | grep -v 'Invalid shrink targets'`
             if [ ! -z "$out" ]; then
@@ -320,11 +330,11 @@ run_custom1 () {
 
     sleep 2
 
-    echo -n "Shrink worker2"
+    /bin/echo -n "Shrink worker2"
     shrink_worker 2
     sleep 2
 
-    echo -n "Join worker2 again"
+    /bin/echo -n "Join worker2 again"
     join_worker 2
     sleep 1
 
@@ -341,16 +351,16 @@ run_custom2 () {
 
     sleep 2
     for i in `seq 4 8`; do
-        echo -n "Join worker$i"
+        /bin/echo -n "Join worker$i"
         join_worker $i
         sleep 1
     done
 
-    echo -n "Shrink worker7"
+    /bin/echo -n "Shrink worker7"
     shrink_worker 7
     sleep 2
 
-    echo -n "Join worker7 again"
+    /bin/echo -n "Join worker7 again"
     join_worker 7
     sleep 1
 
@@ -381,7 +391,7 @@ run_custom4 () {
     sleep 3
 
     for i in 7 1 3 6 2; do
-        echo -n "Shrink worker$i"
+        /bin/echo -n "Shrink worker$i"
         shrink_worker $i
         sleep 1
         poll_out=`poll_ready -w 4 2>&1`
@@ -405,7 +415,7 @@ run_custom5 () {
     for i in `seq 1 2`; do
         for cmd in "shrink_worker 2" "shrink_worker 1" \
                    "join_worker 1" "join_worker 2"; do
-            echo -n $cmd
+            /bin/echo -n $cmd
             $cmd
             sleep 1
             poll_out=`poll_ready -w 4 2>&1`
@@ -417,7 +427,7 @@ run_custom5 () {
             sleep 1.5
         done
     done
-    echo -n "join_worker 3"
+    /bin/echo -n "join_worker 3"
     join_worker 3
     sleep 3
 }
@@ -428,12 +438,12 @@ run_custom3006 () {
     sleep 2
 
     while [ 1 ]; do
-        echo -n c0
+        /bin/echo -n c0
         ./crash-worker.sh 0
         sleep 0.2
         new=/tmp/wallaroo.0.`date +%s`
         mv /tmp/wallaroo.0 $new && gzip $new &
-        echo -n s0
+        /bin/echo -n s0
         ./start-initializer.sh
         poll_out=`poll_ready -w 4 2>&1`
         if [ $? -ne 0 -o ! -z "$poll_out" ]; then
@@ -449,12 +459,12 @@ run_custom_tcp_crash0 () {
     ## Assume that we are run with `./master-crasher.sh 2 run_custom_tcp_crash0
     sleep 2
 
-    echo -n c0
+    /bin/echo -n c0
     ./crash-worker.sh 0
     sleep 0.2
     mv /tmp/wallaroo.0 /tmp/wallaroo.0.`date +%s`
 
-    echo -n s0
+    /bin/echo -n s0
     ./start-initializer.sh
     poll_out=`poll_ready -w 4 2>&1`
     if [ $? -ne 0 -o ! -z "$poll_out" ]; then
@@ -509,5 +519,5 @@ if [ $run_sanity = true ]; then
 fi
 
 echo Done, yay ... waiting
-wait
+wait > /dev/null 2>&1
 exit 0

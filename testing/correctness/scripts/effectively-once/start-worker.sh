@@ -1,8 +1,7 @@
 #!/bin/sh
 
-if [ `uname -s` != Linux ]; then
-    ## We're using GNU's getopt not BSD's {sigh}
-    echo Error: Not a Linux system
+if [ `uname -s` != Linux -a `uname -s` != Darwin ]; then
+    echo Error: Not a Linux or MacOS system
     exit 1
 fi
 
@@ -15,20 +14,17 @@ NUM_WORKERS=1
 VERBOSE=""
 JOIN_ARG=""
 
-# Ref: /usr/share/doc/util-linux/examples/getopt-parse.bash
-TEMP=`getopt -o jn:v --long join,num-workers:,verbose \
-     -n $0 -- "$@"`
+TEMP=`getopt jn:v $*`
 
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
 
-# Note the quotes around `$TEMP': they are essential!
-eval set -- "$TEMP"
+eval set -- $TEMP
 
 while true ; do
     case "$1" in
-        -j|--join) JOIN_ARG="--join $WALLAROO_ARG_CONTROL"; shift 1 ;;
-        -n|--num-workers) NUM_WORKERS=$2; shift 2 ;;
-        -v|--verbose) VERBOSE=true; shift 1 ;;
+        -j) JOIN_ARG="--join $WALLAROO_ARG_CONTROL"; shift 1 ;;
+        -n) NUM_WORKERS=$2; shift 2 ;;
+        -v) VERBOSE=true; shift 1 ;;
         --) shift ; break ;;
         *) echo "Internal error!" ; exit 1 ;;
     esac
