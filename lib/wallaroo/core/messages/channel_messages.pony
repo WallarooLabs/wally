@@ -2002,6 +2002,7 @@ class val InitiatePausingCheckpointMsg is ChannelMsg
   let sender: WorkerName
   let id: U128
 
+  fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName, id': U128) =>
     sender = sender'
     id = id'
@@ -2009,7 +2010,9 @@ class val InitiatePausingCheckpointMsg is ChannelMsg
 class val PausingCheckpointInitiatedMsg is ChannelMsg
   let id: U128
 
+  fun val string(): String => __loc.type_name()
   new val create(id': U128) =>
     id = id'
 
 primitive RestartRepeatingCheckpointsMsg is ChannelMsg
+  fun val string(): String => __loc.type_name()
