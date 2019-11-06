@@ -15,12 +15,15 @@ to `true`.
 
 ## Build prerequisites
 
-* I've only run this stuff on Linux.  OS X will probably break in a few
-  cases, e.g., "tail" arguments working differently than Linux; I don't
-  recommend it.
+* I've only run this stuff on Linux, but the scripts have now been
+  adapted to work (I believe) on MacOS.
 
     * I've been using an Ubuntu Xenial/16.04 LTS virtual machine with
       2 virtual CPUs and 4GB RAM.
+
+* You'll need the `logtail` utility installed.  Download
+  https://github.com/kadashu/logtail/blob/master/logtail and put it
+  into your $PATH somewhere (MacOS) or install with `apt install logtail` (Linux).
 
 * Docker on the Linux host.  Start the metrics UI app via the
   following command, and aim a Web browser at http://linux-ip-addr:4000/.
@@ -214,13 +217,13 @@ Create a large input file, approx 12MB, using the command:
 For connector source & sink testing:
 
 ```
-dd if=testing/data/market_spread/nbbo/r3k-symbols_nbbo-fixish.msg bs=1000000 count=4 | od -x | sed 's/^/T/' > /tmp/input-file.txt
+dd if=$WALLAROO_TOP/testing/data/market_spread/nbbo/r3k-symbols_nbbo-fixish.msg bs=1000000 count=4 | od -x | sed 's/^/T/' > /tmp/input-file.txt
 ```
 
 For TCP source & sink testing:
 
 ```
-dd if=$HOME/wallaroo/testing/data/market_spread/nbbo/r3k-symbols_nbbo-fixish.msg bs=1000000 count=1 | od -x | sed 's/^/T/' | sed -n '1,/T3641060/p' | perl -ne 'print "\0\0\0"; print "1"; print' > /tmp/input-file.txt
+dd if=$WALLAROO_TOP/testing/data/market_spread/nbbo/r3k-symbols_nbbo-fixish.msg bs=1000000 count=1 | od -x | sed 's/^/T/' | sed -n '1,/T3641060/p' | perl -ne 'print "\0\0\0"; print "1"; print' > /tmp/input-file.txt
 ```
 
 All lines in this ASCII file will begin with the letter "T". The

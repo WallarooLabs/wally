@@ -1,8 +1,7 @@
 #!/bin/sh
 
-if [ `uname -s` != Linux ]; then
-    ## We're using GNU's getopt not BSD's {sigh}
-    echo Error: Not a Linux system
+if [ `uname -s` != Linux -a `uname -s` != Darwin ]; then
+    echo Error: Not a Linux or MacOS system
     exit 1
 fi
 

@@ -1,8 +1,7 @@
 #!/bin/sh
 
-if [ `uname -s` != Linux ]; then
-    ## We're using GNU's getopt not BSD's {sigh}
-    echo Error: Not a Linux system
+if [ `uname -s` != Linux -a `uname -s` != Darwin ]; then
+    echo Error: Not a Linux or MacOS system
     exit 1
 fi
 
@@ -11,20 +10,17 @@ COUNT=`expr 15 \* 10` # 15 seconds
 VERBOSE=""
 ALL_RUNNING=""
 
-# Ref: /usr/share/doc/util-linux/examples/getopt-parse.bash
-TEMP=`getopt -o avw: --long all-running,verbose,wait: \
-     -n $0 -- "$@"`
+TEMP=`getopt avw: $*`
 
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
 
-# Note the quotes around `$TEMP': they are essential!
-eval set -- "$TEMP"
+eval set -- $TEMP
 
 while true ; do
     case "$1" in
-        -a|--all-running) ALL_RUNNING=true; shift 1 ;;
-        -v|--verbose) VERBOSE=true; shift 1 ;;
-        -w|--wait) COUNT=`expr $2 \* 10`; shift 2 ;;
+        -a) ALL_RUNNING=true; shift 1 ;;
+        -v) VERBOSE=true; shift 1 ;;
+        -w) COUNT=`expr $2 \* 10`; shift 2 ;;
         --) shift ; break ;;
         *) echo "Internal error!" ; exit 1 ;;
     esac
@@ -59,7 +55,7 @@ for i in `seq 1 $COUNT`; do
         break;
     fi
     if [ ! -z "$VERBOSE" ]; then
-        echo -n .
+        /bin/echo -n .
     fi
     sleep 0.1
 done
@@ -79,7 +75,7 @@ if [ ! -z "$ALL_RUNNING" ]; then
       tr ',' ' '`
     for worker in $workers; do
         if [ ! -z "$VERBOSE" ]; then
-            echo -n "Worker $worker: "
+            /bin/echo -n "Worker $worker: "
         fi
         base_port=7103
         case $worker in
@@ -97,7 +93,7 @@ if [ ! -z "$ALL_RUNNING" ]; then
                 ;;
         esac
         if [ ! -z "$VERBOSE" ]; then
-            echo -n port = $port
+            /bin/echo -n port = $port
         fi
         for i in `seq 1 $COUNT`; do
             output=`$EXTERNAL_SENDER \
@@ -111,7 +107,7 @@ if [ ! -z "$ALL_RUNNING" ]; then
                 break;
             fi
             if [ ! -z "$VERBOSE" ]; then
-                echo -n .
+                /bin/echo -n .
             fi
             sleep 0.1
         done
