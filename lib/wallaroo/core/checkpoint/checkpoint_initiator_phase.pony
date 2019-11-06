@@ -33,7 +33,7 @@ trait _CheckpointInitiatorPhase
     checkpoint_group: USize, checkpoint_initiator: CheckpointInitiator ref,
     checkpoint_promise: (Promise[None] | None) = None)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref initiate_checkpoint(checkpoint_group: USize,
     checkpoint_promise: Promise[None],
@@ -49,7 +49,7 @@ trait _CheckpointInitiatorPhase
     None
 
   fun ref checkpoint_barrier_complete(token: BarrierToken) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref event_log_checkpoint_complete(worker: WorkerName,
     checkpoint_id: CheckpointId)
@@ -89,9 +89,9 @@ trait _CheckpointInitiatorPhase
     checkpoint_initiator.finish_initiating_rollback(recovery_promise, worker,
       rollback_id)
 
-  fun _invalid_call() =>
-    @printf[I32]("Invalid call on checkpoint initiator phase %s\n".cstring(),
-      name().cstring())
+  fun _invalid_call(method_name: String) =>
+    @printf[I32]("Invalid call to method %s on checkpoint initiator phase %s\n".cstring(),
+      method_name.cstring(), name().cstring())
     Fail()
 
   fun _unexpected_call(call: String) =>
@@ -229,7 +229,16 @@ class _RollbackCheckpointInitiatorPhase is _CheckpointInitiatorPhase
 
   fun name(): String => "_RollbackCheckpointInitiatorPhase"
 
-  fun ref initiate_checkpoint(checkpoint_group: USize,
+  fun ref start_checkpoint_timer(time_until_next_checkpoint: U64,
+    checkpoint_group: USize, checkpoint_initiator: CheckpointInitiator ref,
+    checkpoint_promise: (Promise[None] | None) = None)
+  =>
+    """
+    We're rolling back, so we should not initiate a new checkpoint yet.
+    """
+    None
+
+   fun ref initiate_checkpoint(checkpoint_group: USize,
     checkpoint_promise: Promise[None],
     checkpoint_initiator: CheckpointInitiator ref)
   =>
