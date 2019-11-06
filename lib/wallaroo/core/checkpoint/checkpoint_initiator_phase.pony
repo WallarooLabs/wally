@@ -150,6 +150,16 @@ class _CheckpointingPhase is _CheckpointInitiatorPhase
 
   fun name(): String => "_CheckpointingPhase"
 
+  fun ref start_checkpoint_timer(time_until_next_checkpoint: U64,
+    checkpoint_group: USize, checkpoint_initiator: CheckpointInitiator ref,
+    checkpoint_promise: (Promise[None] | None) = None)
+  =>
+    // This message is possible in a race immediately after we see
+    // "INIT PHASE IV: Cluster is ready to work!".
+    // When this checkpoint has finished, the appropriate actor will
+    // reset this timer; just log this event and move on.
+    _unexpected_call(__loc.method_name())
+
   fun ref checkpoint_barrier_complete(token: BarrierToken) =>
     ifdef debug then
       Invariant(token == _token)
