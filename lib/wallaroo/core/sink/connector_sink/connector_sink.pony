@@ -1302,7 +1302,7 @@ actor ConnectorSink is Sink
     if (_host != "") and (_service != "") and not _no_more_reconnect then
       @ll(_conn_info, "RE-Connecting ConnectorSink to %s:%s".cstring(),
                    _host.cstring(), _service.cstring())
-      let timer = Timer(PauseBeforeReconnectConnectorSink(this), _reconnect_pause)
+      let timer = Timer(PauseBeforeReconnectConnectorSink(this, _auth), _reconnect_pause)
       _timers(consume timer)
     end
 
@@ -1367,12 +1367,27 @@ actor ConnectorSink is Sink
 
 class PauseBeforeReconnectConnectorSink is TimerNotify
   let _tcp_sink: ConnectorSink
+  let _auth: ApplyReleaseBackpressureAuth
 
-  new iso create(tcp_sink: ConnectorSink) =>
+  new iso create(tcp_sink: ConnectorSink, auth: ApplyReleaseBackpressureAuth)
+  =>
     _tcp_sink = tcp_sink
+    _auth = auth
 
   fun ref apply(timer: Timer, count: U64): Bool =>
+    // NOTE: This function is executed in the context of the Timers actor.
+    //       If the "owner" of this Timers actor, a ConnectorSink actor,
+    //       is under pressure, then the Timers actor can become muted after
+    //       sending this reconnect message to the sink.  We avoid muting
+    //       the Timers actor by applying backpressure, sending the critical
+    //       reconnect message, then releasing backpressure.
+    //
+    //       We know that no other actor shares a tag to this Timers actor,
+    //       so we do not risk muting some other actor by this apply+release
+    //       trick.
+    Backpressure.apply(_auth)
     _tcp_sink.reconnect()
+    Backpressure.release(_auth)
     false
 
   fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
