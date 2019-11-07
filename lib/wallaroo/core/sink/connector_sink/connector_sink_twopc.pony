@@ -67,6 +67,9 @@ class ConnectorSink2PC
   fun state_is_1precommit(): Bool =>
     state is TwoPCFsm1Precommit
 
+  fun state_is_2abort(): Bool =>
+    state is TwoPCFsm2Abort
+
   fun state_is_2commit(): Bool =>
     state is TwoPCFsm2Commit
 
