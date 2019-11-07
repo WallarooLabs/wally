@@ -705,6 +705,10 @@ actor ConnectorSink is Sink
     Serialize hard state (i.e., can't afford to lose it) and send
     it to the local event log and reset 2PC state.
     """
+    if _twopc.state_is_2abort() then
+      @ll(_twopc_info, "2PC: _twopc.state = %d at checkpoint_state(%s)".cstring(), _twopc.state())
+      return
+    end
     if not (_twopc.state_is_1precommit() or _twopc.state_is_start()) then
       @ll(_twopc_err, "2PC: ERROR: _twopc.state = %d".cstring(), _twopc.state())
       Fail()
