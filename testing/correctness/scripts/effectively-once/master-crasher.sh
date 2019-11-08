@@ -27,7 +27,9 @@ export PYTHONPATH=$WALLAROO_TOP/machida/lib:$WALLAROO_TOP/examples/python/celsiu
 export WALLAROO_BIN=$WALLAROO_TOP/examples/pony/passthrough/passthrough
 export WALLAROO_THRESHOLDS='*.8'
 
-SENDER_OUTFILE=/tmp/sender.out
+export SENDER_OUTFILE=/tmp/sender.out
+export STATUS_CRASH_WORKER=/tmp/crasher.worker.doit
+export STATUS_CRASH_SINK=/tmp/crasher.sink.doit
 
 reset () {
     reset.sh
@@ -169,12 +171,17 @@ run_crash_sink_loop () {
     sleep 3 # Don't start crashing until checkpoint #1 is complete.
     #for i in `seq 1 1`; do
     while [ 1 ]; do
-        /bin/echo -n cS
-        crash_sink
-        random_sleep 2
-        /bin/echo -n rS
-        start_sink
-        random_sleep 10 5
+        if [ -f $STATUS_CRASH_SINK ]; then
+            /bin/echo -n cS
+            crash_sink
+            random_sleep 2
+            /bin/echo -n rS
+            start_sink
+            random_sleep 10 5
+        else
+            /bin/echo -n ":s"
+            sleep 1
+        fi
     done
 }
 
@@ -187,30 +194,47 @@ run_crash_worker_loop () {
     fi
     sleep 2 # Don't start crashing until checkpoint #1 is complete.
     while [ 1 ]; do
-        sleep `random_float 4.5 0`
-        /bin/echo -n "c$worker"
-        crash_out=`crash_worker $worker`
-        mv /tmp/wallaroo.$worker /tmp/wallaroo.$worker.`date +%s` && gzip /tmp/wallaroo.$worker.`date +%s` > /dev/null 2>&1 &
-        if [ -z "$crash_out" ]; then
-            sleep `random_float 2.5 0`
-            if [ $worker -eq 0 ]; then
-                start_initializer
+        if [ -f $STATUS_CRASH_WORKER ]; then
+            sleep `random_float 4.5 0`
+            /bin/echo -n "c$worker"
+            crash_out=`crash_worker $worker`
+            mv /tmp/wallaroo.$worker /tmp/wallaroo.$worker.`date +%s` && gzip /tmp/wallaroo.$worker.`date +%s` > /dev/null 2>&1 &
+            if [ -z "$crash_out" ]; then
+                sleep `random_float 2.5 0`
+                if [ $worker -eq 0 ]; then
+                    start_initializer
+                else
+                    start_worker $worker
+                fi
+                /bin/echo -n "r$worker"
+                sleep 0.25
             else
-                start_worker $worker
+                echo "Crash of $worker failed: $crash_out"
+                pause_the_world
+                break
             fi
         else
-            echo "Crash of $worker failed: $crash_out"
-            pause_the_world
-            break
+            /bin/echo -n ":$worker"
+            sleep 1
         fi
-        /bin/echo -n "r$worker"
-        sleep 0.25
         poll_out=`poll_ready -w 4 2>&1`
         status=$?
         if [ $status -ne 0 -o ! -z "$poll_out" ]; then
-            echo "CRASH LOOP $worker: pause the world: exit $status reason $poll_out"
-            pause_the_world
-            break
+            echo "CRASH LOOP $worker: exit $status reason $poll_out"
+            rm -f $STATUS_CRASH_WORKER
+            rm -f $STATUS_CRASH_SINK
+            sleep 5
+            poll_out=`poll_ready -w 4 -a -S -A 2>&1`
+            status=$?
+            if [ $status -ne 0 -o ! -z "$poll_out" ]; then
+                echo "CRASH 2 LOOP $worker: pause the world: exit $status reason $poll_out"
+                pause_the_world
+                break
+            else
+                touch $STATUS_CRASH_WORKER
+                touch $STATUS_CRASH_SINK
+                echo "CRASH LOOP $worker: resume: $poll_out"
+            fi
         fi
     done
 }
@@ -505,6 +529,8 @@ run_custom_tcp_crash0 () {
     fi
 }
 
+touch $STATUS_CRASH_WORKER
+touch $STATUS_CRASH_SINK
 reset
 start_sink ; sleep 1
 start_all_workers
