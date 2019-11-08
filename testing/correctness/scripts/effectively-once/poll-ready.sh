@@ -9,8 +9,10 @@ EXTERNAL_SENDER=../../../../testing/tools/external_sender/external_sender
 COUNT=`expr 15 \* 10` # 15 seconds
 VERBOSE=""
 ALL_RUNNING=""
+ALL_RUNNING_LIMITED_STATUS=""
+SKIP_INITIAL_CHECK=""
 
-TEMP=`getopt avw: $*`
+TEMP=`getopt aASvw: $*`
 
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
 
@@ -19,6 +21,8 @@ eval set -- $TEMP
 while true ; do
     case "$1" in
         -a) ALL_RUNNING=true; shift 1 ;;
+        -A) ALL_RUNNING_LIMITED_STATUS=true; shift 1 ;;
+        -S) SKIP_INITIAL_CHECK=true; shift 1 ;;
         -v) VERBOSE=true; shift 1 ;;
         -w) COUNT=`expr $2 \* 10`; shift 2 ;;
         --) shift ; break ;;
@@ -46,27 +50,29 @@ done
 
 initializer_external="${WALLAROO_INIT_HOST}:${WALLAROO_MY_EXTERNAL_BASE}"
 
+if [ -z "$SKIP_INITIAL_CHECK" ]; then
+    for i in `seq 1 $COUNT`; do
+        $EXTERNAL_SENDER \
+            -e $initializer_external -t cluster-status-query 2>&1 | \
+          grep -s 'Processing messages: true' > /dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            break;
+        fi
+        if [ ! -z "$VERBOSE" ]; then
+            /bin/echo -n .
+        fi
+        sleep 0.1
+    done
 
-for i in `seq 1 $COUNT`; do
-    $EXTERNAL_SENDER \
-        -e $initializer_external -t cluster-status-query 2>&1 | \
-      grep -s 'Processing messages: true' > /dev/null 2>&1
-    if [ $? -eq 0 ]; then
-        break;
+    if [ $i -eq $COUNT ]; then
+        $EXTERNAL_SENDER \
+            -e $initializer_external -t cluster-status-query 2>&1
+        echo Failed
+        exit 1
     fi
-    if [ ! -z "$VERBOSE" ]; then
-        /bin/echo -n .
-    fi
-    sleep 0.1
-done
-
-if [ $i -eq $COUNT ]; then
-    $EXTERNAL_SENDER \
-        -e $initializer_external -t cluster-status-query 2>&1
-    echo Failed
-    exit 1
 fi
 
+i=0
 if [ ! -z "$ALL_RUNNING" ]; then
     workers=`$EXTERNAL_SENDER \
         -e $initializer_external -t cluster-status-query 2>&1 | \
@@ -98,8 +104,13 @@ if [ ! -z "$ALL_RUNNING" ]; then
         for i in `seq 1 $COUNT`; do
             output=`$EXTERNAL_SENDER \
                 -e 127.0.0.1:$port -t cluster-status-query 2>&1`
-            echo "$output" | \
-                grep -s 'Processing messages: true' > /dev/null 2>&1
+            if [ -z "$ALL_RUNNING_LIMITED_STATUS" ]; then
+                echo "$output" | \
+                    grep -s 'Processing messages: true' > /dev/null 2>&1
+            else
+                echo "$output" | \
+                    grep -s 'Processing messages: ' > /dev/null 2>&1
+            fi
             if [ $? -eq 0 ]; then
                 if [ ! -z "$VERBOSE" ]; then
                     echo ""
