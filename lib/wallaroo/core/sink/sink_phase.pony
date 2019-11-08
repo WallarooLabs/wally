@@ -54,12 +54,38 @@ trait SinkPhase
   fun ref swap_barrier_to_queued(sink: ConnectorSink ref) =>
     _invalid_call(__loc.method_name()); Fail()
 
+  fun ref maybe_use_normal_processor() =>
+    None
+
+  fun ref resume_processing_messages() =>
+    _invalid_call(__loc.method_name()); Fail()
+
   fun _invalid_call(method_name: String) =>
     @printf[I32]("Invalid call to %s on sink phase %s\n".cstring(),
       method_name.cstring(), name().cstring())
 
 class InitialSinkPhase is SinkPhase
   fun name(): String => __loc.type_name()
+
+class EarlySinkPhase is SinkPhase
+  let _sink: Sink ref
+
+  new create(s: Sink ref) =>
+    _sink = s
+
+  fun name(): String => __loc.type_name()
+
+  fun ref maybe_use_normal_processor() =>
+    // We restarted recently, and we haven't yet received one of the
+    // lifecycle messages that triggers using the normal processor.
+    // But we need the normal processor phase *now*.
+    _sink.use_normal_processor()
+
+  fun ref resume_processing_messages() =>
+    // If we're @ InitialSinkPhase, and we've restarted after a crash,
+    // it's possible to hit checkpoint_complete() extremely early in
+    // our restart process.  There's nothing to do here.
+    None
 
 class NormalSinkPhase is SinkPhase
   let _sink: Sink ref
@@ -92,6 +118,9 @@ class NormalSinkPhase is SinkPhase
 
   fun ref queued(): Array[SinkPhaseQueued] =>
     Array[SinkPhaseQueued]
+
+  fun ref resume_processing_messages() =>
+    _sink.resume_processing_messages_queued()
 
 type SinkPhaseQueued is (QueuedMessage | QueuedBarrier)
 
@@ -192,6 +221,9 @@ class BarrierSinkPhase is SinkPhase
   fun ref swap_barrier_to_queued(sink: ConnectorSink ref) =>
     sink.swap_barrier_to_queued(_queued)
 
+  fun ref resume_processing_messages() =>
+    _sink.resume_processing_messages_queued()
+
 class QueuingSinkPhase is SinkPhase
   let _sink_id: RoutingId
   let _sink: Sink ref
@@ -231,3 +263,6 @@ class QueuingSinkPhase is SinkPhase
       qd.push(q)
     end
     qd
+
+  fun ref resume_processing_messages() =>
+    _sink.resume_processing_messages_queued()

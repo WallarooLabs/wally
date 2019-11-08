@@ -225,6 +225,7 @@ actor ConnectorSink is Sink
       @ll(_conn_info, "===ConnectorSink %s created===".cstring(),
         _sink_id.string().cstring())
     end
+    _phase = EarlySinkPhase(this)
 
   //
   // Application Lifecycle events
@@ -513,13 +514,9 @@ actor ConnectorSink is Sink
         barrier_token.string().cstring(), _sink_id.string().cstring(),
         input_id.string().cstring(), _phase.name().cstring())
     end
-    match _phase
-    | let x: InitialSinkPhase =>
-      // We restarted recently, and we haven't yet received one of the
-      // lifecycle messages that triggers using the normal processor.
-      // But we need the normal processor phase *now*.
-      _use_normal_processor()
-    end
+
+    _phase.maybe_use_normal_processor()
+
     match barrier_token
     | let srt: CheckpointRollbackBarrierToken =>
       _phase.prepare_for_rollback(barrier_token)
@@ -565,7 +562,11 @@ actor ConnectorSink is Sink
       _seen_checkpointbarriertoken = None
       ack_now = false
 
-      checkpoint_state(sbt.id)
+      if not _twopc.state_is_2abort() then
+        checkpoint_state(sbt.id)
+      else
+        @ll(_twopc_info, "2PC: _twopc.state = %d, skip checkpoint_state(%s)".cstring(), _twopc.state())
+      end
       _notify.twopc_txn_id_current = _twopc.txn_id
       match _twopc.barrier_complete(sbt)
       | None =>
@@ -671,22 +672,17 @@ actor ConnectorSink is Sink
     """
     2nd-half logic for barrier_fully_acked().
     """
-    match _phase
-    | let x: InitialSinkPhase =>
-      // If we're @ InitialSinkPhase, and we've restarted after a crash,
-      // it's possible to hit checkpoint_complete() extremely early in
-      // our restart process.  There's nothing to do here.
-      None
-    else
-      let queued = _phase.queued()
-      _use_normal_processor()
-      for q in queued.values() do
-        match q
-        | let qm: QueuedMessage =>
-          qm.process_message(this)
-        | let qb: QueuedBarrier =>
-          qb.inject_barrier(this)
-        end
+    _phase.resume_processing_messages()
+
+  fun ref resume_processing_messages_queued() =>
+    let queued = _phase.queued()
+    _use_normal_processor()
+    for q in queued.values() do
+      match q
+      | let qm: QueuedMessage =>
+        qm.process_message(this)
+      | let qb: QueuedBarrier =>
+        qb.inject_barrier(this)
       end
     end
 
@@ -705,10 +701,6 @@ actor ConnectorSink is Sink
     Serialize hard state (i.e., can't afford to lose it) and send
     it to the local event log and reset 2PC state.
     """
-    if _twopc.state_is_2abort() then
-      @ll(_twopc_info, "2PC: _twopc.state = %d at checkpoint_state(%s)".cstring(), _twopc.state())
-      return
-    end
     if not (_twopc.state_is_1precommit() or _twopc.state_is_start()) then
       @ll(_twopc_err, "2PC: ERROR: _twopc.state = %d".cstring(), _twopc.state())
       Fail()

@@ -39,6 +39,8 @@ trait tag Sink is (Consumer & DisposableActor & BarrierProcessor)
     None
   fun ref use_normal_processor() =>
     None
+  fun ref resume_processing_messages_queued() =>
+    None
 
 interface val SinkConfig[Out: Any val]
   fun apply(parallelism: USize): SinkBuilder
