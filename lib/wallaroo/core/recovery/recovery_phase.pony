@@ -142,6 +142,13 @@ class _BoundariesReconnect is _RecoveryPhase
 
   fun name(): String => "_BoundariesReconnect"
 
+  fun ref start_recovery(workers: Array[WorkerName] val,
+    recovery: Recovery ref, with_reconnect: Bool)
+  =>
+    // E.g., immediately after "Online recovery initiated." and
+    // "Reconnect Phase 1: Wait for Boundary Counts"
+    _unexpected_call(__loc.method_name())
+
   fun ref start_reconnect() =>
     _recovery_reconnecter.start_recovery_reconnect(_workers, _recovery)
 
