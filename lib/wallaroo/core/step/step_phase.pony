@@ -38,7 +38,7 @@ trait StepPhase
     frac_ids: FractionalMessageId, i_seq_id: SeqId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref trigger_timeout(step: Step ref) =>
     """
@@ -49,12 +49,12 @@ trait StepPhase
   fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref prepare_for_rollback(token: BarrierToken) =>
     """
@@ -88,7 +88,7 @@ trait StepPhase
     None
 
   fun ref queued(): Array[_Queued] =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
     Array[_Queued]
 
   fun send_state(step: Step ref, runner: Runner, id: RoutingId,
@@ -98,13 +98,14 @@ trait StepPhase
     """
     We should only be sending state in normal processing mode.
     """
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref dispose(step: Step ref) =>
     step.finish_disposing()
 
-  fun _invalid_call() =>
-    @printf[I32]("Invalid call on step phase %s\n".cstring(), name().cstring())
+  fun _invalid_call(method_name: String) =>
+    @printf[I32]("Invalid call to %s on step phase %s\n".cstring(),
+      method_name.cstring(), name().cstring())
 
 class _InitialStepPhase is StepPhase
   fun name(): String => __loc.type_name()

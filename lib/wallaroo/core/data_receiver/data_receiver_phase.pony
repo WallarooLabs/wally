@@ -31,19 +31,19 @@ trait _DataReceiverPhase
     pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
     token: BarrierToken, seq_id: SeqId)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref data_connect(highest_seq_id: SeqId) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
-  fun _invalid_call() =>
-    @printf[I32]("Invalid call on Data Receiver phase %s\n".cstring(),
-      name().cstring())
+  fun _invalid_call(method_name: String) =>
+    @printf[I32]("Invalid call to %s on Data Receiver phase %s\n".cstring(),
+      method_name.cstring(), name().cstring())
 
 class _DataReceiverNotProcessingPhase is _DataReceiverPhase
   fun name(): String => "_DataReceiverNotProcessingPhase"

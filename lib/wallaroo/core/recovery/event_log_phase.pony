@@ -47,13 +47,13 @@ trait _EventLogPhase
     @printf[I32]("checkpoint_state() for resilient %s, checkpoint_id %s\n"
       .cstring(), resilient_id.string().cstring(),
       checkpoint_id.string().cstring())
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref state_checkpointed(resilient_id: RoutingId) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref write_initial_checkpoint_id(checkpoint_id: CheckpointId) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref write_checkpoint_id(checkpoint_id: CheckpointId,
     promise: Promise[CheckpointId])
@@ -67,28 +67,28 @@ trait _EventLogPhase
   fun ref checkpoint_id_written(checkpoint_id: CheckpointId,
     promise: Promise[CheckpointId])
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref expect_rollback_count(count: USize) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref ack_rollback(resilient_id: RoutingId) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref complete_early() =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref check_completion() =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref dispose(event_log: EventLog ref) =>
     event_log._dispose()
 
-  fun _invalid_call() =>
-    @printf[I32]("Invalid call on event log phase %s\n".cstring(),
-      name().cstring())
+  fun _invalid_call(method_name: String) =>
+    @printf[I32]("Invalid call to %s on event log phase %s\n".cstring(),
+      method_name.cstring(), name().cstring())
 
-  fun _unexpected_call(call: String) =>
+  fun _unexpected_call(method_name: String) =>
     """
     Only call this for phase methods that are called directly in response to
     control messages received. That's because we can't be sure in that case if
@@ -105,7 +105,7 @@ trait _EventLogPhase
     there are problems to be solved in order to do this safely.
     """
     @printf[I32]("UNEXPECTED CALL to %s on event log phase %s. Ignoring!\n"
-      .cstring(), call.cstring(), name().cstring())
+      .cstring(), method_name.cstring(), name().cstring())
 
 class _InitialEventLogPhase is _EventLogPhase
   fun name(): String => "_InitialEventLogPhase"

@@ -35,9 +35,9 @@ class FailingConsumerSender is TestableConsumerSender
   new create(producer_id': RoutingId) =>
     _id = producer_id'
 
-  fun _invalid_call() =>
-    @printf[I32]("FailingConsumerSender: Invalid call on Producer %s\n"
-      .cstring(), _id.string().cstring())
+  fun _invalid_call(method_name: String) =>
+    @printf[I32]("FailingConsumerSender: Invalid call to %s on Producer %s\n"
+      .cstring(), method_name.cstring(), _id.string().cstring())
 
   fun ref send[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
@@ -45,22 +45,22 @@ class FailingConsumerSender is TestableConsumerSender
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     consumer: Consumer)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref forward(delivery_msg: DeliveryMsg, pipeline_time_spent: U64,
     latest_ts: U64, metrics_id: U16, metric_name: String,
     worker_ingress_ts: U64, boundary: OutgoingBoundary)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref register_producer(consumer_id: RoutingId, consumer: Consumer) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref unregister_producer(consumer_id: RoutingId, consumer: Consumer) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref update_output_watermark(w: U64): (U64, U64) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
     (0, 0)
 
   fun producer_id(): RoutingId =>

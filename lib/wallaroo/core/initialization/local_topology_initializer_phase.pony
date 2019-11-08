@@ -56,34 +56,32 @@ trait LocalTopologyInitializerPhase
         else
           // If this is not a recovering single worker cluster, then
           // initialize has been called during the wrong phase.
-          _invalid_call()
-          Fail()
+          _invalid_call(__loc.method_name()); Fail()
         end
     else
       // If worker_count is None, then we have not yet initialized the
       // LocalTopology, which means this has been called during the wrong
       // phase.
-      _invalid_call()
-      Fail()
+      _invalid_call(__loc.method_name()); Fail()
     end
 
   fun ref begin_reporting() =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref report_created(initializable: Initializable) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref report_initialized(initializable: Initializable) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref report_ready_to_work(initializable: Initializable) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref worker_report_ready_to_work(w: WorkerName) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref all_workers_ready_to_work() =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref report_event_log_ready_to_work() =>
     // !TODO!: For now, this is partially handled by the
@@ -102,9 +100,9 @@ trait LocalTopologyInitializerPhase
   =>
     lti._cluster_status_query_not_initialized(conn)
 
-  fun _invalid_call() =>
-    @printf[I32]("Invalid call on local topology initializer phase %s\n"
-      .cstring(), name().cstring())
+  fun _invalid_call(method_name: String) =>
+    @printf[I32]("Invalid call to %s on local topology initializer phase %s\n"
+      .cstring(), method_name.cstring(), name().cstring())
 
 class _ApplicationAwaitingInitializationPhase is LocalTopologyInitializerPhase
   let _initializables: Initializables = Initializables
