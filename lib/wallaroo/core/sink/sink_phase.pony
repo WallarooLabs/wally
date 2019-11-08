@@ -34,25 +34,26 @@ trait SinkPhase
     msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref prepare_for_rollback(token: BarrierToken) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref queued(): Array[SinkPhaseQueued] =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
     Array[SinkPhaseQueued]
 
   fun ref swap_barrier_to_queued(sink: ConnectorSink ref) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
-  fun _invalid_call() =>
-    @printf[I32]("Invalid call on sink phase %s\n".cstring(), name().cstring())
+  fun _invalid_call(method_name: String) =>
+    @printf[I32]("Invalid call to %s on sink phase %s\n".cstring(),
+      method_name.cstring(), name().cstring())
 
 class InitialSinkPhase is SinkPhase
   fun name(): String => __loc.type_name()

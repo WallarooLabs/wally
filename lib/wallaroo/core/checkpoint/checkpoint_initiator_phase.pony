@@ -94,7 +94,7 @@ trait _CheckpointInitiatorPhase
       method_name.cstring(), name().cstring())
     Fail()
 
-  fun _unexpected_call(call: String) =>
+  fun _unexpected_call(method_name: String) =>
     """
     Only call this for phase methods that are called directly in response to
     control messages received. That's because we can't be sure in that case if
@@ -111,7 +111,7 @@ trait _CheckpointInitiatorPhase
     there are problems to be solved in order to do this safely.
     """
     @printf[I32]("UNEXPECTED CALL to %s on checkpoint initiator phase %s. Ignoring!\n"
-      .cstring(), call.cstring(), name().cstring())
+      .cstring(), method_name.cstring(), name().cstring())
 
 class _WaitingCheckpointInitiatorPhase is _CheckpointInitiatorPhase
   fun name(): String => "_WaitingCheckpointInitiatorPhase"

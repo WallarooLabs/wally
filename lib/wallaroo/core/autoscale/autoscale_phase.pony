@@ -39,62 +39,62 @@ trait _AutoscalePhase
     local_topology: LocalTopology, current_worker_count: USize,
     response_fn: TryJoinResponseFn)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref update_checkpoint_id(checkpoint_id: CheckpointId,
     rollback_id: RollbackId)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref grow_checkpoint_barrier_complete() =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref grow_autoscale_barrier_complete() =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref worker_connected_to_joining_workers(worker: WorkerName) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref stop_the_world_for_grow_migration_initiated(coordinator: WorkerName,
     joining_workers: Array[WorkerName] val)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref grow_migration_initiated(checkpoint_id: CheckpointId) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref all_migration_complete() =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref receive_grow_migration_ack(worker: WorkerName) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref worker_completed_migration(w: WorkerName) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref pre_register_joining_workers(ws: Array[WorkerName] val) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref receive_hash_partitions(hp: Map[RoutingId, HashPartitions] val) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref inform_of_producers_list(ps: SetIs[Producer] val) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref producer_acked_registering(p: Producer) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref inform_of_boundaries_map(bs: Map[WorkerName, OutgoingBoundary] val)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref boundary_acked_registering(b: OutgoingBoundary) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref try_shrink(local_topology: LocalTopologyInitializer,
     target_workers: Array[WorkerName] val, shrink_count: U64,
@@ -120,29 +120,29 @@ trait _AutoscalePhase
     coordinator: WorkerName, remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref shrink_checkpoint_barrier_complete() =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref shrink_autoscale_barrier_complete() =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref leaving_worker_finished_migration(worker: WorkerName) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref receive_leaving_migration_ack(worker: WorkerName) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref producers_disposed() =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref autoscale_complete() =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
-  fun ref _invalid_call() =>
-    @printf[I32]("Invalid call on autoscale phase %s\n".cstring(),
-      name().cstring())
+  fun ref _invalid_call(method_name: String) =>
+    @printf[I32]("Invalid call to %s on autoscale phase %s\n".cstring(),
+      method_name.cstring(), name().cstring())
 
 class _EmptyAutoscalePhase is _AutoscalePhase
   fun name(): String => "EmptyAutoscalePhase"

@@ -35,16 +35,16 @@ trait _RecoveryPhase
   fun ref start_recovery(workers: Array[WorkerName] val,
     recovery: Recovery ref, with_reconnect: Bool)
   =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref start_reconnect() =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref recovery_reconnect_finished() =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref rollback_prep_complete() =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref worker_ack_local_keys_rollback(w: WorkerName,
     checkpoint_id: CheckpointId)
@@ -56,7 +56,7 @@ trait _RecoveryPhase
     _unexpected_call(__loc.method_name())
 
   fun ref worker_ack_register_producers(w: WorkerName) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref receive_rollback_id(rollback_id: RollbackId) =>
     // This is called directly in response to a control message received.
@@ -66,10 +66,10 @@ trait _RecoveryPhase
     _unexpected_call(__loc.method_name())
 
   fun ref rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref data_receivers_ack() =>
-    _invalid_call(); Fail()
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref ack_recovery_initiated(w: WorkerName) =>
     // This is called directly in response to a control message received.
@@ -94,11 +94,11 @@ trait _RecoveryPhase
     recovery._abort_early(worker)
     abort_promise(None)
 
-  fun _invalid_call() =>
-    @printf[I32]("Invalid call on recovery phase %s\n".cstring(),
-      name().cstring())
+  fun _invalid_call(method_name: String) =>
+    @printf[I32]("Invalid call to %s on recovery phase %s\n".cstring(),
+      method_name.cstring(), name().cstring())
 
-  fun _unexpected_call(call: String) =>
+  fun _unexpected_call(method_name: String) =>
     """
     Only call this for phase methods that are called directly in response to
     control messages received. That's because we can't be sure in that case if
@@ -115,7 +115,7 @@ trait _RecoveryPhase
     there are problems to be solved in order to do this safely.
     """
     @printf[I32]("UNEXPECTED CALL to %s on recovery phase %s. Ignoring!\n"
-      .cstring(), call.cstring(), name().cstring())
+      .cstring(), method_name.cstring(), name().cstring())
 
 class _AwaitRecovering is _RecoveryPhase
   fun name(): String => "_AwaitRecovering"
