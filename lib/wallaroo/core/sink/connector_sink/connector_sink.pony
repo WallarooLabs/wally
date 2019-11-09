@@ -565,7 +565,7 @@ actor ConnectorSink is Sink
       if not _twopc.state_is_2abort() then
         checkpoint_state(sbt.id)
       else
-        @ll(_twopc_info, "2PC: _twopc.state = %d, skip checkpoint_state(%s)".cstring(), _twopc.state())
+        @ll(_twopc_info, "2PC: _twopc.state = %d, skip checkpoint_state(%s)".cstring(), _twopc.state(), barrier_token.string().cstring())
       end
       _notify.twopc_txn_id_current = _twopc.txn_id
       match _twopc.barrier_complete(sbt)
