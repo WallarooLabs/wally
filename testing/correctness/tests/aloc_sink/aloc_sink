@@ -38,101 +38,85 @@ def parse_abort_rules(path):
     except FileNotFoundError:
         return []
 
-def reload_phase1_txn_state(path):
+def reload_phase1_txn_state(lines, instance_name):
     txn_state = {}
-    try:
-        with open(path, 'rb') as f:
-            for l in f:
-                a = eval(l)
-                if a[1] == '1-ok':
-                    txn_state[a[2]] = (True, a[3])
-                if a[1] == '1-rollback':
-                    txn_state[a[2]] = (False, a[3])
-                if (a[1] == '2-ok') or (a[1] == '2-rollback'):
-                    del txn_state[a[2]]
-    except FileNotFoundError:
-        True
+    for l in lines:
+        a = eval(l)
+        if a[1] == '1-ok':
+            txn_state[a[2]] = (True, a[3])
+        if a[1] == '1-rollback':
+            txn_state[a[2]] = (False, a[3])
+        if (a[1] == '2-ok') or (a[1] == '2-rollback'):
+            del txn_state[a[2]]
     if len(txn_state) > 1:
-        logging.critical('reload_phase1_txn_state: bad txn_state: {} file {}'.format(txn_state, path))
+        logging.critical('reload_phase1_txn_state: bad txn_state: {} instance {}'.format(txn_state, instance))
         sys.exit(66)
     return txn_state
 
-def look_for_forced_abort(path):
+def look_for_forced_abort(lines, instance_name):
     res = True # res will become self._txn_commit_next's value
-    try:
-        with open(path, 'rb') as f:
-            for l in f:
-                a = eval(l)
-                if a[1] == 'next-txn-force-abort':
-                    res = False
-                elif a[1] == '1-ok':
-                    if res == False:
-                        logging.critical('next-txn-force-abort followed by 1-ok, file {}'.format(path))
-                        sys.exit(66)
-                    res = True
-                elif a[1] == '1-rollback':
-                    res = True
-        return res
-    except FileNotFoundError:
-        return False
+    for l in lines:
+        a = eval(l)
+        if a[1] == 'next-txn-force-abort':
+            res = False
+        elif a[1] == '1-ok':
+            if res == False:
+                logging.critical('next-txn-force-abort followed by 1-ok, worker {}'.format(instance_name))
+                sys.exit(66)
+            res = True
+        elif a[1] == '1-rollback':
+            res = True
+    return res
 
-def look_for_orphaned_s3_phase2_data(path):
+def look_for_orphaned_s3_phase2_data(lines, instance_name):
     orphaned = {}
-    try:
-        with open(path, 'rb') as f:
-            for l in f:
-                a = eval(l)
-                op = a[1]
-                txn_id = a[2]
-                if op == '1-ok':
-                    where_list = a[3]
-                    if where_list == []:
-                        logging.critical('Empty where_list in {} file {}'.format(l, path))
-                        sys.exit(66)
-                    for (stream_id, start_por, end_por) in where_list:
-                        if stream_id != 1:
-                            logging.critical('Bad stream_id in {} file {}'.format(l, path))
-                            sys.exit(66)
-                    ## The first txn commit may be start=end=0.
-                    ## We don't write an S3 object for 0 bytes,
-                    ## so we don't include this case in orphaned.
-                    if (start_por == 0 and end_por == 0):
-                        ## Pretend that we've seen the 2-ok for 0 & 0.
-                        ## Then it will be filtered by the list comprehension
-                        ## at the end of this func.
-                        orphaned[txn_id] = (txn_id, start_por, end_por, True)
-                    else:
-                        orphaned[txn_id] = (txn_id, start_por, end_por, False)
-                elif op == '2-ok':
-                    if not (txn_id in orphaned):
-                        logging.critical('Expected txn_id {} in {} file {}'.format(txn_id, l, path))
-                        sys.exit(66)
-                    logging.debug('2-ok l = {}'.format(l))
-                    logging.debug('blah = {}'.format(orphaned[txn_id]))
-                    q = orphaned[txn_id]
-                    orphaned[txn_id] = (q[0], q[1], q[2], True)
-                elif op == '2-s3-ok':
-                    try:
-                        del orphaned[txn_id]
-                    except:
-                        None # Should only happen in debugging/testing scenarios
-    except FileNotFoundError:
-        None
+    for l in lines:
+        a = eval(l)
+        op = a[1]
+        txn_id = a[2]
+        if op == '1-ok':
+            where_list = a[3]
+            if where_list == []:
+                logging.critical('Empty where_list in {} worker {}'.format(l, instance_name))
+                sys.exit(66)
+            for (stream_id, start_por, end_por) in where_list:
+                if stream_id != 1:
+                    logging.critical('Bad stream_id in {} worker {}'.format(l, instance_name))
+                    sys.exit(66)
+            ## The first txn commit may be start=end=0.
+            ## We don't write an S3 object for 0 bytes,
+            ## so we don't include this case in orphaned.
+            if (start_por == 0 and end_por == 0):
+                ## Pretend that we've seen the 2-ok for 0 & 0.
+                ## Then it will be filtered by the list comprehension
+                ## at the end of this func.
+                orphaned[txn_id] = (txn_id, start_por, end_por, True)
+            else:
+                orphaned[txn_id] = (txn_id, start_por, end_por, False)
+        elif op == '2-ok':
+            if not (txn_id in orphaned):
+                logging.critical('Expected txn_id {} in {} worker {}'.format(txn_id, l, instance_name))
+                sys.exit(66)
+            logging.debug('2-ok l = {}'.format(l))
+            logging.debug('blah = {}'.format(orphaned[txn_id]))
+            q = orphaned[txn_id]
+            orphaned[txn_id] = (q[0], q[1], q[2], True)
+        elif op == '2-s3-ok':
+            try:
+                del orphaned[txn_id]
+            except:
+                None # Should only happen in debugging/testing scenarios
     return list(x for x in orphaned.values() if x[3] == False)
 
-def find_last_committed_offset(path):
+def find_last_committed_offset(lines):
     offset = 0
-    try:
-        with open(path, 'rb') as f:
-            for l in f:
-                a = eval(l)
-                if a[1] == '2-ok':
-                    offset = a[3]
-    except FileNotFoundError:
-        True
+    for l in lines:
+        a = eval(l)
+        if a[1] == '2-ok':
+            offset = a[3]
     return offset
 
-def read_chunk(path, start_offset, end_offset):
+def read_chunk(path, start_offset, end_offset, delete_me_entire_func_maybe):
     """
     Return only if 100% successful.
     """
@@ -146,11 +130,11 @@ def read_chunk(path, start_offset, end_offset):
 HACK = 0
 
 class AsyncServer(asynchat.async_chat, object):
-    def __init__(self, handler_id, sock, out_path, abort_rule_path, s3_scheme, s3_bucket, s3_prefix, streams=None):
+    def __init__(self, handler_id, sock, abort_rule_path, s3_scheme, s3_bucket, s3_prefix,
+                 streams=None, using_2pc=True, twopc_out=None):
         logging.info("AsyncServer.__init__: {} {}".format(handler_id, sock))
         self._id = handler_id
         self._conn = sock
-        self._out_path = out_path
         self._abort_rule_path = abort_rule_path
         asynchat.async_chat.__init__(self, sock=self._conn)
         self.in_buffer = []
@@ -161,7 +145,7 @@ class AsyncServer(asynchat.async_chat, object):
         self._streams = {} if streams is None else streams
         self.received_count = 0
         self._reset_count = {}
-        self._using_2pc = True
+        self._using_2pc = using_2pc
         self._txn_stream_content = []
         self._next_txn_force_abort_written = False
         if s3_scheme == 'fake-s3':
@@ -175,13 +159,11 @@ class AsyncServer(asynchat.async_chat, object):
         self._s3_chunk = b''
         self._s3_bucket = s3_bucket
         self._s3_prefix = s3_prefix
+        self._twopc_out = twopc_out
         # Items that are initialized later, set to nonsense None now
+        self._txn_state = None
         self._abort_rules = None
-        self._out = None
-        self._out_offset = None
-        self._txn_log = None
         self._worker_name = None
-        self._out_path_opath = None
         self._last_committed_offset = None
         self._last_msg = None
 
@@ -280,39 +262,33 @@ class AsyncServer(asynchat.async_chat, object):
                     self._txn_stream_content.append((stream_id, regexp))
                     # NOTE: This type doesn't have extended disconnect control!
 
-            opath = self._out_path + "." + msg.instance_name
-            with open(opath, 'ab') as tmp:
-                None # Create the file if it doesn't already exist
-            self._out = open(opath, 'r+b')
-            self._out.seek(0, 2) ## Seek to end of the file
-            self._out_path_opath = opath
-            self._out_offset = self._out.tell()
-            logging.debug('top of AsyncServer self._out_offset = {}'.format(self._out_offset))
-
-            tlpath = self._out_path + "." + msg.instance_name + ".txnlog"
-            self._txn_log = open(tlpath, 'ab')
-            self._txn_state = reload_phase1_txn_state(tlpath)
+            self._twopc_out.open(msg.instance_name)
+            tl_lines = self._twopc_out.read_txnlog_lines()
+            self._txn_state = reload_phase1_txn_state(tl_lines, msg.instance_name)
             logging.debug('restored txn state: {}'.format(self._txn_state))
-            self._txn_commit_next = look_for_forced_abort(tlpath)
+            self._txn_commit_next = look_for_forced_abort(tl_lines, msg.instance_name)
 
             orphaned = []
             if self._s3 is not None:
-                orphaned = look_for_orphaned_s3_phase2_data(tlpath)
+                orphaned = look_for_orphaned_s3_phase2_data(tl_lines)
             logging.debug('S3: orphaned {}'.format(orphaned))
             if orphaned == []:
                 logging.info('found zero orphaned items')
                 None
             elif len(orphaned) > 1:
-                logging.critical('expected max 1 orphaned item: {} file {}'.format(orphaned, self._out_path_opath))
+                logging.critical('expected max 1 orphaned item: {} worker {}'.format(orphaned, self._worker_name))
                 sys.exit(66)
             else:
                 (txn_id, start_por, end_por, _) = orphaned[0]
-                chunk = read_chunk(opath, start_por, end_por)
-                self.log_it(['orphaned', (txn_id, start_por, end_por)])
-                self.write_to_s3_and_log(start_por, chunk, txn_id, 'orphaned')
+                if False:
+                    chunk = read_chunk(opath, start_por, end_por)
+                    self.log_it(['orphaned', (txn_id, start_por, end_por)])
+                    self.write_to_s3_and_log(start_por, chunk, txn_id, 'orphaned')
+                else:
+                    raise Error("orphaned error: {}".format(orphaned))
 
-            self._last_committed_offset = find_last_committed_offset(tlpath)
-            logging.info("last committed offset for {} is {}".format(opath, self._last_committed_offset))
+            self._last_committed_offset = find_last_committed_offset(tl_lines)
+            logging.info("last committed offset for {} is {}".format(self._worker_name, self._last_committed_offset))
             truncate_offset = None
             if len(self._txn_state) > 1:
                 sys.exit("Invariant already checked elsewhere")
@@ -320,11 +296,11 @@ class AsyncServer(asynchat.async_chat, object):
                 uncommitted_txn_id = list(self._txn_state.keys())[0]
                 (phase1_status, where_list) = self._txn_state[uncommitted_txn_id]
                 if len(where_list) != 1:
-                    logging.critical('Bad where_list in {} file {}'.format(self._txn_state, self._out_path_opath))
+                    logging.critical('Bad where_list in {} worker {}'.format(self._txn_state, self._worker_name))
                     sys.exit(66)
                 (stream_id, start_por, end_por) = where_list[0]
                 if stream_id != 1:
-                    logging.critical('Bad stream_id in {} file {}'.format(self._txn_state, self._out_path_opath))
+                    logging.critical('Bad stream_id in {} worker {}'.format(self._txn_state, self._worker_name))
                     sys.exit(66)
                 if phase1_status is True:
                     truncate_offset = end_por
@@ -332,10 +308,8 @@ class AsyncServer(asynchat.async_chat, object):
                     truncate_offset = self._last_committed_offset
             elif len(self._txn_state) == 0:
                 truncate_offset = self._last_committed_offset
-            logging.info("truncate {} at offset {}".format(opath, truncate_offset))
-            self._out.truncate(truncate_offset)
-            self._out.seek(truncate_offset)
-            self._out_offset = truncate_offset
+            logging.info("truncate {} at offset {}".format(self._worker_name, truncate_offset))
+            self._twopc_out.truncate_and_seek_to(truncate_offset)
 
         elif isinstance(msg, cwm.Notify):
             if msg.stream_id != 1:
@@ -344,7 +318,7 @@ class AsyncServer(asynchat.async_chat, object):
                 self.write(error)
                 return
             # respond with notifyack
-            key = (self._out_path_opath, msg.stream_id)
+            key = (self._worker_name, msg.stream_id)
             try:
                 por = self._streams[key][2]
             except:
@@ -372,7 +346,7 @@ class AsyncServer(asynchat.async_chat, object):
     def handle_eos_message(self, msg):
         # ack eos
         logging.debug("NH: acking eos for {}".format(msg))
-        key = (self._out_path_opath, msg.stream_id)
+        key = (self._worker_name, msg.stream_id)
         self.write(cwm.Ack(credits = 1,
                            acks= [(msg.stream_id, self._streams[key][2])]))
 
@@ -400,10 +374,10 @@ class AsyncServer(asynchat.async_chat, object):
 
             # Sanity checks
             start_por = -1
-            if self._out_offset != self._out.tell():
+            if self._twopc_out.out_offset != self._twopc_out.out_tell():
                 self._txn_commit_next = False
                 logging.error('2PC: sanity: offset {} != tell {}'.format(
-                    self._out_offset, self._out.tell()))
+                    self._twopc_out.out_offset, self._twopc_out.out_tell()))
             for (stream_id, start_por, end_por) in msg2.where_list:
                 if stream_id != 1:
                     self._txn_commit_next = False
@@ -413,11 +387,11 @@ class AsyncServer(asynchat.async_chat, object):
                     self._txn_commit_next = False
                     logging.error('2PC: Phase 1 invalid start_por {} end_por {}'
                         .format(start_por, end_por))
-                if end_por > self._out_offset:
+                if end_por > self._twopc_out.out_offset:
                     self._txn_commit_next = False
-                    m = '2PC: Phase 1 invalid end_por {} self._out_offset {} file size {} msg2 {}'.format(
-                        end_por, self._out_offset, self._out.tell(), msg2)
-                    if self._out_offset == start_por:
+                    m = '2PC: Phase 1 invalid end_por {} self._twopc_out.out_offset {} file size {} msg2 {}'.format(
+                        end_por, self._twopc_out.out_offset, self._twopc_out.out_tell(), msg2)
+                    if self._twopc_out.out_offset == start_por:
                         ## We probably restarted, we've truncated uncommitted
                         ## bytes at the end of the file, and here's Wallaroo
                         ## starting phase 1 with a byte range that starts
@@ -462,17 +436,17 @@ class AsyncServer(asynchat.async_chat, object):
                         except:
                             True
 
-            self.flush_fsync(self._out)
-            self.flush_fsync(self._txn_log)
+            self._twopc_out.flush_fsync_all()
             success = self._txn_commit_next
-            if success and (self._s3 is not None) and start_por >= 0:
-                opath = self._out_path + "." + msg.instance_name
-                chunk = read_chunk(opath, start_por, end_por)
+            if False and success and (self._s3 is not None) and start_por >= 0:
+                todo_opath = self._out_path + "." + msg.instance_name
+                chunk = read_chunk(todo_opath, start_por, end_por)
                 logging.debug('S3: offset {} to {} len(chunk) = {}'.format(start_por, end_por, len(chunk)))
                 self._s3_chunk = chunk
                 self._s3_chunk_offset = start_por
 
             self._txn_state[msg2.txn_id] = (success, msg2.where_list)
+            logging.debug('2PC: Phase 1 new txn_state = {}'.format(self._txn_state))
             if success:
                 log_tag = '1-ok'
             else:
@@ -488,7 +462,7 @@ class AsyncServer(asynchat.async_chat, object):
             reply_bytes = cwm.TwoPCFrame.encode(reply)
             msg = cwm.Message(0, 0, 0, None, reply_bytes)
             ##time.sleep(0.151)      ### TESTING ONLY! DELETE ME
-            time.sleep(0.25)
+            time.sleep(0.25)      ### TESTING ONLY! DELETE ME
             self.write(msg)
 
             self._txn_commit_next = True
@@ -510,21 +484,19 @@ class AsyncServer(asynchat.async_chat, object):
                         if stream_id != 1:
                             raise Exception('Phase 2 abort: bad stream_id {}'.
                                 format(stream_id))
-                        logging.info('2PC: truncating {} to offset {}'.format(self._out_path_opath, start_por))
+                        logging.info('2PC: truncating {} to offset {}'.format(self._worker_name, start_por))
                         logging.debug('2PC: Phase 2 got {}'.format(msg2))
 
                         ## DIAGNOSTIC: Save a copy of the file for diag purposes:
-                        self.flush_fsync(self._out)
-                        copy_path = "{}.{}".format(self._out_path_opath, time.time())
-                        os.system("cp {} {}.diag".format(self._out_path_opath, copy_path))
+                        self._twopc_out.flush_fsync_out()
+                        copy_path = "/tmp/sink-out/output.{}.{}".format(self._worker_name, time.time())
+                        os.system("cp {} {}.diag".format(self._worker_name, copy_path))
                         logging.info("flushed & copied to {}".format(copy_path))
                         ## End DIAGNOSTIC
 
-                        self.flush_fsync(self._out)
-                        self._out.truncate(start_por)
-                        self._out.seek(start_por)
-                        self._out_offset = start_por
-                        key = (self._out_path_opath, stream_id)
+                        self._twopc_out.flush_fsync_out()
+                        self._twopc_out.truncate_and_seek_to(start_por)
+                        key = (self._worker_name, stream_id)
                         try:
                             self._streams[key][2] = start_por
                         except KeyError as e:
@@ -546,14 +518,14 @@ class AsyncServer(asynchat.async_chat, object):
                     ## Extra sanity check
                     if self._last_committed_offset is None or \
                             offset < self._last_committed_offset:
-                        logging.fatal("2PC: _last_committed_offset {} offset {} file {}".format(
-                            self._last_committed_offset, offset, self._out_path_opath))
+                        logging.fatal("2PC: _last_committed_offset {} offset {} worker {}".format(
+                            self._last_committed_offset, offset, self._worker_name))
                         sys.exit(66)
 
                     ## Remove when the protocol evolves to be unnecessary
-                    if offset != self._out_offset:
-                        logging.critical('2PC: phase 2 offset {} != {} file {}'.format(
-                            offset, self._out_offset, self._out_path_opath))
+                    if offset != self._twopc_out.out_offset:
+                        logging.critical('2PC: phase 2 offset {} != {} worker {}'.format(
+                            offset, self._twopc_out.out_offset, self._worker_name))
                         sys.exit(66)
 
                     self._last_committed_offset = offset
@@ -586,24 +558,9 @@ class AsyncServer(asynchat.async_chat, object):
             # a worker with the same name joining again?  That's very
             # unlikely in the current Wallaroo implementation, but possible.
             #
-            # The file naming convention we use is "output.workername.TS"
-            # and "output.workername.TS.txnlog".  This scheme is compatible
-            # with the "1-to-1-passthrough-verify.sh" script: it examines the
-            # sink output dir for all files with ".txnlog" suffix and then
-            # chops off that suffix to find the corresponding output file.
-            # After that, all of "1-to-1-passthrough-verify.sh" output
-            # order mapping is done by 2PC commit timestamps.
-            now = math.trunc(time.time()*1000000)
+            self._twopc_out.leaving_workers(msg2.leaving_workers)
             for w in msg2.leaving_workers:
-                opath = self._out_path + "." + w
-                mv_path1 = "{}.{}".format(opath, time.time())
-                cmd1 = "mv {} {} > /dev/null 2>&1".format(opath, mv_path1)
-                cmd2 = "mv {}.txnlog {}.txnlog > /dev/null 2>&1".format(opath, mv_path1)
-                logging.info("leaving worker: run: {}".format(cmd1))
-                logging.info("leaving worker: run: {}".format(cmd2))
-                os.system(cmd1)
-                os.system(cmd2)
-                key = (opath, 1)
+                key = (w, 1)
                 try:
                     del self._streams[key]
                 except KeyError:
@@ -621,19 +578,18 @@ class AsyncServer(asynchat.async_chat, object):
                     logging.info('2PC: abort next transaction: {} matches {}'
                         .format(regexp, bs))
 
-        key = (self._out_path_opath, msg.stream_id)
+        key = (self._worker_name, msg.stream_id)
         if msg.message_id != None:
             logging.debug('msg.message_id = {}'.format(msg.message_id))
-            if self._out_offset == msg.message_id:
-                ret1 = self._out.write(bs)
+            if self._twopc_out.out_offset == msg.message_id:
+                ret1 = self._twopc_out.append_out(bs)
                 if len(bs) != ret1:
                     self._txn_commit_next = False
-                    raise Exception("File write error? {} != {} or {} != None".format(len(bs), ret1, ret2))
-                self._out_offset += len(msg.message)
-                self._streams[key][2] = self._out_offset
-                logging.debug('_out_offset is now {} tell {}'.format(self._out_offset, self._out.tell()))
-            elif self._out_offset < msg.message_id:
-                m = 'MISSING DATA: self._out_offset {} tell {} < msg.message_id {} file {}'.format(self._out_offset, self._out.tell(), msg.message_id, self._out_path_opath)
+                    raise Exception("File write error? {} != {}".format(len(bs), ret1))
+                self._streams[key][2] = self._twopc_out.out_offset
+                logging.debug('_out_offset is now {} tell {}'.format(self._twopc_out.out_offset, self._twopc_out.out_tell()))
+            elif self._twopc_out.out_offset < msg.message_id:
+                m = 'MISSING DATA: self._twopc_out.out_offset {} tell {} < msg.message_id {} worker {}'.format(self._twopc_out.out_offset, self._twopc_out.out_tell(), msg.message_id, self._worker_name)
                 self._txn_commit_next = False
                 if not self._next_txn_force_abort_written:
                     self._next_txn_force_abort_written = True
@@ -652,15 +608,15 @@ class AsyncServer(asynchat.async_chat, object):
                     logging.critical("last_msg = {}".format(self._last_msg))
                     logging.critical("     msg = {}".format(msg))
                     sys.exit(66)
-            elif self._out_offset > msg.message_id:
+            elif self._twopc_out.out_offset > msg.message_id:
                 ## The message_id has gone backward.
-                logging.fatal('duplicate data: self._out_offset {} tell {} > msg.message_id {}'.format(self._out_offset, self._out.tell(), msg.message_id))
+                logging.fatal('duplicate data: self._twopc_out.out_offset {} tell {} > msg.message_id {}'.format(self._twopc_out.out_offset, self._twopc_out.out_tell(), msg.message_id))
                 ## Deduplication case: we've already seen this, so
                 ## we don't take any further action.
 
                 ## DIAGNOSTIC: Let's see what's there, shall we?
                 try:
-                    diag = read_chunk(self._out_path_opath, msg.message_id,
+                    diag = todo_read_chunk(self._out_path_opath, msg.message_id,
                         msg.message_id + len(msg.message))
                 except:
                     diag = "<-<exception>->"
@@ -670,8 +626,7 @@ class AsyncServer(asynchat.async_chat, object):
                     logging.fatal('diag: msg = {}'.format(msg))
                     logging.fatal('diag: bytes in opath = {}'.format(diag))
                 ## End DIAGNOSTIC
-                self.flush_fsync(self._out)
-                self.flush_fsync(self._txn_log)
+                self._twopc_out.flush_fsync_all()
                 sys.exit(66)
         else:
             logging.critical('message has no message_id')
@@ -679,7 +634,7 @@ class AsyncServer(asynchat.async_chat, object):
         self._last_msg = msg
 
     def write(self, msg):
-        logging.debug("write {} DIAG {}".format(msg, self._out_path_opath))
+        logging.debug("write {} worker {}".format(msg, self._worker_name))
         data = cwm.Frame.encode(msg)
         super(AsyncServer, self).push(data)
 
@@ -691,8 +646,8 @@ class AsyncServer(asynchat.async_chat, object):
                 credits = 10,
                 acks = [
                     (sid, por)
-                    for (opath,sid), _, por in self._streams.values()
-                    if opath == self._out_path_opath ])
+                    for (wn,sid), _, por in self._streams.values()
+                    if wn == self._worker_name ])
             logging.debug('send ack msg: {}'.format(ack))
             self.write(ack)
         if self.received_count % 9999200 == 0:
@@ -707,11 +662,11 @@ class AsyncServer(asynchat.async_chat, object):
     def close(self, delete_from_active_workers = True):
         logging.info("Closing the connection for {}, delete_from_active_workers = {}".format(self._worker_name, delete_from_active_workers))
         logging.info("last received id by stream for {}:\n\t{}".format(
-            self._out_path_opath, self._streams))
+            self._worker_name, self._streams))
         super(AsyncServer, self).close()
         try:
             self.log_it(['connection-closed', True])
-            self.flush_fsync(self._out)
+            self._twopc_out.flush_fsync_out()
         except:
             ## In case of very early errors, file descriptors
             ## may not have been initialized yet. No harm.
@@ -725,24 +680,9 @@ class AsyncServer(asynchat.async_chat, object):
                 del active_workers_l[self._worker_name]
                 logging.info("Remove {} from active_workers".format(self._worker_name))
 
-    def flush_fsync(self, file):
-        """
-        Return only if 100% successful.
-        """
-        x = file.flush()
-        if x:
-            logging.critical('flush failed: {}'.format(x))
-            sys.exit(66)
-        x = os.fsync(file.fileno())
-        if x:
-            logging.critical('fsync failed: {}'.format(x))
-            sys.exit(66)
-
     def log_it(self, log):
-        if self._txn_log is not None:
-            log.insert(0, time.time())
-            self._txn_log.write(bytes("{}\n".format(log).encode('utf-8')))
-            self.flush_fsync(self._txn_log)
+        log.insert(0, time.time())
+        self._twopc_out.append_txnlog(bytes("{}\n".format(log).encode('utf-8')))
 
     def write_to_s3_and_log(self, chunk_offset, chunk, txn_id, why):
         if self._s3 is not None:
@@ -764,7 +704,8 @@ class AsyncServer(asynchat.async_chat, object):
 class SinkServer(asyncore.dispatcher):
 
     def __init__(self, host, port, out_path, abort_rule_path,
-                 s3_scheme, s3_bucket, s3_prefix):
+                 s3_scheme, s3_bucket, s3_prefix,
+                 twopc_out=None):
         asyncore.dispatcher.__init__(self)
         self.create_socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.set_reuse_addr()
@@ -777,11 +718,14 @@ class SinkServer(asyncore.dispatcher):
         self.s3_bucket = s3_bucket
         self.s3_prefix = s3_prefix
         self._streams = {}
+        self._twopc_out = twopc_out
 
     def handle_accepted(self, sock, addr):
         logging.info('Incoming connection from %s' % repr(addr))
+        twopc_out = TwoPC_Output_LocalFilesystem(self._out_path)
         handler = AsyncServer(self.count, sock,
-            self._out_path, self._abort_rule_path, s3_scheme, s3_bucket, s3_prefix, self._streams)
+            self._abort_rule_path, s3_scheme, s3_bucket, s3_prefix, self._streams,
+            twopc_out = twopc_out)
         self.count += 1
 
 ## Class from dos_server.py
@@ -798,6 +742,113 @@ class ThreadSafeDict(dict) :
     def __exit__(self, type, value, traceback) :
         self._lock.release()
 
+class TwoPC_Output_LocalFilesystem:
+    def __init__(self, out_path):
+        self._out_path = out_path
+        self._out = None
+        self.out_offset = None
+        self._txn_log = None
+        self._instance_name = None
+
+    def open(self, instance_name):
+        self._instance_name = instance_name
+        opath = self._out_path + "." + instance_name
+        with open(opath, 'ab') as tmp:
+            None # Create the file if it doesn't already exist
+        self._out = open(opath, 'r+b')
+        self._out.seek(0, 2) ## Seek to end of the file
+        self.out_offset = self._out.tell()
+        logging.debug('TwoPC_Output_LocalFilesystem.open: worker {} self.out_offset = {}'.format(instance_name, self.out_offset))
+
+        tlpath = self._out_path + "." + instance_name + ".txnlog"
+        self._txn_log = open(tlpath, 'ab')
+        self._txn_log_path = tlpath
+
+    def truncate_and_seek_to(self, truncate_offset):
+        self._out.truncate(truncate_offset)
+        self._out.seek(truncate_offset)
+        self.out_offset = truncate_offset
+        logging.info("truncate_and_seek_to: truncate worker {} to {}".format(
+            self._instance_name, truncate_offset))
+
+    def out_tell(self):
+        """Used only for sanity checking & diagnostic logging/spam."""
+        return self._out.tell()
+
+    def flush_fsync_all(self):
+        self.flush_fsync_out()
+        self.flush_fsync_txnlog()
+
+    def flush_fsync_out(self):
+        self.flush_fsync(self._out)
+
+    def flush_fsync_txnlog(self):
+        self.flush_fsync(self._txn_log)
+
+    ## TODO: Add offset to arguments, to force the caller to perform
+    ##       offset bookkeeping explicitly?
+    def append_out(self, bs):
+        ret = self._out.write(bs)
+        logging.info("write_out: ret = {} len(bs) = {}".format(ret, len(bs)))
+        self.out_offset += ret
+        return ret
+
+    def append_txnlog(self, bs):
+        if self._txn_log is not None:
+            ret = self._txn_log.write(bs)
+            self.flush_fsync_txnlog()
+            return ret
+        else:
+            return -1
+
+    def read_chunk(self, what, should, go, here):
+        raise Error
+
+    def read_txnlog_lines(self):
+        return self._read_file_lines(self._txn_log_path)
+
+    def _read_file(self, path):
+        with open(path, 'rb') as f:
+            return f.read(-1)
+
+    def _read_file_lines(self, path):
+        a = []
+        with open(path, 'rb') as f:
+            for l in f:
+                a.append(l)
+            return a
+
+    def flush_fsync(self, file):
+        """
+        Return only if 100% successful.
+        """
+        x = file.flush()
+        if x:
+            logging.critical('flush failed: {}'.format(x))
+            sys.exit(66)
+        x = os.fsync(file.fileno())
+        if x:
+            logging.critical('fsync failed: {}'.format(x))
+            sys.exit(66)
+
+    # The file naming convention we use is "output.workername.TS"
+    # and "output.workername.TS.txnlog".  This scheme is compatible
+    # with the "1-to-1-passthrough-verify.sh" script: it examines the
+    # sink output dir for all files with ".txnlog" suffix and then
+    # chops off that suffix to find the corresponding output file.
+    # After that, all of "1-to-1-passthrough-verify.sh" output
+    # order mapping is done by 2PC commit timestamps.
+    def leaving_workers(self, leaving_workers):
+        for w in leaving_workers:
+            opath = self._out_path + "." + w
+            mv_path1 = "{}.{}".format(opath, time.time())
+            cmd1 = "mv {} {} > /dev/null 2>&1".format(opath, mv_path1)
+            cmd2 = "mv {}.txnlog {}.txnlog > /dev/null 2>&1".format(opath, mv_path1)
+            logging.info("leaving worker: run: {}".format(cmd1))
+            logging.info("leaving worker: run: {}".format(cmd2))
+            os.system(cmd1)
+            os.system(cmd2)
+
 active_workers = ThreadSafeDict()
 
 fmt = '%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
@@ -805,7 +856,8 @@ logging.root.formatter = logging.Formatter(fmt)
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(logging.root.formatter)
 logging.root.addHandler(stream_handler)
-logging.root.setLevel(logging.INFO)
+#logging.root.setLevel(logging.INFO)
+logging.root.setLevel(logging.DEBUG)
 
 out_path = sys.argv[1]
 abort_rule_path = sys.argv[2]
