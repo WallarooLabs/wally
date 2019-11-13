@@ -464,7 +464,7 @@ run_custom3006 () {
 
 run_custom_tcp_crash0 () {
     ## Assume that we are run with `./master-crasher.sh 2 run_custom_tcp_crash0
-    sleep 2
+    sleep 4
 
     /bin/echo -n c0
     ./crash-worker.sh 0
@@ -475,7 +475,13 @@ run_custom_tcp_crash0 () {
     ./start-initializer.sh
     poll_out=`poll_ready -w 4 2>&1`
     if [ $? -ne 0 -o ! -z "$poll_out" ]; then
-        echo "custom3006 cmd $cmd: $poll_out"
+        echo ""
+        echo "\nQuery initializer\n"
+        ../../../../testing/tools/external_sender/external_sender -e 127.0.0.1:7103 -t cluster-status-query
+        echo "\nQuery worker1\n"
+        ../../../../testing/tools/external_sender/external_sender -e 127.0.0.1:7113 -t cluster-status-query
+        echo "\nQuery initializer again\n"
+        ../../../../testing/tools/external_sender/external_sender -e 127.0.0.1:7103 -t cluster-status-query
         pause_the_world
         exit 1
     fi
