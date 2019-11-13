@@ -18,6 +18,7 @@ Copyright 2018 The Wallaroo Authors.
 
 use "collections"
 use "promises"
+use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
@@ -55,7 +56,14 @@ trait _RecoveryPhase
     // can only log and ignore here.
     _unexpected_call(__loc.method_name())
 
-  fun ref worker_ack_register_producers(w: WorkerName) =>
+  fun ref inform_of_boundaries_map(obs: Map[WorkerName, OutgoingBoundary] val)
+  =>
+    _invalid_call(__loc.method_name()); Fail()
+
+  fun ref boundary_acked_registering(b: OutgoingBoundary) =>
+    _invalid_call(__loc.method_name()); Fail()
+
+  fun ref data_receivers_acked_registering() =>
     _invalid_call(__loc.method_name()); Fail()
 
   fun ref receive_rollback_id(rollback_id: RollbackId) =>
@@ -159,7 +167,7 @@ class _BoundariesReconnect is _RecoveryPhase
       _recovery._abort_early(_override_worker)
       return
     end
-    _recovery._prepare_rollback()
+    _recovery.request_boundaries_map()
 
   fun ref try_override_recovery(worker: WorkerName,
     rollback_id: RollbackId, recovery: Recovery ref,
@@ -172,6 +180,54 @@ class _BoundariesReconnect is _RecoveryPhase
       _highest_rival_rollback_id = rollback_id
       _override_worker = worker
       _abort_promise = abort_promise
+    end
+
+class _WaitingForBoundariesMap is _RecoveryPhase
+  let _recovery: Recovery ref
+
+  new create(recovery: Recovery ref) =>
+    @printf[I32](("RECOVERY: Waiting for list of Producers\n").cstring())
+    _recovery = recovery
+
+  fun name(): String => __loc.type_name()
+
+  fun ref inform_of_boundaries_map(obs: Map[WorkerName, OutgoingBoundary] val)
+  =>
+    _recovery.request_boundaries_to_ack_registering(obs)
+
+class _WaitingForBoundariesToAckRegistering is _RecoveryPhase
+  let _recovery: Recovery ref
+  let _boundaries: SetIs[OutgoingBoundary] = _boundaries.create()
+  let _acked_boundaries: SetIs[OutgoingBoundary] =
+    _acked_boundaries.create()
+  var _data_receivers_acked: Bool = false
+
+  new create(recovery: Recovery ref,
+    boundaries: SetIs[OutgoingBoundary])
+  =>
+    @printf[I32](("RECOVERY: Worker waiting for boundaries " +
+      "to ack forwarding register messages\n").cstring())
+    _recovery = recovery
+    for b in boundaries.values() do
+      _boundaries.set(b)
+    end
+    Invariant(_boundaries.size() > 0)
+
+  fun name(): String => __loc.type_name()
+
+  fun ref boundary_acked_registering(b: OutgoingBoundary) =>
+    _acked_boundaries.set(b)
+    _check_complete()
+
+  fun ref data_receivers_acked_registering() =>
+    _data_receivers_acked = true
+    _check_complete()
+
+  fun ref _check_complete() =>
+    if (_boundaries.size() == _acked_boundaries.size()) and
+      _data_receivers_acked
+    then
+      _recovery._prepare_rollback()
     end
 
 class _PrepareRollback is _RecoveryPhase
@@ -390,9 +446,6 @@ class _RecoveryOverrideAccepted is _RecoveryPhase
 
   fun ref worker_ack_local_keys_rollback(w: WorkerName, checkpoint_id: CheckpointId)
   =>
-    None
-
-  fun ref worker_ack_register_producers(w: WorkerName) =>
     None
 
   fun ref rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>

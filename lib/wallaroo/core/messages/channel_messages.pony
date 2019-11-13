@@ -223,6 +223,19 @@ primitive ChannelMsgEncoder
   =>
     _encode(AckDataReceivedMsg(sender_name, sender_step_id, seq_id), auth)?
 
+  fun request_boundary_punctuation_ack(auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    """
+    A punctuation ack is used to guarantee that all pending messages after
+    a certain received message at DataReceiver were sent by the boundary before
+    we proceed.
+    """
+    _encode(RequestBoundaryPunctuationAckMsg, auth)?
+
+  fun receive_boundary_punctuation_ack(auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(ReceiveBoundaryPunctuationAckMsg, auth)?
+
   fun data_receiver_ack_immediately(auth: AmbientAuth): Array[ByteSeq] val ? =>
     _encode(DataReceiverAckImmediatelyMsg, auth)?
 
@@ -1217,6 +1230,12 @@ class val AckDataReceivedMsg is ChannelMsg
     sender_name = sender_name'
     sender_step_id = sender_step_id'
     seq_id = seq_id'
+
+primitive RequestBoundaryPunctuationAckMsg is ChannelMsg
+  fun val string(): String => __loc.type_name()
+
+primitive ReceiveBoundaryPunctuationAckMsg is ChannelMsg
+  fun val string(): String => __loc.type_name()
 
 class val DataMsg is ChannelMsg
   let pipeline_time_spent: U64

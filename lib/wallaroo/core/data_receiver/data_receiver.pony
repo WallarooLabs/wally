@@ -71,6 +71,14 @@ actor DataReceiver is Producer
   let _step_group_producers: Map[RoutingId, SetIs[RoutingId]] =
     _step_group_producers.create()
 
+  // Keeps track of any promises waiting on a punctuation ack from our
+  // corresponding boundary.
+  // A punctuation ack is used to guarantee that all pending messages after
+  // a certain received message at DataReceiver were sent by the boundary
+  // before we proceed.
+  let _pending_boundary_punctuation_ack_promises: Array[Promise[None]] =
+    _pending_boundary_punctuation_ack_promises.create()
+
   var _phase: _DataReceiverPhase = _DataReceiverNotProcessingPhase
 
   new create(auth: AmbientAuth, id: RoutingId, worker_name: String,
@@ -263,6 +271,21 @@ actor DataReceiver is Producer
     end
 
     _phase.data_connect(highest_seq_id)
+
+  be request_boundary_punctuation_ack(p: Promise[None]) =>
+    try
+      let req_msg = ChannelMsgEncoder.request_boundary_punctuation_ack(_auth)?
+      _write_on_conn(req_msg)
+    else
+      Fail()
+    end
+    _pending_boundary_punctuation_ack_promises.push(p)
+
+  be receive_boundary_punctuation_ack() =>
+    for p in _pending_boundary_punctuation_ack_promises.values() do
+      p(None)
+    end
+    _pending_boundary_punctuation_ack_promises.clear()
 
   fun ref _update_last_id_seen(seq_id: SeqId, on_increase: Bool = false) =>
     if on_increase then

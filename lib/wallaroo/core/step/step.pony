@@ -491,8 +491,8 @@ actor Step is (Producer & Consumer & BarrierProcessor)
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
     ifdef "checkpoint_trace" then
-      @printf[I32]("Barrier complete at Step %s\n".cstring(),
-        _id.string().cstring())
+      @printf[I32]("Barrier %s complete at Step %s\n".cstring(),
+        barrier_token.string().cstring(), _id.string().cstring())
     end
     match barrier_token
     | let cbt: CheckpointBarrierToken =>

@@ -18,6 +18,7 @@ Copyright 2018 The Wallaroo Authors.
 
 use "collections"
 use "promises"
+use "wallaroo/core/boundary"
 use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
 use "wallaroo/core/initialization"
@@ -35,21 +36,28 @@ actor Recovery
     1) _AwaitRecovering: Waiting for start_recovery() to be called
     2) _BoundariesReconnect: Wait for all boundaries to reconnect.
        It is possible to skip this phase if we are rolling back online because
-       of a checkpoint abort.
-    3) _PrepareRollback: Have EventLog tell all resilients to prepare for
-    4) _RollbackLocalKeys: Roll back topology. Wait for acks from all workers.
+       of a checkpoint abort, in which case we go directly to _PrepareRollback.
+    3) _WaitingForBoundariesMap: Wait for map of current boundaries so we can
+      make sure they all register downstream.
+    4) _WaitingForBoundariesToAckRegistering: Wait for all boundaires to ack
+      sending register_producer messages downstream. [We rely on causal
+      message ordering here. Since we're requesting acks from boundaries
+      after all their upstream producers, we know these acks will be sent
+      after the boundaries have forwarded any register_producer messages.]
+    5) _PrepareRollback: Have EventLog tell all resilients to prepare for
+    6) _RollbackLocalKeys: Roll back topology. Wait for acks from all workers.
        register downstream.
-    5) _AwaitRollbackId: We request our rollback id from the
+    7) _AwaitRollbackId: We request our rollback id from the
        CheckpointInitiator.
-    6) _AwaitRecoveryInitiatedAcks: Wait for all workers to acknowledge
+    8) _AwaitRecoveryInitiatedAcks: Wait for all workers to acknowledge
        recovery is about to start. This gives currently recovering workers a
        chance to cede control to us if we're the latest recovering.
-    7) _RollbackBarrier: Use barrier to ensure that all old data is cleared
+    9) _RollbackBarrier: Use barrier to ensure that all old data is cleared
        and all producers and consumers are ready to rollback state.
-    8) _AwaitDataReceiversAck: Put DataReceivers in non-recovery mode.
-    9) _Rollback: Rollback all state to last safe checkpoint.
-    10) _FinishedRecovering: Finished recovery
-    11) _RecoveryOverrideAccepted: If recovery was handed off to another worker
+    10) _AwaitDataReceiversAck: Put DataReceivers in non-recovery mode.
+    11) _Rollback: Rollback all state to last safe checkpoint.
+    12) _FinishedRecovering: Finished recovery
+    13) _RecoveryOverrideAccepted: If recovery was handed off to another worker
   """
   let _self: Recovery tag = this
   let _auth: AmbientAuth
@@ -61,7 +69,7 @@ actor Recovery
   let _recovery_reconnecter: RecoveryReconnecter
   let _checkpoint_initiator: CheckpointInitiator
   let _connections: Connections
-  let _world_stopper_resumer: WorldStopperAndResumer
+  let _router_registry: RouterRegistry
   var _initializer: (LocalTopologyInitializer | None) = None
   let _data_receivers: DataReceivers
   // The checkpoint id we are recovering to if we're recovering
@@ -70,7 +78,7 @@ actor Recovery
   new create(auth: AmbientAuth, worker_name: WorkerName, event_log: EventLog,
     recovery_reconnecter: RecoveryReconnecter,
     checkpoint_initiator: CheckpointInitiator, connections: Connections,
-    world_stopper_resumer: WorldStopperAndResumer, data_receivers: DataReceivers,
+    router_registry: RouterRegistry, data_receivers: DataReceivers,
     is_recovering: Bool)
   =>
     _auth = auth
@@ -79,7 +87,7 @@ actor Recovery
     _recovery_reconnecter = recovery_reconnecter
     _checkpoint_initiator = checkpoint_initiator
     _connections = connections
-    _world_stopper_resumer = world_stopper_resumer
+    _router_registry = router_registry
     _data_receivers = data_receivers
     _checkpoint_initiator.set_recovery(this)
 
@@ -93,20 +101,35 @@ actor Recovery
     with_reconnect: Bool = true)
   =>
     _workers = workers
-    _world_stopper_resumer.stop_the_world()
+    _router_registry.stop_the_world()
     _recovery_phase.start_recovery(_workers, this, with_reconnect)
 
   be recovery_reconnect_finished(abort_promise: (Promise[None] | None)) =>
     _recovery_phase.recovery_reconnect_finished()
+
+  be inform_of_boundaries_map(
+    boundaries: Map[WorkerName, OutgoingBoundary] val)
+  =>
+    _recovery_phase.inform_of_boundaries_map(boundaries)
+
+  be boundary_acked_registering(b: OutgoingBoundary) =>
+    """
+    When we receive all producer register downstream acks, we send a promise
+    to each boundary for it to ack registering downstream. The boundary
+    requests an ack from the DataReceiver, and then acks to us. We also do
+    this the other way, having all DataReceivers request punctuation acks from
+    their corresponding incoming boundaries.
+    """
+    _recovery_phase.boundary_acked_registering(b)
+
+  be data_receivers_acked_registering(n: None) =>
+    _recovery_phase.data_receivers_acked_registering()
 
   be rollback_prep_complete() =>
     _recovery_phase.rollback_prep_complete()
 
   be worker_ack_local_keys_rollback(w: WorkerName, s_id: CheckpointId) =>
     _recovery_phase.worker_ack_local_keys_rollback(w, s_id)
-
-  be worker_ack_register_producers(w: WorkerName) =>
-    _recovery_phase.worker_ack_register_producers(w)
 
   be rollback_barrier_fully_acked(token: CheckpointRollbackBarrierToken) =>
     _recovery_phase.rollback_barrier_complete(token)
@@ -156,6 +179,29 @@ actor Recovery
     else
       _prepare_rollback()
     end
+
+  fun ref request_boundaries_map() =>
+    _recovery_phase = _WaitingForBoundariesMap(this)
+    let promise = Promise[Map[WorkerName, OutgoingBoundary] val]
+    promise.next[None](_self~inform_of_boundaries_map())
+    _router_registry.list_boundaries(promise)
+
+  fun ref request_boundaries_to_ack_registering(
+    boundaries_map: Map[WorkerName, OutgoingBoundary] val)
+  =>
+    let obs = SetIs[OutgoingBoundary]
+    for b in boundaries_map.values() do
+      obs.set(b)
+    end
+    _recovery_phase = _WaitingForBoundariesToAckRegistering(this, obs)
+    for ob in obs.values() do
+      let promise = Promise[OutgoingBoundary]
+      promise.next[None](_self~boundary_acked_registering())
+      ob.ack_immediately(promise)
+    end
+    let promise = Promise[None]
+    promise.next[None](_self~data_receivers_acked_registering())
+    _data_receivers.request_boundary_punctuation_acks(promise)
 
   fun ref _prepare_rollback() =>
     ifdef "resilience" then
@@ -290,7 +336,7 @@ actor Recovery
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery COMPLETE - ~~|\n".cstring())
     end
-    _world_stopper_resumer.resume_the_world(_worker_name)
+    _router_registry.resume_the_world(_worker_name)
     _data_receivers.recovery_complete()
     _recovery_phase = _FinishedRecovering
     match _initializer

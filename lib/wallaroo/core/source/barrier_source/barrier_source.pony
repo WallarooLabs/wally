@@ -87,6 +87,7 @@ actor BarrierSource is Source
       @printf[I32]("===BarrierSource %s created===\n".cstring(),
         _source_id.string().cstring())
     end
+    _router_registry.register_source(this, _source_id)
 
   fun ref metrics_reporter(): MetricsReporter =>
     _metrics_reporter
