@@ -289,6 +289,8 @@ class _DataReceiver is _DataReceiverWrapper
           .cstring())
       end
       Fail()
+    | let m: ReceiveBoundaryPunctuationAckMsg =>
+      _data_receiver.receive_boundary_punctuation_ack()
     | let m: SpinUpLocalTopologyMsg =>
       @printf[I32]("Received spin up local topology message!\n".cstring())
     | let m: ReportStatusMsg =>

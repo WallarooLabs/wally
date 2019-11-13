@@ -17,6 +17,7 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 use "collections"
+use "promises"
 use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
 use "wallaroo/core/metrics"
@@ -124,6 +125,16 @@ actor DataReceivers
         Fail()
       end
     end
+
+  be request_boundary_punctuation_acks(promise: Promise[None]) =>
+    let ps = Array[Promise[None]]
+    for dr in _data_receivers.values() do
+      let p = Promise[None]
+      ps.push(p)
+      dr.request_boundary_punctuation_ack(p)
+    end
+    let promises = Promises[None].join(ps.values())
+    promises.next[None]({(_: None) => promise(None)})
 
   be rollback_barrier_complete(recovery: Recovery) =>
     _recovery_complete()

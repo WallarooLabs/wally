@@ -667,6 +667,14 @@ actor OutgoingBoundary is (Consumer & TCPActor)
           @printf[I32]("Received AckDataReceivedMsg at Boundary\n".cstring())
         end
         receive_ack(aw.seq_id)
+      | let ra: RequestBoundaryPunctuationAckMsg =>
+        try
+          let ack_msg = ChannelMsgEncoder
+            .receive_boundary_punctuation_ack(_auth)?
+          _tcp_handler.writev(ack_msg)
+        else
+          Fail()
+        end
       | let ia: ImmediateAckMsg =>
         receive_immediate_ack()
       else
