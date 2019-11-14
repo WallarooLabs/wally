@@ -166,6 +166,7 @@ class AsyncServer(asynchat.async_chat, object):
         self._worker_name = None
         self._last_committed_offset = None
         self._last_msg = None
+        self._output_offset = None
 
         if self._s3 is not None:
             try:
@@ -262,7 +263,7 @@ class AsyncServer(asynchat.async_chat, object):
                     self._txn_stream_content.append((stream_id, regexp))
                     # NOTE: This type doesn't have extended disconnect control!
 
-            self._twopc_out.open(msg.instance_name)
+            self._output_offset = self._twopc_out.open(msg.instance_name)
             tl_lines = self._twopc_out.read_txnlog_lines()
             self._txn_state = reload_phase1_txn_state(tl_lines, msg.instance_name)
             logging.debug('restored txn state: {}'.format(self._txn_state))
@@ -285,7 +286,7 @@ class AsyncServer(asynchat.async_chat, object):
                     self.log_it(['orphaned', (txn_id, start_por, end_por)])
                     self.write_to_s3_and_log(start_por, chunk, txn_id, 'orphaned')
                 else:
-                    raise Error("orphaned error: {}".format(orphaned))
+                    raise Exception("orphaned error: {}".format(orphaned))
 
             self._last_committed_offset = find_last_committed_offset(tl_lines)
             logging.info("last committed offset for {} is {}".format(self._worker_name, self._last_committed_offset))
@@ -309,7 +310,11 @@ class AsyncServer(asynchat.async_chat, object):
             elif len(self._txn_state) == 0:
                 truncate_offset = self._last_committed_offset
             logging.info("truncate {} at offset {}".format(self._worker_name, truncate_offset))
-            self._twopc_out.truncate_and_seek_to(truncate_offset)
+            t_por = self._twopc_out.truncate_and_seek_to(truncate_offset)
+            if t_por != truncate_offset:
+                raise Exception("truncate got {} expected {}".format(
+                    t_por, truncate_offset))
+            self._output_offset = truncate_offset
 
         elif isinstance(msg, cwm.Notify):
             if msg.stream_id != 1:
@@ -374,10 +379,10 @@ class AsyncServer(asynchat.async_chat, object):
 
             # Sanity checks
             start_por = -1
-            if self._twopc_out.out_offset != self._twopc_out.out_tell():
+            if self._output_offset != self._twopc_out.out_tell():
                 self._txn_commit_next = False
                 logging.error('2PC: sanity: offset {} != tell {}'.format(
-                    self._twopc_out.out_offset, self._twopc_out.out_tell()))
+                    self._output_offset, self._twopc_out.out_tell()))
             for (stream_id, start_por, end_por) in msg2.where_list:
                 if stream_id != 1:
                     self._txn_commit_next = False
@@ -387,11 +392,11 @@ class AsyncServer(asynchat.async_chat, object):
                     self._txn_commit_next = False
                     logging.error('2PC: Phase 1 invalid start_por {} end_por {}'
                         .format(start_por, end_por))
-                if end_por > self._twopc_out.out_offset:
+                if end_por > self._output_offset:
                     self._txn_commit_next = False
-                    m = '2PC: Phase 1 invalid end_por {} self._twopc_out.out_offset {} file size {} msg2 {}'.format(
-                        end_por, self._twopc_out.out_offset, self._twopc_out.out_tell(), msg2)
-                    if self._twopc_out.out_offset == start_por:
+                    m = '2PC: Phase 1 invalid end_por {} self._output_offset {} file size {} msg2 {}'.format(
+                        end_por, self._output_offset, self._twopc_out.out_tell(), msg2)
+                    if self._output_offset == start_por:
                         ## We probably restarted, we've truncated uncommitted
                         ## bytes at the end of the file, and here's Wallaroo
                         ## starting phase 1 with a byte range that starts
@@ -495,7 +500,11 @@ class AsyncServer(asynchat.async_chat, object):
                         ## End DIAGNOSTIC
 
                         self._twopc_out.flush_fsync_out()
-                        self._twopc_out.truncate_and_seek_to(start_por)
+                        t_por = self._twopc_out.truncate_and_seek_to(start_por)
+                        if t_por != start_por:
+                            raise Exception("truncate got {} expected {}".format(
+                                t_por, start_por))
+                        self._output_offset = start_por
                         key = (self._worker_name, stream_id)
                         try:
                             self._streams[key][2] = start_por
@@ -523,9 +532,9 @@ class AsyncServer(asynchat.async_chat, object):
                         sys.exit(66)
 
                     ## Remove when the protocol evolves to be unnecessary
-                    if offset != self._twopc_out.out_offset:
+                    if offset != self._output_offset:
                         logging.critical('2PC: phase 2 offset {} != {} worker {}'.format(
-                            offset, self._twopc_out.out_offset, self._worker_name))
+                            offset, self._output_offset, self._worker_name))
                         sys.exit(66)
 
                     self._last_committed_offset = offset
@@ -582,15 +591,16 @@ class AsyncServer(asynchat.async_chat, object):
         key = (self._worker_name, msg.stream_id)
         if msg.message_id != None:
             logging.debug('msg.message_id = {}'.format(msg.message_id))
-            if self._twopc_out.out_offset == msg.message_id:
-                ret1 = self._twopc_out.append_out(bs)
+            if self._output_offset == msg.message_id:
+                (ret1, new_offset) = self._twopc_out.append_out(bs, self._output_offset)
                 if len(bs) != ret1:
                     self._txn_commit_next = False
                     raise Exception("File write error? {} != {}".format(len(bs), ret1))
-                self._streams[key][2] = self._twopc_out.out_offset
-                logging.debug('_out_offset is now {} tell {}'.format(self._twopc_out.out_offset, self._twopc_out.out_tell()))
-            elif self._twopc_out.out_offset < msg.message_id:
-                m = 'MISSING DATA: self._twopc_out.out_offset {} tell {} < msg.message_id {} worker {}'.format(self._twopc_out.out_offset, self._twopc_out.out_tell(), msg.message_id, self._worker_name)
+                self._output_offset += len(bs)
+                self._streams[key][2] = self._output_offset
+                logging.debug('_output_offset is now {} tell {}'.format(self._output_offset, self._twopc_out.out_tell()))
+            elif self._output_offset < msg.message_id:
+                m = 'MISSING DATA: self._output_offset {} tell {} < msg.message_id {} worker {}'.format(self._output_offset, self._twopc_out.out_tell(), msg.message_id, self._worker_name)
                 self._txn_commit_next = False
                 if not self._next_txn_force_abort_written:
                     self._next_txn_force_abort_written = True
@@ -609,9 +619,9 @@ class AsyncServer(asynchat.async_chat, object):
                     logging.critical("last_msg = {}".format(self._last_msg))
                     logging.critical("     msg = {}".format(msg))
                     sys.exit(66)
-            elif self._twopc_out.out_offset > msg.message_id:
+            elif self._output_offset > msg.message_id:
                 ## The message_id has gone backward.
-                logging.fatal('duplicate data: self._twopc_out.out_offset {} tell {} > msg.message_id {}'.format(self._twopc_out.out_offset, self._twopc_out.out_tell(), msg.message_id))
+                logging.fatal('duplicate data: self._output_offset {} tell {} > msg.message_id {}'.format(self._output_offset, self._twopc_out.out_tell(), msg.message_id))
                 ## Deduplication case: we've already seen this, so
                 ## we don't take any further action.
 
@@ -747,7 +757,7 @@ class TwoPC_Output_LocalFilesystem:
     def __init__(self, out_path):
         self._out_path = out_path
         self._out = None
-        self.out_offset = None
+        self._out_offset = None
         self._txn_log = None
         self._instance_name = None
 
@@ -758,20 +768,24 @@ class TwoPC_Output_LocalFilesystem:
             None # Create the file if it doesn't already exist
         self._out = open(opath, 'r+b')
         self._out.seek(0, 2) ## Seek to end of the file
-        self.out_offset = self._out.tell()
-        logging.debug('TwoPC_Output_LocalFilesystem.open: worker {} self.out_offset = {}'.format(instance_name, self.out_offset))
+        self._out_offset = self._out.tell()
+        logging.debug('TwoPC_Output_LocalFilesystem.open: worker {} self._out_offset = {}'.format(instance_name, self._out_offset))
 
         tlpath = self._out_path + "." + instance_name + ".txnlog"
         self._txn_log = open(tlpath, 'ab')
         self._txn_log_path = tlpath
 
+        return self._out_offset
+
     def truncate_and_seek_to(self, truncate_offset):
         self._out.truncate(truncate_offset)
         self._out.seek(truncate_offset)
-        self.out_offset = truncate_offset
+        self._out_offset = truncate_offset
         self.flush_fsync_txnlog()
         logging.info("truncate_and_seek_to: truncate worker {} to {}".format(
             self._instance_name, truncate_offset))
+
+        return self._out_offset
 
     def out_tell(self):
         """Used only for sanity checking & diagnostic logging/spam."""
@@ -787,14 +801,18 @@ class TwoPC_Output_LocalFilesystem:
     def flush_fsync_txnlog(self):
         self.flush_fsync(self._txn_log)
 
-    ## TODO: Add offset to arguments, to force the caller to perform
-    ##       offset bookkeeping explicitly?
-    def append_out(self, bs):
+    def append_out(self, bs, append_offset):
+        if append_offset != self._out_offset:
+            raise Exception("append_out: worker {}: append_offset {} != _out_offset {}".format(
+                self._instance_name, append_offset, self._out_offset))
         ret = self._out.write(bs)
-        logging.info("write_out: ret = {} len(bs) = {}".format(ret, len(bs)))
-        self.out_offset += ret
-        return ret
+        self._out_offset += ret
+        logging.info("write_out: ret = {} len(bs) = {} new offset {}".format(
+            ret, len(bs), self._out_offset))
+        return (ret, self._out_offset)
 
+    ## TODO: Change argument to logical data (e.g. start & end offset)
+    ##       rather than physical raw bytes.
     def append_txnlog(self, bs):
         if self._txn_log is not None:
             ret = self._txn_log.write(bs)
@@ -804,7 +822,7 @@ class TwoPC_Output_LocalFilesystem:
             return -1
 
     def read_chunk(self, what, should, go, here):
-        raise Error
+        raise Exception
 
     def read_txnlog_lines(self):
         return self._read_file_lines(self._txn_log_path)
