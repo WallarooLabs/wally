@@ -560,6 +560,7 @@ class AsyncServer(asynchat.async_chat, object):
             #
             self._twopc_out.leaving_workers(msg2.leaving_workers)
             for w in msg2.leaving_workers:
+                # NOTE: When streamIds > 1 are used, this iteration needs change
                 key = (w, 1)
                 try:
                     del self._streams[key]
@@ -768,6 +769,7 @@ class TwoPC_Output_LocalFilesystem:
         self._out.truncate(truncate_offset)
         self._out.seek(truncate_offset)
         self.out_offset = truncate_offset
+        self.flush_fsync_txnlog()
         logging.info("truncate_and_seek_to: truncate worker {} to {}".format(
             self._instance_name, truncate_offset))
 
@@ -856,8 +858,8 @@ logging.root.formatter = logging.Formatter(fmt)
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(logging.root.formatter)
 logging.root.addHandler(stream_handler)
-#logging.root.setLevel(logging.INFO)
-logging.root.setLevel(logging.DEBUG)
+logging.root.setLevel(logging.INFO)
+#logging.root.setLevel(logging.DEBUG)
 
 out_path = sys.argv[1]
 abort_rule_path = sys.argv[2]
