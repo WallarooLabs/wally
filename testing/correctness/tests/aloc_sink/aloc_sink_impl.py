@@ -962,3 +962,39 @@ class TwoPC_TxnlogHelper:
 
     def deserialize_txnlog_item(bs):
         return eval(bs)
+
+    def is_phase1(log):
+        return (is_1ok(log) or is_1bad(log))
+
+    def is_phase2(log):
+        return (is_2ok(log) or is_2bad(log))
+
+    def is_1ok(log):
+        if isinstance(log, list):
+            return (log[1] == '1-ok')
+
+    def is_1bad(log):
+        if isinstance(log, list):
+            return (log[1] == '1-rollback')
+
+    def is_2ok(log):
+        if isinstance(log, list):
+            return (log[1] == '2-ok')
+
+    def is_2bad(log):
+        if isinstance(log, list):
+            return (log[1] == '2-error') or (log[1] == '2-rollback')
+
+    def get_1ok_offsets(log):
+        [_ts, status, txn_id, [(_stream_id, start_offset, end_offset)]] = log
+        if status == '1-ok':
+            return (txn_id, start_offset, end_offset)
+        else:
+            raise Exception
+
+    def get_2ok_end_offset(log):
+        [_ts, status, _txn_id, end_offset] = log
+        if status == '2-ok':
+            return end_offset
+        else:
+            raise Exception
