@@ -87,7 +87,13 @@ actor BarrierSource is Source
       @printf[I32]("===BarrierSource %s created===\n".cstring(),
         _source_id.string().cstring())
     end
-    _router_registry.register_source(this, _source_id)
+
+    // NOTE: We don't register BarrierSource as a source with RouterRegistry
+    // because it is only a source for the purposes of the barrier
+    // protocol. As a result, unlike other sources, it does not use its
+    // own OutgoingBoundaries, but instead uses the canonical ones. This is
+    // because it only rarely sends messages (those related to barriers
+    // and to register/unregister itself as a Producer).
 
   fun ref metrics_reporter(): MetricsReporter =>
     _metrics_reporter
