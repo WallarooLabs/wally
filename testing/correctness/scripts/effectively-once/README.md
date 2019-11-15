@@ -81,6 +81,12 @@ Finally, all of the Bourne/Bash shell variables in the
 Their values may be tweaked to fit your use case, hence the prefix
 "sample" in the file name.
 
+You can also pass in your Wallaroo top directory directly, e.g. 
+```
+. ./sample-env-vars.sh path/to/wallaroo
+. ./sample-env-vars.sh.tcp-source+sink path/to/wallaroo
+```
+
 ### Stop all Wallaroo-related processes and delete all state files
 
 ```
