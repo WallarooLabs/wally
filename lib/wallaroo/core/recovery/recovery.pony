@@ -30,6 +30,16 @@ use "wallaroo/core/registries"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
 
+
+type RecoveryReason is U16
+primitive RecoveryReasons
+  fun has_priority(a: RecoveryReason, b: RecoveryReason): Bool =>
+    a > b
+  fun not_recovering(): U16 => 0
+  fun abort_checkpoint(): U16 => 100
+  fun crash_recovery(): U16 => 200
+
+
 actor Recovery
   """
   Phases:
@@ -62,7 +72,7 @@ actor Recovery
   let _self: Recovery tag = this
   let _auth: AmbientAuth
   let _worker_name: WorkerName
-  var _recovery_phase: _RecoveryPhase = _AwaitRecovering
+  var _recovery_phase: _RecoveryPhase
   var _workers: Array[WorkerName] val = recover Array[WorkerName] end
 
   let _event_log: EventLog
@@ -89,6 +99,11 @@ actor Recovery
     _connections = connections
     _router_registry = router_registry
     _data_receivers = data_receivers
+    if is_recovering then
+      _recovery_phase = _AwaitRecovering(RecoveryReasons.crash_recovery())
+    else
+      _recovery_phase = _AwaitRecovering(RecoveryReasons.not_recovering())
+    end
     _checkpoint_initiator.set_recovery(this)
 
   be update_initializer(initializer: LocalTopologyInitializer) =>
@@ -98,11 +113,11 @@ actor Recovery
     _checkpoint_id = s_id
 
   be start_recovery(workers: Array[WorkerName] val,
-    with_reconnect: Bool = true)
+    reason: RecoveryReason)
   =>
     _workers = workers
     _router_registry.stop_the_world()
-    _recovery_phase.start_recovery(_workers, this, with_reconnect)
+    _recovery_phase.start_recovery(_workers, this, reason)
 
   be recovery_reconnect_finished(abort_promise: (Promise[None] | None)) =>
     _recovery_phase.recovery_reconnect_finished()
@@ -142,7 +157,8 @@ actor Recovery
   =>
     _recovery_phase.rollback_complete(worker, token)
 
-  be recovery_initiated_at_worker(worker: WorkerName, rollback_id: RollbackId)
+  be recovery_initiated_at_worker(worker: WorkerName, rollback_id: RollbackId,
+    reason: RecoveryReason)
   =>
     if worker != _worker_name then
       @printf[I32]("Recovery initiation attempted by %s\n".cstring(),
@@ -160,40 +176,52 @@ actor Recovery
         end
       })
 
-      _recovery_phase.try_override_recovery(worker, rollback_id, this, promise)
+      _recovery_phase.try_override_recovery(worker, rollback_id, reason, this,
+        promise)
     end
 
   be ack_recovery_initiated(worker: WorkerName) =>
     _recovery_phase.ack_recovery_initiated(worker)
 
   fun ref _start_reconnect(workers: Array[WorkerName] val,
-    with_reconnect: Bool)
+    reason: RecoveryReason)
   =>
-    if with_reconnect then
+    match reason
+    | RecoveryReasons.crash_recovery() =>
       ifdef "resilience" then
+        @printf[I32]("|~~ - Rolling back for crash recovery - ~~|\n".cstring())
         @printf[I32]("|~~ - Recovery Phase: Reconnect - ~~|\n".cstring())
       end
       _recovery_phase = _BoundariesReconnect(_recovery_reconnecter, workers,
-        this)
+        this, reason)
       _recovery_phase.start_reconnect()
+    | RecoveryReasons.abort_checkpoint() =>
+      ifdef "resilience" then
+        @printf[I32]("|~~ - Rolling back for aborted checkpoint. Skipping reconnect phases. - ~~|\n".cstring())
+      end
+      _prepare_rollback(reason)
     else
-      _prepare_rollback()
+      @printf[I32]("Invalid reason %s for recovery!\n".cstring(),
+        reason.string().cstring())
+      Fail()
     end
 
-  fun ref request_boundaries_map() =>
-    _recovery_phase = _WaitingForBoundariesMap(this)
+  fun ref request_boundaries_map(reason: RecoveryReason) =>
+    _recovery_phase = _WaitingForBoundariesMap(this, reason)
     let promise = Promise[Map[WorkerName, OutgoingBoundary] val]
     promise.next[None](_self~inform_of_boundaries_map())
     _router_registry.list_boundaries(promise)
 
   fun ref request_boundaries_to_ack_registering(
-    boundaries_map: Map[WorkerName, OutgoingBoundary] val)
+    boundaries_map: Map[WorkerName, OutgoingBoundary] val,
+    reason: RecoveryReason)
   =>
     let obs = SetIs[OutgoingBoundary]
     for b in boundaries_map.values() do
       obs.set(b)
     end
-    _recovery_phase = _WaitingForBoundariesToAckRegistering(this, obs)
+    _recovery_phase = _WaitingForBoundariesToAckRegistering(this, obs,
+      reason)
     for ob in obs.values() do
       let promise = Promise[OutgoingBoundary]
       promise.next[None](_self~boundary_acked_registering())
@@ -203,7 +231,7 @@ actor Recovery
     promise.next[None](_self~data_receivers_acked_registering())
     _data_receivers.request_boundary_punctuation_acks(promise)
 
-  fun ref _prepare_rollback() =>
+  fun ref _prepare_rollback(reason: RecoveryReason) =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: Prepare Rollback - ~~|\n".cstring())
       _event_log.prepare_for_rollback(this, _checkpoint_initiator)
@@ -216,18 +244,19 @@ actor Recovery
         Fail()
       end
 
-      _recovery_phase = _PrepareRollback(this)
+      _recovery_phase = _PrepareRollback(this, reason)
     else
-      _recovery_complete(0, 0)
+      _recovery_complete(0, 0, reason)
     end
 
-  fun ref _rollback_local_keys() =>
+  fun ref _rollback_local_keys(reason: RecoveryReason) =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: Rollback Local Keys - ~~|\n"
         .cstring())
       try
         let checkpoint_id = _checkpoint_id as CheckpointId
-        _recovery_phase = _RollbackLocalKeys(this, checkpoint_id, _workers)
+        _recovery_phase = _RollbackLocalKeys(this, checkpoint_id, _workers,
+          reason)
 
         let promise = Promise[None]
         promise.next[None]({(n: None) =>
@@ -248,45 +277,49 @@ actor Recovery
         Fail()
       end
     else
-      _recovery_complete(0, 0)
+      _recovery_complete(0, 0, reason)
     end
 
-  fun ref _local_keys_rollback_complete() =>
+  fun ref _local_keys_rollback_complete(reason: RecoveryReason) =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: Await Rollback Id - ~~|\n".cstring())
-      _recovery_phase = _AwaitRollbackId(this)
+      _recovery_phase = _AwaitRollbackId(this, reason)
       let promise = Promise[RollbackId]
       promise.next[None](_self~receive_rollback_id())
       _checkpoint_initiator.request_rollback_id(promise)
     else
-      _recovery_complete(0, 0)
+      _recovery_complete(0, 0, reason)
     end
 
   be receive_rollback_id(rollback_id: RollbackId) =>
     _recovery_phase.receive_rollback_id(rollback_id)
 
-  fun ref request_recovery_initiated_acks(rollback_id: RollbackId) =>
+  fun ref request_recovery_initiated_acks(rollback_id: RollbackId,
+    reason: RecoveryReason)
+  =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: Await Recovery Initiated Acks - ~~|\n".cstring())
       try
         let msg = ChannelMsgEncoder.recovery_initiated(rollback_id,
-          _worker_name, _auth)?
+          _worker_name, reason, _auth)?
         _connections.send_control_to_cluster(msg)
       else
         Fail()
       end
       _recovery_phase = _AwaitRecoveryInitiatedAcks(_workers, this,
-        rollback_id)
+        rollback_id, reason)
       _recovery_phase.ack_recovery_initiated(_worker_name)
     else
-      _recovery_complete(0, 0)
+      _recovery_complete(0, 0, reason)
     end
 
-  fun ref _recovery_initiated_acks_complete(rollback_id: RollbackId) =>
+  fun ref _recovery_initiated_acks_complete(rollback_id: RollbackId,
+    reason: RecoveryReason)
+  =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: Rollback Barrier - ~~|\n".cstring())
 
-      _recovery_phase = _RollbackBarrier(this)
+      _recovery_phase = _RollbackBarrier(this, rollback_id, reason)
 
       let promise = Promise[CheckpointRollbackBarrierToken]
       promise.next[None]({(token: CheckpointRollbackBarrierToken) =>
@@ -295,23 +328,26 @@ actor Recovery
       _checkpoint_initiator.initiate_rollback(promise, _worker_name,
         rollback_id)
     else
-      _recovery_complete(0, 0)
+      _recovery_complete(0, 0, reason)
     end
 
-  fun ref _rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
+  fun ref _rollback_barrier_complete(token: CheckpointRollbackBarrierToken,
+    reason: RecoveryReason)
+  =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: AwaitDataReceiversAck - ~~|\n"
         .cstring())
       _data_receivers.rollback_barrier_complete(this)
-      _recovery_phase = _AwaitDataReceiversAck(this, token)
+      _recovery_phase = _AwaitDataReceiversAck(this, token, reason)
     end
 
-  fun ref _data_receivers_ack_complete(token: CheckpointRollbackBarrierToken)
+  fun ref _data_receivers_ack_complete(token: CheckpointRollbackBarrierToken,
+    reason: RecoveryReason)
   =>
     ifdef "resilience" then
       @printf[I32](("|~~ - Recovery Phase: Rollback " +
         "- ~~| \n").cstring())
-      _recovery_phase = _Rollback(this, token, _workers)
+      _recovery_phase = _Rollback(this, token, _workers, reason)
 
       let promise = Promise[CheckpointRollbackBarrierToken]
       promise.next[None](recover this~rollback_complete(_worker_name) end)
@@ -331,7 +367,7 @@ actor Recovery
     end
 
   fun ref _recovery_complete(rollback_id: RollbackId,
-    checkpoint_id: CheckpointId)
+    checkpoint_id: CheckpointId, reason: RecoveryReason)
   =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery COMPLETE - ~~|\n".cstring())

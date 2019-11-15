@@ -27,6 +27,7 @@ use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
 use "wallaroo/core/data_receiver"
 use "wallaroo/core/initialization"
+use "wallaroo/core/recovery"
 use "wallaroo/core/registries"
 use "wallaroo/core/routing"
 use "wallaroo/core/source/connector_source"
@@ -529,13 +530,14 @@ primitive ChannelMsgEncoder
     _encode(AnnounceRollbackIdMsg(rollback_id), auth)?
 
   fun recovery_initiated(rollback_id: RollbackId,
-    sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
+    sender: WorkerName, reason: RecoveryReason, auth: AmbientAuth):
+    Array[ByteSeq] val ?
   =>
     """
     Sent to all workers in cluster when a recovering worker has connected so
     that currently recovering workers can cede control.
     """
-    _encode(RecoveryInitiatedMsg(rollback_id, sender), auth)?
+    _encode(RecoveryInitiatedMsg(rollback_id, sender, reason), auth)?
 
   fun ack_recovery_initiated(sender: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -1821,11 +1823,15 @@ class val AnnounceRollbackIdMsg is ChannelMsg
 class val RecoveryInitiatedMsg is ChannelMsg
   let rollback_id: RollbackId
   let sender: WorkerName
+  let reason: RecoveryReason
 
   fun val string(): String => __loc.type_name()
-  new val create(rollback_id': RollbackId, sender': WorkerName) =>
+  new val create(rollback_id': RollbackId, sender': WorkerName,
+    reason': RecoveryReason)
+  =>
     rollback_id = rollback_id'
     sender = sender'
+    reason = reason'
 
 class val AckRecoveryInitiatedMsg is ChannelMsg
   let sender: WorkerName

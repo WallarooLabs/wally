@@ -32,9 +32,10 @@ use "wallaroo_labs/mort"
 
 trait _RecoveryPhase
   fun name(): String
+  fun recovery_reason(): RecoveryReason
 
   fun ref start_recovery(workers: Array[WorkerName] val,
-    recovery: Recovery ref, with_reconnect: Bool)
+    recovery: Recovery ref, reason: RecoveryReason)
   =>
     _invalid_call(__loc.method_name()); Fail()
 
@@ -96,11 +97,14 @@ trait _RecoveryPhase
     _unexpected_call(__loc.method_name())
 
   fun ref try_override_recovery(worker: WorkerName,
-    rollback_id: RollbackId, recovery: Recovery ref,
+    rollback_id: RollbackId, reason: RecoveryReason, recovery: Recovery ref,
     abort_promise: Promise[None])
   =>
-    recovery._abort_early(worker)
-    abort_promise(None)
+    if not RecoveryReasons.has_priority(recovery_reason(), reason)
+    then
+      recovery._abort_early(worker)
+      abort_promise(None)
+    end
 
   fun _invalid_call(method_name: String) =>
     @printf[I32]("Invalid call to %s on recovery phase %s\n".cstring(),
@@ -126,14 +130,23 @@ trait _RecoveryPhase
       .cstring(), method_name.cstring(), name().cstring())
 
 class _AwaitRecovering is _RecoveryPhase
-  fun name(): String => "_AwaitRecovering"
+  let _initial_recovery_reason: RecoveryReason
+
+  new create(reason: RecoveryReason) =>
+    _initial_recovery_reason = reason
+
+  fun name(): String => __loc.type_name()
+  fun recovery_reason(): RecoveryReason => _initial_recovery_reason
 
   fun ref start_recovery(workers: Array[WorkerName] val,
-    recovery: Recovery ref, with_reconnect: Bool)
+    recovery: Recovery ref, reason: RecoveryReason)
   =>
-    recovery._start_reconnect(workers, with_reconnect)
+    // We can override the initial recovery reason here, in the case where
+    // we started up normally but are aborting a checkpoint, for example.
+    recovery._start_reconnect(workers, reason)
 
 class _BoundariesReconnect is _RecoveryPhase
+  let _recovery_reason: RecoveryReason
   let _recovery_reconnecter: RecoveryReconnecter
   let _workers: Array[WorkerName] val
   let _recovery: Recovery ref
@@ -142,16 +155,19 @@ class _BoundariesReconnect is _RecoveryPhase
   var _abort_promise: (Promise[None] | None) = None
 
   new create(recovery_reconnecter: RecoveryReconnecter,
-    workers: Array[WorkerName] val, recovery: Recovery ref)
+    workers: Array[WorkerName] val, recovery: Recovery ref,
+    reason: RecoveryReason)
   =>
+    _recovery_reason = reason
     _recovery_reconnecter = recovery_reconnecter
     _workers = workers
     _recovery = recovery
 
-  fun name(): String => "_BoundariesReconnect"
+  fun name(): String => __loc.type_name()
+  fun recovery_reason(): RecoveryReason => _recovery_reason
 
   fun ref start_recovery(workers: Array[WorkerName] val,
-    recovery: Recovery ref, with_reconnect: Bool)
+    recovery: Recovery ref, reason: RecoveryReason)
   =>
     // E.g., immediately after "Online recovery initiated." and
     // "Reconnect Phase 1: Wait for Boundary Counts"
@@ -167,46 +183,54 @@ class _BoundariesReconnect is _RecoveryPhase
       _recovery._abort_early(_override_worker)
       return
     end
-    _recovery.request_boundaries_map()
+    _recovery.request_boundaries_map(_recovery_reason)
 
   fun ref try_override_recovery(worker: WorkerName,
-    rollback_id: RollbackId, recovery: Recovery ref,
+    rollback_id: RollbackId, reason: RecoveryReason, recovery: Recovery ref,
     abort_promise: Promise[None])
   =>
     @printf[I32](("RECOVERY: Received override recovery message during " +
       "Reconnect Phase. Waiting to cede control until " +
       "boundaries are reconnected.\n").cstring())
-    if rollback_id > _highest_rival_rollback_id then
+    if RecoveryReasons.has_priority(reason, _recovery_reason) or
+       (not RecoveryReasons.has_priority(_recovery_reason, reason) and
+         (rollback_id > _highest_rival_rollback_id))
+    then
       _highest_rival_rollback_id = rollback_id
       _override_worker = worker
       _abort_promise = abort_promise
     end
 
 class _WaitingForBoundariesMap is _RecoveryPhase
+  let _recovery_reason: RecoveryReason
   let _recovery: Recovery ref
 
-  new create(recovery: Recovery ref) =>
+  new create(recovery: Recovery ref, reason: RecoveryReason) =>
     @printf[I32](("RECOVERY: Waiting for list of Producers\n").cstring())
+    _recovery_reason = reason
     _recovery = recovery
 
   fun name(): String => __loc.type_name()
+  fun recovery_reason(): RecoveryReason => _recovery_reason
 
   fun ref inform_of_boundaries_map(obs: Map[WorkerName, OutgoingBoundary] val)
   =>
-    _recovery.request_boundaries_to_ack_registering(obs)
+    _recovery.request_boundaries_to_ack_registering(obs, _recovery_reason)
 
 class _WaitingForBoundariesToAckRegistering is _RecoveryPhase
+  let _recovery_reason: RecoveryReason
   let _recovery: Recovery ref
   let _boundaries: SetIs[OutgoingBoundary] = _boundaries.create()
   let _acked_boundaries: SetIs[OutgoingBoundary] =
     _acked_boundaries.create()
   var _data_receivers_acked: Bool = false
 
-  new create(recovery: Recovery ref,
-    boundaries: SetIs[OutgoingBoundary])
+  new create(recovery: Recovery ref, boundaries: SetIs[OutgoingBoundary],
+    reason: RecoveryReason)
   =>
     @printf[I32](("RECOVERY: Worker waiting for boundaries " +
       "to ack forwarding register messages\n").cstring())
+    _recovery_reason = reason
     _recovery = recovery
     for b in boundaries.values() do
       _boundaries.set(b)
@@ -214,6 +238,7 @@ class _WaitingForBoundariesToAckRegistering is _RecoveryPhase
     Invariant(_boundaries.size() > 0)
 
   fun name(): String => __loc.type_name()
+  fun recovery_reason(): RecoveryReason => _recovery_reason
 
   fun ref boundary_acked_registering(b: OutgoingBoundary) =>
     _acked_boundaries.set(b)
@@ -227,34 +252,40 @@ class _WaitingForBoundariesToAckRegistering is _RecoveryPhase
     if (_boundaries.size() == _acked_boundaries.size()) and
       _data_receivers_acked
     then
-      _recovery._prepare_rollback()
+      _recovery._prepare_rollback(_recovery_reason)
     end
 
 class _PrepareRollback is _RecoveryPhase
+  let _recovery_reason: RecoveryReason
   let _recovery: Recovery ref
 
-  new create(recovery: Recovery ref) =>
+  new create(recovery: Recovery ref, reason: RecoveryReason) =>
+    _recovery_reason = reason
     _recovery = recovery
 
-  fun name(): String => "_PrepareRollback"
+  fun name(): String => __loc.type_name()
+  fun recovery_reason(): RecoveryReason => _recovery_reason
 
   fun ref rollback_prep_complete() =>
-    _recovery._rollback_local_keys()
+    _recovery._rollback_local_keys(_recovery_reason)
 
 class _RollbackLocalKeys is _RecoveryPhase
+  let _recovery_reason: RecoveryReason
   let _recovery: Recovery ref
   let _checkpoint_id: CheckpointId
   let _workers: Array[WorkerName] val
   let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
 
   new create(recovery: Recovery ref, checkpoint_id: CheckpointId,
-    workers: Array[WorkerName] val)
+    workers: Array[WorkerName] val, reason: RecoveryReason)
   =>
+    _recovery_reason = reason
     _recovery = recovery
     _workers = workers
     _checkpoint_id = checkpoint_id
 
-  fun name(): String => "_RollbackTopology"
+  fun name(): String => __loc.type_name()
+  fun recovery_reason(): RecoveryReason => _recovery_reason
 
   fun ref worker_ack_local_keys_rollback(w: WorkerName, checkpoint_id: CheckpointId)
   =>
@@ -276,7 +307,7 @@ class _RollbackLocalKeys is _RecoveryPhase
 
   fun ref _check_completion() =>
     if _workers.size() == _acked_workers.size() then
-      _recovery._local_keys_rollback_complete()
+      _recovery._local_keys_rollback_complete(_recovery_reason)
     else
       ifdef "checkpoint_trace" then
         @printf[I32]("_RollbackTopology: %s acked out of %s\n".cstring(),
@@ -286,43 +317,48 @@ class _RollbackLocalKeys is _RecoveryPhase
     end
 
 class _AwaitRollbackId is _RecoveryPhase
+  let _recovery_reason: RecoveryReason
   let _recovery: Recovery ref
   var _abort_promise: (Promise[None] | None) = None
   var _highest_rival_rollback_id: RollbackId = 0
   var _override_worker: WorkerName = ""
 
-  new create(recovery: Recovery ref) =>
+  new create(recovery: Recovery ref, reason: RecoveryReason) =>
+    _recovery_reason = reason
     _recovery = recovery
 
-  fun name(): String => "_AwaitRollbackId"
+  fun name(): String => __loc.type_name()
+  fun recovery_reason(): RecoveryReason => _recovery_reason
 
   fun ref receive_rollback_id(rollback_id: RollbackId) =>
-    _recovery.request_recovery_initiated_acks(rollback_id)
+    _recovery.request_recovery_initiated_acks(rollback_id, _recovery_reason)
 
   fun ref try_override_recovery(worker: WorkerName,
-    rollback_id: RollbackId, recovery: Recovery ref,
+    rollback_id: RollbackId, reason: RecoveryReason, recovery: Recovery ref,
     abort_promise: Promise[None])
   =>
-    // Another worker has made it past the request rollback id phase before
-    // us, and has managed to inform us, so we should simply cede control to
-    // it.
-    abort_promise(None)
-    _recovery._abort_early(worker)
+    if not RecoveryReasons.has_priority(_recovery_reason, reason) then
+      abort_promise(None)
+      _recovery._abort_early(worker)
+    end
 
 class _AwaitRecoveryInitiatedAcks is _RecoveryPhase
+  let _recovery_reason: RecoveryReason
   let _workers: Array[WorkerName] val
   let _recovery: Recovery ref
   let _rollback_id: RollbackId
   let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
 
   new create(workers: Array[WorkerName] val, recovery: Recovery ref,
-    rollback_id: RollbackId)
+    rollback_id: RollbackId, reason: RecoveryReason)
   =>
+    _recovery_reason = reason
     _workers = workers
     _recovery = recovery
     _rollback_id = rollback_id
 
-  fun name(): String => "_AwaitRecoveryInitiatedAcks"
+  fun name(): String => __loc.type_name()
+  fun recovery_reason(): RecoveryReason => _recovery_reason
 
   fun ref ack_recovery_initiated(w: WorkerName) =>
     _acked_workers.set(w)
@@ -330,65 +366,99 @@ class _AwaitRecoveryInitiatedAcks is _RecoveryPhase
 
   fun ref check_completion() =>
     if _acked_workers.size() == _workers.size() then
-      _recovery._recovery_initiated_acks_complete(_rollback_id)
+      _recovery._recovery_initiated_acks_complete(_rollback_id,
+        _recovery_reason)
     end
 
   fun ref try_override_recovery(worker: WorkerName,
-    rollback_id: RollbackId, recovery: Recovery ref,
+    rollback_id: RollbackId, reason: RecoveryReason, recovery: Recovery ref,
     abort_promise: Promise[None])
   =>
-    if rollback_id > _rollback_id then
+    if RecoveryReasons.has_priority(reason, _recovery_reason) or
+       (not RecoveryReasons.has_priority(_recovery_reason, reason) and
+         (rollback_id > _rollback_id))
+    then
       recovery._abort_early(worker)
       abort_promise(None)
     end
 
 class _RollbackBarrier is _RecoveryPhase
+  let _recovery_reason: RecoveryReason
   let _recovery: Recovery ref
+  let _rollback_id: RollbackId
 
-  new create(recovery: Recovery ref) =>
+  new create(recovery: Recovery ref, rollback_id: RollbackId,
+    reason: RecoveryReason)
+  =>
+    _recovery_reason = reason
     _recovery = recovery
+    _rollback_id = rollback_id
 
-  fun name(): String => "_RollbackBarrier"
+  fun name(): String => __loc.type_name()
+  fun recovery_reason(): RecoveryReason => _recovery_reason
 
   fun ref rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
-    _recovery._rollback_barrier_complete(token)
+    _recovery._rollback_barrier_complete(token, _recovery_reason)
+
+  fun ref try_override_recovery(worker: WorkerName,
+    rollback_id: RollbackId, reason: RecoveryReason, recovery: Recovery ref,
+    abort_promise: Promise[None])
+  =>
+    if RecoveryReasons.has_priority(reason, _recovery_reason) or
+       (not RecoveryReasons.has_priority(_recovery_reason, reason) and
+         (rollback_id > _rollback_id))
+    then
+      recovery._abort_early(worker)
+      abort_promise(None)
+    end
 
 class _AwaitDataReceiversAck is _RecoveryPhase
+  let _recovery_reason: RecoveryReason
   let _recovery: Recovery ref
   let _token: CheckpointRollbackBarrierToken
 
-  new create(recovery: Recovery ref, token: CheckpointRollbackBarrierToken) =>
+  new create(recovery: Recovery ref, token: CheckpointRollbackBarrierToken,
+    reason: RecoveryReason)
+  =>
+    _recovery_reason = reason
     _recovery = recovery
     _token = token
 
-  fun name(): String => "_AwaitDataReceiversAck"
+  fun name(): String => __loc.type_name()
+  fun recovery_reason(): RecoveryReason => _recovery_reason
 
   fun ref data_receivers_ack() =>
-    _recovery._data_receivers_ack_complete(_token)
+    _recovery._data_receivers_ack_complete(_token, _recovery_reason)
 
   fun ref try_override_recovery(worker: WorkerName,
-    rollback_id: RollbackId, recovery: Recovery ref,
+    rollback_id: RollbackId, reason: RecoveryReason, recovery: Recovery ref,
     abort_promise: Promise[None])
   =>
-    if rollback_id > _token.rollback_id then
+    if RecoveryReasons.has_priority(reason, _recovery_reason) or
+       (not RecoveryReasons.has_priority(_recovery_reason, reason) and
+         (rollback_id > _token.rollback_id))
+    then
       recovery._abort_early(worker)
       abort_promise(None)
     end
 
 class _Rollback is _RecoveryPhase
+  let _recovery_reason: RecoveryReason
   let _recovery: Recovery ref
   let _token: CheckpointRollbackBarrierToken
   let _workers: Array[WorkerName] box
   let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
 
   new create(recovery: Recovery ref, token: CheckpointRollbackBarrierToken,
-    workers: Array[WorkerName] box)
+    workers: Array[WorkerName] box, reason: RecoveryReason)
   =>
+    _recovery_reason = reason
     _recovery = recovery
     _token = token
     _workers = workers
 
-  fun name(): String => "_Rollback"
+  fun name(): String => __loc.type_name()
+  fun recovery_reason(): RecoveryReason => _recovery_reason
 
   fun ref rollback_complete(worker: WorkerName,
     token: CheckpointRollbackBarrierToken)
@@ -399,44 +469,50 @@ class _Rollback is _RecoveryPhase
     end
     _acked_workers.set(worker)
     if _acked_workers.size() == _workers.size() then
-      _recovery._recovery_complete(token.rollback_id, token.checkpoint_id)
+      _recovery._recovery_complete(token.rollback_id, token.checkpoint_id,
+        _recovery_reason)
     end
 
   fun ref try_override_recovery(worker: WorkerName,
-    rollback_id: RollbackId, recovery: Recovery ref,
+    rollback_id: RollbackId, reason: RecoveryReason, recovery: Recovery ref,
     abort_promise: Promise[None])
   =>
-    if rollback_id > _token.rollback_id then
+    if RecoveryReasons.has_priority(reason, _recovery_reason) or
+       (not RecoveryReasons.has_priority(_recovery_reason, reason) and
+         (rollback_id > _token.rollback_id))
+    then
       _recovery._abort_early(worker)
       abort_promise(None)
     end
 
 class _FinishedRecovering is _RecoveryPhase
-  fun name(): String => "_FinishedRecovering"
+  fun name(): String => __loc.type_name()
+  fun recovery_reason(): RecoveryReason => RecoveryReasons.not_recovering()
 
   fun ref start_recovery(workers: Array[WorkerName] val,
-    recovery: Recovery ref, with_reconnect: Bool)
+    recovery: Recovery ref, reason: RecoveryReason)
   =>
     @printf[I32]("Online recovery initiated.\n".cstring())
-    recovery._start_reconnect(workers, with_reconnect)
+    recovery._start_reconnect(workers, reason)
 
   fun ref recovery_reconnect_finished() =>
     None
 
   fun ref try_override_recovery(worker: WorkerName,
-    rollback_id: RollbackId, recovery: Recovery ref,
+    rollback_id: RollbackId, reason: RecoveryReason, recovery: Recovery ref,
     abort_promise: Promise[None])
   =>
     abort_promise(None)
 
 class _RecoveryOverrideAccepted is _RecoveryPhase
-  fun name(): String => "_RecoveryOverrideAccepted"
+  fun name(): String => __loc.type_name()
+  fun recovery_reason(): RecoveryReason => RecoveryReasons.not_recovering()
 
   fun ref start_recovery(workers: Array[WorkerName] val,
-    recovery: Recovery ref, with_reconnect: Bool)
+    recovery: Recovery ref, reason: RecoveryReason)
   =>
     @printf[I32]("Online recovery initiated.\n".cstring())
-    recovery._start_reconnect(workers, with_reconnect)
+    recovery._start_reconnect(workers, reason)
 
   fun ref recovery_reconnect_finished() =>
     None
@@ -463,7 +539,7 @@ class _RecoveryOverrideAccepted is _RecoveryPhase
     None
 
   fun ref try_override_recovery(worker: WorkerName,
-    rollback_id: RollbackId, recovery: Recovery ref,
+    rollback_id: RollbackId, reason: RecoveryReason, recovery: Recovery ref,
     abort_promise: Promise[None])
   =>
     abort_promise(None)
