@@ -11,21 +11,18 @@ jobs:
     executor: pony-changelog
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: changelog-tool verify
 
   unit-tests:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: make unit-tests debug=true
 
   integration-tests:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: make integration-tests-lib-all debug=true
       - run: make integration-tests-demos-all debug=true
       - run: make integration-tests-examples-all debug=true
@@ -41,7 +38,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: make integration-tests-demos-all debug=true resilience=on
       - run: make integration-tests-examples-all debug=true resilience=on
       - store_artifacts:
@@ -51,7 +47,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: make integration-tests-testing-correctness-apps-all debug=true
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
@@ -60,7 +55,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: make integration-tests-testing-correctness-apps-all debug=true resilience=on
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
@@ -69,7 +63,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: make integration-tests-testing-correctness-tests-aloc_sink debug=true resilience=on
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
@@ -78,7 +71,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
           ulimit -a
@@ -90,7 +82,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
           ulimit -a
@@ -102,7 +93,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
           ulimit -a
@@ -114,7 +104,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
           ulimit -a
@@ -126,7 +115,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
           ulimit -a
@@ -138,7 +126,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
           ulimit -a
@@ -150,7 +137,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
           ulimit -a
@@ -162,7 +148,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
           ulimit -a
@@ -174,7 +159,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
           ulimit -a
@@ -186,7 +170,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
           ulimit -a
@@ -198,7 +181,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
           ulimit -a
@@ -210,7 +192,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
           ulimit -a
@@ -222,7 +203,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
           ulimit -a
@@ -234,7 +214,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
           ulimit -a
@@ -246,7 +225,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
           ulimit -a
@@ -258,7 +236,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
           ulimit -a
@@ -270,7 +247,6 @@ jobs:
     executor: wallaroo-ci
     steps:
       - checkout
-      - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
           ulimit -a
