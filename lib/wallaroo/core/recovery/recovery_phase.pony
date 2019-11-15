@@ -524,6 +524,16 @@ class _RecoveryOverrideAccepted is _RecoveryPhase
   =>
     None
 
+  fun ref inform_of_boundaries_map(obs: Map[WorkerName, OutgoingBoundary] val)
+  =>
+    None
+
+  fun ref boundary_acked_registering(b: OutgoingBoundary) =>
+    None
+
+  fun ref data_receivers_acked_registering() =>
+    None
+
   fun ref rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
     None
 
