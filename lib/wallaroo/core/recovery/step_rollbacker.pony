@@ -26,6 +26,10 @@ primitive StepRollbacker
   fun apply(payload: ByteSeq val, runner: Runner, step: Step ref,
     rb: Reader = Reader)
   =>
+    match runner
+    | let r: RollbackableRunner =>
+      r.clear_state()
+    end
     rb.append(payload)
     try
       let w_bytes_size = rb.u32_be()?.usize()
