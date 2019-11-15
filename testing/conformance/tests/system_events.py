@@ -41,7 +41,7 @@ from integration import clear_current_test
 #     # ResilienceTestBaseApplications provide their own test runner
 #     # So we only need to give it a config and a sequence of operations
 #     with MultiPartitionDetector(config=conf) as test:
-#         test.run_test_sequence([Wait(1), Grow(1), Wait(1), Shrink(1), Wait(1)])
+#         test.run_test_sequence([Wait(3), Grow(1), Wait(1), Shrink(1), Wait(1)])
 
 ####################
 # Generative Tests #
@@ -75,20 +75,20 @@ SOURCE_NUMBERS = [1]
 
 RESILIENCE_SEQS = [
     # wait, grow1, wait, shrink1, wait, crash2, wait, recover
-    [Wait(2), Grow(1), Wait(2), Shrink(1), Wait(2), Crash(2),
-     Wait(2), Recover(2), Wait(5)],
+    [Wait(3), Grow(1), Wait(2), Shrink(1), Wait(2), Crash(2),
+     Wait(3), Recover(2), Wait(5)],
 
     # crash1, recover1
-    [Wait(2), Crash(1), Wait(2), Recover(1), Wait(5)],
+    [Wait(3), Crash(1), Wait(2), Recover(1), Wait(5)],
 
     # crash2, recover2
-    [Wait(2), Crash(2), Wait(2), Recover(2), Wait(5)],
+    [Wait(3), Crash(2), Wait(2), Recover(2), Wait(5)],
 
     # Log rotate
-    [Wait(2), Rotate(), Wait(2)],
+    [Wait(3), Rotate(), Wait(2)],
 
     # Log rotate and crash
-    [Wait(2), Rotate(), Wait(2), Crash(1), Wait(2), Recover(1), Wait(2)],
+    [Wait(3), Rotate(), Wait(2), Crash(1), Wait(2), Recover(1), Wait(2)],
     ]
 
 
