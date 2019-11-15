@@ -905,7 +905,9 @@ actor RouterRegistry is (KeyRegistry & SourceRegistry & DisposableRegistry &
     end
 
   be inform_worker_of_boundary_count(target_worker: WorkerName) =>
-    // There is one boundary per source plus the canonical boundary
+    // There is one boundary per source plus the canonical boundary.
+    // BarrierSource, a special case, is not counted here because it uses the
+    // canonical boundary and doesn't register as a normal source.
     let count = _sources.size() + 1
     _connections.inform_worker_of_boundary_count(target_worker, count)
 

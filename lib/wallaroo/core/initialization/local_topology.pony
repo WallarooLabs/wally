@@ -1131,7 +1131,8 @@ actor LocalTopologyInitializer is LayoutInitializer
     match _topology
     | let t: LocalTopology =>
       if _is_recovering then
-        _recovery.start_recovery(t.worker_names)
+        _recovery.start_recovery(t.worker_names,
+          RecoveryReasons.crash_recovery())
       else
         _phase.report_recovery_ready_to_work()
         _event_log.quick_initialize(this)

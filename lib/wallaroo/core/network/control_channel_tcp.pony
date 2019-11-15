@@ -598,7 +598,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _checkpoint_initiator.commit_checkpoint_id(m.checkpoint_id,
           m.rollback_id, m.sender)
       | let m: RecoveryInitiatedMsg =>
-        _recovery.recovery_initiated_at_worker(m.sender, m.rollback_id)
+        _recovery.recovery_initiated_at_worker(m.sender, m.rollback_id,
+          m.reason)
       | let m: AckRecoveryInitiatedMsg =>
         _recovery.ack_recovery_initiated(m.sender)
       | let m: InitiateRollbackBarrierMsg =>

@@ -414,7 +414,7 @@ actor CheckpointInitiator is Initializable
         else
           r.update_checkpoint_id(_last_complete_checkpoint_id)
         end
-        r.start_recovery(consume ws where with_reconnect = false)
+        r.start_recovery(consume ws, RecoveryReasons.abort_checkpoint())
       else
         Fail()
       end
