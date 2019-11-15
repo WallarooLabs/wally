@@ -63,6 +63,7 @@ trait SerializableStateRunner
 
 trait RollbackableRunner
   fun ref rollback(state_bytes: ByteSeq val)
+  fun ref clear_state()
   fun ref set_step_id(id: U128)
 
 trait val RunnerBuilder
@@ -675,6 +676,12 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     else
       Fail()
     end
+
+  fun ref clear_state() =>
+    """
+    Called to purge all keys when we are rolling back.
+    """
+    _state_map.clear()
 
 interface Stringablike
   fun string(): String
