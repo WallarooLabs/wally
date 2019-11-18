@@ -34,9 +34,11 @@ use "wallaroo/core/routing"
 use "wallaroo/core/tcp_actor"
 use "wallaroo/core/topology"
 use "wallaroo_labs/bytes"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
 
+use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag,...)
 
 class val OutgoingBoundaryBuilder
   let _auth: AmbientAuth
@@ -351,7 +353,11 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _maybe_mute_or_unmute_upstreams()
 
   fun ref receive_ack(acked_seq_id: SeqId) =>
+    @l(Log.debug(), Log.boundary(), "worker %s target_worker %s acked_seq_id %lu > _lowest_queue_id %lu\n".cstring(), _worker_name.cstring(), _target_worker.cstring(), acked_seq_id, _lowest_queue_id)
     ifdef debug then
+      if not (acked_seq_id > _lowest_queue_id) then
+        @printf[I32]("not (acked_seq_id %lu > _lowest_queue_id %lu)\n".cstring(), acked_seq_id, _lowest_queue_id)
+      end
       Invariant(acked_seq_id > _lowest_queue_id)
     end
 
@@ -541,10 +547,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
   =>
-    """
-    There is nothing for a Boundary to rollback to.
-    """
-    None
+    _lowest_queue_id = 0
 
   be update_worker_data_service(worker: WorkerName,
     host: String, service: String)
@@ -660,6 +663,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
           @printf[I32]("Received StartNormalDataSendingMsg at Boundary\n"
             .cstring())
         end
+        @l(Log.debug(), Log.boundary(), "received: worker %s target_worker %s sn.last_id_seen %lu\n".cstring(), _worker_name.cstring(), _target_worker.cstring(), sn.last_id_seen)
         receive_connect_ack(sn.last_id_seen)
         start_normal_sending()
       | let aw: AckDataReceivedMsg =>
