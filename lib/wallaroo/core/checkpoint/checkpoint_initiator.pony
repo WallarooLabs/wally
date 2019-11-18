@@ -509,7 +509,7 @@ actor CheckpointInitiator is Initializable
           @printf[I32]("CheckpointInitiator: Checkpoint %s is complete!\n".
             cstring(), st.id.string().cstring())
         end
-        _save_checkpoint_id(st.id, _last_rollback_id)
+        _save_checkpoint_id(st.id, st.id, _last_rollback_id)
         _last_complete_checkpoint_id = st.id
         _propagate_checkpoint_complete(st.id)
         try
@@ -568,7 +568,8 @@ actor CheckpointInitiator is Initializable
     if (_primary_worker == _worker_name) then
       let rollback_id = _last_rollback_id + 1
       _last_rollback_id = rollback_id
-      _save_checkpoint_id(_last_complete_checkpoint_id, rollback_id)
+      _save_checkpoint_id(_current_checkpoint_id, _last_complete_checkpoint_id,
+        rollback_id)
       promise(_last_rollback_id)
     else
       try
@@ -631,7 +632,8 @@ actor CheckpointInitiator is Initializable
 
   be rollback_complete(rollback_id: RollbackId) =>
     ifdef "resilience" then
-      _save_checkpoint_id(_last_complete_checkpoint_id, rollback_id)
+      _save_checkpoint_id(_current_checkpoint_id, _last_complete_checkpoint_id,
+        rollback_id)
     end
 
   be commit_checkpoint_id(checkpoint_id: CheckpointId, rollback_id: RollbackId,
@@ -645,22 +647,25 @@ actor CheckpointInitiator is Initializable
         "not the primary for checkpoints. Ignoring.\n").cstring())
     end
 
-  fun ref _commit_checkpoint_id(checkpoint_id: CheckpointId,
+  fun ref _commit_checkpoint_id(current_checkpoint_id: CheckpointId,
     rollback_id: RollbackId)
   =>
     ifdef "resilience" then
-      _current_checkpoint_id = checkpoint_id
-      _last_complete_checkpoint_id = checkpoint_id
-      _save_checkpoint_id(checkpoint_id, rollback_id)
+      _current_checkpoint_id = current_checkpoint_id
+      _last_complete_checkpoint_id = current_checkpoint_id
+      _save_checkpoint_id(_current_checkpoint_id, _last_complete_checkpoint_id,
+        rollback_id)
     end
 
-  fun ref _save_checkpoint_id(checkpoint_id: CheckpointId,
-    rollback_id: RollbackId)
+  fun ref _save_checkpoint_id(current_checkpoint_id: CheckpointId,
+    last_complete_checkpoint_id: CheckpointId, rollback_id: RollbackId)
   =>
     try
       ifdef "checkpoint_trace" then
-        @printf[I32]("Saving CheckpointId %s and RollbackId %s\n".cstring(),
-          checkpoint_id.string().cstring(), rollback_id.string().cstring())
+        @printf[I32]("Saving current CheckpointId %s last complete CheckpointId %s RollbackId %s\n".cstring(),
+          current_checkpoint_id.string().cstring(),
+          last_complete_checkpoint_id.string().cstring(),
+          rollback_id.string().cstring())
       end
       let filepath = FilePath(_auth, _checkpoint_id_file)?
       // TODO: We'll need to rotate this file since it will grow.
@@ -669,7 +674,8 @@ actor CheckpointInitiator is Initializable
         _do_local_file_io)
       file.seek_end(0)
 
-      _wb.u64_be(checkpoint_id)
+      _wb.u64_be(current_checkpoint_id)
+      _wb.u64_be(last_complete_checkpoint_id)
       _wb.u64_be(rollback_id)
       // TODO: We can't be sure we actually wrote all this out given the
       // way this code works.
@@ -683,10 +689,11 @@ actor CheckpointInitiator is Initializable
 
   fun ref _load_latest_checkpoint_id() =>
     ifdef "resilience" then
-      (let checkpoint_id, let rollback_id) =
-        LatestCheckpointId.read(_auth, _checkpoint_id_file)
-      _current_checkpoint_id = checkpoint_id
-      _last_complete_checkpoint_id = checkpoint_id
+      (let current_checkpoint_id,
+       let last_complete_checkpoint_id,
+       let rollback_id) = LatestCheckpointId.read(_auth, _checkpoint_id_file)
+      _current_checkpoint_id = current_checkpoint_id
+      _last_complete_checkpoint_id = last_complete_checkpoint_id
       _last_rollback_id = rollback_id
     end
 
@@ -697,28 +704,33 @@ actor CheckpointInitiator is Initializable
 
 primitive LatestCheckpointId
   fun read(auth: AmbientAuth, checkpoint_id_file: String):
-    (CheckpointId, RollbackId)
+    (CheckpointId, CheckpointId, RollbackId)
   =>
     try
       let filepath = FilePath(auth, checkpoint_id_file)?
       if filepath.exists() then
         let file = File(filepath)
         file.seek_end(0)
-        file.seek(-16)
+        file.seek(-24)
         let r = Reader
-        r.append(file.read(16))
-        let checkpoint_id = r.u64_be()?
+        r.append(file.read(24))
+        let current_checkpoint_id = r.u64_be()?
+        let last_complete_checkpoint_id = r.u64_be()?
         let rollback_id = r.u64_be()?
-        (checkpoint_id, rollback_id)
+        ifdef "checkpoint_trace" then
+          @printf[I32]("Found checkpoint ids in recovery file: current %lu last successful %lu rollback %lu\n".cstring(),
+          current_checkpoint_id, last_complete_checkpoint_id, rollback_id)
+        end
+        (current_checkpoint_id, last_complete_checkpoint_id, rollback_id)
       else
         @printf[I32]("No latest checkpoint id in recovery file.\n".cstring())
         Fail()
-        (0, 0)
+        (0, 0, 0)
       end
     else
       @printf[I32]("Error reading checkpoint id recovery file!".cstring())
       Fail()
-      (0, 0)
+      (0, 0, 0)
     end
 
 class _InitiateCheckpoint is TimerNotify

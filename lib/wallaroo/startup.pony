@@ -180,9 +180,10 @@ actor Startup
         _disposables.set(joining_listener)
       elseif _is_recovering then
         ifdef "resilience" then
-          (let checkpoint_id, let rollback_id) =
+          (let current_checkpoint_id, let last_complete_checkpoint_id,
+            let rollback_id) =
             LatestCheckpointId.read(auth, _checkpoint_ids_file)
-          _initialize(checkpoint_id)
+          _initialize(last_complete_checkpoint_id)
         else
           _initialize()
         end
