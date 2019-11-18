@@ -305,6 +305,8 @@ actor CheckpointInitiator is Initializable
     ifdef "resilience" then
       _clear_pending_checkpoints()
       _current_checkpoint_id = _current_checkpoint_id + 1
+      _save_checkpoint_id(_current_checkpoint_id, _last_complete_checkpoint_id,
+        _last_rollback_id)
 
       ifdef "checkpoint_trace" then
         try
@@ -509,9 +511,10 @@ actor CheckpointInitiator is Initializable
           @printf[I32]("CheckpointInitiator: Checkpoint %s is complete!\n".
             cstring(), st.id.string().cstring())
         end
-        _save_checkpoint_id(st.id, st.id, _last_rollback_id)
         _last_complete_checkpoint_id = st.id
-        _propagate_checkpoint_complete(st.id)
+        _save_checkpoint_id(_current_checkpoint_id,
+          _last_complete_checkpoint_id, _last_rollback_id)
+        _propagate_checkpoint_complete(_last_complete_checkpoint_id)
         try
           let msg = ChannelMsgEncoder.commit_checkpoint_id(st.id,
             _last_rollback_id, _worker_name, _auth)?
@@ -569,7 +572,7 @@ actor CheckpointInitiator is Initializable
       let rollback_id = _last_rollback_id + 1
       _last_rollback_id = rollback_id
       _save_checkpoint_id(_current_checkpoint_id, _last_complete_checkpoint_id,
-        rollback_id)
+        _last_rollback_id)
       promise(_last_rollback_id)
     else
       try
@@ -605,6 +608,8 @@ actor CheckpointInitiator is Initializable
         _last_complete_checkpoint_id)
       if _current_checkpoint_id < _last_complete_checkpoint_id then
         _current_checkpoint_id = _last_complete_checkpoint_id
+        _save_checkpoint_id(_current_checkpoint_id,
+          _last_complete_checkpoint_id, rollback_id)
       end
       let barrier_promise = Promise[BarrierToken]
       barrier_promise.next[None]({(t: BarrierToken) =>
