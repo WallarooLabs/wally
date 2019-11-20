@@ -322,11 +322,6 @@ class _ApplicationReadyToWorkPhase is LocalTopologyInitializerPhase
       _lti._cluster_ready_to_work(_initializables)
     end
 
-  fun ref cluster_status_query(lti: LocalTopologyInitializer ref,
-    conn: TCPConnection)
-  =>
-    lti._cluster_status_query_initialized(conn)
-
 class _ClusterReadyToWorkPhase is LocalTopologyInitializerPhase
   let _lti: LocalTopologyInitializer ref
 
