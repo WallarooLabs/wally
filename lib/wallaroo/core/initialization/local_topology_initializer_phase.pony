@@ -26,6 +26,8 @@ use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
 
 
+
+
 trait LocalTopologyInitializerPhase
   fun name(): String
 
@@ -321,11 +323,6 @@ class _ApplicationReadyToWorkPhase is LocalTopologyInitializerPhase
     if not _is_initializer then
       _lti._cluster_ready_to_work(_initializables)
     end
-
-  fun ref cluster_status_query(lti: LocalTopologyInitializer ref,
-    conn: TCPConnection)
-  =>
-    lti._cluster_status_query_initialized(conn)
 
 class _ClusterReadyToWorkPhase is LocalTopologyInitializerPhase
   let _lti: LocalTopologyInitializer ref
