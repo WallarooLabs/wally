@@ -1371,12 +1371,14 @@ actor RouterRegistry is (KeyRegistry & SourceRegistry & DisposableRegistry &
     conn.writev(msg)
 
   be cluster_status_query_not_initialized(conn: TCPConnection) =>
+    @printf[I32]("!@ sending (negative) cluster_status_query_not_initialized\n".cstring())
     let msg = ExternalMsgEncoder.cluster_status_query_reponse_not_initialized()
     conn.writev(msg)
 
   be cluster_status_query(worker_names: Array[WorkerName] val,
     conn: TCPConnection)
   =>
+    @printf[I32]("!@ sending cluster_status_query response: worker_count: %s\n".cstring(), worker_names.size().string().cstring())
     let msg = ExternalMsgEncoder.cluster_status_query_response(
       worker_names.size(), worker_names, _stop_the_world_in_process)
     conn.writev(msg)
