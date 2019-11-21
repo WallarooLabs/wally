@@ -547,6 +547,10 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
   =>
+    // TODO: It's clear that the following line fixes BUG #3056,
+    //       but it is not clear if it may create a problem in
+    //       detecting out-of-order sequence IDs in the future;
+    //       see BUG #3063.
     _lowest_queue_id = 0
 
   be update_worker_data_service(worker: WorkerName,
