@@ -43,7 +43,7 @@ class ConnectorSinkNotify
   var credits: U32 = 0
   var acked_point_of_ref: cwm.MessageId = 0
   var message_id: cwm.MessageId = acked_point_of_ref
-  var _connection_count: USize = 0
+  var _report_ready_to_work_done: Bool = false
   let _conn_debug: U16 = Log.make_sev_cat(Log.debug(), Log.conn_sink())
   let _conn_info: U16 = Log.make_sev_cat(Log.info(), Log.conn_sink())
   let _conn_err: U16 = Log.make_sev_cat(Log.err(), Log.conn_sink())
@@ -92,7 +92,6 @@ class ConnectorSinkNotify
     twopc.notify1_sent = false
     twopc_intro_done = false
     twopc_uncommitted_list = None
-    _connection_count = _connection_count + 1
     // Apply runtime throttle until we're done with initial 2PC ballet.
     throttled(conn)
     conn.set_nodelay(true)
@@ -304,13 +303,13 @@ class ConnectorSinkNotify
           twopc_intro_done = true
           unthrottled(conn)
           twopc_current_txn_aborted = false
-          if _connection_count == 1 then
+          if not _report_ready_to_work_done then
             try
               (conn as ConnectorSink ref).report_ready_to_work()
+              _report_ready_to_work_done = true
             else
               Fail()
             end
-            None
           end
           try (conn as ConnectorSink ref).twopc_intro_done() else Fail() end
         | let mi: cwm.TwoPCReplyMsg =>
