@@ -1,5 +1,11 @@
 ## When using sh/bash, use via: . /path/to/this/file
 
+if [ -z "$1" ]; then
+	echo ""
+else
+	export WALLAROO_TOP=$1
+fi
+
 if [ -z "$WALLAROO_TOP" ]; then
     export WALLAROO_TOP=$HOME/wallaroo
 fi
