@@ -219,12 +219,16 @@ trait _ReconnectPhase
       .cstring(), method_name.cstring(), name().cstring())
 
 class _EmptyReconnectPhase is _ReconnectPhase
+  new create() =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
+
   fun name(): String => "Empty Reconnect Phase"
 
 class _AwaitingRecoveryReconnectStart is _ReconnectPhase
   let _reconnecter: _RecoveryReconnecter ref
 
   new create(reconnecter: _RecoveryReconnecter ref) =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
     _reconnecter = reconnecter
 
   fun name(): String => "Awaiting Recovery Reconnect Phase"
@@ -238,6 +242,7 @@ class _ReadyForNormalProcessing is _ReconnectPhase
   let _reconnecter: _RecoveryReconnecter ref
 
   new create(reconnecter: _RecoveryReconnecter ref) =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
     _reconnecter = reconnecter
 
   fun name(): String => "Not Recovery Reconnecting Phase"
@@ -263,6 +268,7 @@ class _WaitingForBoundaryCounts is _ReconnectPhase
     reconnected_boundaries: Map[WorkerName, SetIs[RoutingId]],
     reconnecter: _RecoveryReconnecter ref)
   =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
     _expected_workers = expected_workers
     _reconnected_boundaries = reconnected_boundaries
     _reconnecter = reconnecter
@@ -301,6 +307,7 @@ class _WaitForReconnections is _ReconnectPhase
     reconnected_boundaries: Map[WorkerName, SetIs[RoutingId]],
     reconnecter: _RecoveryReconnecter ref)
   =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
     _expected_boundaries = expected_boundaries
     _reconnected_boundaries = reconnected_boundaries
     _reconnecter = reconnecter
@@ -340,3 +347,4 @@ primitive CheckCounts
       Fail()
       return false
     end
+

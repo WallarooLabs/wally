@@ -133,6 +133,7 @@ class _AwaitRecovering is _RecoveryPhase
   let _initial_recovery_reason: RecoveryReason
 
   new create(reason: RecoveryReason) =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
     _initial_recovery_reason = reason
 
   fun name(): String => __loc.type_name()
@@ -141,6 +142,7 @@ class _AwaitRecovering is _RecoveryPhase
   fun ref start_recovery(workers: Array[WorkerName] val,
     recovery: Recovery ref, reason: RecoveryReason)
   =>
+    @printf[I32]("!@ %s:start_recovery\n".cstring(), __loc.type_name().string().cstring())
     // We can override the initial recovery reason here, in the case where
     // we started up normally but are aborting a checkpoint, for example.
     recovery._start_reconnect(workers, reason)
@@ -158,6 +160,7 @@ class _BoundariesReconnect is _RecoveryPhase
     workers: Array[WorkerName] val, recovery: Recovery ref,
     reason: RecoveryReason)
   =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
     _recovery_reason = reason
     _recovery_reconnecter = recovery_reconnecter
     _workers = workers
@@ -169,6 +172,7 @@ class _BoundariesReconnect is _RecoveryPhase
   fun ref start_recovery(workers: Array[WorkerName] val,
     recovery: Recovery ref, reason: RecoveryReason)
   =>
+    @printf[I32]("!@ %s:start_recovery\n".cstring(), __loc.type_name().string().cstring())
     // E.g., immediately after "Online recovery initiated." and
     // "Reconnect Phase 1: Wait for Boundary Counts"
     _unexpected_call(__loc.method_name())
@@ -192,10 +196,12 @@ class _BoundariesReconnect is _RecoveryPhase
     @printf[I32](("RECOVERY: Received override recovery message during " +
       "Reconnect Phase. Waiting to cede control until " +
       "boundaries are reconnected.\n").cstring())
+    @printf[I32]("!@ my reason: %s, their reason: %s, rollback_id: %s, _highest_rival_rollback_id: %s\n".cstring(), reason.string().cstring(), _recovery_reason.string().cstring(), rollback_id.string().cstring(), _highest_rival_rollback_id.string().cstring())
     if RecoveryReasons.has_priority(reason, _recovery_reason) or
        (not RecoveryReasons.has_priority(_recovery_reason, reason) and
          (rollback_id > _highest_rival_rollback_id))
     then
+      @printf[I32]("!@ HIGHER THAN HIGHEST RIVAL\n".cstring())
       _highest_rival_rollback_id = rollback_id
       _override_worker = worker
       _abort_promise = abort_promise
@@ -206,6 +212,7 @@ class _WaitingForBoundariesMap is _RecoveryPhase
   let _recovery: Recovery ref
 
   new create(recovery: Recovery ref, reason: RecoveryReason) =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
     @printf[I32](("RECOVERY: Waiting for list of Producers\n").cstring())
     _recovery_reason = reason
     _recovery = recovery
@@ -228,6 +235,7 @@ class _WaitingForBoundariesToAckRegistering is _RecoveryPhase
   new create(recovery: Recovery ref, boundaries: SetIs[OutgoingBoundary],
     reason: RecoveryReason)
   =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
     @printf[I32](("RECOVERY: Worker waiting for boundaries " +
       "to ack forwarding register messages\n").cstring())
     _recovery_reason = reason
@@ -260,6 +268,7 @@ class _PrepareRollback is _RecoveryPhase
   let _recovery: Recovery ref
 
   new create(recovery: Recovery ref, reason: RecoveryReason) =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
     _recovery_reason = reason
     _recovery = recovery
 
@@ -279,6 +288,7 @@ class _RollbackLocalKeys is _RecoveryPhase
   new create(recovery: Recovery ref, checkpoint_id: CheckpointId,
     workers: Array[WorkerName] val, reason: RecoveryReason)
   =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
     _recovery_reason = reason
     _recovery = recovery
     _workers = workers
@@ -324,6 +334,7 @@ class _AwaitRollbackId is _RecoveryPhase
   var _override_worker: WorkerName = ""
 
   new create(recovery: Recovery ref, reason: RecoveryReason) =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
     _recovery_reason = reason
     _recovery = recovery
 
@@ -352,6 +363,7 @@ class _AwaitRecoveryInitiatedAcks is _RecoveryPhase
   new create(workers: Array[WorkerName] val, recovery: Recovery ref,
     rollback_id: RollbackId, reason: RecoveryReason)
   =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
     _recovery_reason = reason
     _workers = workers
     _recovery = recovery
@@ -390,6 +402,7 @@ class _RollbackBarrier is _RecoveryPhase
   new create(recovery: Recovery ref, rollback_id: RollbackId,
     reason: RecoveryReason)
   =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
     _recovery_reason = reason
     _recovery = recovery
     _rollback_id = rollback_id
@@ -420,6 +433,7 @@ class _AwaitDataReceiversAck is _RecoveryPhase
   new create(recovery: Recovery ref, token: CheckpointRollbackBarrierToken,
     reason: RecoveryReason)
   =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
     _recovery_reason = reason
     _recovery = recovery
     _token = token
@@ -452,6 +466,7 @@ class _Rollback is _RecoveryPhase
   new create(recovery: Recovery ref, token: CheckpointRollbackBarrierToken,
     workers: Array[WorkerName] box, reason: RecoveryReason)
   =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
     _recovery_reason = reason
     _recovery = recovery
     _token = token
@@ -486,12 +501,16 @@ class _Rollback is _RecoveryPhase
     end
 
 class _FinishedRecovering is _RecoveryPhase
+  new create() =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
+
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => RecoveryReasons.not_recovering()
 
   fun ref start_recovery(workers: Array[WorkerName] val,
     recovery: Recovery ref, reason: RecoveryReason)
   =>
+    @printf[I32]("!@ %s:start_recovery\n".cstring(), __loc.type_name().string().cstring())
     @printf[I32]("Online recovery initiated.\n".cstring())
     recovery._start_reconnect(workers, reason)
 
@@ -505,12 +524,16 @@ class _FinishedRecovering is _RecoveryPhase
     abort_promise(None)
 
 class _RecoveryOverrideAccepted is _RecoveryPhase
+  new create() =>
+    @printf[I32]("!@ PHASE TRANSITION: %s\n".cstring(), __loc.type_name().string().cstring())
+
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => RecoveryReasons.not_recovering()
 
   fun ref start_recovery(workers: Array[WorkerName] val,
     recovery: Recovery ref, reason: RecoveryReason)
   =>
+    @printf[I32]("!@ %s:start_recovery\n".cstring(), __loc.type_name().string().cstring())
     @printf[I32]("Online recovery initiated.\n".cstring())
     recovery._start_reconnect(workers, reason)
 
@@ -556,3 +579,4 @@ class _RecoveryOverrideAccepted is _RecoveryPhase
 
   fun ref ack_recovery_initiated(w: WorkerName) =>
     None
+

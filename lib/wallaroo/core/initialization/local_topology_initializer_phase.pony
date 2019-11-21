@@ -100,6 +100,7 @@ trait LocalTopologyInitializerPhase
   fun ref cluster_status_query(lti: LocalTopologyInitializer ref,
     conn: TCPConnection)
   =>
+    @printf[I32]("!@ cluster_status_query (negative) called in phase %s\n".cstring(), name().string().cstring())
     lti._cluster_status_query_not_initialized(conn)
 
   fun _invalid_call(method_name: String) =>
@@ -248,6 +249,8 @@ class _InitializablesReadyToWorkPhase is LocalTopologyInitializerPhase
     initializables: Initializables, recovery_ready_to_work: Bool,
     event_log_ready_to_work: Bool, workers_ready_to_work: SetIs[WorkerName])
   =>
+    @printf[I32]("|~~ !@ INIT PHASE IIb: _InitializablesReadyToWorkPhase! ~~|\n"
+      .cstring())
     _lti = lti
     _initializables = initializables
     _recovery_ready_to_work = recovery_ready_to_work
@@ -257,6 +260,7 @@ class _InitializablesReadyToWorkPhase is LocalTopologyInitializerPhase
   fun name(): String => "_InitializablesReadyToWorkPhase"
 
   fun ref report_event_log_ready_to_work() =>
+    @printf[I32]("!@ _InitializablesReadyToWorkPhase: report_event_log_ready_to_work\n".cstring())
     _event_log_ready_to_work = true
     if _recovery_ready_to_work then
       _lti.application_ready_to_work(_initializables,
@@ -264,6 +268,7 @@ class _InitializablesReadyToWorkPhase is LocalTopologyInitializerPhase
     end
 
   fun ref report_recovery_ready_to_work() =>
+    @printf[I32]("!@ _InitializablesReadyToWorkPhase: report_recovery_ready_to_work\n".cstring())
     _recovery_ready_to_work = true
     if _event_log_ready_to_work then
       _lti.application_ready_to_work(_initializables,
@@ -271,6 +276,7 @@ class _InitializablesReadyToWorkPhase is LocalTopologyInitializerPhase
     end
 
   fun ref worker_report_ready_to_work(w: WorkerName) =>
+    @printf[I32]("!@ _InitializablesReadyToWorkPhase: worker_report_ready_to_work %s\n".cstring(), w.string().cstring())
     _workers_ready_to_work.set(w)
 
 class _ApplicationReadyToWorkPhase is LocalTopologyInitializerPhase
@@ -355,4 +361,5 @@ class _ClusterReadyToWorkPhase is LocalTopologyInitializerPhase
   fun ref cluster_status_query(lti: LocalTopologyInitializer ref,
     conn: TCPConnection)
   =>
+    @printf[I32]("!@ cluster_status_query called in phase %s\n".cstring(), name().string().cstring())
     lti._cluster_status_query_initialized(conn)

@@ -1124,6 +1124,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   fun ref _initializables_ready_to_work(initializables: Initializables,
     workers_ready_to_work: SetIs[WorkerName])
   =>
+    @printf[I32]("!@ LocalTopology:_initializables_ready_to_work\n".cstring())
     _phase = _InitializablesReadyToWorkPhase(this, initializables,
       _recovery_ready_to_work, _event_log_ready_to_work,
       workers_ready_to_work)
@@ -1131,9 +1132,11 @@ actor LocalTopologyInitializer is LayoutInitializer
     match _topology
     | let t: LocalTopology =>
       if _is_recovering then
+        @printf[I32]("!@ -- is_recovering\n".cstring())
         _recovery.start_recovery(t.worker_names,
           RecoveryReasons.crash_recovery())
       else
+        @printf[I32]("!@ -- not is_recovering\n".cstring())
         _phase.report_recovery_ready_to_work()
         _event_log.quick_initialize(this)
       end
