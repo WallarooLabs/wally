@@ -49,7 +49,7 @@ aloc_sink_tests:
 	-rm -fv /tmp/Celsius* /tmp/aloc*
 	#### -cd $(HOME)/s/src/other-repo && make start-s3-container
 	-cd $(ALOC_SINK_PATH) && ./run_aloc_sink_test > /tmp/run_aloc_sink_test.out 2>&1
-	cd $(ALOC_SINK_PATH) && ./run_aloc_sink_test.validate.sh
+	cd $(ALOC_SINK_PATH) && ./run_aloc_sink_test.validate.sh || cat /tmp/run_aloc_sink_test.out
 else
 aloc_sink_tests:
 	$(QUIET)printf "aloc_sink tests not run.\nRun make with 'resilience=on' to run this test.\n"
