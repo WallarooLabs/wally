@@ -357,7 +357,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
       // This is probably because of an outdated message.
       // TODO: We need to be careful that this isn't masking a potential bug.
       @l(Log.debug(), Log.boundary(), "Ignoring acked seq id %lu from worker %s, which is less than _lowest_queue_id %lu. Current seq_id is %lu\n"
-        .cstring(), _worker_name.cstring(), acked_seq_id, _lowest_queue_id,
+        .cstring(), acked_seq_id, _worker_name.cstring(), _lowest_queue_id,
         seq_id)
       Invariant(not (acked_seq_id > seq_id))
       return
