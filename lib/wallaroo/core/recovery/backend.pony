@@ -147,7 +147,7 @@ class FileBackend is Backend
   fun bytes_written(): USize =>
     _bytes_written
 
-  fun get_path(): String => // SLF TODO used??
+  fun get_path(): String =>
     _filepath.path
 
   fun ref start_rollback(checkpoint_id: CheckpointId): USize =>
@@ -158,7 +158,8 @@ class FileBackend is Backend
     end
     if _file.size() == 0 then
       @printf[I32](("Trying to rollback to checkpoint %s from empty " +
-        "recovery file %s\n").cstring(), checkpoint_id.string().cstring())
+        "recovery file %s\n").cstring(), checkpoint_id.string().cstring(),
+        get_path().cstring())
       Fail()
     end
 
