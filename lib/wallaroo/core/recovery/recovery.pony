@@ -39,6 +39,14 @@ primitive RecoveryReasons
   fun abort_checkpoint(): U16 => 100
   fun crash_recovery(): U16 => 200
 
+  fun string_for(rr: RecoveryReason): String =>
+    match rr
+    | RecoveryReasons.not_recovering() => "no reason to recover"
+    | RecoveryReasons.abort_checkpoint() => "checkpoint abort"
+    | RecoveryReasons.crash_recovery() => "crash recovery"
+    else
+      "unknown recovery reason"
+    end
 
 actor Recovery
   """
@@ -115,6 +123,8 @@ actor Recovery
   be start_recovery(workers: Array[WorkerName] val,
     reason: RecoveryReason)
   =>
+    @printf[I32]("|~~ - Starting recovery for %s - ~~|\n".cstring(),
+      RecoveryReasons.string_for(reason))
     _workers = workers
     _router_registry.stop_the_world()
     _recovery_phase.start_recovery(_workers, this, reason)

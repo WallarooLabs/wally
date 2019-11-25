@@ -199,23 +199,37 @@ interface _RecoveryReconnecter
 trait _ReconnectPhase
   fun name(): String
   fun ref add_expected_boundary_count(worker: WorkerName, count: USize) =>
-    _invalid_call(__loc.method_name()); Fail()
+    _unexpected_call(__loc.method_name())
 
   fun ref add_reconnected_boundary(worker: WorkerName,
     boundary_id: RoutingId) ?
   =>
-    _invalid_call(__loc.method_name()); Fail()
-
-  fun ref add_boundary_reconnect_complete(worker: WorkerName,
-    boundary_id: RoutingId)
-  =>
-    _invalid_call(__loc.method_name()); Fail()
+    _unexpected_call(__loc.method_name())
 
   fun ref check_completion() =>
     _invalid_call(__loc.method_name()); Fail()
 
   fun _invalid_call(method_name: String) =>
     @printf[I32]("Invalid call to %s on recovery reconnecter phase %s\n"
+      .cstring(), method_name.cstring(), name().cstring())
+
+  fun _unexpected_call(method_name: String) =>
+    """
+    Only call this for phase methods that are called directly in response to
+    control messages received. That's because we can't be sure in that case if
+    we had crashed and recovered during an earlier recovery/rollback round, in
+    which case any control messages related to that earlier round are simply
+    outdated. We shouldn't Fail() in this case because we can expect control
+    messages to go out of sync in this way in this kind of scenario.
+
+    TODO: All such control messages could be tagged with a rollback id,
+    enabling us to determine at the Recovery actor level if we should drop
+    such a message or send it to our current phase. This would mean we'd have
+    to ignore anything we receive before we get an initial rollback id, which
+    takes place after at least one phase that waits for a control message, so
+    there are problems to be solved in order to do this safely.
+    """
+    @printf[I32]("UNEXPECTED CALL to %s on recovery reconnector phase %s. Ignoring!\n"
       .cstring(), method_name.cstring(), name().cstring())
 
 class _EmptyReconnectPhase is _ReconnectPhase
@@ -244,12 +258,6 @@ class _ReadyForNormalProcessing is _ReconnectPhase
 
   fun ref add_reconnected_boundary(worker: WorkerName, boundary_id: RoutingId)
   =>
-    None
-
-  fun ref add_boundary_reconnect_complete(worker: WorkerName,
-    boundary_id: RoutingId)
-  =>
-    // TODO: Do we need this anymore?
     None
 
 class _WaitingForBoundaryCounts is _ReconnectPhase
