@@ -284,20 +284,22 @@ class _WaitingForBoundaryCounts is _ReconnectPhase
   fun name(): String => "Waiting for Boundary Counts Phase"
 
   fun ref add_expected_boundary_count(worker: WorkerName, count: USize) =>
-    ifdef debug then
-      // This should only be called once per worker
-      Invariant(not _expected_boundaries.contains(worker))
-    end
-    _expected_boundaries(worker) = count
-    if not _reconnected_boundaries.contains(worker) then
-      _reconnected_boundaries(worker) = SetIs[RoutingId]
-    end
-    if SetHelpers[WorkerName].forall(_expected_workers,
-      {(w: WorkerName)(_expected_boundaries): Bool =>
-        _expected_boundaries.contains(w)})
-    then
-      _reconnecter._wait_for_reconnections(_expected_boundaries,
-        _reconnected_boundaries)
+    if _expected_boundaries.contains(worker) then
+      // This worker probably crashed and recovered while we were
+      // recovering. Ignore this message.
+      None
+    else
+      _expected_boundaries(worker) = count
+      if not _reconnected_boundaries.contains(worker) then
+        _reconnected_boundaries(worker) = SetIs[RoutingId]
+      end
+      if SetHelpers[WorkerName].forall(_expected_workers,
+        {(w: WorkerName)(_expected_boundaries): Bool =>
+          _expected_boundaries.contains(w)})
+      then
+        _reconnecter._wait_for_reconnections(_expected_boundaries,
+          _reconnected_boundaries)
+      end
     end
 
   fun ref add_reconnected_boundary(worker: WorkerName,
