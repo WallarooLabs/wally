@@ -377,6 +377,9 @@ actor LocalTopologyInitializer is LayoutInitializer
     _connections.create_connections(control_addrs, data_addrs, this,
       _router_registry)
 
+  be abort_recovery_early() =>
+    _is_recovering = false
+
   be initialize(cluster_initializer: (ClusterInitializer | None) = None,
     checkpoint_target: (CheckpointId | None) = None,
     recovering_without_resilience: Bool = false)
