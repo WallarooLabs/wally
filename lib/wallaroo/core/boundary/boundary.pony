@@ -353,13 +353,17 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _maybe_mute_or_unmute_upstreams()
 
   fun ref receive_ack(acked_seq_id: SeqId) =>
-    @l(Log.debug(), Log.boundary(), "worker %s target_worker %s acked_seq_id %lu > _lowest_queue_id %lu. Current seq_id is %lu\n".cstring(), _worker_name.cstring(), _target_worker.cstring(), acked_seq_id, _lowest_queue_id, seq_id.string().cstring())
-    ifdef debug then
-      if not (acked_seq_id > _lowest_queue_id) then
-        @printf[I32]("not (acked_seq_id %lu > _lowest_queue_id %lu). Our curretn seq_id is %s\n".cstring(), acked_seq_id, _lowest_queue_id, seq_id.string().cstring())
-      end
-      Invariant(acked_seq_id > _lowest_queue_id)
+    if not (acked_seq_id > _lowest_queue_id) then
+      // This is probably because of an outdated message.
+      // TODO: We need to be careful that this isn't masking a potential bug.
+      @l(Log.debug(), Log.boundary(), "Ignoring acked seq id %lu from worker %s, which is less than _lowest_queue_id %lu. Current seq_id is %lu\n"
+        .cstring(), _worker_name.cstring(), acked_seq_id, _lowest_queue_id,
+        seq_id)
+      Invariant(not (acked_seq_id > seq_id))
+      return
     end
+
+    @l(Log.debug(), Log.boundary(), "worker %s target_worker %s acked_seq_id %lu > _lowest_queue_id %lu. Current seq_id is %lu\n".cstring(), _worker_name.cstring(), _target_worker.cstring(), acked_seq_id, _lowest_queue_id, seq_id)
 
     ifdef "trace" then
       @printf[I32](
