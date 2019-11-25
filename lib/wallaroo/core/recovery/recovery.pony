@@ -126,6 +126,11 @@ actor Recovery
     @printf[I32]("|~~ - Starting recovery for %s - ~~|\n".cstring(),
       RecoveryReasons.string_for(reason))
     _workers = workers
+    // In case we died while another worker was recovering, we should send
+    // every worker our corresponding boundary count.
+    for w in _workers.values() do
+      _router_registry.inform_worker_of_boundary_count(w)
+    end
     _router_registry.stop_the_world()
     _recovery_phase.start_recovery(_workers, this, reason)
 
