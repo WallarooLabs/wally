@@ -124,7 +124,7 @@ actor Recovery
     reason: RecoveryReason)
   =>
     @printf[I32]("|~~ - Starting recovery for %s - ~~|\n".cstring(),
-      RecoveryReasons.string_for(reason))
+      RecoveryReasons.string_for(reason).cstring())
     _workers = workers
     // In case we died while another worker was recovering, we should send
     // every worker our corresponding boundary count.
@@ -409,6 +409,12 @@ actor Recovery
     then we finish our boundary connections and then abort, ceding the recovery
     protocol to the other worker.
     """
+    match _initializer
+    | let lti: LocalTopologyInitializer =>
+      lti.abort_recovery_early()
+    else
+      Fail()
+    end
     _data_receivers.recovery_complete()
     @printf[I32]("|~~ - Recovery initiated at %s. Ceding control. - ~~|\n"
       .cstring(), worker.cstring())
