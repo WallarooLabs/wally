@@ -531,6 +531,12 @@ if [ $run_sanity = true ]; then
     run_sanity_loop &
 fi
 
+START_TIME=$(date +%s000)
+echo Start time: $START_TIME
 echo Done, yay ... waiting
 wait > /dev/null 2>&1
+END_TIME=$(date +%s000)
+echo End time: $END_TIME
+RUN_DURATION=$(($END_TIME - $START_TIME))
+echo Duration: $RUN_DURATION
 exit 0
