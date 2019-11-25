@@ -37,7 +37,11 @@ trait _RecoveryPhase
   fun ref start_recovery(workers: Array[WorkerName] val,
     recovery: Recovery ref, reason: RecoveryReason)
   =>
-    _invalid_call(__loc.method_name()); Fail()
+    // If a lower priority reason triggers this, then we simply ignore.
+    // Otherwise, this should never happen.
+    if not RecoveryReasons.has_priority(recovery_reason(), reason) then
+      _invalid_call(__loc.method_name()); Fail()
+    end
 
   fun ref start_reconnect() =>
     _invalid_call(__loc.method_name()); Fail()
