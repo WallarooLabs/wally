@@ -14,6 +14,7 @@ if [ $usage = yes ]; then
 fi
 shift
 
+START_TIME=$(date +%s000)
 
 if [ -z "$WALLAROO_INIT_HOST" ]; then
     echo "ERROR: please set vars in sample-env-vars.sh.tcp-source+sink or in"
@@ -73,12 +74,21 @@ poll_ready () {
     poll-ready.sh $*
 }
 
+print_duration () {
+    END_TIME=$(date +%s000)
+    echo End time: $END_TIME
+    RUN_DURATION=$(($END_TIME - $START_TIME))
+    echo Duration: $RUN_DURATION
+}
+
 pause_the_world () {
     killall -STOP passthrough
     if [ `uname -s` = Linux ]; then
+        print_duration
         killall -STOP master-crasher.sh
     fi
     if [ `uname -s` = Darwin ]; then
+        print_duration
         ps axww | grep -v grep | grep '/bin/sh ./master-crasher.sh' | \
             awk '{print $1}' | xargs kill -STOP
     fi
@@ -149,6 +159,7 @@ crash_worker () {
     worker="$1"
     if [ -z "$worker" ]; then
         echo ERROR: $0: worker number not given
+        print_duration
         exit 1
     fi
     crash-worker.sh $worker
@@ -171,6 +182,7 @@ run_crash_worker_loop () {
     worker="$1"
     if [ -z "$worker" ]; then
         echo ERROR: $0: worker number not given
+        print_duration
         exit 1
     fi
     sleep 2 # Don't start crashing until checkpoint #1 is complete.
@@ -229,11 +241,13 @@ run_sanity_loop () {
         if [ ! -z "$res" ]; then
             echo "SANITY LOOP SUCCESS: EOF found!"
             echo "SANITY LOOP SUCCESS: EOF found!" >> /tmp/res
+            print_duration
             echo $res >> /tmp/res
             pause_the_world
         fi
     done
     echo "SANITY LOOP FAILURE: pause the world"
+    print_duration
     pause_the_world
 }
 
@@ -405,6 +419,7 @@ run_custom4 () {
         if [ $? -ne 0 -o ! -z "$poll_out" ]; then
             echo "custom4 shrinking worker$i: $poll_out"
             pause_the_world
+            print_duration
             exit 1
         fi
         sleep 1.3 # Give output a chance to accumulate a bit at sink.
@@ -429,6 +444,7 @@ run_custom5 () {
             if [ $? -ne 0 -o ! -z "$poll_out" ]; then
                 echo "custom5 cmd $cmd: $poll_out"
                 pause_the_world
+                print_duration
                 exit 1
             fi
             sleep 1.5
@@ -456,6 +472,7 @@ run_custom3006 () {
         if [ $? -ne 0 -o ! -z "$poll_out" ]; then
             echo "custom3006 cmd $cmd: $poll_out"
             pause_the_world
+            print_duration
             exit 1
         fi
         sleep 1.5
@@ -483,6 +500,7 @@ run_custom_tcp_crash0 () {
         echo "\nQuery initializer again\n"
         ../../../../testing/tools/external_sender/external_sender -e 127.0.0.1:7103 -t cluster-status-query
         pause_the_world
+        print_duration
         exit 1
     fi
 }
@@ -531,6 +549,8 @@ if [ $run_sanity = true ]; then
     run_sanity_loop &
 fi
 
+echo Start time: $START_TIME
 echo Done, yay ... waiting
 wait > /dev/null 2>&1
+print_duration
 exit 0
