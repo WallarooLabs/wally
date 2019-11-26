@@ -79,7 +79,7 @@ trait _RecoveryPhase
     _unexpected_call(__loc.method_name())
 
   fun ref rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
-    _invalid_call(__loc.method_name()); Fail()
+    _unexpected_call(__loc.method_name())
 
   fun ref data_receivers_ack() =>
     _invalid_call(__loc.method_name()); Fail()
