@@ -33,11 +33,15 @@ use "wallaroo_labs/mort"
 
 type RecoveryReason is U16
 primitive RecoveryReasons
-  fun has_priority(a: RecoveryReason, b: RecoveryReason): Bool =>
-    a > b
   fun not_recovering(): U16 => 0
   fun abort_checkpoint(): U16 => 100
   fun crash_recovery(): U16 => 200
+
+  fun has_priority(a: RecoveryReason, b: RecoveryReason): Bool =>
+    a > b
+
+  fun is_recovering_worker(r: RecoveryReason): Bool =>
+    r == RecoveryReasons.crash_recovery()
 
   fun string_for(rr: RecoveryReason): String =>
     match rr
@@ -199,7 +203,7 @@ actor Recovery
     _recovery_phase.ack_recovery_initiated(worker)
 
   fun ref _start_reconnect(workers: Array[WorkerName] val,
-    reason: RecoveryReason)
+    reason: RecoveryReason, recovery_priority_tracker: RecoveryPriorityTracker)
   =>
     match reason
     | RecoveryReasons.crash_recovery() =>
@@ -208,35 +212,34 @@ actor Recovery
         @printf[I32]("|~~ - Recovery Phase: Reconnect - ~~|\n".cstring())
       end
       _recovery_phase = _BoundariesReconnect(_recovery_reconnecter, workers,
-        this, reason)
+        this, reason, recovery_priority_tracker)
       _recovery_phase.start_reconnect()
     | RecoveryReasons.abort_checkpoint() =>
       ifdef "resilience" then
         @printf[I32]("|~~ - Rolling back for aborted checkpoint. Skipping reconnect phases. - ~~|\n".cstring())
       end
-      _prepare_rollback(reason)
+      _prepare_rollback(reason, recovery_priority_tracker)
     else
       @printf[I32]("Invalid reason %s for recovery!\n".cstring(),
         reason.string().cstring())
       Fail()
     end
 
-  fun ref request_boundaries_map(reason: RecoveryReason) =>
-    _recovery_phase = _WaitingForBoundariesMap(this, reason)
+  fun ref request_boundaries_map(reason: RecoveryReason,
+    recovery_priority_tracker: RecoveryPriorityTracker)
+  =>
+    _recovery_phase = _WaitingForBoundariesMap(this, reason,
+      recovery_priority_tracker)
     let promise = Promise[Map[WorkerName, OutgoingBoundary] val]
     promise.next[None](_self~inform_of_boundaries_map())
     _router_registry.list_boundaries(promise)
 
   fun ref request_boundaries_to_ack_registering(
-    boundaries_map: Map[WorkerName, OutgoingBoundary] val,
-    reason: RecoveryReason)
+    obs: SetIs[OutgoingBoundary], reason: RecoveryReason,
+    recovery_priority_tracker: RecoveryPriorityTracker)
   =>
-    let obs = SetIs[OutgoingBoundary]
-    for b in boundaries_map.values() do
-      obs.set(b)
-    end
     _recovery_phase = _WaitingForBoundariesToAckRegistering(this, obs,
-      reason)
+      reason, recovery_priority_tracker)
     for ob in obs.values() do
       let promise = Promise[OutgoingBoundary]
       promise.next[None](_self~boundary_acked_registering())
@@ -246,20 +249,27 @@ actor Recovery
     promise.next[None](_self~data_receivers_acked_registering())
     _data_receivers.request_boundary_punctuation_acks(promise)
 
-  fun ref _prepare_rollback(reason: RecoveryReason) =>
+  fun ref _prepare_rollback(reason: RecoveryReason,
+    recovery_priority_tracker: RecoveryPriorityTracker)
+  =>
     ifdef "resilience" then
-      @printf[I32]("|~~ - Recovery Phase: Prepare Rollback - ~~|\n".cstring())
-      _event_log.prepare_for_rollback(this, _checkpoint_initiator)
-
-      // Inform cluster to prepare for rollback
-      try
-        let msg = ChannelMsgEncoder.prepare_for_rollback(_worker_name, _auth)?
-        _connections.send_control_to_cluster(msg)
+      if recovery_priority_tracker.has_override() then
+        recovery_priority_tracker.initiate_abort(this)
       else
-        Fail()
-      end
+        @printf[I32]("|~~ - Recovery Phase: Prepare Rollback - ~~|\n"
+          .cstring())
+        _event_log.prepare_for_rollback(this, _checkpoint_initiator)
 
-      _recovery_phase = _PrepareRollback(this, reason)
+        // Inform cluster to prepare for rollback
+        try
+          let msg = ChannelMsgEncoder.prepare_for_rollback(_worker_name, _auth)?
+          _connections.send_control_to_cluster(msg)
+        else
+          Fail()
+        end
+
+        _recovery_phase = _PrepareRollback(this, reason)
+      end
     else
       _recovery_complete(0, 0, reason)
     end
