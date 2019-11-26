@@ -92,6 +92,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   var _initializer: (LayoutInitializer | None) = None
   var _reported_initialized: Bool = false
   var _reported_ready_to_work: Bool = false
+  var _ready_to_work_requested: Bool = false
 
   // Consumer
   var _registered_producers: RegisteredProducers =
@@ -177,7 +178,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
       if _routing_id == 0 then
         Fail()
       end
-
+      _ready_to_work_requested = true
       let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
         _routing_id, seq_id, _auth)?
       _tcp_handler.writev(connect_msg)
@@ -379,7 +380,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _replay_from(last_id_seen)
 
   fun ref start_normal_sending() =>
-    if not _reported_ready_to_work then
+    if not _reported_ready_to_work and _ready_to_work_requested then
       match _initializer
       | let li: LayoutInitializer =>
         li.report_ready_to_work(this)
