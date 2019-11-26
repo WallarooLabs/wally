@@ -18,14 +18,14 @@ Copyright 2018 The Wallaroo Authors.
 
 use "collections"
 use "promises"
+use "wallaroo/core/barrier"
 use "wallaroo/core/boundary"
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
-use "wallaroo/core/barrier"
 use "wallaroo/core/network"
-use "wallaroo/core/checkpoint"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
 
@@ -69,7 +69,7 @@ trait _RecoveryPhase
     _invalid_call(__loc.method_name()); Fail()
 
   fun ref data_receivers_acked_registering() =>
-    _invalid_call(__loc.method_name()); Fail()
+    _unexpected_call(__loc.method_name())
 
   fun ref receive_rollback_id(rollback_id: RollbackId) =>
     // This is called directly in response to a control message received.
@@ -135,9 +135,11 @@ trait _RecoveryPhase
 
 class _AwaitRecovering is _RecoveryPhase
   let _initial_recovery_reason: RecoveryReason
+  let _recovery_priority_tracker: RecoveryPriorityTracker
 
   new create(reason: RecoveryReason) =>
     _initial_recovery_reason = reason
+    _recovery_priority_tracker = RecoveryPriorityTracker(reason)
 
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => _initial_recovery_reason
@@ -147,25 +149,41 @@ class _AwaitRecovering is _RecoveryPhase
   =>
     // We can override the initial recovery reason here, in the case where
     // we started up normally but are aborting a checkpoint, for example.
-    recovery._start_reconnect(workers, reason)
+    recovery._start_reconnect(workers, reason, _recovery_priority_tracker)
+
+  fun ref try_override_recovery(worker: WorkerName,
+    rollback_id: RollbackId, reason: RecoveryReason, recovery: Recovery ref,
+    abort_promise: Promise[None])
+  =>
+    if RecoveryReasons.is_recovering_worker(_initial_recovery_reason) then
+      // If we're a recovering worker, we need to get through boundary
+      // connection and producer registration phases before we cede control.
+      _recovery_priority_tracker.try_override(worker, rollback_id, reason,
+        recovery, abort_promise)
+    else
+      if not RecoveryReasons.has_priority(_initial_recovery_reason, reason)
+      then
+        recovery._abort_early(worker)
+        abort_promise(None)
+      end
+    end
 
 class _BoundariesReconnect is _RecoveryPhase
   let _recovery_reason: RecoveryReason
   let _recovery_reconnecter: RecoveryReconnecter
   let _workers: Array[WorkerName] val
   let _recovery: Recovery ref
-  var _override_worker: WorkerName = ""
-  var _highest_rival_rollback_id: RollbackId = 0
-  var _abort_promise: (Promise[None] | None) = None
+  let _recovery_priority_tracker: RecoveryPriorityTracker
 
   new create(recovery_reconnecter: RecoveryReconnecter,
     workers: Array[WorkerName] val, recovery: Recovery ref,
-    reason: RecoveryReason)
+    reason: RecoveryReason, recovery_priority_tracker: RecoveryPriorityTracker)
   =>
     _recovery_reason = reason
     _recovery_reconnecter = recovery_reconnecter
     _workers = workers
     _recovery = recovery
+    _recovery_priority_tracker = recovery_priority_tracker
 
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => _recovery_reason
@@ -181,61 +199,72 @@ class _BoundariesReconnect is _RecoveryPhase
     _recovery_reconnecter.start_recovery_reconnect(_workers, _recovery)
 
   fun ref recovery_reconnect_finished() =>
-    match _abort_promise
-    | let p: Promise[None] =>
-      p(None)
-      _recovery._abort_early(_override_worker)
-      return
-    end
-    _recovery.request_boundaries_map(_recovery_reason)
+    //!@
+    // match _abort_promise
+    // | let p: Promise[None] =>
+    //   p(None)
+    //   _recovery._abort_early(_override_worker)
+    //   return
+    // end
+    _recovery.request_boundaries_map(_recovery_reason,
+      _recovery_priority_tracker)
 
   fun ref try_override_recovery(worker: WorkerName,
     rollback_id: RollbackId, reason: RecoveryReason, recovery: Recovery ref,
     abort_promise: Promise[None])
   =>
-    @printf[I32](("RECOVERY: Received override recovery message during " +
-      "Reconnect Phase. Waiting to cede control until " +
-      "boundaries are reconnected.\n").cstring())
-    if RecoveryReasons.has_priority(reason, _recovery_reason) or
-       (not RecoveryReasons.has_priority(_recovery_reason, reason) and
-         (rollback_id > _highest_rival_rollback_id))
-    then
-      _highest_rival_rollback_id = rollback_id
-      _override_worker = worker
-      _abort_promise = abort_promise
-    end
+    _recovery_priority_tracker.try_override(worker, rollback_id, reason,
+      recovery, abort_promise)
 
 class _WaitingForBoundariesMap is _RecoveryPhase
   let _recovery_reason: RecoveryReason
   let _recovery: Recovery ref
+  let _recovery_priority_tracker: RecoveryPriorityTracker
 
-  new create(recovery: Recovery ref, reason: RecoveryReason) =>
+  new create(recovery: Recovery ref, reason: RecoveryReason,
+    recovery_priority_tracker: RecoveryPriorityTracker)
+  =>
     @printf[I32](("RECOVERY: Waiting for list of Producers\n").cstring())
     _recovery_reason = reason
     _recovery = recovery
+    _recovery_priority_tracker = recovery_priority_tracker
 
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => _recovery_reason
 
   fun ref inform_of_boundaries_map(obs: Map[WorkerName, OutgoingBoundary] val)
   =>
-    _recovery.request_boundaries_to_ack_registering(obs, _recovery_reason)
+    let obs_set = SetIs[OutgoingBoundary]
+    for b in obs.values() do
+      obs_set.set(b)
+    end
+    _recovery.request_boundaries_to_ack_registering(obs_set, _recovery_reason,
+      _recovery_priority_tracker)
+
+  fun ref try_override_recovery(worker: WorkerName,
+    rollback_id: RollbackId, reason: RecoveryReason, recovery: Recovery ref,
+    abort_promise: Promise[None])
+  =>
+    _recovery_priority_tracker.try_override(worker, rollback_id, reason,
+      recovery, abort_promise)
 
 class _WaitingForBoundariesToAckRegistering is _RecoveryPhase
   let _recovery_reason: RecoveryReason
   let _recovery: Recovery ref
+  let _recovery_priority_tracker: RecoveryPriorityTracker
   let _boundaries: SetIs[OutgoingBoundary] = _boundaries.create()
   let _acked_boundaries: SetIs[OutgoingBoundary] =
     _acked_boundaries.create()
   var _data_receivers_acked: Bool = false
 
   new create(recovery: Recovery ref, boundaries: SetIs[OutgoingBoundary],
-    reason: RecoveryReason)
+    reason: RecoveryReason, recovery_priority_tracker: RecoveryPriorityTracker)
   =>
     @printf[I32](("RECOVERY: Worker waiting for boundaries " +
       "to ack forwarding register messages\n").cstring())
     _recovery_reason = reason
     _recovery = recovery
+    _recovery_priority_tracker = recovery_priority_tracker
     for b in boundaries.values() do
       _boundaries.set(b)
     end
@@ -252,11 +281,25 @@ class _WaitingForBoundariesToAckRegistering is _RecoveryPhase
     _data_receivers_acked = true
     _check_complete()
 
+  fun ref try_override_recovery(worker: WorkerName,
+    rollback_id: RollbackId, reason: RecoveryReason, recovery: Recovery ref,
+    abort_promise: Promise[None])
+  =>
+    _recovery_priority_tracker.try_override(worker, rollback_id, reason,
+      recovery, abort_promise)
+    if _recovery_priority_tracker.has_override() then
+      // If we're overridden here, that means another worker has probably
+      // crashed and restarted since we started recovering. We need to
+      // start this phase over to rerequest boundary acks.
+      _recovery.request_boundaries_to_ack_registering(_boundaries,
+        _recovery_reason, _recovery_priority_tracker)
+    end
+
   fun ref _check_complete() =>
     if (_boundaries.size() == _acked_boundaries.size()) and
       _data_receivers_acked
     then
-      _recovery._prepare_rollback(_recovery_reason)
+      _recovery._prepare_rollback(_recovery_reason, _recovery_priority_tracker)
     end
 
 class _PrepareRollback is _RecoveryPhase
@@ -497,7 +540,7 @@ class _FinishedRecovering is _RecoveryPhase
     recovery: Recovery ref, reason: RecoveryReason)
   =>
     @printf[I32]("Online recovery initiated.\n".cstring())
-    recovery._start_reconnect(workers, reason)
+    recovery._start_reconnect(workers, reason, RecoveryPriorityTracker(reason))
 
   fun ref recovery_reconnect_finished() =>
     None
@@ -516,7 +559,7 @@ class _RecoveryOverrideAccepted is _RecoveryPhase
     recovery: Recovery ref, reason: RecoveryReason)
   =>
     @printf[I32]("Online recovery initiated.\n".cstring())
-    recovery._start_reconnect(workers, reason)
+    recovery._start_reconnect(workers, reason, RecoveryPriorityTracker(reason))
 
   fun ref recovery_reconnect_finished() =>
     None
