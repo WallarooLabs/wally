@@ -247,6 +247,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   var _recovered_worker_names: Array[WorkerName] val =
     recover val Array[WorkerName] end
   var _is_recovering: Bool = false
+  var _recovery_overriden: Bool = false
   let _is_joining: Bool
 
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
@@ -378,7 +379,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       _router_registry)
 
   be abort_recovery_early() =>
-    _is_recovering = false
+    _recovery_overriden = true
 
   be initialize(cluster_initializer: (ClusterInitializer | None) = None,
     checkpoint_target: (CheckpointId | None) = None,
@@ -1133,7 +1134,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
     match _topology
     | let t: LocalTopology =>
-      if _is_recovering then
+      if _is_recovering and not _recovery_overriden then
         _recovery.start_recovery(t.worker_names,
           RecoveryReasons.crash_recovery())
       else
