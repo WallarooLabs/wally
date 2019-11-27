@@ -159,6 +159,9 @@ class BarrierSinkPhase is SinkPhase
     barrier_token: BarrierToken)
   =>
     if input_blocking(input_id) then
+      ifdef debug then
+        @printf[I32]("SinkPhase %s: receive_barrier: push %s\n".cstring(), name().cstring(), barrier_token.string().cstring())
+      end
       _queued.push(QueuedBarrier(input_id, producer, barrier_token))
     else
       ifdef debug then
@@ -252,6 +255,9 @@ class QueuingSinkPhase is SinkPhase
   fun ref receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
+    ifdef debug then
+      @printf[I32]("SinkPhase %s: receive_barrier: push %s\n".cstring(), name().cstring(), barrier_token.string().cstring())
+    end
     _queued.push(QueuedBarrier(input_id, producer, barrier_token))
 
   fun ref prepare_for_rollback(token: BarrierToken) =>
