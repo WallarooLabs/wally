@@ -214,20 +214,21 @@ run_crash_worker_loop () {
                 break
             fi
         else
-            /bin/echo -n ":$worker"
+            /bin/echo -n ":c$worker"
             sleep 1
         fi
         poll_out=`poll_ready -w 4 2>&1`
         status=$?
         if [ $status -ne 0 -o ! -z "$poll_out" ]; then
-            echo "CRASH LOOP $worker: exit $status reason $poll_out"
+            echo "CRASH LOOP A: $worker: exit $status reason $poll_out"
             rm -f $STATUS_CRASH_WORKER
             rm -f $STATUS_CRASH_SINK
-            sleep 5
+            sleep 7
             poll_out=`poll_ready -w 4 -a -S -A 2>&1`
             status=$?
             if [ $status -ne 0 -o ! -z "$poll_out" ]; then
-                echo "CRASH 2 LOOP $worker: pause the world: exit $status reason $poll_out"
+                echo "CRASH LOOP B: $worker: pause the world: exit $status reason $poll_out"
+                echo "SLEEP: $worker @ 45" ; sleep 45
                 pause_the_world
                 break
             else
@@ -523,6 +524,43 @@ run_custom_tcp_crash0 () {
         ../../../../testing/tools/external_sender/external_sender -e 127.0.0.1:7113 -t cluster-status-query
         echo "\nQuery initializer again\n"
         ../../../../testing/tools/external_sender/external_sender -e 127.0.0.1:7103 -t cluster-status-query
+        pause_the_world
+        print_duration
+        exit 1
+    fi
+}
+
+run_custom_crashsink_crash0_overlap () {
+    ## Assume that we are run with `./master-crasher.sh 3 run_custom_crashsink_crash0_overlap`
+    sleep 4
+
+    /bin/echo -n cS
+    crash_sink
+    sleep 0.1
+
+    /bin/echo -n c0
+    ./crash-worker.sh 0
+    mv /tmp/wallaroo.0 /tmp/wallaroo.0.`date +%s`
+    sleep 0.1
+
+    /bin/echo -n rS
+    start_sink
+    sleep 0.1
+
+    /bin/echo -n s0
+    ./start-initializer.sh
+    poll_out=`poll_ready -w 4 2>&1`
+    if [ $? -ne 0 -o ! -z "$poll_out" ]; then
+        echo ""
+        echo "\nQuery initializer\n"
+        ../../../../testing/tools/external_sender/external_sender -e 127.0.0.1:7103 -t cluster-status-query
+        echo "\nQuery worker1\n"
+        ../../../../testing/tools/external_sender/external_sender -e 127.0.0.1:7113 -t cluster-status-query
+        echo "\nQuery worker2\n"
+        ../../../../testing/tools/external_sender/external_sender -e 127.0.0.1:7123 -t cluster-status-query
+        echo "\nQuery initializer again\n"
+        ../../../../testing/tools/external_sender/external_sender -e 127.0.0.1:7103 -t cluster-status-query
+        echo "SLEEP 10"; sleep 10
         pause_the_world
         print_duration
         exit 1
