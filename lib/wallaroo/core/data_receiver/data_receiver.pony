@@ -365,6 +365,8 @@ actor DataReceiver is Producer
   be forward_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
     barrier_token: BarrierToken, seq_id: SeqId)
   =>
+    var forward: Bool = false
+
     ifdef "checkpoint_trace" then
       @printf[I32]("DataReceiver: forward_barrier to step (or step group) %s from %s -> seq id %s, last_seen: %s\n".cstring(),
         target_step_id.string().cstring(), origin_step_id.string().cstring(),
@@ -380,6 +382,23 @@ actor DataReceiver is Producer
         _phase = _NormalDataReceiverPhase(this)
       end
 
+      forward = true
+    else
+      match barrier_token
+      | let crt: CheckpointRollbackBarrierToken =>
+        forward = true
+      | let crrt: CheckpointRollbackResumeBarrierToken =>
+        forward = true
+      else
+        @l(Log.debug(), Log.routing(),
+          "DataReceiver: dropping token %s from %s".cstring(),
+          barrier_token.string().cstring(), origin_step_id.string().cstring())
+      end
+      if forward then
+        @l(Log.notice(), Log.routing(), "DataReceiver: forwarding token %s from %s".cstring(), barrier_token.string().cstring(), origin_step_id.string().cstring())
+      end
+    end
+    if forward then
       _forward_barrier(target_step_id, origin_step_id, barrier_token, seq_id)
     end
 
@@ -391,9 +410,28 @@ actor DataReceiver is Producer
   fun ref send_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
     barrier_token: BarrierToken, seq_id: SeqId)
   =>
+    var forward: Bool = false
+
     if seq_id > _last_id_seen then
       _ack_counter = _ack_counter + 1
       _last_id_seen = seq_id
+      forward = true
+    else
+      match barrier_token
+      | let crt: CheckpointRollbackBarrierToken =>
+        forward = true
+      | let crt: CheckpointRollbackResumeBarrierToken =>
+        forward = true
+      else
+        @l(Log.debug(), Log.routing(),
+          "DataReceiver: send_barrier: dropping token %s from %s".cstring(),
+          barrier_token.string().cstring(), origin_step_id.string().cstring())
+      end
+      if forward then
+        @l(Log.notice(), Log.routing(), "DataReceiver: send_barrier: forwarding token %s from %s".cstring(), barrier_token.string().cstring(), origin_step_id.string().cstring())
+      end
+    end
+    if forward then
       _router.forward_barrier(target_step_id, origin_step_id, this,
         barrier_token)
     end
