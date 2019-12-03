@@ -428,7 +428,7 @@ actor ConnectorSink is Sink
     This is a callback used by the ConnectorSinkNotify class to Inform
     us that it received a 2PC phase 1 reply.
     """
-    match _twopc.twopc_phase1_reply(txn_id, commit)
+    match _twopc.twopc_phase1_reply(this, txn_id, commit)
     | true =>
       if _twopc.barrier_token != _twopc.barrier_token_initial then
         _barrier_coordinator.ack_barrier(this, _twopc.barrier_token)

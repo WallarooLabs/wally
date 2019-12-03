@@ -126,6 +126,23 @@ class ConnectorSink2PC
       txn_id = prefix + make_txn_id_string(sbt.id)
       barrier_token = sbt
       current_txn_end_offset = current_offset
+    elseif state_is_2abort() then
+      // We are here because:
+      // 0. We were disconnected from the external sink.
+      // 1. We saw a single CheckpointBarrierToken but not all the copies
+      //    that we were expecting.
+      // 2. We were reconnected to the external sink.  Since we'd seen
+      //    a CheckpointBarrierToken, we'd set state to 2abort.
+      //    NOTE: We also told the barrier coordinator to abort the
+      //          checkpoint!
+      // 3. We saw the final copy of the CheckpointBarrierToken and
+      //    then got to here.
+      //
+      // Since some app data was sent to the sink, then we must
+      // go through a round of 2PC to tell the sink to throw away
+      // that data.  If no app data was sent to the sink, we would've
+      // hit the commit-fast path above.
+      @ll(_twopc_info, "NOTICE, need to send Phase1 and then force abort for Phase2".cstring())
     else
       @ll(_twopc_err, "2PC: ERROR: _twopc.state = %d".cstring(), state())
       Fail()
@@ -225,7 +242,9 @@ class ConnectorSink2PC
       reset_state()
     end
 
-  fun ref twopc_phase1_reply(txn_id': String, commit: Bool): (Bool | None) =>
+  fun ref twopc_phase1_reply(sink: ConnectorSink ref,
+    txn_id': String, commit: Bool): (Bool | None)
+  =>
     if txn_id' != txn_id then
       // It's possible that the reply we got is for an old txn id, see
       // comments in ConnectorSink.twopc_phase1_reply.  The other
@@ -235,6 +254,13 @@ class ConnectorSink2PC
         txn_id'.cstring(), txn_id.cstring())
       return None
     end
+
+    if state_is_2abort() then
+      @ll(_twopc_info, "2PC: txn_id %s was %s; send abort now".cstring(), txn_id'.cstring(), commit.string().cstring())
+      send_phase2(sink, false)
+      return false
+    end
+
     if not (state_is_start() or state_is_1precommit() or
       state_is_2commit_fast()) then
       @ll(_twopc_err, "2PC: ERROR: twopc_reply: _twopc.state = %d".cstring(), state())
