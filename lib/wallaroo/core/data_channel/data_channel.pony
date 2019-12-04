@@ -267,12 +267,12 @@ class _DataReceiver is _DataReceiverWrapper
       _data_receiver.received(data_msg.delivery_msg, data_msg.producer_id,
           data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
           data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
-          my_latest_ts)
+          my_latest_ts, data_msg.connection_round)
     | let dc: DataConnectMsg =>
       @printf[I32](("Received DataConnectMsg on DataChannel, but we already " +
         "have a DataReceiver for this connection.\n").cstring())
     | let ia: DataReceiverAckImmediatelyMsg =>
-      _data_receiver.data_receiver_ack_immediately()
+      _data_receiver.data_receiver_ack_immediately(ia.connection_round)
     | let km: KeyMigrationMsg =>
       ifdef "trace" then
         @printf[I32]("Received KeyMigrationMsg on Data Channel\n".cstring())
@@ -290,17 +290,19 @@ class _DataReceiver is _DataReceiverWrapper
       end
       Fail()
     | let m: ReceiveBoundaryPunctuationAckMsg =>
-      _data_receiver.receive_boundary_punctuation_ack()
+      _data_receiver.receive_boundary_punctuation_ack(m.connection_round)
     | let m: SpinUpLocalTopologyMsg =>
       @printf[I32]("Received spin up local topology message!\n".cstring())
     | let m: ReportStatusMsg =>
       _data_receiver.report_status(m.code)
     | let m: RegisterProducerMsg =>
-      _data_receiver.register_producer(m.source_id, m.target_id)
+      _data_receiver.register_producer(m.source_id, m.target_id,
+        m.connection_round)
     | let m: UnregisterProducerMsg =>
-      _data_receiver.unregister_producer(m.source_id, m.target_id)
+      _data_receiver.unregister_producer(m.source_id, m.target_id,
+        m.connection_round)
     | let m: ForwardBarrierMsg =>
-      _data_receiver.forward_barrier(m.target_id, m.origin_id, m.token, m.seq_id)
+      _data_receiver.forward_barrier(m.target_id, m.origin_id, m.token, m.seq_id, m.connection_round)
     | let m: UnknownChannelMsg =>
       @printf[I32]("Unknown Wallaroo data message type: UnknownChannelMsg.\n"
         .cstring())

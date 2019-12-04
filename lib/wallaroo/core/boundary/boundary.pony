@@ -24,6 +24,7 @@ use "time"
 use "wallaroo/core/barrier"
 use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
+use "wallaroo/core/data_receiver"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
@@ -137,6 +138,8 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   let _reconnect_failed_delay: U64
   var _initial_connection_was_established: Bool = false
 
+  var _connection_round: ConnectionRound = 0
+
   new create(auth: AmbientAuth, worker_name: String, target_worker: String,
     tcp_handler_builder: TestableTCPHandlerBuilder,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
@@ -179,8 +182,9 @@ actor OutgoingBoundary is (Consumer & TCPActor)
         Fail()
       end
       _ready_to_work_requested = true
+      @printf[I32]("!@ Boundary %s sending DataConnect for application_initialized with seq id %s to %s\n".cstring(), _routing_id.string().cstring(), seq_id.string().cstring(), _target_worker.cstring())
       let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
-        _routing_id, seq_id, _auth)?
+        _routing_id, seq_id, _connection_round, _auth)?
       _tcp_handler.writev(connect_msg)
     else
       Fail()
@@ -210,8 +214,9 @@ actor OutgoingBoundary is (Consumer & TCPActor)
           Fail()
         end
 
+        @printf[I32]("!@ Boundary %s sending DataConnect for quick_initialize with seq id %s to %s\n".cstring(), _routing_id.string().cstring(), seq_id.string().cstring(), _target_worker.cstring())
         let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
-          _routing_id, seq_id, _auth)?
+          _routing_id, seq_id, _connection_round, _auth)?
         _tcp_handler.writev(connect_msg)
       else
         Fail()
@@ -221,7 +226,8 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   be ack_immediately(p: Promise[OutgoingBoundary]) =>
     _pending_immediate_ack_promise = p
     try
-      let msg = ChannelMsgEncoder.data_receiver_ack_immediately(_auth)?
+      let msg = ChannelMsgEncoder.data_receiver_ack_immediately(
+        _connection_round, _auth)?
 
       _tcp_handler.writev(msg)
     else
@@ -255,7 +261,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   =>
     try
       let outgoing_msg = ChannelMsgEncoder.migrate_key(step_group, key,
-        checkpoint_id, state, _worker_name, _auth)?
+        checkpoint_id, state, _worker_name, _connection_round, _auth)?
       _tcp_handler.writev(outgoing_msg)
     else
       Fail()
@@ -264,7 +270,8 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   be send_migration_batch_complete() =>
     try
       let migration_batch_complete_msg =
-        ChannelMsgEncoder.migration_batch_complete(_worker_name, _auth)?
+        ChannelMsgEncoder.migration_batch_complete(_worker_name,
+          _connection_round, _auth)?
       _tcp_handler.writev(migration_batch_complete_msg)
     else
       Fail()
@@ -329,7 +336,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
         i_producer_id,
         pipeline_time_spent + (WallClock.nanoseconds() - worker_ingress_ts),
         seq_id, _wb, _auth, WallClock.nanoseconds(),
-        new_metrics_id, metric_name)?
+        new_metrics_id, metric_name, _connection_round)?
       _add_to_upstream_backup(outgoing_msg)
 
       if _connection_initialized then
@@ -376,7 +383,10 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _maybe_mute_or_unmute_upstreams()
     _lowest_queue_id = _lowest_queue_id + flush_count.u64()
 
-  fun ref receive_connect_ack(last_id_seen: SeqId) =>
+  fun ref receive_connect_ack(last_id_seen: SeqId,
+    connection_round: ConnectionRound)
+  =>
+    _connection_round = connection_round
     _replay_from(last_id_seen)
 
   fun ref start_normal_sending() =>
@@ -389,6 +399,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
         Fail()
       end
     end
+    @printf[I32]("!@ START_NORMAL_SENDING on boundary %s\n".cstring(), _routing_id.string().cstring())
     _connection_initialized = true
     _replaying = false
     for msg in _unsent.values() do
@@ -459,7 +470,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _registered_producers.register_producer(source_id, producer, target_id)
     try
       let msg = ChannelMsgEncoder.register_producer(_worker_name,
-        source_id, target_id, _auth)?
+        source_id, target_id, _connection_round, _auth)?
       _tcp_handler.writev(msg)
     else
       Fail()
@@ -472,7 +483,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _registered_producers.unregister_producer(source_id, producer, target_id)
     try
       let msg = ChannelMsgEncoder.unregister_producer(_worker_name,
-        source_id, target_id, _auth)?
+        source_id, target_id, _connection_round, _auth)?
       _tcp_handler.writev(msg)
     else
       Fail()
@@ -499,6 +510,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   be forward_barrier(target_routing_id: RoutingId,
     origin_routing_id: RoutingId, barrier_token: BarrierToken)
   =>
+    @printf[I32]("!@ FORWARD_BARRIER %s from %s to %s from boundary %s\n".cstring(), barrier_token.string().cstring(), origin_routing_id.string().cstring(), target_routing_id.string().cstring(), _routing_id.string().cstring())
     match barrier_token
     | let srt: CheckpointRollbackBarrierToken =>
       _queue.clear()
@@ -511,10 +523,12 @@ actor OutgoingBoundary is (Consumer & TCPActor)
       seq_id = seq_id + 1
 
       let msg = ChannelMsgEncoder.forward_barrier(target_routing_id,
-        origin_routing_id, barrier_token, seq_id, _auth)?
+        origin_routing_id, barrier_token, seq_id, _connection_round, _auth)?
       if _connection_initialized then
+        @printf[I32]("!@ ---- sending barrier now!\n".cstring())
         _tcp_handler.writev(msg)
       else
+        @printf[I32]("!@ ---- pushing barrier to unsent for later!\n".cstring())
         _unsent.push(msg)
       end
       _add_to_upstream_backup(msg)
@@ -660,11 +674,6 @@ actor OutgoingBoundary is (Consumer & TCPActor)
         @printf[I32]("Rcvd msg at OutgoingBoundary\n".cstring())
       end
       match ChannelMsgDecoder(consume data, _auth)
-      | let ac: AckDataConnectMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received AckDataConnectMsg at Boundary\n".cstring())
-        end
-        receive_connect_ack(ac.last_id_seen)
       | let dd: DataDisconnectMsg =>
         dispose()
       | let sn: StartNormalDataSendingMsg =>
@@ -673,7 +682,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
             .cstring())
         end
         @l(Log.debug(), Log.boundary(), "received: worker %s target_worker %s sn.last_id_seen %lu\n".cstring(), _worker_name.cstring(), _target_worker.cstring(), sn.last_id_seen)
-        receive_connect_ack(sn.last_id_seen)
+        receive_connect_ack(sn.last_id_seen, sn.connection_round)
         start_normal_sending()
       | let aw: AckDataReceivedMsg =>
         ifdef "trace" then
@@ -683,7 +692,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
       | let ra: RequestBoundaryPunctuationAckMsg =>
         try
           let ack_msg = ChannelMsgEncoder
-            .receive_boundary_punctuation_ack(_auth)?
+            .receive_boundary_punctuation_ack(_connection_round, _auth)?
           _tcp_handler.writev(ack_msg)
         else
           Fail()
@@ -720,8 +729,9 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     if _initial_connection_was_established then
       // This is not the initial time we connected, so we're reconnecting.
       try
+        @printf[I32]("!@ Boundary %s sending DataConnect for connected() with seq id %s to %s\n".cstring(), _routing_id.string().cstring(), seq_id.string().cstring(), _target_worker.cstring())
         let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
-          _routing_id, seq_id, _auth)?
+          _routing_id, seq_id, _connection_round, _auth)?
         _tcp_handler.writev(connect_msg)
       else
         @printf[I32]("error creating data connect message on reconnect\n"
