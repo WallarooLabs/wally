@@ -249,6 +249,7 @@ actor ConnectorSink is Sink
       __loc.type_name().cstring(), __loc.method_name().cstring(),
       _sink_id.string().cstring())
     _initial_connect()
+    _notify.ready_to_work_requested(this)
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     @ll(_conn_info, "Lifecycle: %s.%s at %s".cstring(),
