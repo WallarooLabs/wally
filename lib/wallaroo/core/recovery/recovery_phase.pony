@@ -515,6 +515,7 @@ class _Rollback is _RecoveryPhase
       Invariant(ArrayHelpers[String].contains[String](_workers, worker))
     end
     _acked_workers.set(worker)
+    @printf[I32]("!@ rollback_complete from worker %s. We've seen %s, we need %s\n".cstring(), worker.string().cstring(), _acked_workers.size().string().cstring(), _workers.size().string().cstring())
     if _acked_workers.size() == _workers.size() then
       _recovery._recovery_complete(token.rollback_id, token.checkpoint_id,
         _recovery_reason)

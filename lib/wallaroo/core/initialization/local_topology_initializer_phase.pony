@@ -220,7 +220,9 @@ class _ApplicationInitializedPhase is LocalTopologyInitializerPhase
   fun name(): String => "_ApplicationInitializedPhase"
 
   fun ref report_ready_to_work(initializable: Initializable) =>
+    @printf[I32]("!@ report_ready_to_work called. Currently: %s. Need: %s.\n".cstring(), _ready_to_work.size().string().cstring(), _initializables.size().string().cstring())
     if not _ready_to_work.contains(initializable) then
+      @printf[I32]("!@ -- report_ready_to_work ADDING 1 to %s\n".cstring(), _ready_to_work.size().string().cstring())
       _ready_to_work.set(initializable)
       if _ready_to_work.size() == _initializables.size() then
         _lti._initializables_ready_to_work(_initializables,
