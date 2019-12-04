@@ -250,12 +250,13 @@ actor DataReceiver is Producer
     end
 
   be data_receiver_ack_immediately(connection_round: ConnectionRound) =>
-    if connection_round != _connection_round then
-      @printf[I32](("DataReceiver %s received data_receiver_ack_immediately " +
-        " over outdated connection. Ignoring.\n").cstring(),
-        _id.string().cstring())
-      return
-    end
+    // !@
+    // if connection_round != _connection_round then
+    //   @printf[I32](("DataReceiver %s received data_receiver_ack_immediately " +
+    //     " over outdated connection. Ignoring.\n").cstring(),
+    //     _id.string().cstring())
+    //   return
+    // end
     try
       let ack_msg = ChannelMsgEncoder.immediate_ack(_auth)?
       _write_on_conn(ack_msg)
@@ -305,12 +306,13 @@ actor DataReceiver is Producer
     _pending_boundary_punctuation_ack_promises.push(p)
 
   be receive_boundary_punctuation_ack(connection_round: ConnectionRound) =>
-    if connection_round != _connection_round then
-      @printf[I32](("DataReceiver %s received receive_boundary_punctuation_ack " +
-        " over outdated connection. Ignoring.\n").cstring(),
-        _id.string().cstring())
-      return
-    end
+    // !@
+    // if connection_round != _connection_round then
+    //   @printf[I32](("DataReceiver %s received receive_boundary_punctuation_ack " +
+    //     " over outdated connection. Ignoring.\n").cstring(),
+    //     _id.string().cstring())
+    //   return
+    // end
     for p in _pending_boundary_punctuation_ack_promises.values() do
       p(None)
     end
@@ -360,12 +362,13 @@ actor DataReceiver is Producer
   be register_producer(input_id: RoutingId, output_id: RoutingId,
     connection_round: ConnectionRound)
   =>
-    if connection_round != _connection_round then
-      @printf[I32](("DataReceiver %s received register_producer " +
-        " for %s over outdated connection. Ignoring.\n").cstring(),
-        _id.string().cstring(), input_id.string().cstring())
-      return
-    end
+    // !@
+    // if connection_round != _connection_round then
+    //   @printf[I32](("DataReceiver %s received register_producer " +
+    //     " for %s over outdated connection. Ignoring.\n").cstring(),
+    //     _id.string().cstring(), input_id.string().cstring())
+    //   return
+    // end
     if _step_group_producers.contains(output_id) then
       try
         _step_group_producers.insert_if_absent(output_id,
@@ -387,12 +390,13 @@ actor DataReceiver is Producer
   be unregister_producer(input_id: RoutingId, output_id: RoutingId,
     connection_round: ConnectionRound)
   =>
-    if connection_round != _connection_round then
-      @printf[I32](("DataReceiver %s received unregister_producer " +
-        " for %s over outdated connection. Ignoring.\n").cstring(),
-        _id.string().cstring(), input_id.string().cstring())
-      return
-    end
+    // !@
+    // if connection_round != _connection_round then
+    //   @printf[I32](("DataReceiver %s received unregister_producer " +
+    //     " for %s over outdated connection. Ignoring.\n").cstring(),
+    //     _id.string().cstring(), input_id.string().cstring())
+    //   return
+    // end
     if _step_group_producers.contains(output_id) then
       try
         let set = _step_group_producers(output_id)?
