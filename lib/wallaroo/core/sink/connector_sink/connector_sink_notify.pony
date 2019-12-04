@@ -43,6 +43,8 @@ class ConnectorSinkNotify
   var credits: U32 = 0
   var acked_point_of_ref: cwm.MessageId = 0
   var message_id: cwm.MessageId = acked_point_of_ref
+  var _ready_to_work: Bool = false
+  var _report_ready_to_work_requested: Bool = false
   var _report_ready_to_work_done: Bool = false
   let _conn_debug: U16 = Log.make_sev_cat(Log.debug(), Log.conn_sink())
   let _conn_info: U16 = Log.make_sev_cat(Log.info(), Log.conn_sink())
@@ -224,6 +226,13 @@ class ConnectorSinkNotify
       @ll(_twopc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s current txn=%s.".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_txn_id_current.cstring())
     end
 
+  fun ref ready_to_work_requested(conn: ConnectorSink ref) =>
+    _report_ready_to_work_requested = true
+    if _ready_to_work then
+      conn.report_ready_to_work()
+      _report_ready_to_work_done = true
+    end
+
   fun send_msg(conn: WallarooOutgoingNetworkActor ref, msg: cwm.Message) =>
     let w1: Writer = w1.create()
 
@@ -304,11 +313,14 @@ class ConnectorSinkNotify
           unthrottled(conn)
           twopc_current_txn_aborted = false
           if not _report_ready_to_work_done then
-            try
-              (conn as ConnectorSink ref).report_ready_to_work()
-              _report_ready_to_work_done = true
-            else
-              Fail()
+            _ready_to_work = true
+            if _report_ready_to_work_requested then
+              try
+                (conn as ConnectorSink ref).report_ready_to_work()
+                _report_ready_to_work_done = true
+              else
+                Fail()
+              end
             end
           end
           try (conn as ConnectorSink ref).twopc_intro_done() else Fail() end
