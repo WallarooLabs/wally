@@ -52,26 +52,27 @@ primitive ChannelMsgEncoder
   fun data_channel(delivery_msg: DeliveryMsg,
     producer_id: RoutingId, pipeline_time_spent: U64, seq_id: SeqId,
     wb: Writer, auth: AmbientAuth, latest_ts: U64, metrics_id: U16,
-    metric_name: String): Array[ByteSeq] val ?
-  =>
-    _encode(DataMsg(delivery_msg, producer_id, pipeline_time_spent, seq_id,
-      latest_ts, metrics_id, metric_name), auth, wb)?
-
-  fun migrate_key(step_group: RoutingId, key: Key, checkpoint_id: CheckpointId,
-    state: ByteSeq val, worker: WorkerName, auth: AmbientAuth):
+    metric_name: String, connection_round: ConnectionRound):
     Array[ByteSeq] val ?
   =>
+    _encode(DataMsg(delivery_msg, producer_id, pipeline_time_spent, seq_id,
+      latest_ts, metrics_id, metric_name, connection_round), auth, wb)?
+
+  fun migrate_key(step_group: RoutingId, key: Key, checkpoint_id: CheckpointId,
+    state: ByteSeq val, worker: WorkerName, connection_round: ConnectionRound,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
     _encode(KeyMigrationMsg(step_group, key, checkpoint_id, state,
-      worker), auth)?
+      worker, connection_round), auth)?
 
   fun migration_batch_complete(sender: WorkerName,
-    auth: AmbientAuth): Array[ByteSeq] val ?
+    connection_round: ConnectionRound, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
     Sent to signal to joining worker that a batch of steps has finished
     emigrating from this step.
     """
-    _encode(MigrationBatchCompleteMsg(sender), auth)?
+    _encode(MigrationBatchCompleteMsg(sender, connection_round), auth)?
 
   fun worker_completed_migration_batch(worker: WorkerName,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -202,22 +203,19 @@ primitive ChannelMsgEncoder
     _encode(CreateDataChannelListener(workers), auth)?
 
   fun data_connect(sender_name: String, sender_step_id: RoutingId,
-    highest_seq_id: SeqId, auth: AmbientAuth): Array[ByteSeq] val ?
+    highest_seq_id: SeqId, connection_round: ConnectionRound,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(DataConnectMsg(sender_name, sender_step_id, highest_seq_id), auth)?
-
-  fun ack_data_connect(last_id_seen: SeqId, auth: AmbientAuth):
-    Array[ByteSeq] val ?
-  =>
-    _encode(AckDataConnectMsg(last_id_seen), auth)?
+    _encode(DataConnectMsg(sender_name, sender_step_id, highest_seq_id,
+      connection_round), auth)?
 
   fun data_disconnect(auth: AmbientAuth): Array[ByteSeq] val ? =>
     _encode(DataDisconnectMsg, auth)?
 
-  fun start_normal_data_sending(last_id_seen: SeqId, auth: AmbientAuth):
-    Array[ByteSeq] val ?
+  fun start_normal_data_sending(last_id_seen: SeqId,
+    connection_round: ConnectionRound, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(StartNormalDataSendingMsg(last_id_seen), auth)?
+    _encode(StartNormalDataSendingMsg(last_id_seen, connection_round), auth)?
 
   fun ack_data_received(sender_name: String, sender_step_id: RoutingId,
     seq_id: SeqId, auth: AmbientAuth): Array[ByteSeq] val ?
@@ -233,12 +231,15 @@ primitive ChannelMsgEncoder
     """
     _encode(RequestBoundaryPunctuationAckMsg, auth)?
 
-  fun receive_boundary_punctuation_ack(auth: AmbientAuth): Array[ByteSeq] val ?
+  fun receive_boundary_punctuation_ack(connection_round: ConnectionRound,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(ReceiveBoundaryPunctuationAckMsg, auth)?
+    _encode(ReceiveBoundaryPunctuationAckMsg(connection_round), auth)?
 
-  fun data_receiver_ack_immediately(auth: AmbientAuth): Array[ByteSeq] val ? =>
-    _encode(DataReceiverAckImmediatelyMsg, auth)?
+  fun data_receiver_ack_immediately(connection_round: ConnectionRound,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(DataReceiverAckImmediatelyMsg(connection_round), auth)?
 
   fun immediate_ack(auth: AmbientAuth): Array[ByteSeq] val ? =>
     _encode(ImmediateAckMsg, auth)?
@@ -477,10 +478,10 @@ primitive ChannelMsgEncoder
 
   fun forward_barrier(target_step_id: RoutingId,
     origin_step_id: RoutingId, token: BarrierToken, seq_id: SeqId,
-    auth: AmbientAuth): Array[ByteSeq] val ?
+    connection_round: ConnectionRound, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(ForwardBarrierMsg(target_step_id, origin_step_id, token,
-      seq_id), auth)?
+      seq_id, connection_round), auth)?
 
   fun abort_checkpoint(checkpoint_id: CheckpointId, sender: WorkerName,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -610,14 +611,18 @@ primitive ChannelMsgEncoder
     _encode(ResumeProcessingMsg(sender), auth)?
 
   fun register_producer(sender: WorkerName, source_id: RoutingId,
-    target_id: RoutingId, auth: AmbientAuth): Array[ByteSeq] val ?
+    target_id: RoutingId, connection_round: ConnectionRound,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(RegisterProducerMsg(sender, source_id, target_id), auth)?
+    _encode(RegisterProducerMsg(sender, source_id, target_id,
+      connection_round), auth)?
 
   fun unregister_producer(sender: WorkerName, source_id: RoutingId,
-    target_id: RoutingId, auth: AmbientAuth): Array[ByteSeq] val ?
+    target_id: RoutingId, connection_round: ConnectionRound,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(UnregisterProducerMsg(sender, source_id, target_id), auth)?
+    _encode(UnregisterProducerMsg(sender, source_id, target_id,
+      connection_round), auth)?
 
   fun connector_stream_notify(worker_name: WorkerName, source_name: String,
     stream: StreamTuple, request_id: ConnectorStreamNotifyId,
@@ -1057,34 +1062,37 @@ class val DataConnectMsg is ChannelMsg
   let sender_name: String
   let sender_boundary_id: U128
   let highest_seq_id: SeqId
+  let connection_round: ConnectionRound
 
   fun val string(): String => __loc.type_name()
   new val create(sender_name': String, sender_boundary_id': U128,
-    highest_seq_id': SeqId)
+    highest_seq_id': SeqId, connection_round': ConnectionRound)
   =>
     sender_name = sender_name'
     sender_boundary_id = sender_boundary_id'
     highest_seq_id = highest_seq_id'
+    connection_round = connection_round'
 
 primitive DataDisconnectMsg is ChannelMsg
   fun val string(): String => __loc.type_name()
 
-class val AckDataConnectMsg is ChannelMsg
-  let last_id_seen: SeqId
-
-  fun val string(): String => __loc.type_name()
-  new val create(last_id_seen': SeqId) =>
-    last_id_seen = last_id_seen'
-
 class val StartNormalDataSendingMsg is ChannelMsg
   let last_id_seen: SeqId
+  let connection_round: ConnectionRound
 
   fun val string(): String => __loc.type_name()
-  new val create(last_id_seen': SeqId) =>
+  new val create(last_id_seen': SeqId, connection_round': ConnectionRound) =>
     last_id_seen = last_id_seen'
+    connection_round = connection_round'
 
-primitive DataReceiverAckImmediatelyMsg is ChannelMsg
+class val DataReceiverAckImmediatelyMsg is ChannelMsg
+  let connection_round: ConnectionRound
+
+  new val create(connection_round': ConnectionRound) =>
+    connection_round = connection_round'
+
   fun val string(): String => __loc.type_name()
+
 primitive ImmediateAckMsg is ChannelMsg
   fun val string(): String => __loc.type_name()
 
@@ -1120,29 +1128,35 @@ class val KeyMigrationMsg is ChannelMsg
   let _checkpoint_id: CheckpointId
   let _state: ByteSeq val
   let _worker: WorkerName
+  let _connection_round: ConnectionRound
 
   fun val string(): String => __loc.type_name()
   new val create(step_group': RoutingId, key': Key,
-    checkpoint_id': CheckpointId, state': ByteSeq val, worker': WorkerName)
+    checkpoint_id': CheckpointId, state': ByteSeq val, worker': WorkerName,
+    connection_round': ConnectionRound)
   =>
     _step_group = step_group'
     _key = key'
     _checkpoint_id = checkpoint_id'
     _state = state'
     _worker = worker'
+    _connection_round = connection_round'
 
   fun step_group(): RoutingId => _step_group
   fun checkpoint_id(): CheckpointId => _checkpoint_id
   fun state(): ByteSeq val => _state
   fun key(): Key => _key
   fun worker(): String => _worker
+  fun connection_round(): ConnectionRound => _connection_round
 
 class val MigrationBatchCompleteMsg is ChannelMsg
   let sender_name: WorkerName
+  let connection_round: ConnectionRound
 
   fun val string(): String => __loc.type_name()
-  new val create(sender: WorkerName) =>
+  new val create(sender: WorkerName, connection_round': ConnectionRound) =>
     sender_name = sender
+    connection_round = connection_round'
 
 class val WorkerCompletedMigrationBatch is ChannelMsg
   let sender_name: WorkerName
@@ -1236,7 +1250,11 @@ class val AckDataReceivedMsg is ChannelMsg
 primitive RequestBoundaryPunctuationAckMsg is ChannelMsg
   fun val string(): String => __loc.type_name()
 
-primitive ReceiveBoundaryPunctuationAckMsg is ChannelMsg
+class val ReceiveBoundaryPunctuationAckMsg is ChannelMsg
+  let connection_round: ConnectionRound
+
+  new val create(connection_round': ConnectionRound) =>
+    connection_round = connection_round'
   fun val string(): String => __loc.type_name()
 
 class val DataMsg is ChannelMsg
@@ -1247,11 +1265,12 @@ class val DataMsg is ChannelMsg
   let latest_ts: U64
   let metrics_id: U16
   let metric_name: String
+  let connection_round: ConnectionRound
 
   fun val string(): String => __loc.type_name()
   new val create(msg: DeliveryMsg, producer_id': RoutingId,
     pipeline_time_spent': U64, seq_id': SeqId, latest_ts': U64,
-    metrics_id': U16, metric_name': String)
+    metrics_id': U16, metric_name': String, connection_round': ConnectionRound)
   =>
     producer_id = producer_id'
     seq_id = seq_id'
@@ -1260,6 +1279,7 @@ class val DataMsg is ChannelMsg
     latest_ts = latest_ts'
     metrics_id = metrics_id'
     metric_name = metric_name'
+    connection_round = connection_round'
 
 trait val DeliveryMsg is ChannelMsg
   fun sender_name(): String
@@ -1738,15 +1758,17 @@ class val ForwardBarrierMsg is ChannelMsg
   let token: BarrierToken
   // Seq id assigned by boundary
   let seq_id: SeqId
+  let connection_round: ConnectionRound
 
   fun val string(): String => __loc.type_name()
   new val create(target_id': RoutingId, origin_id': RoutingId,
-    token': BarrierToken, seq_id': SeqId)
+    token': BarrierToken, seq_id': SeqId, connection_round': ConnectionRound)
   =>
     target_id = target_id'
     origin_id = origin_id'
     token = token'
     seq_id = seq_id'
+    connection_round = connection_round'
 
 class val AbortCheckpointMsg is ChannelMsg
   let checkpoint_id: CheckpointId
@@ -1924,27 +1946,31 @@ class val RegisterProducerMsg is ChannelMsg
   let sender: WorkerName
   let source_id: RoutingId
   let target_id: RoutingId
+  let connection_round: ConnectionRound
 
   fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName, source_id': RoutingId,
-    target_id': RoutingId)
+    target_id': RoutingId, connection_round': ConnectionRound)
   =>
     sender = sender'
     source_id = source_id'
     target_id = target_id'
+    connection_round = connection_round'
 
 class val UnregisterProducerMsg is ChannelMsg
   let sender: WorkerName
   let source_id: RoutingId
   let target_id: RoutingId
+  let connection_round: ConnectionRound
 
   fun val string(): String => __loc.type_name()
   new val create(sender': WorkerName, source_id': RoutingId,
-    target_id': RoutingId)
+    target_id': RoutingId, connection_round': ConnectionRound)
   =>
     sender = sender'
     source_id = source_id'
     target_id = target_id'
+    connection_round = connection_round'
 
 class val ReportStatusMsg is ChannelMsg
   let code: ReportStatusCode
