@@ -20,6 +20,7 @@ use "collections"
 use "promises"
 use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
+use "wallaroo/core/invariant"
 use "wallaroo/core/metrics"
 use "wallaroo/core/network"
 use "wallaroo/core/recovery"
@@ -28,6 +29,8 @@ use "wallaroo/core/step"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
+
+type ConnectionRound is U16
 
 interface DataReceiversSubscriber
   be data_receiver_added(sender_name: String, boundary_step_id: RoutingId,
@@ -44,6 +47,8 @@ actor DataReceivers
 
   let _data_receivers: Map[BoundaryId, DataReceiver] =
     _data_receivers.create()
+  let _data_receiver_connection_rounds: Map[BoundaryId, ConnectionRound] =
+    _data_receiver_connection_rounds.create()
   var _data_router: DataRouter
   let _subscribers: SetIs[DataReceiversSubscriber tag] = _subscribers.create()
 
@@ -84,13 +89,20 @@ actor DataReceivers
     """
     Called when a DataChannel is first created and needs to know the
     DataReceiver corresponding to the relevant OutgoingBoundary. If this
-    is the first time that OutgoingBoundary has connected to this worker,
-    then we create a new DataReceiver here.
+    is the first time that logical OutgoingBoundary has connected to this
+    worker, then we create a new DataReceiver here.
     """
     let boundary_id = BoundaryId(sender_name, sender_boundary_id)
-    let dr =
+    (let dr, let connection_round) =
       try
-        _data_receivers(boundary_id)?
+        let found_dr = _data_receivers(boundary_id)?
+        ifdef debug then
+          Invariant(_data_receiver_connection_rounds.contains(boundary_id))
+        end
+        let last_connection_round =
+          _data_receiver_connection_rounds(boundary_id)?
+        let next_connection_round = last_connection_round + 1
+        (found_dr, next_connection_round)
       else
         // !TODO!: This should be recoverable
         let id = RoutingIdGenerator()
@@ -100,8 +112,10 @@ actor DataReceivers
           _is_recovering)
         _data_receivers(boundary_id) = new_dr
         _connections.register_disposable(new_dr)
-        new_dr
+        (new_dr, 1)
       end
+    _data_receiver_connection_rounds(boundary_id) = connection_round
+    dr.update_connection_round(connection_round)
     conn.identify_data_receiver(dr, sender_boundary_id, highest_seq_id)
     _inform_subscribers(boundary_id, dr)
 
