@@ -199,13 +199,6 @@ class _BoundariesReconnect is _RecoveryPhase
     _recovery_reconnecter.start_recovery_reconnect(_workers, _recovery)
 
   fun ref recovery_reconnect_finished() =>
-    //!@
-    // match _abort_promise
-    // | let p: Promise[None] =>
-    //   p(None)
-    //   _recovery._abort_early(_override_worker)
-    //   return
-    // end
     _recovery.request_boundaries_map(_recovery_reason,
       _recovery_priority_tracker)
 
