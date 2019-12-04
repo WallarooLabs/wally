@@ -131,7 +131,7 @@ for app in APPS:
             if o1 == o2:
                 ops = [o1]
             else:
-                ops = [o1, Wait(2), o2]
+                ops = [o1, Wait(4), o2]
             for src_type in SOURCE_TYPES:
                 for src_num in SOURCE_NUMBERS:
                     test_name = (

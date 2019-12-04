@@ -39,8 +39,9 @@ use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag, 
 actor DataReceiver is Producer
   let _id: RoutingId
   let _auth: AmbientAuth
-  let _worker_name: String
-  var _sender_name: String
+  let _worker_name: WorkerName
+  var _sender_name: WorkerName
+  var _connection_round: ConnectionRound = 0
   var _sender_step_id: RoutingId = 0
   var _router: DataRouter
   var _last_id_seen: SeqId = 0
@@ -81,8 +82,8 @@ actor DataReceiver is Producer
 
   var _phase: _DataReceiverPhase = _DataReceiverNotProcessingPhase
 
-  new create(auth: AmbientAuth, id: RoutingId, worker_name: String,
-    sender_name: String, data_router: DataRouter,
+  new create(auth: AmbientAuth, id: RoutingId, worker_name: WorkerName,
+    sender_name: WorkerName, data_router: DataRouter,
     metrics_reporter': MetricsReporter iso,
     initialized: Bool = false, is_recovering: Bool = false)
   =>
@@ -139,6 +140,9 @@ actor DataReceiver is Producer
 
     _phase = _NormalDataReceiverPhase(this)
 
+  be update_connection_round(round: ConnectionRound) =>
+    _connection_round = round
+
   be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
     // DataReceiver doesn't have its own routes
     None
@@ -171,8 +175,15 @@ actor DataReceiver is Producer
   // MESSAGES
   /////////////////////////////////////////////////////////////////////////////
   be received(d: DeliveryMsg, producer_id: RoutingId, pipeline_time_spent: U64,
-    seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
+    connection_round: ConnectionRound)
   =>
+    if connection_round != _connection_round then
+      @printf[I32](("DataReceiver %s received DataMsg from producer %s over " +
+        " outdated connection. Ignoring.\n").cstring(), _id.string().cstring(),
+        producer_id.string().cstring())
+      return
+    end
     process_message(d, producer_id, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
 
@@ -238,7 +249,7 @@ actor DataReceiver is Producer
       @printf[I32]("Error creating ack data received message\n".cstring())
     end
 
-  be data_receiver_ack_immediately() =>
+  be data_receiver_ack_immediately(connection_round: ConnectionRound) =>
     try
       let ack_msg = ChannelMsgEncoder.immediate_ack(_auth)?
       _write_on_conn(ack_msg)
@@ -253,6 +264,7 @@ actor DataReceiver is Producer
     _phase = _NormalDataReceiverPhase(this)
     _inform_boundary_to_send_normal_messages()
 
+    // Rename sender_step_id to boundary_routing_id
   be data_connect(sender_step_id: RoutingId, highest_seq_id: SeqId,
     conn: DataChannel)
   =>
@@ -281,7 +293,7 @@ actor DataReceiver is Producer
     end
     _pending_boundary_punctuation_ack_promises.push(p)
 
-  be receive_boundary_punctuation_ack() =>
+  be receive_boundary_punctuation_ack(connection_round: ConnectionRound) =>
     for p in _pending_boundary_punctuation_ack_promises.values() do
       p(None)
     end
@@ -299,7 +311,7 @@ actor DataReceiver is Producer
   fun _inform_boundary_to_send_normal_messages() =>
     try
       let start_msg = ChannelMsgEncoder.start_normal_data_sending(
-        _last_id_seen, _auth)?
+        _last_id_seen, _connection_round, _auth)?
       _write_on_conn(start_msg)
     else
       Fail()
@@ -328,7 +340,9 @@ actor DataReceiver is Producer
   /////////////////////////////////////////////////////////////////////////////
   // REGISTER PRODUCERS
   /////////////////////////////////////////////////////////////////////////////
-  be register_producer(input_id: RoutingId, output_id: RoutingId) =>
+  be register_producer(input_id: RoutingId, output_id: RoutingId,
+    connection_round: ConnectionRound)
+  =>
     if _step_group_producers.contains(output_id) then
       try
         _step_group_producers.insert_if_absent(output_id,
@@ -347,7 +361,9 @@ actor DataReceiver is Producer
   =>
     _queued_unregister_producers.push((input_id, output_id))
 
-  be unregister_producer(input_id: RoutingId, output_id: RoutingId) =>
+  be unregister_producer(input_id: RoutingId, output_id: RoutingId,
+    connection_round: ConnectionRound)
+  =>
     if _step_group_producers.contains(output_id) then
       try
         let set = _step_group_producers(output_id)?
@@ -363,8 +379,15 @@ actor DataReceiver is Producer
   // BARRIER
   /////////////////////////////////////////////////////////////////////////////
   be forward_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
-    barrier_token: BarrierToken, seq_id: SeqId)
+    barrier_token: BarrierToken, seq_id: SeqId,
+    connection_round: ConnectionRound)
   =>
+    if connection_round != _connection_round then
+      @printf[I32](("DataReceiver %s received forward_barrier from %s " +
+        " over outdated connection. Ignoring.\n").cstring(),
+        _id.string().cstring(), origin_step_id.string().cstring())
+      return
+    end
     ifdef "checkpoint_trace" then
       @printf[I32]("DataReceiver: forward_barrier to step (or step group) %s from %s -> seq id %s, last_seen: %s\n".cstring(),
         target_step_id.string().cstring(), origin_step_id.string().cstring(),
