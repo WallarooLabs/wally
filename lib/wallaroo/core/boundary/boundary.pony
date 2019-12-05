@@ -182,6 +182,9 @@ actor OutgoingBoundary is (Consumer & TCPActor)
         Fail()
       end
       _ready_to_work_requested = true
+      if not _reported_ready_to_work and _connection_initialized then
+        _report_ready_to_work()
+      end
       let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
         _routing_id, seq_id, _connection_round, _auth)?
       _tcp_handler.writev(connect_msg)
@@ -225,9 +228,13 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _pending_immediate_ack_promise = p
     try
       let msg = ChannelMsgEncoder.data_receiver_ack_immediately(
-        _connection_round, _auth)?
+        _connection_round, _routing_id, _auth)?
 
-      _tcp_handler.writev(msg)
+      if _connection_initialized then
+        _tcp_handler.writev(msg)
+      else
+        _unsent.push(msg)
+      end
     else
       Fail()
     end
@@ -279,8 +286,8 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _routing_id = routing_id
 
     ifdef "identify_routing_ids" then
-      @printf[I32]("===OutgoingBoundary %s routing_id registered===\n"
-        .cstring(), _routing_id.string().cstring())
+      @printf[I32]("===OutgoingBoundary %s to target worker %s routing_id registered===\n"
+        .cstring(), _routing_id.string().cstring(), _target_worker.cstring())
     end
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
@@ -381,21 +388,12 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _maybe_mute_or_unmute_upstreams()
     _lowest_queue_id = _lowest_queue_id + flush_count.u64()
 
-  fun ref receive_connect_ack(last_id_seen: SeqId,
+  fun ref start_normal_sending(last_id_seen: SeqId,
     connection_round: ConnectionRound)
   =>
     _connection_round = connection_round
-    _replay_from(last_id_seen)
-
-  fun ref start_normal_sending() =>
     if not _reported_ready_to_work and _ready_to_work_requested then
-      match _initializer
-      | let li: LayoutInitializer =>
-        li.report_ready_to_work(this)
-        _reported_ready_to_work = true
-      else
-        Fail()
-      end
+      _report_ready_to_work()
     end
     _connection_initialized = true
     _replaying = false
@@ -403,7 +401,17 @@ actor OutgoingBoundary is (Consumer & TCPActor)
       _tcp_handler.writev(msg)
     end
     _unsent.clear()
+    _replay_from(last_id_seen)
     _maybe_mute_or_unmute_upstreams()
+
+  fun ref _report_ready_to_work() =>
+    match _initializer
+    | let li: LayoutInitializer =>
+      li.report_ready_to_work(this)
+      _reported_ready_to_work = true
+    else
+      Fail()
+    end
 
   fun ref _replay_from(idx: SeqId) =>
     // In case the downstream has failed and recovered, resend producer
@@ -417,7 +425,6 @@ actor OutgoingBoundary is (Consumer & TCPActor)
       end
       cur_id = cur_id + 1
     end
-    _unsent.clear()
 
   be update_router(router: Router) =>
     """
@@ -468,7 +475,11 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     try
       let msg = ChannelMsgEncoder.register_producer(_worker_name,
         source_id, target_id, _connection_round, _auth)?
-      _tcp_handler.writev(msg)
+      if _connection_initialized then
+        _tcp_handler.writev(msg)
+      else
+        _unsent.push(msg)
+      end
     else
       Fail()
     end
@@ -481,7 +492,11 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     try
       let msg = ChannelMsgEncoder.unregister_producer(_worker_name,
         source_id, target_id, _connection_round, _auth)?
-      _tcp_handler.writev(msg)
+      if _connection_initialized then
+        _tcp_handler.writev(msg)
+      else
+        _unsent.push(msg)
+      end
     else
       Fail()
     end
@@ -619,7 +634,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
       not _replaying and
       not _backup_queue_is_overflowing()
 
-  fun ref set_connection_not_initialized() =>
+  fun ref _set_connection_not_initialized() =>
     _connection_initialized = false
 
   fun ref maybe_report_initialized() =>
@@ -676,8 +691,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
             .cstring())
         end
         @l(Log.debug(), Log.boundary(), "received: worker %s target_worker %s sn.last_id_seen %lu\n".cstring(), _worker_name.cstring(), _target_worker.cstring(), sn.last_id_seen)
-        receive_connect_ack(sn.last_id_seen, sn.connection_round)
-        start_normal_sending()
+        start_normal_sending(sn.last_id_seen, sn.connection_round)
       | let aw: AckDataReceivedMsg =>
         ifdef "trace" then
           @printf[I32]("Received AckDataReceivedMsg at Boundary\n".cstring())
@@ -742,10 +756,10 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     @printf[I32]("OutgoingBoundary: closed connection to %s at %s:%s...\n\n"
       .cstring(), _target_worker.cstring(), _host.cstring(),
       _service.cstring())
+    _set_connection_not_initialized()
     if not locally_initiated_close then
       _schedule_reconnect()
     end
-    set_connection_not_initialized()
 
   fun ref connect_failed() =>
     @printf[I32]("OutgoingBoundary: connect_failed to %s at %s:%s...\n\n"
