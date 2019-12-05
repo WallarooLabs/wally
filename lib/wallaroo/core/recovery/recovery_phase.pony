@@ -133,6 +133,12 @@ trait _RecoveryPhase
     @printf[I32]("UNEXPECTED CALL to %s on recovery phase %s. Ignoring!\n"
       .cstring(), method_name.cstring(), name().cstring())
 
+  fun _print_phase_transition() =>
+    ifdef debug then
+      @printf[I32]("_RecoveryPhase transition to %s\n".cstring(),
+        name().string().cstring())
+    end
+
 class _AwaitRecovering is _RecoveryPhase
   let _initial_recovery_reason: RecoveryReason
   let _recovery_priority_tracker: RecoveryPriorityTracker
@@ -140,6 +146,7 @@ class _AwaitRecovering is _RecoveryPhase
   new create(reason: RecoveryReason) =>
     _initial_recovery_reason = reason
     _recovery_priority_tracker = RecoveryPriorityTracker(reason)
+    _print_phase_transition()
 
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => _initial_recovery_reason
@@ -184,6 +191,7 @@ class _BoundariesReconnect is _RecoveryPhase
     _workers = workers
     _recovery = recovery
     _recovery_priority_tracker = recovery_priority_tracker
+    _print_phase_transition()
 
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => _recovery_reason
@@ -221,6 +229,7 @@ class _WaitingForBoundariesMap is _RecoveryPhase
     _recovery_reason = reason
     _recovery = recovery
     _recovery_priority_tracker = recovery_priority_tracker
+    _print_phase_transition()
 
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => _recovery_reason
@@ -262,6 +271,7 @@ class _WaitingForBoundariesToAckRegistering is _RecoveryPhase
       _boundaries.set(b)
     end
     Invariant(_boundaries.size() > 0)
+    _print_phase_transition()
 
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => _recovery_reason
@@ -302,6 +312,7 @@ class _PrepareRollback is _RecoveryPhase
   new create(recovery: Recovery ref, reason: RecoveryReason) =>
     _recovery_reason = reason
     _recovery = recovery
+    _print_phase_transition()
 
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => _recovery_reason
@@ -323,6 +334,7 @@ class _RollbackLocalKeys is _RecoveryPhase
     _recovery = recovery
     _workers = workers
     _checkpoint_id = checkpoint_id
+    _print_phase_transition()
 
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => _recovery_reason
@@ -366,6 +378,7 @@ class _AwaitRollbackId is _RecoveryPhase
   new create(recovery: Recovery ref, reason: RecoveryReason) =>
     _recovery_reason = reason
     _recovery = recovery
+    _print_phase_transition()
 
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => _recovery_reason
@@ -396,6 +409,7 @@ class _AwaitRecoveryInitiatedAcks is _RecoveryPhase
     _workers = workers
     _recovery = recovery
     _rollback_id = rollback_id
+    _print_phase_transition()
 
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => _recovery_reason
@@ -433,6 +447,7 @@ class _RollbackBarrier is _RecoveryPhase
     _recovery_reason = reason
     _recovery = recovery
     _rollback_id = rollback_id
+    _print_phase_transition()
 
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => _recovery_reason
@@ -463,6 +478,7 @@ class _AwaitDataReceiversAck is _RecoveryPhase
     _recovery_reason = reason
     _recovery = recovery
     _token = token
+    _print_phase_transition()
 
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => _recovery_reason
@@ -496,6 +512,7 @@ class _Rollback is _RecoveryPhase
     _recovery = recovery
     _token = token
     _workers = workers
+    _print_phase_transition()
 
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => _recovery_reason
@@ -525,9 +542,12 @@ class _Rollback is _RecoveryPhase
       abort_promise(None)
     end
 
-class _FinishedRecovering is _RecoveryPhase
+class _NotRecovering is _RecoveryPhase
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => RecoveryReasons.not_recovering()
+
+  new create() =>
+    _print_phase_transition()
 
   fun ref start_recovery(workers: Array[WorkerName] val,
     recovery: Recovery ref, reason: RecoveryReason)
@@ -547,6 +567,9 @@ class _FinishedRecovering is _RecoveryPhase
 class _RecoveryOverrideAccepted is _RecoveryPhase
   fun name(): String => __loc.type_name()
   fun recovery_reason(): RecoveryReason => RecoveryReasons.not_recovering()
+
+  new create() =>
+    _print_phase_transition()
 
   fun ref start_recovery(workers: Array[WorkerName] val,
     recovery: Recovery ref, reason: RecoveryReason)

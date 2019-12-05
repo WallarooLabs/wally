@@ -237,9 +237,10 @@ primitive ChannelMsgEncoder
     _encode(ReceiveBoundaryPunctuationAckMsg(connection_round), auth)?
 
   fun data_receiver_ack_immediately(connection_round: ConnectionRound,
-    auth: AmbientAuth): Array[ByteSeq] val ?
+    boundary_routing_id: RoutingId, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(DataReceiverAckImmediatelyMsg(connection_round), auth)?
+    _encode(DataReceiverAckImmediatelyMsg(connection_round,
+      boundary_routing_id), auth)?
 
   fun immediate_ack(auth: AmbientAuth): Array[ByteSeq] val ? =>
     _encode(ImmediateAckMsg, auth)?
@@ -1087,9 +1088,13 @@ class val StartNormalDataSendingMsg is ChannelMsg
 
 class val DataReceiverAckImmediatelyMsg is ChannelMsg
   let connection_round: ConnectionRound
+  let boundary_routing_id: RoutingId
 
-  new val create(connection_round': ConnectionRound) =>
+  new val create(connection_round': ConnectionRound,
+    boundary_routing_id': RoutingId)
+  =>
     connection_round = connection_round'
+    boundary_routing_id = boundary_routing_id'
 
   fun val string(): String => __loc.type_name()
 

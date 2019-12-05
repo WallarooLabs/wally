@@ -78,7 +78,7 @@ actor Recovery
        and all producers and consumers are ready to rollback state.
     10) _AwaitDataReceiversAck: Put DataReceivers in non-recovery mode.
     11) _Rollback: Rollback all state to last safe checkpoint.
-    12) _FinishedRecovering: Finished recovery
+    12) _NotRecovering: Either finished recovery or was never recovering
     13) _RecoveryOverrideAccepted: If recovery was handed off to another worker
   """
   let _self: Recovery tag = this
@@ -114,7 +114,7 @@ actor Recovery
     if is_recovering then
       _recovery_phase = _AwaitRecovering(RecoveryReasons.crash_recovery())
     else
-      _recovery_phase = _AwaitRecovering(RecoveryReasons.not_recovering())
+      _recovery_phase = _NotRecovering
     end
     _checkpoint_initiator.set_recovery(this)
 
@@ -399,7 +399,7 @@ actor Recovery
     end
     _router_registry.resume_the_world(_worker_name)
     _data_receivers.recovery_complete()
-    _recovery_phase = _FinishedRecovering
+    _recovery_phase = _NotRecovering
     match _initializer
     | let lti: LocalTopologyInitializer =>
       lti.report_recovery_ready_to_work()
