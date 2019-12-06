@@ -33,7 +33,7 @@ export STATUS_CRASH_SINK=/tmp/crasher.sink.doit
 
 reset () {
     reset.sh
-    ps axww | grep master-crasher.sh | grep -v $$ | awk '{print $1}' | xargs kill -9 > /dev/null 2&>1
+    ps axww | grep master-crasher.sh | grep -v $$ | awk '{print $1}' | xargs kill -9 > /dev/null 2>&1
     stop_sink > /dev/null 2>&1
     stop_sender > /dev/null 2>&1
 }
