@@ -20,6 +20,7 @@ use "collections"
 use "net"
 use "promises"
 use "time"
+use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
 use "wallaroo/core/invariant"
@@ -249,9 +250,11 @@ actor DataReceiver is Producer
       @printf[I32]("Error creating ack data received message\n".cstring())
     end
 
-  be data_receiver_ack_immediately(connection_round: ConnectionRound) =>
+  be data_receiver_ack_immediately(ack_id: AckId,
+    connection_round: ConnectionRound)
+  =>
     try
-      let ack_msg = ChannelMsgEncoder.immediate_ack(_auth)?
+      let ack_msg = ChannelMsgEncoder.immediate_ack(ack_id, _auth)?
       _write_on_conn(ack_msg)
     else
       Fail()

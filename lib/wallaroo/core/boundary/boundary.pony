@@ -41,6 +41,9 @@ use "wallaroo_labs/time"
 
 use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag,...)
 
+
+type AckId is U64
+
 class val OutgoingBoundaryBuilder
   let _auth: AmbientAuth
   let _worker_name: String
@@ -120,15 +123,17 @@ actor OutgoingBoundary is (Consumer & TCPActor)
   // TODO: this should go away and TerminusRoute entirely takes
   // over seq_id generation whether there is resilience or not.
   var seq_id: SeqId = 0
+  var _next_ack_id: AckId = 0
   var _disposed: Bool = false
 
   // Reconnect
   var _initial_reconnect_pause: U64 = 500_000_000
+  var _retry_immediate_ack_request_pause: U64 = 50_000_000
   var _reconnect_pause: U64 = _initial_reconnect_pause
   let _timers: Timers = Timers
 
-  var _pending_immediate_ack_promise:
-    (Promise[OutgoingBoundary] | None) = None
+  var _pending_immediate_ack_promises: Map[AckId, Promise[OutgoingBoundary]] =
+    _pending_immediate_ack_promises.create()
 
   // TCP
   var _tcp_handler: TestableTCPHandler = EmptyTCPHandler
@@ -225,26 +230,55 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     end
 
   be ack_immediately(p: Promise[OutgoingBoundary]) =>
-    _pending_immediate_ack_promise = p
+    _next_ack_id = _next_ack_id + 1
+    _pending_immediate_ack_promises(_next_ack_id) = p
     try
       let msg = ChannelMsgEncoder.data_receiver_ack_immediately(
-        _connection_round, _routing_id, _auth)?
+        _next_ack_id, _connection_round, _routing_id, _auth)?
 
       if _connection_initialized then
         _tcp_handler.writev(msg)
-      else
-        _unsent.push(msg)
       end
+      let timer = Timer(_RetryImmediateAckRequest(this, _next_ack_id),
+        _retry_immediate_ack_request_pause)
+      _timers(consume timer)
     else
       Fail()
     end
 
-  fun ref receive_immediate_ack() =>
-    match _pending_immediate_ack_promise
-    | let p: Promise[OutgoingBoundary] => p(this)
+  be retry_immediate_ack_request(ack_id: AckId) =>
+    if _pending_immediate_ack_promises.contains(ack_id) then
+      try
+        @printf[I32]("OutgoingBoundary %s retrying immediate ack %s request\n"
+          .cstring(), _routing_id.string().cstring(),
+          ack_id.string().cstring())
+        let msg = ChannelMsgEncoder.data_receiver_ack_immediately(
+          ack_id, _connection_round, _routing_id, _auth)?
+
+        if _connection_initialized then
+          _tcp_handler.writev(msg)
+        end
+        let timer = Timer(_RetryImmediateAckRequest(this, ack_id),
+          _retry_immediate_ack_request_pause)
+        _timers(consume timer)
+      else
+        Fail()
+      end
+    end
+
+  fun ref receive_immediate_ack(ack_id: AckId) =>
+    if _pending_immediate_ack_promises.contains(ack_id) then
+      try
+        let p = _pending_immediate_ack_promises(ack_id)?
+        p(this)
+        _pending_immediate_ack_promises.remove(ack_id)?
+      else
+        Unreachable()
+      end
     else
-      @printf[I32](("OutgoingBoundary: Received immediate ack but " +
-        "had no corresponding pending promise.\n").cstring())
+      @printf[I32](("OutgoingBoundary: Received immediate ack id %s but " +
+        "had no corresponding pending promise.\n").cstring(),
+        ack_id.string().cstring())
     end
 
   be reconnect() =>
@@ -570,7 +604,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
     _lowest_queue_id = _lowest_queue_id + _queue.size().u64()
     _queue.clear()
     _unsent.clear()
-    _pending_immediate_ack_promise = None
+    _pending_immediate_ack_promises.clear()
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
@@ -706,7 +740,7 @@ actor OutgoingBoundary is (Consumer & TCPActor)
           Fail()
         end
       | let ia: ImmediateAckMsg =>
-        receive_immediate_ack()
+        receive_immediate_ack(ia.ack_id)
       else
         @printf[I32](("Unknown Wallaroo data message type received at " +
           "OutgoingBoundary.\n").cstring())
@@ -788,4 +822,16 @@ class _PauseBeforeReconnect is TimerNotify
 
   fun ref apply(timer: Timer, count: U64): Bool =>
     _ob.reconnect()
+    false
+
+class _RetryImmediateAckRequest is TimerNotify
+  let _ob: OutgoingBoundary
+  let _ack_id: AckId
+
+  new iso create(ob: OutgoingBoundary, ack_id: AckId) =>
+    _ob = ob
+    _ack_id = ack_id
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    _ob.retry_immediate_ack_request(_ack_id)
     false

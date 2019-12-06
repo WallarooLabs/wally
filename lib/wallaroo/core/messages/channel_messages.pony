@@ -236,14 +236,15 @@ primitive ChannelMsgEncoder
   =>
     _encode(ReceiveBoundaryPunctuationAckMsg(connection_round), auth)?
 
-  fun data_receiver_ack_immediately(connection_round: ConnectionRound,
-    boundary_routing_id: RoutingId, auth: AmbientAuth): Array[ByteSeq] val ?
+  fun data_receiver_ack_immediately(ack_id: AckId,
+    connection_round: ConnectionRound, boundary_routing_id: RoutingId,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(DataReceiverAckImmediatelyMsg(connection_round,
+    _encode(DataReceiverAckImmediatelyMsg(ack_id, connection_round,
       boundary_routing_id), auth)?
 
-  fun immediate_ack(auth: AmbientAuth): Array[ByteSeq] val ? =>
-    _encode(ImmediateAckMsg, auth)?
+  fun immediate_ack(ack_id: AckId, auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(ImmediateAckMsg(ack_id), auth)?
 
   fun request_recovery_info(worker_name: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -1087,18 +1088,25 @@ class val StartNormalDataSendingMsg is ChannelMsg
     connection_round = connection_round'
 
 class val DataReceiverAckImmediatelyMsg is ChannelMsg
+  let ack_id: AckId
   let connection_round: ConnectionRound
   let boundary_routing_id: RoutingId
 
-  new val create(connection_round': ConnectionRound,
+  new val create(ack_id': AckId, connection_round': ConnectionRound,
     boundary_routing_id': RoutingId)
   =>
+    ack_id = ack_id'
     connection_round = connection_round'
     boundary_routing_id = boundary_routing_id'
 
   fun val string(): String => __loc.type_name()
 
-primitive ImmediateAckMsg is ChannelMsg
+class val ImmediateAckMsg is ChannelMsg
+  let ack_id: AckId
+
+  new val create(ack_id': AckId) =>
+    ack_id = ack_id'
+
   fun val string(): String => __loc.type_name()
 
 class val RequestBoundaryCountMsg is ChannelMsg

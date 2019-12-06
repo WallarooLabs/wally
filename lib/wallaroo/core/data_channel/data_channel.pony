@@ -275,7 +275,8 @@ class _DataReceiver is _DataReceiverWrapper
       @printf[I32](("Received DataReceiverAckImmediatelyMsg from boundary " +
         "with routing id %s\n").cstring(),
         ia.boundary_routing_id.string().cstring())
-      _data_receiver.data_receiver_ack_immediately(ia.connection_round)
+      _data_receiver.data_receiver_ack_immediately(ia.ack_id,
+        ia.connection_round)
     | let km: KeyMigrationMsg =>
       ifdef "trace" then
         @printf[I32]("Received KeyMigrationMsg on Data Channel\n".cstring())
