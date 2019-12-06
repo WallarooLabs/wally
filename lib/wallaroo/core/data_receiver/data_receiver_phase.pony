@@ -16,6 +16,7 @@ Copyright 2018 The Wallaroo Authors.
 
 */
 
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
 use "wallaroo/core/messages"
 use "wallaroo/core/barrier"
@@ -45,8 +46,14 @@ trait _DataReceiverPhase
     @printf[I32]("Invalid call to %s on Data Receiver phase %s\n".cstring(),
       method_name.cstring(), name().cstring())
 
+  fun _print_phase_transition() =>
+    ifdef debug then
+      @printf[I32]("_DataReceiverPhase transition to %s\n".cstring(),
+        name().string().cstring())
+    end
+
 class _DataReceiverNotProcessingPhase is _DataReceiverPhase
-  fun name(): String => "_DataReceiverNotProcessingPhase"
+  fun name(): String => __loc.type_name()
 
   fun ref data_connect(highest_seq_id: SeqId) =>
     // If we're not processing, then we need to wait for DataReceivers to be
@@ -54,14 +61,53 @@ class _DataReceiverNotProcessingPhase is _DataReceiverPhase
     @printf[I32](("DataReceiver: data_connect received, but still waiting " +
       "for DataReceivers to initialize.\n").cstring())
 
-class _RecoveringDataReceiverPhase is _DataReceiverPhase
+class _RecoveringNotAcceptingMessagesOrBarriersDataReceiverPhase is
+  _DataReceiverPhase
   let _data_receiver: DataReceiver ref
 
   new create(dr: DataReceiver ref) =>
     _data_receiver = dr
+    _print_phase_transition()
 
-  fun name(): String =>
-    "_RecoveringDataReceiverPhase"
+  fun name(): String => __loc.type_name()
+
+  fun has_pending(): Bool =>
+    false
+
+  fun ref deliver(d: DeliveryMsg, producer_id: RoutingId,
+    pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
+  =>
+    ifdef debug then
+      @printf[I32]("Recovering DataReceiver dropping message\n"
+        .cstring())
+    end
+    _data_receiver._update_last_id_seen(seq_id, true)
+
+  fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
+    token: BarrierToken, seq_id: SeqId)
+  =>
+    ifdef debug then
+      @printf[I32]("Recovering DataReceiver dropping barrier\n"
+        .cstring())
+    end
+    _data_receiver._update_last_id_seen(seq_id, true)
+
+  fun ref data_connect(highest_seq_id: SeqId) =>
+    _data_receiver._update_last_id_seen(highest_seq_id)
+    _data_receiver._inform_boundary_to_send_normal_messages()
+
+class _RecoveringOnlyAcceptingRollbackBarriersDataReceiverPhase is
+  _DataReceiverPhase
+  let _data_receiver: DataReceiver ref
+  let _minimum_rollback_id: RollbackId
+
+  new create(dr: DataReceiver ref, min_rollback_id: RollbackId) =>
+    _data_receiver = dr
+    _minimum_rollback_id = min_rollback_id
+    _print_phase_transition()
+
+  fun name(): String => __loc.type_name()
 
   fun has_pending(): Bool =>
     false
@@ -83,9 +129,19 @@ class _RecoveringDataReceiverPhase is _DataReceiverPhase
     // Drop anything that's not related to rollback
     match token
     | let srt: CheckpointRollbackBarrierToken =>
-      _data_receiver.send_barrier(input_id, output_id, token, seq_id)
+      if srt.rollback_id >= _minimum_rollback_id then
+        _data_receiver.send_barrier(input_id, output_id, token, seq_id)
+      else
+        @printf[I32]("Recovery DataReceiver ignoring lower rollback id %s\n"
+          .cstring(), srt.rollback_id.string().cstring())
+      end
     | let srt: CheckpointRollbackResumeBarrierToken =>
-      _data_receiver.send_barrier(input_id, output_id, token, seq_id)
+      if srt.rollback_id >= _minimum_rollback_id then
+        _data_receiver.send_barrier(input_id, output_id, token, seq_id)
+      else
+        @printf[I32]("Recovery DataReceiver ignoring lower rollback id %s\n"
+          .cstring(), srt.rollback_id.string().cstring())
+      end
     else
       ifdef debug then
         @printf[I32]("Recovering DataReceiver dropping non-rollback barrier\n"
@@ -95,8 +151,6 @@ class _RecoveringDataReceiverPhase is _DataReceiverPhase
     end
 
   fun ref data_connect(highest_seq_id: SeqId) =>
-    // If we're recovering, then we ignore existing queues on upstream
-    // boundaries, which will be cleared as part of rollback.
     _data_receiver._update_last_id_seen(highest_seq_id)
     _data_receiver._inform_boundary_to_send_normal_messages()
 
@@ -105,9 +159,9 @@ class _NormalDataReceiverPhase is _DataReceiverPhase
 
   new create(dr: DataReceiver ref) =>
     _data_receiver = dr
+    _print_phase_transition()
 
-  fun name(): String =>
-    "_NormalDataReceiverPhase"
+  fun name(): String => __loc.type_name()
 
   fun has_pending(): Bool =>
     false

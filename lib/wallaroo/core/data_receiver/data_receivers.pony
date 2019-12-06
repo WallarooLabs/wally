@@ -18,6 +18,7 @@ Copyright 2018 The Wallaroo Authors.
 
 use "collections"
 use "promises"
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
 use "wallaroo/core/invariant"
@@ -146,6 +147,17 @@ actor DataReceivers
       let p = Promise[None]
       ps.push(p)
       dr.request_boundary_punctuation_ack(p)
+    end
+    let promises = Promises[None].join(ps.values())
+    promises.next[None]({(_: None) => promise(None)})
+
+  be start_accepting_barriers(promise: Promise[None], rollback_id: RollbackId)
+  =>
+    let ps = Array[Promise[None]]
+    for dr in _data_receivers.values() do
+      let p = Promise[None]
+      ps.push(p)
+      dr.start_accepting_barriers(p, rollback_id)
     end
     let promises = Promises[None].join(ps.values())
     promises.next[None]({(_: None) => promise(None)})

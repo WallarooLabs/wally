@@ -74,12 +74,14 @@ actor Recovery
     8) _AwaitRecoveryInitiatedAcks: Wait for all workers to acknowledge
        recovery is about to start. This gives currently recovering workers a
        chance to cede control to us if we're the latest recovering.
-    9) _RollbackBarrier: Use barrier to ensure that all old data is cleared
+    9) _WaitForDataReceiversAcceptBarriersAcks: We are now ready to tell
+       all DataReceivers they can process barriers.
+    10) _RollbackBarrier: Use barrier to ensure that all old data is cleared
        and all producers and consumers are ready to rollback state.
-    10) _AwaitDataReceiversAck: Put DataReceivers in non-recovery mode.
-    11) _Rollback: Rollback all state to last safe checkpoint.
-    12) _NotRecovering: Either finished recovery or was never recovering
-    13) _RecoveryOverrideAccepted: If recovery was handed off to another worker
+    11) _AwaitDataReceiversAck: Put DataReceivers in non-recovery mode.
+    12) _Rollback: Rollback all state to last safe checkpoint.
+    13) _NotRecovering: Either finished recovery or was never recovering
+    14) _RecoveryOverrideAccepted: If recovery was handed off to another worker
   """
   let _self: Recovery tag = this
   let _auth: AmbientAuth
@@ -164,6 +166,9 @@ actor Recovery
 
   be worker_ack_local_keys_rollback(w: WorkerName, s_id: CheckpointId) =>
     _recovery_phase.worker_ack_local_keys_rollback(w, s_id)
+
+  be data_receivers_acked_accepting_barriers() =>
+    _recovery_phase.data_receivers_acked_accepting_barriers()
 
   be rollback_barrier_fully_acked(token: CheckpointRollbackBarrierToken) =>
     _recovery_phase.rollback_barrier_complete(token)
@@ -342,6 +347,24 @@ actor Recovery
     reason: RecoveryReason)
   =>
     ifdef "resilience" then
+      @printf[I32]("|~~ - Recovery Phase: Waiting for DataReceivers to Ack Accepting Barriers - ~~|\n".cstring())
+
+      _recovery_phase = _WaitForDataReceiversAcceptBarriersAcks(this,
+        rollback_id, reason)
+
+      let promise = Promise[None]
+      promise.next[None]({(_: None) =>
+        _self.data_receivers_acked_accepting_barriers()
+      })
+      _data_receivers.start_accepting_barriers(promise, rollback_id)
+    else
+      _recovery_complete(0, 0, reason)
+    end
+
+  fun ref _data_receivers_accepting_barriers(rollback_id: RollbackId,
+    reason: RecoveryReason)
+  =>
+    ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: Rollback Barrier - ~~|\n".cstring())
 
       _recovery_phase = _RollbackBarrier(this, rollback_id, reason)
@@ -442,4 +465,4 @@ actor Recovery
     else
       Fail()
     end
-    _recovery_phase = _RecoveryOverrideAccepted
+    _recovery_phase = _NotRecovering
