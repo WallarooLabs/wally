@@ -9,8 +9,14 @@
 #    writes these 1-line messages as-is and then commits via 2PC
 #    groups of 0 or more entire & intact lines.
 #
-# 3. The input file has all lines beginning with the same character,
-#    e.g., ASCII "T".
+# 3. The input file SHOULD have all lines beginning with the same character,
+#    e.g., ASCII "A".  That same character is given to us on the
+#    command line as argument $1.  We use KEY=$1 to filter lines
+#    that begin with that letter because the 1st char in the line is
+#    Wallaroo's routing key, and Wallaroo has limits order guarantees
+#    only on single routing keys.
+#    If the file contains more than one routing key, then this script
+#    should be run multiple times: once for each unique routing key.
 #
 # 5. We follow the TCP port and file input/output naming conventions
 #    of the scripts in this directory.
@@ -28,7 +34,9 @@
 #
 # 9. This script will be for point-in-time verification use.
 
-INPUT=$1
+KEY=$1
+INPUT=$2
+MULTI_KEY_TMP_FILE=$3
 OUTPUT_DIR=/tmp/sink-out
 OUTPUT=$OUTPUT_DIR/output.concatenated
 
@@ -43,8 +51,19 @@ if [ ! -f $INPUT ]; then
     exit 1
 fi
 
-./concat-sink-output.py $OUTPUT_DIR/*.txnlog > $OUTPUT 2> $OUTPUT.mapping
+if [ -z "$MULTI_KEY_TMP_FILE" ]; then
+    ./concat-sink-output.py $OUTPUT_DIR/*.txnlog | \
+        egrep "^$KEY" 1> $OUTPUT 2> $OUTPUT.mapping 
+else
+    if [ ! -f $MULTI_KEY_TMP_FILE ]; then
+        ##/bin/echo -n CONCAT > /dev/tty
+        ./concat-sink-output.py $OUTPUT_DIR/*.txnlog \
+            1> $MULTI_KEY_TMP_FILE 2> $MULTI_KEY_TMP_FILE.mapping
+    fi
+    egrep "^$KEY" < $MULTI_KEY_TMP_FILE > $OUTPUT 2> $OUTPUT.mapping 
+fi
 output_size=`ls -l $OUTPUT | awk '{print $5}'`
+##/bin/echo -n v$KEY,$output_size, > /dev/tty
 
 cmp -n $output_size $INPUT $OUTPUT
 if [ $? -eq 0 ]; then

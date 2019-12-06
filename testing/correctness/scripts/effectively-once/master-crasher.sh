@@ -109,20 +109,27 @@ start_all_workers () {
     poll_ready -a -v -w 5 || exit 1
 }
 
-start_sender () {
-    rm -f $SENDER_OUTFILE
-    while [ 1 ]; do
-        if [ "$WALLAROO_TCP_SOURCE_SINK" = "true" ]; then
-            $WALLAROO_TOP/testing/tools/fixed_length_message_blaster/fixed_length_message_blaster \
-            --host localhost:$WALLAROO_IN_BASE --file /tmp/input-file.txt \
-            --msg-size 53 --batch-size 6 \
-            --msec-interval 5 --report-interval 1000000 --ponythreads=1 \
-            >> $SENDER_OUTFILE 2>&1
-        else
-            env ERROR_9_SHOULD_EXIT=true $WALLAROO_TOP/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 66000 >> $SENDER_OUTFILE 2>&1
-        fi
-        sleep 0.1
+start_senders () {
+    rm -f $SENDER_OUTFILE.*
+    if [ -z "$MULTIPLE_KEYS_LIST" ]; then
+        echo ERROR: The variable \$MULTIPLE_KEYS_LIST is empty, exiting!
+        exit 1
+    fi
+    for i in $MULTIPLE_KEYS_LIST; do
+        while [ 1 ]; do
+            if [ "$WALLAROO_TCP_SOURCE_SINK" = "true" ]; then
+                $WALLAROO_TOP/testing/tools/fixed_length_message_blaster/fixed_length_message_blaster \
+                --host localhost:$WALLAROO_IN_BASE --file /tmp/input-file.$i.txt \
+                --msg-size 53 --batch-size 6 \
+                --msec-interval 5 --report-interval 1000000 --ponythreads=1 \
+                >> $SENDER_OUTFILE.$i 2>&1
+            else
+                env ERROR_9_SHOULD_EXIT=true $WALLAROO_TOP/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.$i.txt 66000 >> $SENDER_OUTFILE.$i 2>&1
+            fi
+            sleep 0.1
+        done &
     done
+    wait
 }
 
 stop_sender () {
@@ -254,16 +261,34 @@ run_sanity_loop () {
             echo SANITY
             break
         fi
-        ./1-to-1-passthrough-verify.sh /tmp/input-file.txt > $outfile 2>&1
-        if [ $? -ne 0 ]; then
-            head $outfile
+        multi_key_tmp_file=/tmp/concat-multikey-tmp-file
+        rm -f $multi_key_tmp_file
+        errors=0
+        for i in $MULTIPLE_KEYS_LIST; do
+            ./1-to-1-passthrough-verify.sh $i /tmp/input-file.$i.txt $multi_key_tmp_file > $outfile 2>&1
+            if [ $? -ne 0 ]; then
+                echo ""
+                head $outfile
+                rm $outfile
+                echo SANITY2
+                errors=1
+            fi
             rm $outfile
-            echo BREAK2
-            break
+        done
+        if [ $errors -ne 0 ]; then
+            print_duration
+            pause_the_world
         fi
-        rm $outfile
-        res=`logtail $SENDER_OUTFILE | egrep 'MultiSourceConnector closed Stream.*, point_of_ref=12368928, is_open=False'`
-        if [ ! -z "$res" ]; then
+        total=0
+        found=0
+        for i in $MULTIPLE_KEYS_LIST; do
+            total=`expr $total + 1`
+            res=`logtail $SENDER_OUTFILE.$i | egrep 'MultiSourceConnector closed Stream.*, point_of_ref=12368928, is_open=False'`
+            if [ ! -z "$res" ]; then
+                found=`expr $found + 1`
+            fi
+        done
+        if [ $found -eq $total ]; then
             echo "SANITY LOOP SUCCESS: EOF found!"
             echo "SANITY LOOP SUCCESS: EOF found!" >> /tmp/res
             print_duration
@@ -572,7 +597,7 @@ touch $STATUS_CRASH_SINK
 reset
 start_sink ; sleep 1
 start_all_workers
-start_sender &
+start_senders &
 
 run_sanity=true
 for arg in $*; do
