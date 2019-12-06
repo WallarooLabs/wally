@@ -91,6 +91,9 @@ trait _RecoveryPhase
     // can only log and ignore here.
     _unexpected_call(__loc.method_name())
 
+  fun ref data_receivers_acked_accepting_barriers() =>
+    _invalid_call(__loc.method_name()); Fail()
+
   fun ref rollback_complete(worker: WorkerName,
     token: CheckpointRollbackBarrierToken)
   =>
@@ -436,6 +439,38 @@ class _AwaitRecoveryInitiatedAcks is _RecoveryPhase
       abort_promise(None)
     end
 
+class _WaitForDataReceiversAcceptBarriersAcks is _RecoveryPhase
+  let _recovery_reason: RecoveryReason
+  let _recovery: Recovery ref
+  let _rollback_id: RollbackId
+
+  new create(recovery: Recovery ref, rollback_id: RollbackId,
+    reason: RecoveryReason)
+  =>
+    _recovery_reason = reason
+    _recovery = recovery
+    _rollback_id = rollback_id
+    _print_phase_transition()
+
+  fun name(): String => __loc.type_name()
+  fun recovery_reason(): RecoveryReason => _recovery_reason
+
+  fun ref data_receivers_acked_accepting_barriers() =>
+    _recovery._data_receivers_accepting_barriers(_rollback_id,
+      _recovery_reason)
+
+  fun ref try_override_recovery(worker: WorkerName,
+    rollback_id: RollbackId, reason: RecoveryReason, recovery: Recovery ref,
+    abort_promise: Promise[None])
+  =>
+    if RecoveryReasons.has_priority(reason, _recovery_reason) or
+       (not RecoveryReasons.has_priority(_recovery_reason, reason) and
+         (rollback_id > _rollback_id))
+    then
+      recovery._abort_early(worker)
+      abort_promise(None)
+    end
+
 class _RollbackBarrier is _RecoveryPhase
   let _recovery_reason: RecoveryReason
   let _recovery: Recovery ref
@@ -558,28 +593,6 @@ class _NotRecovering is _RecoveryPhase
   fun ref recovery_reconnect_finished() =>
     None
 
-  fun ref try_override_recovery(worker: WorkerName,
-    rollback_id: RollbackId, reason: RecoveryReason, recovery: Recovery ref,
-    abort_promise: Promise[None])
-  =>
-    abort_promise(None)
-
-class _RecoveryOverrideAccepted is _RecoveryPhase
-  fun name(): String => __loc.type_name()
-  fun recovery_reason(): RecoveryReason => RecoveryReasons.not_recovering()
-
-  new create() =>
-    _print_phase_transition()
-
-  fun ref start_recovery(workers: Array[WorkerName] val,
-    recovery: Recovery ref, reason: RecoveryReason)
-  =>
-    @printf[I32]("Online recovery initiated.\n".cstring())
-    recovery._start_reconnect(workers, reason, RecoveryPriorityTracker(reason))
-
-  fun ref recovery_reconnect_finished() =>
-    None
-
   fun ref rollback_prep_complete() =>
     None
 
@@ -595,6 +608,9 @@ class _RecoveryOverrideAccepted is _RecoveryPhase
     None
 
   fun ref data_receivers_acked_registering() =>
+    None
+
+  fun ref data_receivers_acked_accepting_barriers() =>
     None
 
   fun ref rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>

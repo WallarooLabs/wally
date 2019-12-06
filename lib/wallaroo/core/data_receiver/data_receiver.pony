@@ -94,7 +94,7 @@ actor DataReceiver is Producer
     _router = data_router
     _metrics_reporter = consume metrics_reporter'
     if is_recovering then
-      _phase = _RecoveringDataReceiverPhase(this)
+      _phase = _RecoveringNotAcceptingMessagesOrBarriersDataReceiverPhase(this)
     else
       _phase = _NormalDataReceiverPhase(this)
     end
@@ -299,6 +299,12 @@ actor DataReceiver is Producer
     end
     _pending_boundary_punctuation_ack_promises.clear()
 
+  be start_accepting_barriers(promise: Promise[None], rollback_id: RollbackId)
+  =>
+    _phase = _RecoveringOnlyAcceptingRollbackBarriersDataReceiverPhase(this,
+      rollback_id)
+    promise(None)
+
   fun ref _update_last_id_seen(seq_id: SeqId, on_increase: Bool = false) =>
     if on_increase then
       if seq_id > _last_id_seen then
@@ -394,15 +400,6 @@ actor DataReceiver is Producer
         seq_id.string().cstring(), _last_id_seen.string().cstring())
     end
     if seq_id > _last_id_seen then
-      match barrier_token
-      // !TODO!: This isn't good enough. We need to ensure that we've been
-      // overridden to make this change back from recovery phase. As it stands,
-      // this introduces a race condition if we receive an old resume token in
-      // flight before we recovered.
-      | let crrt: CheckpointRollbackResumeBarrierToken =>
-        _phase = _NormalDataReceiverPhase(this)
-      end
-
       _forward_barrier(target_step_id, origin_step_id, barrier_token, seq_id)
     end
 
