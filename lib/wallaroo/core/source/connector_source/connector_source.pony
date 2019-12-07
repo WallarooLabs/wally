@@ -469,7 +469,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     _prepare_for_rollback()
 
   fun ref _prepare_for_rollback() =>
-    _notify.prepare_for_rollback()
+    _notify.prepare_for_rollback(this)
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
