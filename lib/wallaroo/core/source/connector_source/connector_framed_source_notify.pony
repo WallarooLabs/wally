@@ -718,9 +718,10 @@ class ConnectorSourceNotify[In: Any val]
     end
     w.done()
 
-  fun ref prepare_for_rollback() =>
+  fun ref prepare_for_rollback(source: ConnectorSource[In] ref) =>
     if _session_active then
       _prep_for_rollback = true
+      source.close()
       ifdef "trace" then
         @ll(_conn_debug, "TRACE: %s.%s\n".cstring(), __loc.type_name().cstring(),
           __loc.method_name().cstring())
@@ -747,6 +748,8 @@ class ConnectorSourceNotify[In: Any val]
       end
       while true do
         let s = _StreamState.deserialize(rb)?
+        @ll(_conn_info, "ConnectorSource[%s]: rollback: payload relinquish name %s id %s last_acked %lu\n"
+          .cstring(), _source_name.cstring(), s.name.cstring(), s.id.string().cstring(), s.last_acked)
         _pending_relinquish.push(StreamTuple(s.id, s.name, s.last_acked))
         // TODO: should we remove s.id from all my other lists, _active_streams, etc??
       end
@@ -795,6 +798,10 @@ class ConnectorSourceNotify[In: Any val]
   fun ref checkpoint_complete(source: ConnectorSource[In] ref,
     checkpoint_id: CheckpointId)
   =>
+    @ll(_conn_debug, ("ConnectorSourceNotify: Checkpoint complete for id " +
+      " %s _prep_for_rollback %s _session_active %s\n").cstring(),
+      checkpoint_id.string().cstring(),
+      _prep_for_rollback.string().cstring(), _session_active.string().cstring())
     if not _prep_for_rollback then
       ifdef debug then
         if (_barrier_checkpoint_id > 0) and (checkpoint_id != _barrier_checkpoint_id) then

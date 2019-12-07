@@ -443,12 +443,16 @@ class GlobalConnectorStreamRegistry[In: Any val]
   ////////////////////////////
   // INTERNAL STATE MANAGEMENT
   ////////////////////////////
-  fun ref _deactivate_stream(stream: StreamTuple) ? =>
+  fun ref _deactivate_stream(stream: StreamTuple) =>
     @ll(_debug, "_deactivate_stream(StreamTuple(%s, %s, %s))".cstring(),
       stream.id.string().cstring(), stream.name.cstring(),
       stream.last_acked.string().cstring())
-    // fail if not already active
-    _active_streams.remove(stream.id)?
+    try
+      _active_streams.remove(stream.id)?
+      @ll(_debug, "_deactivate_stream(StreamTuple(%s, %s, %s)) removed successfully".cstring(),
+        stream.id.string().cstring(), stream.name.cstring(),
+        stream.last_acked.string().cstring())
+    end
     @ll(_debug, "_deactivate_stream: name %s id %s last_acked %lu".cstring(),
       stream.name.cstring(),
       stream.id.string().cstring(), stream.last_acked)
@@ -601,10 +605,8 @@ class GlobalConnectorStreamRegistry[In: Any val]
       for stream in streams.values() do
         Invariant(_active_streams.get_or_else(stream.id, _worker_name) ==
           worker_name)
-        try
-          // assume active, try deactivate
-          _deactivate_stream(stream)?
-        end
+        // assume active, try deactivate
+        _deactivate_stream(stream)
       end
     else
       ConnectorStreamRegistryMessenger.streams_relinquish(_leader_name,
@@ -701,17 +703,11 @@ class GlobalConnectorStreamRegistry[In: Any val]
       for stream in streams.values() do
         Invariant(_active_streams.get_or_else(stream.id, _worker_name) ==
           worker_name)
-        try
-          // assume active, try deactivate
-          @ll(_debug, "streams_shrink: try name %s id %s last_acked %lu".cstring(),
-            stream.name.cstring(),
-            stream.id.string().cstring(), stream.last_acked)
-          _deactivate_stream(stream)?
-          @ll(_debug,"streams_shrink: deactivate name %s id %s last_acked %lu".cstring(),
-            stream.name.cstring(),
-            stream.id.string().cstring(), stream.last_acked)
-          _pending_shrink.unset(stream.id)
-        end
+        _deactivate_stream(stream)
+        @ll(_debug,"streams_shrink: deactivate name %s id %s last_acked %lu".cstring(),
+          stream.name.cstring(),
+          stream.id.string().cstring(), stream.last_acked)
+        _pending_shrink.unset(stream.id)
       end
       // for local streams_shrink, respond directly
       if worker_name == _worker_name then
