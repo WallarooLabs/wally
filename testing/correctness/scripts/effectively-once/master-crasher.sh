@@ -194,20 +194,35 @@ run_crash_sink_loop () {
 
 run_crash_worker_loop () {
     worker="$1"
+    suffix="$2"
+
     if [ -z "$worker" ]; then
         echo ERROR: $0: worker number not given
         print_duration
         exit 1
     fi
     sleep 2 # Don't start crashing until checkpoint #1 is complete.
+    counter=0
     while [ 1 ]; do
+        counter=`expr $counter + 1`
         if [ -f $STATUS_CRASH_WORKER ]; then
-            sleep `random_float 4.5 0`
+            case "$suffix" in
+                *slow*)
+                    ## Space apart the crashes very roughly 120+fudge seconds apart
+                    if [ $counter -lt 120 ]; then
+                        sleep 1
+                        sleep `random_float 0.2`
+                        continue
+                    fi
+                    counter=0
+                ;;
+            esac
+            sleep `random_float 4.5`
             /bin/echo -n "c$worker"
             crash_out=`crash_worker $worker`
             mv /tmp/wallaroo.$worker /tmp/wallaroo.$worker.`date +%s` && gzip /tmp/wallaroo.$worker.`date +%s` > /dev/null 2>&1 &
             if [ -z "$crash_out" ]; then
-                sleep `random_float 2.5 0`
+                sleep `random_float 2.5`
                 if [ $worker -eq 0 ]; then
                     start_initializer
                 else
@@ -611,8 +626,14 @@ for arg in $*; do
             run_sanity=false
             ;;
         crash[0-9]*)
-            worker=`echo $arg | sed 's/crash//'`
-            cmd="run_crash_worker_loop $worker"
+            worker=`echo $arg | sed -e 's/crash//' -e 's/\..*//'`
+            suffix=""
+            case $arg in
+                *.*)
+                    suffix=`echo $arg | sed 's/crash[0-9]*\.//'`
+                ;;
+            esac
+            cmd="run_crash_worker_loop $worker $suffix"
             echo RUN: $cmd
             $cmd &
             ;;
