@@ -59,7 +59,6 @@ class ConnectorSinkNotify
   var twopc_txn_id_last_committed: (None|String) = None
   var twopc_txn_id_current: String = ""
   var _twopc_uncommitted_list: (None|Array[String] val) = None
-  var twopc_current_txn_aborted: Bool = false
 
   new create(sink_id: RoutingId, app_name: String, worker_name: WorkerName,
     protocol_version: String, cookie: String,
@@ -223,7 +222,7 @@ class ConnectorSinkNotify
         " back pressure, connected = %s").cstring(),
         _connected.string().cstring())
       try @ll(_twopc_debug, "DBGDBG: unthrottled: buffer check, FSM state = %d".cstring(), (conn as ConnectorSink ref).get_twopc_state()) else Fail() end
-      @ll(_twopc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s current txn=%s.".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_txn_id_current.cstring())
+      @ll(_twopc_debug, "DBGDBG: unthrottled: buffer: current txn=%s.".cstring(), twopc_txn_id_current.cstring())
     end
 
   fun ref ready_to_work_requested(conn: ConnectorSink ref) =>
@@ -299,9 +298,7 @@ class ConnectorSinkNotify
           @ll(_conn_debug, "TRACE: uncommitted txns = %d".cstring(),
               mi.txn_ids.size())
           _twopc_uncommitted_list = mi.txn_ids
-          // twopc_current_txn_aborted is used by unthrottled()
-          twopc_current_txn_aborted = process_uncommitted_list(
-            conn as ConnectorSink ref)
+          process_uncommitted_list(conn as ConnectorSink ref)
 
           // The 2PC intro dance has finished.  We can permit the rest
           // of the sink's operation to resume.  The txns in the
@@ -311,7 +308,6 @@ class ConnectorSinkNotify
           // call above).
           twopc_intro_done = true
           unthrottled(conn)
-          twopc_current_txn_aborted = false
           if not _report_ready_to_work_done then
             _ready_to_work = true
             if _report_ready_to_work_requested then

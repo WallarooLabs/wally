@@ -816,9 +816,10 @@ actor ConnectorSink is Sink
     // commit status: commit for checkpoint_id, all greater are invalid.
     _notify.twopc_txn_id_last_committed = rollback_to_c_id
     @ll(_twopc_debug, "2PC: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
-    _notify.twopc_current_txn_aborted = _notify.process_uncommitted_list(this)
 
-    @ll(_twopc_debug, "2PC: twopc_current_txn_aborted = %s.".cstring(), _notify.twopc_current_txn_aborted.string().cstring())
+    let current_txn_aborted = _notify.process_uncommitted_list(this)
+
+    @ll(_twopc_debug, "2PC: current_txn_aborted = %s.".cstring(), current_txn_aborted.string().cstring())
     @ll(_twopc_debug, "2PC: Rollback: _twopc.last_offset %lu _twopc.current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s".cstring(), _twopc.last_offset, _twopc.current_offset, _notify.acked_point_of_ref, _notify.twopc_txn_id_last_committed_helper().cstring(), _sink_id.string().cstring())
 
     event_log.ack_rollback(_sink_id)
