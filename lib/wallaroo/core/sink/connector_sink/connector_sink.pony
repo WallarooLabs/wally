@@ -627,46 +627,52 @@ actor ConnectorSink is Sink
     _phase = QueuingSinkPhase(_sink_id, this, queue)
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
-    @ll(_twopc_debug, "2PC: Checkpoint complete %d at ConnectorSink %s".cstring(), checkpoint_id, _sink_id.string().cstring())
-    @ll(_twopc_info, "2PC: Checkpoint complete %d _twopc.txn_id is %s".cstring(), checkpoint_id, _twopc.txn_id.cstring())
-
     let cpoint_id = ifdef "test_disconnect_at_5" then "5" else "" end
     let drop_phase2_msg = try if _twopc.txn_id.split("=")(1)? == cpoint_id then true else false end else false end
 
-    _twopc.checkpoint_complete(this, drop_phase2_msg)
+    @ll(_twopc_debug, "2PC: Checkpoint complete %d _twopc.txn_id is %s".cstring(), checkpoint_id, _twopc.txn_id.cstring())
+    if _connected and _notify.twopc_intro_done then
+      @ll(_twopc_debug, "2PC: Checkpoint complete %d at ConnectorSink %s".cstring(), checkpoint_id, _sink_id.string().cstring())
 
-    @ll(_twopc_debug, "2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d _notify.twopc_txn_id_last_committed %s".cstring(), _twopc.last_offset, _notify.twopc_txn_id_last_committed_helper().cstring())
+      _twopc.checkpoint_complete(this, drop_phase2_msg)
 
-    if _twopc.txn_id == "" then
-      // There are two reasons for this:
-      // 1. There is a legitimate bug.
-      // 2. We crashed and restarted, and we're still very early in
-      //    the restart process, e.g., during "INIT PHASE II".
-      //    Now we're told that the checkpoint is complete.  We didn't
-      //    really particpate in this checkpoint (because we had
-      //    crashed), but we can continue.
-      // We can't easily tell the difference between #1 and #2 because
-      // we would need to query LocalTopologyInitializer _initializer
-      // but can't.  I've ironed out most bugs in the 2PC impl, so
-      // let's assume that this isn't a fatal error.
-      @ll(_twopc_info, "checkpoint_complete() with empty _twopc.txn_id = %s.".cstring(), _twopc.txn_id.cstring())
-    else
-      if not _twopc.txn_id.contains("skip--.--CheckpointBarrierToken") then
-        _notify.twopc_txn_id_last_committed = _twopc.txn_id
+      @ll(_twopc_debug, "2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d _notify.twopc_txn_id_last_committed %s".cstring(), _twopc.last_offset, _notify.twopc_txn_id_last_committed_helper().cstring())
+
+      if _twopc.txn_id == "" then
+        // There are two reasons for this:
+        // 1. There is a legitimate bug.
+        // 2. We crashed and restarted, and we're still very early in
+        //    the restart process, e.g., during "INIT PHASE II".
+        //    Now we're told that the checkpoint is complete.  We didn't
+        //    really particpate in this checkpoint (because we had
+        //    crashed), but we can continue.
+        // We can't easily tell the difference between #1 and #2 because
+        // we would need to query LocalTopologyInitializer _initializer
+        // but can't.  I've ironed out most bugs in the 2PC impl, so
+        // let's assume that this isn't a fatal error.
+        @ll(_twopc_info, "checkpoint_complete() with empty _twopc.txn_id = %s.".cstring(), _twopc.txn_id.cstring())
+      else
+        if not _twopc.txn_id.contains("skip--.--CheckpointBarrierToken") then
+          _notify.twopc_txn_id_last_committed = _twopc.txn_id
+        end
+        @ll(_twopc_debug, "2PC: DBGDBG: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
       end
-      @ll(_twopc_debug, "2PC: DBGDBG: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
-    end
-    _twopc.reset_state()
+      _twopc.reset_state()
 
-    _resume_processing_messages()
+      _resume_processing_messages()
 
-    if drop_phase2_msg then
-      // Because we're using TCP, we get message loss only when
-      // the TCP connection is closed.  It doesn't matter why the
-      // connection is closed.  We have direct control over the
-      // timing here, so close it now.
-      _hard_close()
-      _schedule_reconnect()
+      if drop_phase2_msg then
+        // Because we're using TCP, we get message loss only when
+        // the TCP connection is closed.  It doesn't matter why the
+        // connection is closed.  We have direct control over the
+        // timing here, so close it now.
+        _hard_close()
+        _schedule_reconnect()
+      end
+    else
+      @ll(_twopc_info, "2PC: Checkpoint complete %d at ConnectorSink %s, but not connected/twopc_intro_done".cstring(), checkpoint_id, _sink_id.string().cstring())
+      // Do not resume processing messages: wait until we are
+      // reconnected and then the entire system rolls back.
     end
 
   fun ref _resume_processing_messages() =>
