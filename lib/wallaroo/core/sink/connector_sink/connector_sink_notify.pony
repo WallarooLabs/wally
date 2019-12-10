@@ -383,7 +383,7 @@ class ConnectorSinkNotify
       conn.close()
     end
 
-  fun ref process_uncommitted_list(conn: ConnectorSink ref): Bool =>
+  fun ref process_uncommitted_list(conn: ConnectorSink ref) =>
     """
     In case of a Wallaroo failure, we need to do two things that can
     happen in either order: 1. get list of uncommitted transactions,
@@ -394,27 +394,24 @@ class ConnectorSinkNotify
     Return true if we aborted the twopc_txn_id_last_committed txn.
     """
 
+    // This match is intended to do nothing substantial if any
+    // of the match types are None.
     match (twopc_txn_id_last_committed, _twopc_uncommitted_list)
     | (let last_committed: String, let uncommitted: Array[String] val) =>
-      var current_txn_aborted: Bool = false
-
       @ll(_twopc_debug, "2PC: process_uncommitted_list processing %d items, last_committed = %s".cstring(), uncommitted.size(), last_committed.cstring())
       for txn_id in uncommitted.values() do
         let do_commit = if txn_id == last_committed then true else false end
         @ll(_twopc_debug, "2PC: uncommitted txn_id %s commit=%s".cstring(), txn_id.cstring(), do_commit.string().cstring())
         if not do_commit and (txn_id == twopc_txn_id_current) then
           @ll(_twopc_debug, "2PC: current txn_id %s was aborted".cstring(), twopc_txn_id_current.cstring())
-          current_txn_aborted = true
         end
         let p2 = TwoPCEncode.phase2(txn_id, do_commit)
         let p2_msg = cwm.MessageMsg(0, 0, 0, None, p2)
         send_msg(conn, p2_msg)
       end
-      _twopc_uncommitted_list = None//QQQTODO this is ok, ja?
-      current_txn_aborted
+      _twopc_uncommitted_list = None
     else
       @ll(_twopc_debug, "2PC: process_uncommitted_list waiting".cstring())
-      false
     end
 
 
@@ -441,7 +438,7 @@ class ConnectorSinkNotify
       // There hasn't been a rollback() as part of our startup, so we
       // are starting for the first time.  There is no prior committed
       // txn_id.
-      twopc_txn_id_last_committed = ""
+      twopc_txn_id_last_committed = "skip--.--ready_to_work"
       @ll(_twopc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.".cstring(), twopc_txn_id_last_committed_helper().cstring())
       process_uncommitted_list(conn)
     end
