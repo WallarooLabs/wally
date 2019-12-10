@@ -58,7 +58,7 @@ class ConnectorSink2PC
   fun ref reset_state() =>
     state = TwoPCFsmStart
     txn_id = txn_id_initial
-    ph1_barrier_token = ph1_barrier_token_initial
+    clear_ph1_barrier_token()
     @ll(_twopc_debug, "2PC: reset 2PC state".cstring())
     @ll(_twopc_debug, "2PC: set 2PC state => %d".cstring(), state())
 
@@ -279,6 +279,9 @@ class ConnectorSink2PC
       set_state_abort()
       false
     end
+
+  fun ref clear_ph1_barrier_token() =>
+    ph1_barrier_token = ph1_barrier_token_initial
 
   fun send_phase2(sink: ConnectorSink ref, commit: Bool)
   =>
