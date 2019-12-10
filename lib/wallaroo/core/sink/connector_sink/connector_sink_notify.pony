@@ -59,6 +59,7 @@ class ConnectorSinkNotify
   var twopc_txn_id_last_committed: (None|String) = None
   var twopc_txn_id_current: String = ""
   var _twopc_uncommitted_list: (None|Array[String] val) = None
+  var twopc_txn_id_rollback: (None|String) = None
 
   new create(sink_id: RoutingId, app_name: String, worker_name: WorkerName,
     protocol_version: String, cookie: String,
@@ -390,17 +391,26 @@ class ConnectorSinkNotify
     2. get the initial rollback() message + payload blob of state.
     After both have happened, then we need to commit/abort any
     uncommitted txns outstanding at the connector sink.
-
-    Return true if we aborted the twopc_txn_id_last_committed txn.
     """
 
     // This match is intended to do nothing substantial if any
-    // of the match types are None.
-    match (twopc_txn_id_last_committed, _twopc_uncommitted_list)
-    | (let last_committed: String, let uncommitted: Array[String] val) =>
+    // of the match vars' types are None.
+    match (twopc_txn_id_last_committed,
+           twopc_txn_id_rollback,
+           _twopc_uncommitted_list)
+    | (let last_committed: String,
+       let rollback_id: String,
+       let uncommitted: Array[String] val) =>
       @ll(_twopc_debug, "2PC: process_uncommitted_list processing %d items, last_committed = %s".cstring(), uncommitted.size(), last_committed.cstring())
       for txn_id in uncommitted.values() do
-        let do_commit = if txn_id == last_committed then true else false end
+        let do_commit =
+          if txn_id == last_committed then
+            true
+          elseif txn_id == rollback_id then
+            true
+          else
+            false
+          end
         @ll(_twopc_debug, "2PC: uncommitted txn_id %s commit=%s".cstring(), txn_id.cstring(), do_commit.string().cstring())
         if not do_commit and (txn_id == twopc_txn_id_current) then
           @ll(_twopc_debug, "2PC: current txn_id %s was aborted".cstring(), twopc_txn_id_current.cstring())
@@ -409,6 +419,7 @@ class ConnectorSinkNotify
         let p2_msg = cwm.MessageMsg(0, 0, 0, None, p2)
         send_msg(conn, p2_msg)
       end
+      twopc_txn_id_rollback = None
       _twopc_uncommitted_list = None
     else
       @ll(_twopc_debug, "2PC: process_uncommitted_list waiting".cstring())
@@ -446,12 +457,18 @@ class ConnectorSinkNotify
   fun _payload_length(data: Array[U8] iso): USize ? =>
     Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
-  fun twopc_txn_id_last_committed_helper(): String =>
+  fun none_helper(x: (None|String)): String =>
     try
-      twopc_txn_id_last_committed as String
+      x as String
     else
       "--<<{{None}}>>--"
     end
+
+  fun twopc_txn_id_last_committed_helper(): String =>
+    none_helper(twopc_txn_id_last_committed)
+
+  fun twopc_txn_id_rollback_helper(): String =>
+    none_helper(twopc_txn_id_rollback)
 
   fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
     """

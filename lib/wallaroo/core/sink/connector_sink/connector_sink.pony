@@ -815,10 +815,13 @@ actor ConnectorSink is Sink
     // we didn't know if the txn-in-progress had committed globally.
     // When rollback() is called here, we now know the global txn
     // commit status: commit for checkpoint_id, all greater are invalid.
-    _notify.twopc_txn_id_last_committed = rollback_to_c_id
-    @ll(_twopc_debug, "2PC: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
+    _notify.twopc_txn_id_rollback = rollback_to_c_id
+    @ll(_twopc_debug, "2PC: twopc_txn_id_last_committed = %s, twopc_txn_id_rollback = %s".cstring(),
+      _notify.twopc_txn_id_last_committed_helper().cstring(),
+      _notify.twopc_txn_id_rollback_helper().cstring())
 
     _notify.process_uncommitted_list(this)
+    _notify.twopc_txn_id_last_committed = rollback_to_c_id
 
     @ll(_twopc_debug, "2PC: Rollback: _twopc.last_offset %lu _twopc.current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s".cstring(), _twopc.last_offset, _twopc.current_offset, _notify.acked_point_of_ref, _notify.twopc_txn_id_last_committed_helper().cstring(), _sink_id.string().cstring())
 
