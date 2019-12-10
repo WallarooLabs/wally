@@ -602,7 +602,7 @@ actor ConnectorSink is Sink
     | let rbrt: CheckpointRollbackResumeBarrierToken =>
       _seen_checkpointbarriertoken = None
       _resume_processing_messages()
-      _twopc.reset_state()
+      _twopc.reset_fsm_state()
     | let sat: AutoscaleBarrierToken =>
       _last_autoscale_barrier_token = sat
       _resume_processing_messages()
@@ -658,7 +658,7 @@ actor ConnectorSink is Sink
         end
         @ll(_twopc_debug, "2PC: DBGDBG: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
       end
-      _twopc.reset_state()
+      _twopc.reset_fsm_state()
 
       _resume_processing_messages()
 
@@ -745,11 +745,12 @@ actor ConnectorSink is Sink
 
     let rollback_to_c_id = _twopc.make_txn_id_string(checkpoint_id)
     if _connected and _notify.twopc_intro_done then
-      // If we were disconnected + perform a local abort, then we
-      // arrive here with _twopc.txn_id="".  The last transaction,
-      // named by _twopc.txn_id_at_close, has already been aborted
-      // during the twopc_intro portion of the connector sink protocol.
+      @ll(_twopc_debug, "TODO: skip sending missing phase1".cstring())
+/****
+ TODO: Delete this, I think: nowadays, we can't send data because we're in queueing state??
 
+      // If we were disconnected & reconnected, then we
+      // arrive here with _twopc.txn_id="".
       if _twopc.txn_id == "" then
         // We may have sent data to the sink that has not been committed,
         // and also we haven't sent a phase1 message.  Do that now,
@@ -770,8 +771,12 @@ actor ConnectorSink is Sink
           @ll(_twopc_debug, "sent rollback phase 1 for txn_id %s, size %lu".cstring(), _twopc.txn_id.cstring(), msgs.size())
         end
       end
+****/
 
-      if not _twopc.state_is_start() then
+      @ll(_twopc_debug, "TODO: skip sending missing phase2".cstring())
+/****
+TODO: delete this because process_uncommitted_list will take care of things?
+      if not (_twopc.state_is_start() or _twopc.state_is_2abort()) then
         if rollback_to_c_id == _twopc.txn_id then
           // This is an interesting case: we are rolling back to but have not
           // committed with phase 2.  This is possible when initializer has
@@ -788,10 +793,11 @@ actor ConnectorSink is Sink
             Fail()
           end
         else
-         @ll(_twopc_info, "Txn id %s needs phase 2 abort, sending!".cstring(), _twopc.txn_id.cstring())
+          @ll(_twopc_info, "Txn id %s needs phase 2 abort, sending!".cstring(), _twopc.txn_id.cstring())
           _twopc.send_phase2(this, false)
         end
       end
+****/
     else
       // We aren't connector and/or 2PC intro is not done.
       // When we are finally are connected & 2PC intro done, then
@@ -801,7 +807,7 @@ actor ConnectorSink is Sink
       @ll(_twopc_info, "_connected %s twopc_intro_done %s".cstring(), _connected.string().cstring(), _notify.twopc_intro_done.string().cstring())
     end
 
-    _twopc.reset_state()
+    _twopc.reset_fsm_state()
 
     let r = Reader
     r.append(payload)

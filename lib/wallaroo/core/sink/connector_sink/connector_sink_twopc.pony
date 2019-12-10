@@ -55,7 +55,7 @@ class ConnectorSink2PC
   fun ref update_offset(encoded1_len: USize) =>
     current_offset = current_offset + encoded1_len
 
-  fun ref reset_state() =>
+  fun ref reset_fsm_state() =>
     state = TwoPCFsmStart
     txn_id = txn_id_initial
     clear_ph1_barrier_token()
@@ -123,7 +123,7 @@ class ConnectorSink2PC
       end
 
       state = TwoPCFsm1Precommit
-      let prefix = if is_rollback then "rollback--" else "" end
+      let prefix = if is_rollback then "rollback--.--" else "" end
       txn_id = prefix + make_txn_id_string(sbt.id)
       ph1_barrier_token = sbt
       current_txn_end_offset = current_offset
@@ -176,7 +176,7 @@ class ConnectorSink2PC
       if state_is_start() then
         // If the connector sink disconnects immediately after we've
         // decided that the checkpoint will commit, then the disconnect
-        // will call reset_state().  When the rest of Wallaroo's events
+        // will call reset_fsm_state().  When the rest of Wallaroo's events
         // catch up, we'll be in this case, which is ok.
         None
       else
@@ -202,7 +202,7 @@ class ConnectorSink2PC
     txn_id_at_close = txn_id
     ph1_barrier_token_at_close = ph1_barrier_token
     @ll(_twopc_debug, "2PC: DBG: hard_close: state = %s, txn_id_at_close = %s, ph1_barrier_token_at_close = %s".cstring(), state().string().cstring(), txn_id_at_close.cstring(), ph1_barrier_token_at_close.string().cstring())
-    // Do not reset_state() here.  Wait (typically) until 2PC intro is done.
+    // Do not reset_fsm_state() here.  Wait (typically) until 2PC intro is done.
 
   fun make_txn_id_string(checkpoint_id: CheckpointId): String =>
     stream_name + ":c_id=" + checkpoint_id.string()
@@ -235,12 +235,12 @@ class ConnectorSink2PC
       // by other parts of the system, e.g c_id=5.  However, we
       // should not set_state_abort() here because when it's time for
       // c_id=6, we shouldn't let 5's abort state affect 6's.
-      reset_state()
+      reset_fsm_state()
       txn_id = txn_id_at_close
       txn_id_at_close = txn_id_initial
       ph1_barrier_token_at_close = ph1_barrier_token_initial
     else
-      reset_state()
+      reset_fsm_state()
     end
 
   fun ref twopc_phase1_reply(sink: ConnectorSink ref,
