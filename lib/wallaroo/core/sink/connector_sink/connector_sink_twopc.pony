@@ -34,11 +34,12 @@ use "wallaroo_labs/mort"
 
 class ConnectorSink2PC
   var state: TwoPCFsmState = TwoPCFsmStart
-  var txn_id: String = ""
-  var txn_id_at_close: String = ""
-  var barrier_token_initial: CheckpointBarrierToken = CheckpointBarrierToken(0)
-  var barrier_token: CheckpointBarrierToken = barrier_token_initial
-  var barrier_token_at_close: CheckpointBarrierToken = barrier_token_initial
+  let txn_id_initial: String = ""
+  var txn_id: String = txn_id_initial
+  var txn_id_at_close: String = txn_id_initial
+  let ph1_barrier_token_initial: CheckpointBarrierToken = CheckpointBarrierToken(0)
+  var ph1_barrier_token: CheckpointBarrierToken = ph1_barrier_token_initial
+  var ph1_barrier_token_at_close: CheckpointBarrierToken = ph1_barrier_token_initial
   var last_offset: USize = 0
   var current_offset: USize = 0
   var current_txn_end_offset: USize = 0
@@ -56,8 +57,8 @@ class ConnectorSink2PC
 
   fun ref reset_state() =>
     state = TwoPCFsmStart
-    txn_id = ""
-    barrier_token = CheckpointBarrierToken(0)
+    txn_id = txn_id_initial
+    ph1_barrier_token = ph1_barrier_token_initial
     @ll(_twopc_debug, "2PC: reset 2PC state".cstring())
     @ll(_twopc_debug, "2PC: set 2PC state => %d".cstring(), state())
 
@@ -94,7 +95,7 @@ class ConnectorSink2PC
 
   fun ref preemptive_txn_abort(sbt: CheckpointBarrierToken) =>
     txn_id = "preemptive txn abort"
-    barrier_token = sbt
+    ph1_barrier_token = sbt
 
   fun ref barrier_complete(sbt: CheckpointBarrierToken,
     is_rollback: Bool = false,
@@ -124,7 +125,7 @@ class ConnectorSink2PC
       state = TwoPCFsm1Precommit
       let prefix = if is_rollback then "rollback--" else "" end
       txn_id = prefix + make_txn_id_string(sbt.id)
-      barrier_token = sbt
+      ph1_barrier_token = sbt
       current_txn_end_offset = current_offset
     elseif state_is_2abort() then
       // We are here because:
@@ -199,8 +200,8 @@ class ConnectorSink2PC
 
   fun ref hard_close() =>
     txn_id_at_close = txn_id
-    barrier_token_at_close = barrier_token
-    @ll(_twopc_debug, "2PC: DBG: hard_close: state = %s, txn_id_at_close = %s, barrier_token_at_close = %s".cstring(), state().string().cstring(), txn_id_at_close.cstring(), barrier_token_at_close.string().cstring())
+    ph1_barrier_token_at_close = ph1_barrier_token
+    @ll(_twopc_debug, "2PC: DBG: hard_close: state = %s, txn_id_at_close = %s, ph1_barrier_token_at_close = %s".cstring(), state().string().cstring(), txn_id_at_close.cstring(), ph1_barrier_token_at_close.string().cstring())
     // Do not reset_state() here.  Wait (typically) until 2PC intro is done.
 
   fun make_txn_id_string(checkpoint_id: CheckpointId): String =>
@@ -208,15 +209,15 @@ class ConnectorSink2PC
 
   fun ref twopc_intro_done(sink: ConnectorSink ref) =>
     """
-    We use barrier_token_at_close to determine if we were
+    We use ph1_barrier_token_at_close to determine if we were
     disconnected during a round of 2PC.  If so, we assume that we
     lost the phase1 reply from the connector sink, so we make the
     pessimistic assumption that the connector sink voted rollback/abort.
     """
-    if barrier_token_at_close != barrier_token_initial then
-      @ll(_twopc_info, "2PC: Wallaroo local abort for txn_id %s barrier %s _twopc.state = %d".cstring(), txn_id_at_close.cstring(), barrier_token_at_close.string().cstring(), state())
+    if ph1_barrier_token_at_close != ph1_barrier_token_initial then
+      @ll(_twopc_info, "2PC: Wallaroo local abort for txn_id %s barrier %s _twopc.state = %d".cstring(), txn_id_at_close.cstring(), ph1_barrier_token_at_close.string().cstring(), state())
 
-      // It's possible that barrier_token_at_close completed
+      // It's possible that ph1_barrier_token_at_close completed
       // successfully and phase 2 commit was sent to the sink, but our
       // connection was closed immediately after sending that commit.
       // In that case, our attempt to abort here will be ignored:
@@ -228,7 +229,7 @@ class ConnectorSink2PC
       // to do, and this barrier token will be recognized and trigger
       // the rollback that we need.
       sink.abort_decision("TCP connection closed during 2PC",
-        txn_id_at_close, barrier_token_at_close)
+        txn_id_at_close, ph1_barrier_token_at_close)
 
       // NOTE: If we disconnected, then that txn will be aborted
       // by other parts of the system, e.g c_id=5.  However, we
@@ -236,8 +237,8 @@ class ConnectorSink2PC
       // c_id=6, we shouldn't let 5's abort state affect 6's.
       reset_state()
       txn_id = txn_id_at_close
-      txn_id_at_close = ""
-      barrier_token_at_close = barrier_token_initial
+      txn_id_at_close = txn_id_initial
+      ph1_barrier_token_at_close = ph1_barrier_token_initial
     else
       reset_state()
     end

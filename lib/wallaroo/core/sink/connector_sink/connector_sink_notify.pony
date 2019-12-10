@@ -58,7 +58,7 @@ class ConnectorSinkNotify
   var twopc_intro_done: Bool = false
   var twopc_txn_id_last_committed: (None|String) = None
   var twopc_txn_id_current: String = ""
-  var twopc_uncommitted_list: (None|Array[String] val) = None
+  var _twopc_uncommitted_list: (None|Array[String] val) = None
   var twopc_current_txn_aborted: Bool = false
 
   new create(sink_id: RoutingId, app_name: String, worker_name: WorkerName,
@@ -93,7 +93,7 @@ class ConnectorSinkNotify
     _throttled = false
     twopc.notify1_sent = false
     twopc_intro_done = false
-    twopc_uncommitted_list = None
+    _twopc_uncommitted_list = None
     // Apply runtime throttle until we're done with initial 2PC ballet.
     throttled(conn)
     conn.set_nodelay(true)
@@ -142,7 +142,7 @@ class ConnectorSinkNotify
     _throttled = false
     twopc.notify1_sent = false
     twopc_intro_done = false
-    twopc_uncommitted_list = None
+    _twopc_uncommitted_list = None
     throttled(conn)
 
   fun ref dispose() =>
@@ -298,14 +298,14 @@ class ConnectorSinkNotify
           end
           @ll(_conn_debug, "TRACE: uncommitted txns = %d".cstring(),
               mi.txn_ids.size())
-          twopc_uncommitted_list = mi.txn_ids
+          _twopc_uncommitted_list = mi.txn_ids
           // twopc_current_txn_aborted is used by unthrottled()
           twopc_current_txn_aborted = process_uncommitted_list(
             conn as ConnectorSink ref)
 
           // The 2PC intro dance has finished.  We can permit the rest
           // of the sink's operation to resume.  The txns in the
-          // twopc_uncommitted_list will be committed/aborted as soon
+          // _twopc_uncommitted_list will be committed/aborted as soon
           // as we have all the relevant information is available (and
           // may already have been done by the process_uncommitted_list()
           // call above).
@@ -398,7 +398,7 @@ class ConnectorSinkNotify
     Return true if we aborted the twopc_txn_id_last_committed txn.
     """
 
-    match (twopc_txn_id_last_committed, twopc_uncommitted_list)
+    match (twopc_txn_id_last_committed, _twopc_uncommitted_list)
     | (let last_committed: String, let uncommitted: Array[String] val) =>
       var current_txn_aborted: Bool = false
 
@@ -414,7 +414,7 @@ class ConnectorSinkNotify
         let p2_msg = cwm.MessageMsg(0, 0, 0, None, p2)
         send_msg(conn, p2_msg)
       end
-      twopc_uncommitted_list = []
+      _twopc_uncommitted_list = None//QQQTODO this is ok, ja?
       current_txn_aborted
     else
       @ll(_twopc_debug, "2PC: process_uncommitted_list waiting".cstring())

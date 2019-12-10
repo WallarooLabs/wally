@@ -431,12 +431,12 @@ actor ConnectorSink is Sink
     """
     match _twopc.twopc_phase1_reply(this, txn_id, commit)
     | true =>
-      if _twopc.barrier_token != _twopc.barrier_token_initial then
-        _barrier_coordinator.ack_barrier(this, _twopc.barrier_token)
+      if _twopc.ph1_barrier_token != _twopc.ph1_barrier_token_initial then
+        _barrier_coordinator.ack_barrier(this, _twopc.ph1_barrier_token)
       end
     | false =>
-      if _twopc.barrier_token != _twopc.barrier_token_initial then
-        abort_decision("phase 1 ABORT", _twopc.txn_id, _twopc.barrier_token)
+      if _twopc.ph1_barrier_token != _twopc.ph1_barrier_token_initial then
+        abort_decision("phase 1 ABORT", _twopc.txn_id, _twopc.ph1_barrier_token)
       end
     | None =>
       // This case is possible when:
