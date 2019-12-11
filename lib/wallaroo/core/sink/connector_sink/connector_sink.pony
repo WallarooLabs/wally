@@ -637,7 +637,7 @@ actor ConnectorSink is Sink
 
       _twopc.checkpoint_complete(this, drop_phase2_msg)
 
-      @ll(_twopc_debug, "2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d _notify.twopc_txn_id_last_committed %s".cstring(), _twopc.last_offset, _notify.twopc_txn_id_last_committed_helper().cstring())
+      @ll(_twopc_debug, "2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d old _notify.twopc_txn_id_last_committed %s".cstring(), _twopc.last_offset, _notify.twopc_txn_id_last_committed_helper().cstring())
 
       if _twopc.txn_id == "" then
         // There are two reasons for this:
@@ -745,6 +745,29 @@ actor ConnectorSink is Sink
     @ll(_twopc_info, "2PC: Rollback: twopc_state %d txn_id %s.".cstring(), _twopc.state(), _twopc.txn_id.cstring())
 
     let rollback_to_c_id = _twopc.make_txn_id_string(checkpoint_id)
+
+    let r = Reader
+    r.append(payload)
+    let current_offset = try r.u64_be()?.usize() else Fail(); 0 end
+    _twopc.rollback(current_offset)
+    _notify.acked_point_of_ref = try r.u64_be()? else Fail(); 0 end
+    _notify.message_id = _twopc.last_offset.u64()
+
+    // The EventLog's payload's data doesn't include the last
+    // committed txn_id because at the time that payload was created,
+    // we didn't know if the txn-in-progress had committed globally.
+    // When rollback() is called here, we now know the global txn
+    // commit status: commit for checkpoint_id, all greater are invalid.
+    _notify.twopc_txn_id_rollback = rollback_to_c_id
+    @ll(_twopc_debug, "2PC: twopc_txn_id_last_committed = %s, twopc_txn_id_rollback = %s".cstring(),
+      _notify.twopc_txn_id_last_committed_helper().cstring(),
+      _notify.twopc_txn_id_rollback_helper().cstring())
+
+    _notify.process_uncommitted_list(this)
+    _notify.twopc_txn_id_last_committed = rollback_to_c_id
+
+    @ll(_twopc_debug, "2PC: Rollback: _twopc.last_offset %lu _twopc.current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s".cstring(), _twopc.last_offset, _twopc.current_offset, _notify.acked_point_of_ref, _notify.twopc_txn_id_last_committed_helper().cstring(), _sink_id.string().cstring())
+
     if _connected and _notify.twopc_intro_done then
 /****
  TODO: Delete this, I think: nowadays, we can't send data because we're in queueing state??
@@ -815,29 +838,6 @@ actor ConnectorSink is Sink
     end
 
     _twopc.reset_fsm_state()
-
-    let r = Reader
-    r.append(payload)
-    let current_offset = try r.u64_be()?.usize() else Fail(); 0 end
-    _twopc.rollback(current_offset)
-    _notify.acked_point_of_ref = try r.u64_be()? else Fail(); 0 end
-    _notify.message_id = _twopc.last_offset.u64()
-
-    // The EventLog's payload's data doesn't include the last
-    // committed txn_id because at the time that payload was created,
-    // we didn't know if the txn-in-progress had committed globally.
-    // When rollback() is called here, we now know the global txn
-    // commit status: commit for checkpoint_id, all greater are invalid.
-    _notify.twopc_txn_id_rollback = rollback_to_c_id
-    @ll(_twopc_debug, "2PC: twopc_txn_id_last_committed = %s, twopc_txn_id_rollback = %s".cstring(),
-      _notify.twopc_txn_id_last_committed_helper().cstring(),
-      _notify.twopc_txn_id_rollback_helper().cstring())
-
-    _notify.process_uncommitted_list(this)
-    _notify.twopc_txn_id_last_committed = rollback_to_c_id
-
-    @ll(_twopc_debug, "2PC: Rollback: _twopc.last_offset %lu _twopc.current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s".cstring(), _twopc.last_offset, _twopc.current_offset, _notify.acked_point_of_ref, _notify.twopc_txn_id_last_committed_helper().cstring(), _sink_id.string().cstring())
-
     event_log.ack_rollback(_sink_id)
 
   ///////////////

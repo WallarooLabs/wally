@@ -221,6 +221,9 @@ class ConnectorSink2PC
     lost the phase1 reply from the connector sink, so we make the
     pessimistic assumption that the connector sink voted rollback/abort.
     """
+    @ll(_twopc_info, "2PC: twopc_intro_done txn_id %s barrier %s _twopc.state = %d".cstring(),
+      txn_id_at_close.cstring(), ph1_barrier_token_at_close.string().cstring(),
+      state())
     if ph1_barrier_token_at_close != ph1_barrier_token_initial then
       @ll(_twopc_info, "2PC: Wallaroo local abort for txn_id %s barrier %s _twopc.state = %d".cstring(), txn_id_at_close.cstring(), ph1_barrier_token_at_close.string().cstring(), state())
 
@@ -292,12 +295,14 @@ class ConnectorSink2PC
   fun ref clear_ph1_barrier_token() =>
     ph1_barrier_token = ph1_barrier_token_initial
 
-  fun send_phase2(sink: ConnectorSink ref, commit: Bool)
+  fun send_phase2(sink: ConnectorSink ref, commit: Bool,
+    override_txn_id: String = "")
   =>
-    let bs: Array[U8] val = TwoPCEncode.phase2(txn_id, commit)
+    let tid = if override_txn_id != "" then override_txn_id else txn_id end
+    let bs: Array[U8] val = TwoPCEncode.phase2(tid, commit)
     let msg: cwm.MessageMsg = cwm.MessageMsg(0, 0, 0, None, bs)
     sink.send_msg(sink, msg)
-    @ll(_twopc_debug, "2PC: sent phase 2 commit=%s for txn_id %s".cstring(), commit.string().cstring(), txn_id.cstring())
+    @ll(_twopc_debug, "2PC: sent phase 2 commit=%s for tid/txn_id %s".cstring(), commit.string().cstring(), tid.cstring())
 
   fun send_workers_left(sink: ConnectorSink ref,
     rtag: U64, leaving_workers: Array[cwm.WorkerName val] val)
