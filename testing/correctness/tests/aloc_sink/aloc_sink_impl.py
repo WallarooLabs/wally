@@ -66,7 +66,7 @@ def reload_phase1_txn_state(lines, instance_name):
         if (a[1] == '2-ok') or (a[1] == '2-rollback'):
             del txn_state[a[2]]
     if len(txn_state) > 1:
-        logging.critical('reload_phase1_txn_state: bad txn_state: {} instance {}'.format(txn_state, instance))
+        logging.critical('reload_phase1_txn_state: bad txn_state: {} instance {}'.format(txn_state, instance_name))
         sys.exit(66)
     return txn_state
 
