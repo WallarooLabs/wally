@@ -149,6 +149,9 @@ class ConnectorSink2PC
     elseif state_is_2commit() or state_is_2commit_fast() then
       @ll(_twopc_info, "2PC: _twopc.state = %d, ".cstring(), state())
       return (consume msgs)
+    elseif state_is_1precommit() then
+      @ll(_twopc_err, "2PC: ERROR: _twopc.state = %d, don't resend phase 1".cstring(), state())
+      return (consume msgs)
     else
       @ll(_twopc_err, "2PC: ERROR: _twopc.state = %d".cstring(), state())
       Fail()

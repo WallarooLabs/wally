@@ -792,9 +792,12 @@ actor ConnectorSink is Sink
             Fail()
           end
         else
-          @ll(_twopc_info, "Txn id %s needs phase 2 abort, sending!".cstring(), _twopc.txn_id.cstring())
+          @ll(_twopc_info, "Txn id %s needs phase 2 abort, sending from %lu".cstring(), _twopc.txn_id.cstring(), __loc.line())
           _twopc.send_phase2(this, false)
         end
+      elseif _twopc.state_is_2abort() then
+        @ll(_twopc_info, "Txn id %s needs phase 2 abort, sending from %lu".cstring(), _twopc.txn_id.cstring(), __loc.line())
+        _twopc.send_phase2(this, false)
       end
     else
       // We aren't connector and/or 2PC intro is not done.
