@@ -729,6 +729,7 @@ actor ConnectorSink is Sink
     _phase.early_prepare_for_rollback()
 
   fun ref finish_preparing_for_rollback() =>
+    @ll(_conn_debug, "SLF: TODO: finish_preparing_for_rollback(), do we really want to use normal processor here?  What about drop app msgs and pass through barriers?".cstring())
     _use_normal_processor()
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
@@ -745,13 +746,16 @@ actor ConnectorSink is Sink
 
     let rollback_to_c_id = _twopc.make_txn_id_string(checkpoint_id)
     if _connected and _notify.twopc_intro_done then
-      @ll(_twopc_debug, "TODO: skip sending missing phase1".cstring())
 /****
  TODO: Delete this, I think: nowadays, we can't send data because we're in queueing state??
+ ANSWER: No, this is necessary in a case where a rollback is triggered
+         by some other Wallaroo worker crashing & restarting & rollback:
+         we may not notice anything wrong until prepare_for_rollback()
+         and rollback() are called.  We probably sent data to the sink,
+         so we need to send Phase1 and Phase2 to discard that data.
+****/
 
-      // If we were disconnected & reconnected, then we
-      // arrive here with _twopc.txn_id="".
-      if _twopc.txn_id == "" then
+      if true then // TODO delete? _twopc.txn_id == "" then
         // We may have sent data to the sink that has not been committed,
         // and also we haven't sent a phase1 message.  Do that now,
         // and we'll immediately abort it below.
@@ -771,11 +775,7 @@ actor ConnectorSink is Sink
           @ll(_twopc_debug, "sent rollback phase 1 for txn_id %s, size %lu".cstring(), _twopc.txn_id.cstring(), msgs.size())
         end
       end
-****/
 
-      @ll(_twopc_debug, "TODO: skip sending missing phase2".cstring())
-/****
-TODO: delete this because process_uncommitted_list will take care of things?
       if not (_twopc.state_is_start() or _twopc.state_is_2abort()) then
         if rollback_to_c_id == _twopc.txn_id then
           // This is an interesting case: we are rolling back to but have not
@@ -797,7 +797,6 @@ TODO: delete this because process_uncommitted_list will take care of things?
           _twopc.send_phase2(this, false)
         end
       end
-****/
     else
       // We aren't connector and/or 2PC intro is not done.
       // When we are finally are connected & 2PC intro done, then
