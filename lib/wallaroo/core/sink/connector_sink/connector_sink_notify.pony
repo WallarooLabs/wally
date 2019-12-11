@@ -393,6 +393,15 @@ class ConnectorSinkNotify
     uncommitted txns outstanding at the connector sink.
     """
 
+    match (twopc_txn_id_last_committed, twopc_txn_id_rollback)
+    | (let x1: None, let x2: String) =>
+      // last_committed is None, which means that we restarted recently,
+      // but also x2 is a string, so we know that we are rolling back
+      // now.  Set last_committed to a not-None value so that the next
+      // match will do useful stuff.
+      twopc_txn_id_last_committed = "special-case--.--"
+    end
+
     // This match is intended to do nothing substantial if any
     // of the match vars' types are None.
     match (twopc_txn_id_last_committed,
