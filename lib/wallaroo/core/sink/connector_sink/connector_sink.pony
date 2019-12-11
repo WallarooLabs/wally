@@ -759,24 +759,30 @@ actor ConnectorSink is Sink
         // We may have sent data to the sink that has not been committed,
         // and also we haven't sent a phase1 message.  Do that now,
         // and we'll immediately abort it below.
-        let bt = CheckpointBarrierToken(checkpoint_id)
-        match _twopc.barrier_complete(bt where
-          is_rollback = true, stream_id = _notify.stream_id)
-        | None =>
-          // No data has been processed by the sink since the last
-          // checkpoint.
-          @ll(_twopc_debug, "no data written during this checkpoint interval, skipping phase 1".cstring())
-          _twopc.txn_id = "skip--.--" + bt.string()
-        | let msgs: Array[cwm.Message] =>
-          for msg in msgs.values() do
-            _notify.send_msg(this, msg)
+        if rollback_to_c_id == _notify.twopc_txn_id_last_committed_helper() then
+          @ll(_twopc_info, "Txn id %s is last_committed id, no phase 1 required".cstring(), _twopc.txn_id.cstring())
+        else
+          let bt = CheckpointBarrierToken(checkpoint_id)
+          match _twopc.barrier_complete(bt where
+            is_rollback = true, stream_id = _notify.stream_id)
+          | None =>
+            // No data has been processed by the sink since the last
+            // checkpoint.
+            @ll(_twopc_debug, "no data written during this checkpoint interval, skipping phase 1".cstring())
+            _twopc.txn_id = "skip--.--" + bt.string()
+          | let msgs: Array[cwm.Message] =>
+            for msg in msgs.values() do
+              _notify.send_msg(this, msg)
+            end
+            @ll(_twopc_debug, "sent rollback phase 1 for txn_id %s, size %lu".cstring(), _twopc.txn_id.cstring(), msgs.size())
           end
-          @ll(_twopc_debug, "sent rollback phase 1 for txn_id %s, size %lu".cstring(), _twopc.txn_id.cstring(), msgs.size())
         end
       end
 
       if not (_twopc.state_is_start() or _twopc.state_is_2abort()) then
-        if rollback_to_c_id == _twopc.txn_id then
+        if rollback_to_c_id == _notify.twopc_txn_id_last_committed_helper() then
+          @ll(_twopc_info, "Txn id %s is last_committed id, no phase 2 required".cstring(), _twopc.txn_id.cstring())
+        elseif rollback_to_c_id == _twopc.txn_id then
           // This is an interesting case: we are rolling back to but have not
           // committed with phase 2.  This is possible when initializer has
           // determined that the checkpoint has committed globally, writes
