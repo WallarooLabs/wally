@@ -771,7 +771,6 @@ actor ConnectorSink is Sink
           for msg in msgs.values() do
             _notify.send_msg(this, msg)
           end
-          _twopc.set_state_1precommit()
           @ll(_twopc_debug, "sent rollback phase 1 for txn_id %s, size %lu".cstring(), _twopc.txn_id.cstring(), msgs.size())
         end
       end

@@ -102,6 +102,8 @@ class ConnectorSink2PC
     stream_id: cwm.StreamId = 223344 /* arbitrary integer != 1 or 0 */):
   (None | Array[cwm.Message])
   =>
+    let msgs: Array[cwm.Message] = recover trn msgs.create() end
+
     if state_is_start() then
       // Calculate short circuit/commit-fast here.
       // Don't short circuit if we're rolling back.
@@ -144,12 +146,14 @@ class ConnectorSink2PC
       // that data.  If no app data was sent to the sink, we would've
       // hit the commit-fast path above.
       @ll(_twopc_info, "NOTICE, need to send Phase1 and then force abort for Phase2".cstring())
+    elseif state_is_2commit() or state_is_2commit_fast() then
+      @ll(_twopc_info, "2PC: _twopc.state = %d, ".cstring(), state())
+      return (consume msgs)
     else
       @ll(_twopc_err, "2PC: ERROR: _twopc.state = %d".cstring(), state())
       Fail()
     end
 
-    let msgs: Array[cwm.Message] = recover trn msgs.create() end
     if not notify1_sent then
       // The barrier arrived before we've sent a Notify message for
       // stream ID 1.  Our attempt to abort a byte range for stream ID 1
@@ -239,8 +243,10 @@ class ConnectorSink2PC
       txn_id = txn_id_at_close
       txn_id_at_close = txn_id_initial
       ph1_barrier_token_at_close = ph1_barrier_token_initial
+/**** TODO delete??
     else
       reset_fsm_state()
+****/
     end
 
   fun ref twopc_phase1_reply(sink: ConnectorSink ref,
