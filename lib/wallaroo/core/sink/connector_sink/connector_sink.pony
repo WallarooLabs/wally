@@ -755,7 +755,7 @@ actor ConnectorSink is Sink
          so we need to send Phase1 and Phase2 to discard that data.
 ****/
 
-      if true then // TODO delete? _twopc.txn_id == "" then
+      if _twopc.state_is_start() or _twopc.state_is_1precommit() then
         // We may have sent data to the sink that has not been committed,
         // and also we haven't sent a phase1 message.  Do that now,
         // and we'll immediately abort it below.
