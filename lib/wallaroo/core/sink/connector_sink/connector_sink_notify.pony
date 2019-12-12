@@ -407,6 +407,10 @@ class ConnectorSinkNotify
     uncommitted txns outstanding at the connector sink.
     """
 
+    @ll(_twopc_debug, "2PC: process_uncommitted_list top: 1 %s 2 %s 3 %s".cstring(),
+      twopc_txn_id_last_committed_helper().cstring(),
+      twopc_txn_id_rollback_helper().cstring(),
+      (if _twopc_uncommitted_list is None then "None" else "Array" end).cstring())
     match (twopc_txn_id_last_committed, twopc_txn_id_rollback)
     | (let x1: None, let x2: String) =>
       // last_committed is None, which means that we restarted recently,
