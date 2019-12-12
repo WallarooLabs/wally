@@ -653,9 +653,9 @@ actor ConnectorSink is Sink
 
       @ll(_twopc_debug, "2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d old _notify.twopc_txn_id_last_committed %s".cstring(), _twopc.last_offset, _notify.twopc_txn_id_last_committed_helper().cstring())
       @ll(_twopc_debug, "2PC: DBGDBG: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
-      //SLF: original location: _twopc.reset_fsm_state()
 
-      //SLF: original location: _resume_processing_messages()
+      _twopc.reset_fsm_state()
+      _resume_processing_messages()
 
       if drop_phase2_msg then
         // Because we're using TCP, we get message loss only when
@@ -667,22 +667,22 @@ actor ConnectorSink is Sink
       end
     else
       @ll(_twopc_info, "2PC: Checkpoint complete %d at ConnectorSink %s, but not connected/twopc_intro_done".cstring(), checkpoint_id, _sink_id.string().cstring())
-      // Do not resume processing messages: wait until we are
-      // reconnected and then the entire system rolls back.
+      _twopc.reset_fsm_state()
+      _resume_processing_messages(where discard_message_type = true)
     end
-    _twopc.reset_fsm_state()
-    _resume_processing_messages() // SLF: new location
 
-  fun ref _resume_processing_messages() =>
-    _phase.resume_processing_messages()
+  fun ref _resume_processing_messages(discard_message_type: Bool = false) =>
+    _phase.resume_processing_messages(discard_message_type)
 
-  fun ref resume_processing_messages_queued() =>
+  fun ref resume_processing_messages_queued(discard_message_type: Bool) =>
     let queued = _phase.queued()
     _use_normal_processor()
     for q in queued.values() do
       match q
       | let qm: QueuedMessage =>
-        qm.process_message(this)
+        if not discard_message_type then
+          qm.process_message(this)
+        end
       | let qb: QueuedBarrier =>
         qb.inject_barrier(this)
       end

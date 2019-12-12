@@ -57,7 +57,7 @@ trait SinkPhase
   fun ref maybe_use_normal_processor() =>
     None
 
-  fun ref resume_processing_messages() =>
+  fun ref resume_processing_messages(discard_message_type: Bool) =>
     _invalid_call(__loc.method_name()); Fail()
 
   fun _invalid_call(method_name: String) =>
@@ -81,7 +81,7 @@ class EarlySinkPhase is SinkPhase
     // But we need the normal processor phase *now*.
     _sink.use_normal_processor()
 
-  fun ref resume_processing_messages() =>
+  fun ref resume_processing_messages(discard_message_type: Bool) =>
     // If we're @ InitialSinkPhase, and we've restarted after a crash,
     // it's possible to hit checkpoint_complete() extremely early in
     // our restart process.  There's nothing to do here.
@@ -119,8 +119,8 @@ class NormalSinkPhase is SinkPhase
   fun ref queued(): Array[SinkPhaseQueued] =>
     Array[SinkPhaseQueued]
 
-  fun ref resume_processing_messages() =>
-    _sink.resume_processing_messages_queued()
+  fun ref resume_processing_messages(discard_message_type: Bool) =>
+    _sink.resume_processing_messages_queued(discard_message_type)
 
 type SinkPhaseQueued is (QueuedMessage | QueuedBarrier)
 
@@ -224,8 +224,8 @@ class BarrierSinkPhase is SinkPhase
   fun ref swap_barrier_to_queued(sink: ConnectorSink ref) =>
     sink.swap_barrier_to_queued(_queued)
 
-  fun ref resume_processing_messages() =>
-    _sink.resume_processing_messages_queued()
+  fun ref resume_processing_messages(discard_message_type: Bool) =>
+    _sink.resume_processing_messages_queued(discard_message_type)
 
 class QueuingSinkPhase is SinkPhase
   let _sink_id: RoutingId
@@ -270,5 +270,5 @@ class QueuingSinkPhase is SinkPhase
     end
     qd
 
-  fun ref resume_processing_messages() =>
-    _sink.resume_processing_messages_queued()
+  fun ref resume_processing_messages(discard_message_type: Bool) =>
+    _sink.resume_processing_messages_queued(discard_message_type)
