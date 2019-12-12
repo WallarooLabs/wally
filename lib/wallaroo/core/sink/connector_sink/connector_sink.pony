@@ -485,7 +485,7 @@ actor ConnectorSink is Sink
     else
       @ll(_twopc_debug, "twopc_intro_done: _seen_checkpointbarriertoken is None".cstring())
     end
-    // SLF: TODO: works, sort-of, but adds extra rollback after a 2PC abort round? _resume_processing_messages()
+    // SLF: TODO: works, sort-of, but adds extra rollback after a 2PC abort round? But if omitted, checkpoint 20 doesn't work in the integration-tests-testing-correctness-tests-aloc_sink test! :  _resume_processing_messages()
 
   ///////////////
   // BARRIER
@@ -646,10 +646,11 @@ actor ConnectorSink is Sink
       _notify.twopc_txn_id_rollback = checkpoint_complete_c_id
     end
 
+    _twopc.checkpoint_complete(this, drop_phase2_msg) // SLF: new location in this func ... but does not fix checkpoint 20 not-happening problem in integration-tests-testing-correctness-tests-aloc_sink
     if _connected and _notify.twopc_intro_done then
       @ll(_twopc_debug, "2PC: Checkpoint complete %d at ConnectorSink %s".cstring(), checkpoint_id, _sink_id.string().cstring())
 
-      _twopc.checkpoint_complete(this, drop_phase2_msg)
+      // SLF: orig location in this func: _twopc.checkpoint_complete(this, drop_phase2_msg)
 
       @ll(_twopc_debug, "2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d old _notify.twopc_txn_id_last_committed %s".cstring(), _twopc.last_offset, _notify.twopc_txn_id_last_committed_helper().cstring())
       @ll(_twopc_debug, "2PC: DBGDBG: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
