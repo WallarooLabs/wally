@@ -646,8 +646,6 @@ actor ConnectorSink is Sink
       _notify.twopc_txn_id_rollback = checkpoint_complete_c_id
     end
 
-    _resume_processing_messages() // SLF: new location
-
     if _connected and _notify.twopc_intro_done then
       @ll(_twopc_debug, "2PC: Checkpoint complete %d at ConnectorSink %s".cstring(), checkpoint_id, _sink_id.string().cstring())
 
@@ -655,7 +653,7 @@ actor ConnectorSink is Sink
 
       @ll(_twopc_debug, "2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d old _notify.twopc_txn_id_last_committed %s".cstring(), _twopc.last_offset, _notify.twopc_txn_id_last_committed_helper().cstring())
       @ll(_twopc_debug, "2PC: DBGDBG: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
-      _twopc.reset_fsm_state()
+      //SLF: original location: _twopc.reset_fsm_state()
 
       //SLF: original location: _resume_processing_messages()
 
@@ -672,6 +670,8 @@ actor ConnectorSink is Sink
       // Do not resume processing messages: wait until we are
       // reconnected and then the entire system rolls back.
     end
+    _twopc.reset_fsm_state()
+    _resume_processing_messages() // SLF: new location
 
   fun ref _resume_processing_messages() =>
     _phase.resume_processing_messages()
