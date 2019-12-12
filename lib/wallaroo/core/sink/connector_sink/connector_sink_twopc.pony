@@ -55,8 +55,11 @@ class ConnectorSink2PC
   fun ref update_offset(encoded1_len: USize) =>
     current_offset = current_offset + encoded1_len
 
-  fun ref reset_fsm_state() =>
+  fun ref reset_fsm_state(state_only: Bool = false) =>
     state = TwoPCFsmStart
+    if state_only then
+      return
+    end
     txn_id = txn_id_initial
     clear_ph1_barrier_token()
     @ll(_twopc_debug, "2PC: reset 2PC state".cstring())
@@ -249,9 +252,11 @@ class ConnectorSink2PC
       txn_id = txn_id_at_close
       txn_id_at_close = txn_id_initial
       ph1_barrier_token_at_close = ph1_barrier_token_initial
-/**** TODO delete??
     else
-      reset_fsm_state()
+      None     
+/**** TODO: remove state_only arg??
+      // We only want a partial reset, not full amnesia about history.
+      reset_fsm_state(where state_only = true)
 ****/
     end
 

@@ -297,19 +297,6 @@ class ConnectorSinkNotify
             Fail()
           end
 
-          match twopc_txn_id_last_committed
-          | None => None
-          | let tid_l_c: String =>
-            // Send a Phase2 commit for the last committed txn.
-            // There is a small chance that a race condition between us
-            // sending Phase2 commit on the old connection vs. closing
-            // the old connection caused the commit message to get lost.
-            // If it did get lost, then this msg fixes things.
-            // If it did not get lost, then the sink will ignore this msg.
-            @ll(_twopc_debug, "2PC: JIC: notify: send phase 2 commit=true for twopc_txn_id_last_committed %s".cstring(), tid_l_c.cstring())
-            twopc.send_phase2(conn as ConnectorSink ref, true where override_txn_id = tid_l_c)
-          end
-
           @ll(_conn_debug, "TRACE: uncommitted txns = %d".cstring(),
               mi.txn_ids.size())
           _twopc_uncommitted_list = mi.txn_ids

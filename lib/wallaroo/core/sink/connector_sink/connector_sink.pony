@@ -433,6 +433,9 @@ actor ConnectorSink is Sink
     | true =>
       if _twopc.ph1_barrier_token != _twopc.ph1_barrier_token_initial then
         _barrier_coordinator.ack_barrier(this, _twopc.ph1_barrier_token)
+        @ll(_twopc_debug, "QQQ: ack_barrier line %lu for barrier %s".cstring(), __loc.line(), _twopc.ph1_barrier_token.string().cstring())
+      else
+        @ll(_twopc_debug, "QQQ: SKIP ack_barrier line %lu for barrier %s".cstring(), __loc.line(), _twopc.ph1_barrier_token.string().cstring())
       end
     | false =>
       if _twopc.ph1_barrier_token != _twopc.ph1_barrier_token_initial then
@@ -482,6 +485,7 @@ actor ConnectorSink is Sink
     else
       @ll(_twopc_debug, "twopc_intro_done: _seen_checkpointbarriertoken is None".cstring())
     end
+    // SLF: TODO: works, sort-of, but adds extra rollback after a 2PC abort round? _resume_processing_messages()
 
   ///////////////
   // BARRIER
@@ -575,6 +579,7 @@ actor ConnectorSink is Sink
         // If no data has been processed by the sink since the last
         // checkpoint, then don't bother with 2PC, return early.
         _barrier_coordinator.ack_barrier(this, sbt)
+        @ll(_twopc_debug, "QQQ: ack_barrier line %lu for barrier %s".cstring(), __loc.line(), sbt.string().cstring())
         @ll(_twopc_debug, "2PC: no data written during this checkpoint interval, skipping 2PC round".cstring())
         _twopc.txn_id = "skip--.--" + barrier_token.string()
         return
@@ -622,6 +627,7 @@ actor ConnectorSink is Sink
     end
     if ack_now then
       _barrier_coordinator.ack_barrier(this, barrier_token)
+      @ll(_twopc_debug, "QQQ: ack_barrier line %lu for barrier %s".cstring(), __loc.line(), barrier_token.string().cstring())
     end
 
   fun ref swap_barrier_to_queued(queue: Array[SinkPhaseQueued]) =>
@@ -666,9 +672,6 @@ actor ConnectorSink is Sink
     end
 
   fun ref _resume_processing_messages() =>
-    """
-    2nd-half logic for barrier_fully_acked().
-    """
     _phase.resume_processing_messages()
 
   fun ref resume_processing_messages_queued() =>
