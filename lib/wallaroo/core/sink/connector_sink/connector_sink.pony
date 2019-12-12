@@ -646,17 +646,18 @@ actor ConnectorSink is Sink
       _notify.twopc_txn_id_rollback = checkpoint_complete_c_id
     end
 
-    _twopc.checkpoint_complete(this, drop_phase2_msg) // SLF: new location in this func ... but does not fix checkpoint 20 not-happening problem in integration-tests-testing-correctness-tests-aloc_sink
+    _resume_processing_messages() // SLF: new location
+
     if _connected and _notify.twopc_intro_done then
       @ll(_twopc_debug, "2PC: Checkpoint complete %d at ConnectorSink %s".cstring(), checkpoint_id, _sink_id.string().cstring())
 
-      // SLF: orig location in this func: _twopc.checkpoint_complete(this, drop_phase2_msg)
+      _twopc.checkpoint_complete(this, drop_phase2_msg)
 
       @ll(_twopc_debug, "2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d old _notify.twopc_txn_id_last_committed %s".cstring(), _twopc.last_offset, _notify.twopc_txn_id_last_committed_helper().cstring())
       @ll(_twopc_debug, "2PC: DBGDBG: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
       _twopc.reset_fsm_state()
 
-      _resume_processing_messages()
+      //SLF: original location: _resume_processing_messages()
 
       if drop_phase2_msg then
         // Because we're using TCP, we get message loss only when
