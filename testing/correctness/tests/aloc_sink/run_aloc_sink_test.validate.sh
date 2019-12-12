@@ -31,7 +31,10 @@ done
 # because test timing can affect how many checkpoints may follow.
 # Also, 18 is the last checkpoint that aloc_sink.abort-rules
 # will affect.
-# We skip 19 but check 20 because checkpointing should continue
+# We skip 19 because a race condition that we can't control
+# may/may not cause a gap in Wallaroo's output and thus a
+# Phase 1 abort vote by the sink.
+# We check 20 because checkpointing should continue
 # after 18 (some bugs related to 18's scenario can prevent
 # future checkpoints).
 for c in 1 2 4 5 7 8 11 12 13 14 16 17 18 20; do

@@ -635,7 +635,7 @@ actor ConnectorSink is Sink
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
     let cpoint_id = ifdef "test_disconnect_at_5" then "5" else "" end
-    let drop_phase2_msg = try if _twopc.txn_id.split("=")(1)? == cpoint_id then true else false end else false end
+    let drop_phase2_msg_test_option = try if _twopc.txn_id.split("=")(1)? == cpoint_id then true else false end else false end
 
     @ll(_twopc_debug, "2PC: Checkpoint complete %d _twopc.txn_id is %s".cstring(), checkpoint_id, _twopc.txn_id.cstring())
 
@@ -643,32 +643,30 @@ actor ConnectorSink is Sink
       let checkpoint_complete_c_id = _twopc.make_txn_id_string(checkpoint_id)
       _notify.twopc_txn_id_last_committed = checkpoint_complete_c_id
       @ll(_twopc_debug, "2PC: QQQ TODO KEEP THIS?: twopc_txn_id_last_committed = %s, also setting rollback_id to same".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
+      @ll(_twopc_debug, "2PC: QQQ TODO KEEP THIS?: _twopc.last_offset %lu _twopc.current_txn_end_offset %lu".cstring(), _twopc.last_offset, _twopc.current_txn_end_offset)
       _notify.twopc_txn_id_rollback = checkpoint_complete_c_id
     end
 
-    if _connected and _notify.twopc_intro_done then
-      @ll(_twopc_debug, "2PC: Checkpoint complete %d at ConnectorSink %s".cstring(), checkpoint_id, _sink_id.string().cstring())
+    let conn_ready: Bool = _connected and _notify.twopc_intro_done
+    @ll(_twopc_debug, "2PC: Checkpoint complete %d at ConnectorSink %s, conn_ready = %s".cstring(), checkpoint_id, _sink_id.string().cstring(), conn_ready.string().cstring())
 
-      _twopc.checkpoint_complete(this, drop_phase2_msg)
+    // If not conn_ready, then don't bother send Phase2 message.
+    _twopc.checkpoint_complete(this,
+      if not conn_ready then true else drop_phase2_msg_test_option end)
 
-      @ll(_twopc_debug, "2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d old _notify.twopc_txn_id_last_committed %s".cstring(), _twopc.last_offset, _notify.twopc_txn_id_last_committed_helper().cstring())
-      @ll(_twopc_debug, "2PC: DBGDBG: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
+    @ll(_twopc_debug, "2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d old _notify.twopc_txn_id_last_committed %s".cstring(), _twopc.last_offset, _notify.twopc_txn_id_last_committed_helper().cstring())
+    @ll(_twopc_debug, "2PC: DBGDBG: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
 
-      _twopc.reset_fsm_state()
-      _resume_processing_messages()
+    _twopc.reset_fsm_state()
+    _resume_processing_messages(where discard_message_type = (not conn_ready))
 
-      if drop_phase2_msg then
-        // Because we're using TCP, we get message loss only when
-        // the TCP connection is closed.  It doesn't matter why the
-        // connection is closed.  We have direct control over the
-        // timing here, so close it now.
-        _hard_close()
-        _schedule_reconnect()
-      end
-    else
-      @ll(_twopc_info, "2PC: Checkpoint complete %d at ConnectorSink %s, but not connected/twopc_intro_done".cstring(), checkpoint_id, _sink_id.string().cstring())
-      _twopc.reset_fsm_state()
-      _resume_processing_messages(where discard_message_type = true)
+    if drop_phase2_msg_test_option then
+      // Because we're using TCP, we get message loss only when
+      // the TCP connection is closed.  It doesn't matter why the
+      // connection is closed.  We have direct control over the
+      // timing here, so close it now.
+      _hard_close()
+      _schedule_reconnect()
     end
 
   fun ref _resume_processing_messages(discard_message_type: Bool = false) =>

@@ -415,8 +415,8 @@ class AsyncServer(asynchat.async_chat, object):
                         .format(start_por, end_por))
                 if end_por > self._output_offset:
                     self._txn_commit_next = False
-                    m = '2PC: Phase 1 invalid end_por {} self._output_offset {} file size {} msg2 {}'.format(
-                        end_por, self._output_offset, self._twopc_out.out_tell(), msg2)
+                    m = '2PC: Phase 1 invalid start_por {} end_por {} self._output_offset {} file size {} msg2 {}'.format(
+                        start_por, end_por, self._output_offset, self._twopc_out.out_tell(), msg2)
                     if self._output_offset == start_por:
                         ## We probably restarted, we've truncated uncommitted
                         ## bytes at the end of the file, and here's Wallaroo
