@@ -52,8 +52,8 @@ if [ ! -f $INPUT ]; then
 fi
 
 if [ -z "$MULTI_KEY_TMP_FILE" ]; then
-    ./concat-sink-output.py $OUTPUT_DIR/*.txnlog | \
-        egrep "^$KEY" 1> $OUTPUT 2> $OUTPUT.mapping 
+    (./concat-sink-output.py $OUTPUT_DIR/*.txnlog | \
+        egrep "^$KEY") 1> $OUTPUT 2> $OUTPUT.mapping
 else
     if [ ! -f $MULTI_KEY_TMP_FILE ]; then
         ##/bin/echo -n CONCAT > /dev/tty
