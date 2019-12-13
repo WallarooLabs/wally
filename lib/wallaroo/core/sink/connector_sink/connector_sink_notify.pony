@@ -407,6 +407,20 @@ class ConnectorSinkNotify
       twopc_txn_id_last_committed = "special-case--.--"
     end
 
+    // Unconditionally abort any txn id that starts with r_prefix.
+    let r_prefix = "rollback--.--"
+    match _twopc_uncommitted_list
+    | let uncommitted: Array[String] val =>
+      for txn_id in uncommitted.values() do
+        if txn_id.compare_sub(r_prefix, r_prefix.size()) is Equal then
+          @ll(_twopc_debug, "2PC: force abort rollback txn txn_id %s".cstring(), txn_id.cstring())
+          let p2 = TwoPCEncode.phase2(txn_id, false)
+          let p2_msg = cwm.MessageMsg(0, 0, 0, None, p2)
+          send_msg(conn, p2_msg)
+        end
+      end
+    end
+
     // This match is intended to do nothing substantial if any
     // of the match vars' types are None.
     match (twopc_txn_id_last_committed,
