@@ -429,14 +429,18 @@ actor ConnectorSink is Sink
     This is a callback used by the ConnectorSinkNotify class to Inform
     us that it received a 2PC phase 1 reply.
     """
+    @ll(_twopc_debug, "twopc_phase1_reply: _twopc.ph1_barrier_token %s _twopc.ph1_barrier_token_initial %s".cstring(), _twopc.ph1_barrier_token.string().cstring(), _twopc.ph1_barrier_token_initial.string().cstring())
     match _twopc.twopc_phase1_reply(this, txn_id, commit)
     | true =>
-      if _twopc.barrier_token != _twopc.barrier_token_initial then
-        _barrier_coordinator.ack_barrier(this, _twopc.barrier_token)
+      if _twopc.ph1_barrier_token != _twopc.ph1_barrier_token_initial then
+        _barrier_coordinator.ack_barrier(this, _twopc.ph1_barrier_token)
+        @ll(_twopc_debug, "twopc_phase1_reply: ack_barrier line %lu for barrier %s".cstring(), __loc.line(), _twopc.ph1_barrier_token.string().cstring())
+      else
+        @ll(_twopc_debug, "twopc_phase1_reply: SKIP ack_barrier line %lu for barrier %s".cstring(), __loc.line(), _twopc.ph1_barrier_token.string().cstring())
       end
     | false =>
-      if _twopc.barrier_token != _twopc.barrier_token_initial then
-        abort_decision("phase 1 ABORT", _twopc.txn_id, _twopc.barrier_token)
+      if _twopc.ph1_barrier_token != _twopc.ph1_barrier_token_initial then
+        abort_decision("phase 1 ABORT", _twopc.txn_id, _twopc.ph1_barrier_token)
       end
     | None =>
       // This case is possible when:
@@ -452,6 +456,11 @@ actor ConnectorSink is Sink
       // 7. twopc_phase1_reply() ignores the information in the reply to #1
       //    via this None.
       None
+    end
+    if txn_id == _twopc.txn_id then
+      _twopc.clear_ph1_barrier_token()
+    else
+      @ll(_twopc_debug, "Skip calling clear_ph1_barrier_token: %s != %s".cstring(), txn_id.cstring(), _twopc.txn_id.cstring())
     end
 
   fun ref abort_decision(reason: String, txn_id: String,
@@ -601,7 +610,7 @@ actor ConnectorSink is Sink
     | let rbrt: CheckpointRollbackResumeBarrierToken =>
       _seen_checkpointbarriertoken = None
       _resume_processing_messages()
-      _twopc.reset_state()
+      _twopc.reset_fsm_state()
     | let sat: AutoscaleBarrierToken =>
       _last_autoscale_barrier_token = sat
       _resume_processing_messages()
@@ -627,40 +636,30 @@ actor ConnectorSink is Sink
     _phase = QueuingSinkPhase(_sink_id, this, queue)
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
-    @ll(_twopc_debug, "2PC: Checkpoint complete %d at ConnectorSink %s".cstring(), checkpoint_id, _sink_id.string().cstring())
-    @ll(_twopc_info, "2PC: Checkpoint complete %d _twopc.txn_id is %s".cstring(), checkpoint_id, _twopc.txn_id.cstring())
-
     let cpoint_id = ifdef "test_disconnect_at_5" then "5" else "" end
-    let drop_phase2_msg = try if _twopc.txn_id.split("=")(1)? == cpoint_id then true else false end else false end
+    let drop_phase2_msg_test_option = try if _twopc.txn_id.split("=")(1)? == cpoint_id then true else false end else false end
 
-    _twopc.checkpoint_complete(this, drop_phase2_msg)
+    @ll(_twopc_debug, "2PC: Checkpoint complete %d _twopc.txn_id is %s".cstring(), checkpoint_id, _twopc.txn_id.cstring())
 
-    @ll(_twopc_debug, "2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d _notify.twopc_txn_id_last_committed %s".cstring(), _twopc.last_offset, _notify.twopc_txn_id_last_committed_helper().cstring())
+    // Global txn result is commit; update our state accordingly
+    let checkpoint_complete_c_id = _twopc.make_txn_id_string(checkpoint_id)
+    _notify.twopc_txn_id_last_committed = checkpoint_complete_c_id
+    _notify.twopc_txn_id_rollback = checkpoint_complete_c_id
 
-    if _twopc.txn_id == "" then
-      // There are two reasons for this:
-      // 1. There is a legitimate bug.
-      // 2. We crashed and restarted, and we're still very early in
-      //    the restart process, e.g., during "INIT PHASE II".
-      //    Now we're told that the checkpoint is complete.  We didn't
-      //    really particpate in this checkpoint (because we had
-      //    crashed), but we can continue.
-      // We can't easily tell the difference between #1 and #2 because
-      // we would need to query LocalTopologyInitializer _initializer
-      // but can't.  I've ironed out most bugs in the 2PC impl, so
-      // let's assume that this isn't a fatal error.
-      @ll(_twopc_info, "checkpoint_complete() with empty _twopc.txn_id = %s.".cstring(), _twopc.txn_id.cstring())
-    else
-      if not _twopc.txn_id.contains("skip--.--CheckpointBarrierToken") then
-        _notify.twopc_txn_id_last_committed = _twopc.txn_id
-      end
-      @ll(_twopc_debug, "2PC: DBGDBG: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
-    end
-    _twopc.reset_state()
+    let conn_ready: Bool = _connected and _notify.twopc_intro_done
+    @ll(_twopc_debug, "2PC: Checkpoint complete %d at ConnectorSink %s, conn_ready = %s".cstring(), checkpoint_id, _sink_id.string().cstring(), conn_ready.string().cstring())
 
-    _resume_processing_messages()
+    // If not conn_ready, then don't bother send Phase2 message.
+    _twopc.checkpoint_complete(this,
+      if not conn_ready then true else drop_phase2_msg_test_option end)
 
-    if drop_phase2_msg then
+    @ll(_twopc_debug, "2PC: DBGDBG: checkpoint_complete: commit, _twopc.last_offset %d old _notify.twopc_txn_id_last_committed %s".cstring(), _twopc.last_offset, _notify.twopc_txn_id_last_committed_helper().cstring())
+    @ll(_twopc_debug, "2PC: DBGDBG: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
+
+    _twopc.reset_fsm_state()
+    _resume_processing_messages(where discard_message_type = (not conn_ready))
+
+    if drop_phase2_msg_test_option then
       // Because we're using TCP, we get message loss only when
       // the TCP connection is closed.  It doesn't matter why the
       // connection is closed.  We have direct control over the
@@ -669,19 +668,18 @@ actor ConnectorSink is Sink
       _schedule_reconnect()
     end
 
-  fun ref _resume_processing_messages() =>
-    """
-    2nd-half logic for barrier_fully_acked().
-    """
-    _phase.resume_processing_messages()
+  fun ref _resume_processing_messages(discard_message_type: Bool = false) =>
+    _phase.resume_processing_messages(discard_message_type)
 
-  fun ref resume_processing_messages_queued() =>
+  fun ref resume_processing_messages_queued(discard_message_type: Bool) =>
     let queued = _phase.queued()
     _use_normal_processor()
     for q in queued.values() do
       match q
       | let qm: QueuedMessage =>
-        qm.process_message(this)
+        if not discard_message_type then
+          qm.process_message(this)
+        end
       | let qb: QueuedBarrier =>
         qb.inject_barrier(this)
       end
@@ -737,13 +735,34 @@ actor ConnectorSink is Sink
     @ll(_twopc_info, "2PC: Rollback: twopc_state %d txn_id %s.".cstring(), _twopc.state(), _twopc.txn_id.cstring())
 
     let rollback_to_c_id = _twopc.make_txn_id_string(checkpoint_id)
-    if _connected and _notify.twopc_intro_done then
-      // If we were disconnected + perform a local abort, then we
-      // arrive here with _twopc.txn_id="".  The last transaction,
-      // named by _twopc.txn_id_at_close, has already been aborted
-      // during the twopc_intro portion of the connector sink protocol.
 
-      if _twopc.txn_id == "" then
+    let r = Reader
+    r.append(payload)
+    let current_offset = try r.u64_be()?.usize() else Fail(); 0 end
+    _twopc.rollback(current_offset)
+    _notify.acked_point_of_ref = try r.u64_be()? else Fail(); 0 end
+    _notify.message_id = _twopc.last_offset.u64()
+
+    // The EventLog's payload's data doesn't include the last
+    // committed txn_id because at the time that payload was created,
+    // we didn't know if the txn-in-progress had committed globally.
+    // When rollback() is called here, we now know the global txn
+    // commit status: commit for checkpoint_id, all greater are invalid.
+    _notify.twopc_txn_id_rollback = rollback_to_c_id
+    @ll(_twopc_debug, "2PC: twopc_txn_id_last_committed = %s, twopc_txn_id_rollback = %s".cstring(),
+      _notify.twopc_txn_id_last_committed_helper().cstring(),
+      _notify.twopc_txn_id_rollback_helper().cstring())
+
+    _notify.process_uncommitted_list(this)
+    _notify.twopc_txn_id_last_committed = rollback_to_c_id
+
+    @ll(_twopc_debug, "2PC: Rollback: _twopc.last_offset %lu _twopc.current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s".cstring(), _twopc.last_offset, _twopc.current_offset, _notify.acked_point_of_ref, _notify.twopc_txn_id_last_committed_helper().cstring(), _sink_id.string().cstring())
+
+    if _connected and _notify.twopc_intro_done then
+      // Rollback has been started, perhaps by some other Wallaroo
+      // worker crashing & restarting & rollback: we may not notice
+      // anything wrong until now.
+      if _twopc.state_is_start() or _twopc.state_is_1precommit() then
         // We may have sent data to the sink that has not been committed,
         // and also we haven't sent a phase1 message.  Do that now,
         // and we'll immediately abort it below.
@@ -759,12 +778,11 @@ actor ConnectorSink is Sink
           for msg in msgs.values() do
             _notify.send_msg(this, msg)
           end
-          _twopc.set_state_1precommit()
           @ll(_twopc_debug, "sent rollback phase 1 for txn_id %s, size %lu".cstring(), _twopc.txn_id.cstring(), msgs.size())
         end
       end
 
-      if not _twopc.state_is_start() then
+      if not (_twopc.state_is_start() or _twopc.state_is_2abort()) then
         if rollback_to_c_id == _twopc.txn_id then
           // This is an interesting case: we are rolling back to but have not
           // committed with phase 2.  This is possible when initializer has
@@ -781,12 +799,15 @@ actor ConnectorSink is Sink
             Fail()
           end
         else
-         @ll(_twopc_info, "Txn id %s needs phase 2 abort, sending!".cstring(), _twopc.txn_id.cstring())
+          @ll(_twopc_info, "Txn id %s needs phase 2 abort, sending from %lu".cstring(), _twopc.txn_id.cstring(), __loc.line())
           _twopc.send_phase2(this, false)
         end
+      elseif _twopc.state_is_2abort() then
+        @ll(_twopc_info, "Txn id %s needs phase 2 abort, sending from %lu".cstring(), _twopc.txn_id.cstring(), __loc.line())
+        _twopc.send_phase2(this, false)
       end
     else
-      // We aren't connector and/or 2PC intro is not done.
+      // We aren't connected and/or 2PC intro is not done.
       // When we are finally are connected & 2PC intro done, then
       // any 2PC actions that need doing will be done at that time.
       @ll(_conn_info, "TODO any other info to log here?".cstring())
@@ -794,27 +815,7 @@ actor ConnectorSink is Sink
       @ll(_twopc_info, "_connected %s twopc_intro_done %s".cstring(), _connected.string().cstring(), _notify.twopc_intro_done.string().cstring())
     end
 
-    _twopc.reset_state()
-
-    let r = Reader
-    r.append(payload)
-    let current_offset = try r.u64_be()?.usize() else Fail(); 0 end
-    _twopc.rollback(current_offset)
-    _notify.acked_point_of_ref = try r.u64_be()? else Fail(); 0 end
-    _notify.message_id = _twopc.last_offset.u64()
-
-    // The EventLog's payload's data doesn't include the last
-    // committed txn_id because at the time that payload was created,
-    // we didn't know if the txn-in-progress had committed globally.
-    // When rollback() is called here, we now know the global txn
-    // commit status: commit for checkpoint_id, all greater are invalid.
-    _notify.twopc_txn_id_last_committed = rollback_to_c_id
-    @ll(_twopc_debug, "2PC: twopc_txn_id_last_committed = %s.".cstring(), _notify.twopc_txn_id_last_committed_helper().cstring())
-    _notify.twopc_current_txn_aborted = _notify.process_uncommitted_list(this)
-
-    @ll(_twopc_debug, "2PC: twopc_current_txn_aborted = %s.".cstring(), _notify.twopc_current_txn_aborted.string().cstring())
-    @ll(_twopc_debug, "2PC: Rollback: _twopc.last_offset %lu _twopc.current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s".cstring(), _twopc.last_offset, _twopc.current_offset, _notify.acked_point_of_ref, _notify.twopc_txn_id_last_committed_helper().cstring(), _sink_id.string().cstring())
-
+    _twopc.reset_fsm_state()
     event_log.ack_rollback(_sink_id)
 
   ///////////////

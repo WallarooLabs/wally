@@ -58,8 +58,8 @@ class ConnectorSinkNotify
   var twopc_intro_done: Bool = false
   var twopc_txn_id_last_committed: (None|String) = None
   var twopc_txn_id_current: String = ""
-  var twopc_uncommitted_list: (None|Array[String] val) = None
-  var twopc_current_txn_aborted: Bool = false
+  var _twopc_uncommitted_list: (None|Array[String] val) = None
+  var twopc_txn_id_rollback: (None|String) = None
 
   new create(sink_id: RoutingId, app_name: String, worker_name: WorkerName,
     protocol_version: String, cookie: String,
@@ -93,7 +93,7 @@ class ConnectorSinkNotify
     _throttled = false
     twopc.notify1_sent = false
     twopc_intro_done = false
-    twopc_uncommitted_list = None
+    _twopc_uncommitted_list = None
     // Apply runtime throttle until we're done with initial 2PC ballet.
     throttled(conn)
     conn.set_nodelay(true)
@@ -142,7 +142,7 @@ class ConnectorSinkNotify
     _throttled = false
     twopc.notify1_sent = false
     twopc_intro_done = false
-    twopc_uncommitted_list = None
+    _twopc_uncommitted_list = None
     throttled(conn)
 
   fun ref dispose() =>
@@ -223,7 +223,7 @@ class ConnectorSinkNotify
         " back pressure, connected = %s").cstring(),
         _connected.string().cstring())
       try @ll(_twopc_debug, "DBGDBG: unthrottled: buffer check, FSM state = %d".cstring(), (conn as ConnectorSink ref).get_twopc_state()) else Fail() end
-      @ll(_twopc_debug, "DBGDBG: unthrottled: buffer: twopc_current_txn_aborted = %s current txn=%s.".cstring(), twopc_current_txn_aborted.string().cstring(), twopc_txn_id_current.cstring())
+      @ll(_twopc_debug, "DBGDBG: unthrottled: buffer: current txn=%s.".cstring(), twopc_txn_id_current.cstring())
     end
 
   fun ref ready_to_work_requested(conn: ConnectorSink ref) =>
@@ -296,22 +296,20 @@ class ConnectorSinkNotify
             @ll(_twopc_err, "2PC: bad rtag match: %lu != %lu".cstring(), mi.rtag, _rtag)
             Fail()
           end
+
           @ll(_conn_debug, "TRACE: uncommitted txns = %d".cstring(),
               mi.txn_ids.size())
-          twopc_uncommitted_list = mi.txn_ids
-          // twopc_current_txn_aborted is used by unthrottled()
-          twopc_current_txn_aborted = process_uncommitted_list(
-            conn as ConnectorSink ref)
+          _twopc_uncommitted_list = mi.txn_ids
+          process_uncommitted_list(conn as ConnectorSink ref)
 
           // The 2PC intro dance has finished.  We can permit the rest
           // of the sink's operation to resume.  The txns in the
-          // twopc_uncommitted_list will be committed/aborted as soon
+          // _twopc_uncommitted_list will be committed/aborted as soon
           // as we have all the relevant information is available (and
           // may already have been done by the process_uncommitted_list()
           // call above).
           twopc_intro_done = true
           unthrottled(conn)
-          twopc_current_txn_aborted = false
           if not _report_ready_to_work_done then
             _ready_to_work = true
             if _report_ready_to_work_requested then
@@ -387,38 +385,61 @@ class ConnectorSinkNotify
       conn.close()
     end
 
-  fun ref process_uncommitted_list(conn: ConnectorSink ref): Bool =>
+  fun ref process_uncommitted_list(conn: ConnectorSink ref) =>
     """
     In case of a Wallaroo failure, we need to do two things that can
     happen in either order: 1. get list of uncommitted transactions,
     2. get the initial rollback() message + payload blob of state.
     After both have happened, then we need to commit/abort any
     uncommitted txns outstanding at the connector sink.
-
-    Return true if we aborted the twopc_txn_id_last_committed txn.
     """
 
-    match (twopc_txn_id_last_committed, twopc_uncommitted_list)
-    | (let last_committed: String, let uncommitted: Array[String] val) =>
-      var current_txn_aborted: Bool = false
+    @ll(_twopc_debug, "2PC: process_uncommitted_list top: 1 %s 2 %s 3 %s".cstring(),
+      twopc_txn_id_last_committed_helper().cstring(),
+      twopc_txn_id_rollback_helper().cstring(),
+      (if _twopc_uncommitted_list is None then "None" else "Array" end).cstring())
+    match (twopc_txn_id_last_committed, twopc_txn_id_rollback)
+    | (let x1: None, let x2: String) =>
+      // last_committed is None, which means that we restarted recently,
+      // but also x2 is a string, so we know that we are rolling back
+      // now.  Set last_committed to a not-None value so that the next
+      // match will do useful stuff.
+      twopc_txn_id_last_committed = "special-case--.--"
+    end
 
+    // This match is intended to do nothing substantial if any
+    // of the match vars' types are None.
+    match (twopc_txn_id_last_committed,
+           twopc_txn_id_rollback,
+           _twopc_uncommitted_list)
+    | (let last_committed: String,
+       let rollback_id: String,
+       let uncommitted: Array[String] val) =>
       @ll(_twopc_debug, "2PC: process_uncommitted_list processing %d items, last_committed = %s".cstring(), uncommitted.size(), last_committed.cstring())
       for txn_id in uncommitted.values() do
-        let do_commit = if txn_id == last_committed then true else false end
+        let do_commit =
+          if txn_id == last_committed then
+            true
+          elseif txn_id == rollback_id then
+            true
+          else
+            false
+          end
         @ll(_twopc_debug, "2PC: uncommitted txn_id %s commit=%s".cstring(), txn_id.cstring(), do_commit.string().cstring())
         if not do_commit and (txn_id == twopc_txn_id_current) then
           @ll(_twopc_debug, "2PC: current txn_id %s was aborted".cstring(), twopc_txn_id_current.cstring())
-          current_txn_aborted = true
         end
         let p2 = TwoPCEncode.phase2(txn_id, do_commit)
         let p2_msg = cwm.MessageMsg(0, 0, 0, None, p2)
         send_msg(conn, p2_msg)
       end
-      twopc_uncommitted_list = []
-      current_txn_aborted
+      twopc_txn_id_rollback = None
+      _twopc_uncommitted_list = None
     else
-      @ll(_twopc_debug, "2PC: process_uncommitted_list waiting".cstring())
-      false
+      @ll(_twopc_debug, "2PC: process_uncommitted_list waiting: 1 %s 2 %s 3 %s".cstring(),
+        (if twopc_txn_id_last_committed is None then "None" else "String" end).cstring(),
+        (if twopc_txn_id_rollback is None then "None" else "String" end).cstring(),
+        (if _twopc_uncommitted_list is None then "None" else "Array" end).cstring())
     end
 
 
@@ -445,7 +466,7 @@ class ConnectorSinkNotify
       // There hasn't been a rollback() as part of our startup, so we
       // are starting for the first time.  There is no prior committed
       // txn_id.
-      twopc_txn_id_last_committed = ""
+      twopc_txn_id_last_committed = "skip--.--ready_to_work"
       @ll(_twopc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.".cstring(), twopc_txn_id_last_committed_helper().cstring())
       process_uncommitted_list(conn)
     end
@@ -453,12 +474,18 @@ class ConnectorSinkNotify
   fun _payload_length(data: Array[U8] iso): USize ? =>
     Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
-  fun twopc_txn_id_last_committed_helper(): String =>
+  fun none_helper(x: (None|String)): String =>
     try
-      twopc_txn_id_last_committed as String
+      x as String
     else
       "--<<{{None}}>>--"
     end
+
+  fun twopc_txn_id_last_committed_helper(): String =>
+    none_helper(twopc_txn_id_last_committed)
+
+  fun twopc_txn_id_rollback_helper(): String =>
+    none_helper(twopc_txn_id_rollback)
 
   fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
     """
