@@ -105,7 +105,7 @@ actor EmptySink is Sink
   =>
     None
 
-  fun ref finish_preparing_for_rollback() =>
+  fun ref finish_preparing_for_rollback(token: (BarrierToken | None)) =>
     None
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>

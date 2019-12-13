@@ -16,19 +16,19 @@ Copyright 2019 The Wallaroo Authors.
 
 */
 
-type ConnectorProtoFsmState is (ConnectorProtoFsmConnected | ConnectorProtoFsmHandshake |
-  ConnectorProtoFsmStreaming |
-  ConnectorProtoFsmError |
-  ConnectorProtoFsmDisconnected)
+type ExtConnStateState is (ExtConnStateConnected | ExtConnStateHandshake |
+  ExtConnStateStreaming |
+  ExtConnStateError |
+  ExtConnStateDisconnected)
 
-primitive ConnectorProtoFsmConnected
+primitive ExtConnStateConnected
   fun apply(): U8 => 1
-primitive ConnectorProtoFsmHandshake
+primitive ExtConnStateHandshake
   fun apply(): U8 => 2
-primitive ConnectorProtoFsmStreaming
+primitive ExtConnStateStreaming
   fun apply(): U8 => 3
-primitive ConnectorProtoFsmError
+primitive ExtConnStateError
   fun apply(): U8 => 4
-primitive ConnectorProtoFsmDisconnected
+primitive ExtConnStateDisconnected
   fun apply(): U8 => 5
 

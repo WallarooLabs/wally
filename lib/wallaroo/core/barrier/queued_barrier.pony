@@ -1,6 +1,6 @@
 /*
 
-Copyright 2018 The Wallaroo Authors.
+Copyright 2018-2020 The Wallaroo Authors.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -17,7 +17,9 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 use "wallaroo/core/common"
+use "wallaroo/core/sink/connector_sink"
 use "wallaroo/core/topology"
+use "wallaroo_labs/mort"
 
 
 trait BarrierProcessor
@@ -42,3 +44,6 @@ class val QueuedBarrier
         _barrier_token.string().cstring())
     end
     b_processor.process_barrier(_input_id, _producer, _barrier_token)
+
+  fun post_valve_process_barrier(sink: ConnectorSink ref) =>
+    sink.barrier_complete(_barrier_token)

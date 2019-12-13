@@ -28,8 +28,7 @@ export WALLAROO_BIN=$WALLAROO_TOP/examples/pony/passthrough/passthrough
 export WALLAROO_THRESHOLDS='*.8'
 
 export SENDER_OUTFILE=/tmp/sender.out
-export STATUS_CRASH_WORKER=/tmp/crasher.worker.doit
-export STATUS_CRASH_SINK=/tmp/crasher.sink.doit
+export STABILIZE_PREFIX=/tmp/stabilize.doit
 
 reset () {
     reset.sh
@@ -76,6 +75,10 @@ poll_ready () {
     poll-ready.sh $*
 }
 
+poll_all_ready () {
+    poll-all-ready.sh $*
+}
+
 print_duration () {
     END_TIME=$(date +%s000)
     echo End time: $END_TIME
@@ -106,7 +109,7 @@ start_all_workers () {
             sleep 1
         done
     fi
-    poll_ready -a -v -w 5 || exit 1
+    poll_all_ready -v -w 5 || exit 1
 }
 
 start_senders () {
@@ -174,21 +177,31 @@ crash_worker () {
     crash-worker.sh $worker
 }
 
+count_stabilize_files () {
+    ls $STABILIZE_PREFIX.* 2> /dev/null | wc -l
+}
+
+all_stabilize_files_are_present () {
+    if [ `count_stabilize_files` -eq $STABILIZE_COUNT ]; then
+        echo ""
+    else
+        echo NO
+    fi
+}
+
 run_crash_sink_loop () {
     sleep 3 # Don't start crashing until checkpoint #1 is complete.
-    #for i in `seq 1 1`; do
     while [ 1 ]; do
-        if [ -f $STATUS_CRASH_SINK ]; then
+        if [ -z `all_stabilize_files_are_present` ]; then
             /bin/echo -n cS
             crash_sink
             random_sleep 2
             /bin/echo -n rS
             start_sink
-            random_sleep 10 5
         else
             /bin/echo -n ":s"
-            sleep 1
         fi
+        random_sleep 15 10
     done
 }
 
@@ -201,11 +214,12 @@ run_crash_worker_loop () {
         print_duration
         exit 1
     fi
-    sleep 2 # Don't start crashing until checkpoint #1 is complete.
+
+    sleep 3 # Don't start crashing until checkpoint #1 is complete.
     counter=0
     while [ 1 ]; do
         counter=`expr $counter + 1`
-        if [ -f $STATUS_CRASH_WORKER ]; then
+        if [ -z `all_stabilize_files_are_present` ]; then
             case "$suffix" in
                 *slow*)
                     ## Space apart the crashes very roughly 120+fudge seconds apart
@@ -217,12 +231,12 @@ run_crash_worker_loop () {
                     counter=0
                 ;;
             esac
-            sleep `random_float 4.5`
+            sleep `random_float 4.0`
             /bin/echo -n "c$worker"
             crash_out=`crash_worker $worker`
             mv /tmp/wallaroo.$worker /tmp/wallaroo.$worker.`date +%s` && gzip /tmp/wallaroo.$worker.`date +%s` > /dev/null 2>&1 &
             if [ -z "$crash_out" ]; then
-                sleep `random_float 2.5`
+                sleep `random_float 4`
                 if [ $worker -eq 0 ]; then
                     start_initializer
                 else
@@ -239,26 +253,75 @@ run_crash_worker_loop () {
             /bin/echo -n ":c$worker"
             sleep 1
         fi
-        poll_out=`poll_ready -w 4 2>&1`
+        poll_out=`poll_ready -w 8 $worker 2>&1`
         status=$?
         if [ $status -ne 0 -o ! -z "$poll_out" ]; then
             echo "CRASH LOOP A: $worker: exit $status reason $poll_out"
-            rm -f $STATUS_CRASH_WORKER
-            rm -f $STATUS_CRASH_SINK
-            sleep 7
-            poll_out=`poll_ready -w 4 -a -S -A 2>&1`
+            rm -f $STABILIZE_PREFIX.$worker
+            poll_out=`poll_all_ready -w 20 2>&1`
             status=$?
             if [ $status -ne 0 -o ! -z "$poll_out" ]; then
                 echo "CRASH LOOP B: $worker: pause the world: exit $status reason $poll_out"
-                echo "SLEEP: $worker @ 45" ; sleep 45
                 pause_the_world
                 break
             else
-                touch $STATUS_CRASH_WORKER
-                touch $STATUS_CRASH_SINK
+                touch $STABILIZE_PREFIX.$worker
                 echo "CRASH LOOP $worker: resume: $poll_out"
             fi
         fi
+    done
+}
+
+run_ack_progress_loop () {
+    ## If this script is also crashing the initializer, or if there's almost always
+    ## a crash component, then we might report a false positive?
+    sleep 5
+
+    while [ 1 ]; do
+        sleep 180
+        if [ "$WALLAROO_TCP_SOURCE_SINK" = "true" ]; then
+            ## progress assumptions are not met by TCPSink
+            continue
+        fi
+        for f in /tmp/sender.out.?; do
+            logtail -o $f.ack-progress $f > /tmp/foo
+            cat /tmp/foo | egrep -s -q 'MultiSourceConnector acked Stream.*is_open=True'
+            if [ $? -ne 0 ]; then
+                echo run_ack_progress_loop: successful ack not seen in $f
+                print_duration
+                pause_the_world
+                sleep 5
+            fi
+        done
+        /bin/echo -n "{AP}"
+    done
+}
+
+run_registry_progress_loop () {
+    ## If this script is also crashing the initializer, then we might report
+    ## a false positive?
+    sleep 10
+
+    tmpfile=/tmp/registry_progress_loop.$$
+    tmpnum=20
+    while [ 1 ]; do
+        if [ "$WALLAROO_TCP_SOURCE_SINK" = "true" ]; then
+            ## progress assumptions are not met by TCPSink
+            continue
+        fi
+        for f in /tmp/sender.out.?; do
+            grep 'MultiSourceConnector added Stream' $f | tail -n $tmpnum > $tmpfile
+            tmpcount=`wc -l $tmpfile | awk '{print $1}'`
+            cat $tmpfile | grep -s -q 'is_open=True'
+            if [ $tmpcount -eq $tmpnum -a $? -ne 0 ]; then
+                echo run_registry_progress_loop: '"MultiSourceConnector added Stream.*is_open=True"' not seen in $f
+                print_duration
+                pause_the_world
+            fi
+        done
+        rm -f $tmpfile
+        /bin/echo -n "{RP}"
+        sleep 15
     done
 }
 
@@ -360,7 +423,7 @@ run_grow_shrink_loop () {
                     worker_num=`echo $w | sed 's/worker//'`
                     join_worker -n 1 $worker_num
                     sleep 1
-                    poll_out=`poll_ready -w 4 2>&1`
+                    poll_out=`poll_ready -w 4 $worker_num 2>&1`
                     if [ $? -ne 0 -o ! -z "$poll_out" ]; then
                         echo "GROW LOOP join $w: pause the world: $poll_out"
                         pause_the_world
@@ -381,7 +444,7 @@ run_grow_shrink_loop () {
                     worker_num=`echo $running | sed 's/worker//'`
                     shrink_worker $worker_num
                     sleep 1
-                    poll_out=`poll_ready -w 4 2>&1`
+                    poll_out=`poll_ready -w 4 $worker_num 2>&1`
                     if [ $? -ne 0 -o ! -z "$poll_out" ]; then
                         echo "GROW LOOP shrink $w: pause the world: $poll_out"
                         pause_the_world
@@ -400,7 +463,7 @@ run_grow_shrink_loop () {
                 # Shrink op started
                 echo $out
                 sleep 1
-                poll_out=`poll_ready -w 4 2>&1`
+                poll_out=`poll_all_ready -w 4 2>&1`
                 if [ $? -ne 0 -o ! -z "$poll_out" ]; then
                     echo "custom hack $w: $poll_out"
                     pause_the_world
@@ -480,7 +543,7 @@ run_custom4 () {
         /bin/echo -n "Shrink worker$i"
         shrink_worker $i
         sleep 1
-        poll_out=`poll_ready -w 4 2>&1`
+        poll_out=`poll_ready -w 4 0 2>&1`
         if [ $? -ne 0 -o ! -z "$poll_out" ]; then
             echo "custom4 shrinking worker$i: $poll_out"
             pause_the_world
@@ -505,7 +568,7 @@ run_custom5 () {
             /bin/echo -n $cmd
             $cmd
             sleep 1
-            poll_out=`poll_ready -w 4 2>&1`
+            poll_out=`poll_ready -w 4 0 2>&1`
             if [ $? -ne 0 -o ! -z "$poll_out" ]; then
                 echo "custom5 cmd $cmd: $poll_out"
                 pause_the_world
@@ -533,7 +596,7 @@ run_custom3006 () {
         mv /tmp/wallaroo.0 $new && gzip $new &
         /bin/echo -n s0
         ./start-initializer.sh
-        poll_out=`poll_ready -w 4 2>&1`
+        poll_out=`poll_ready -w 7 0 2>&1`
         if [ $? -ne 0 -o ! -z "$poll_out" ]; then
             echo "custom3006 cmd $cmd: $poll_out"
             pause_the_world
@@ -541,6 +604,7 @@ run_custom3006 () {
             exit 1
         fi
         sleep 1.5
+        ##sleep 1.5
     done
 }
 
@@ -555,7 +619,7 @@ run_custom_tcp_crash0 () {
 
     /bin/echo -n s0
     ./start-initializer.sh
-    poll_out=`poll_ready -w 4 2>&1`
+    poll_out=`poll_ready -w 4 0 2>&1`
     if [ $? -ne 0 -o ! -z "$poll_out" ]; then
         echo ""
         echo "\nQuery initializer\n"
@@ -589,7 +653,7 @@ run_custom_crashsink_crash0_overlap () {
 
     /bin/echo -n s0
     ./start-initializer.sh
-    poll_out=`poll_ready -w 4 2>&1`
+    poll_out=`poll_ready -w 4 0 2>&1`
     if [ $? -ne 0 -o ! -z "$poll_out" ]; then
         echo ""
         echo "\nQuery initializer\n"
@@ -630,10 +694,10 @@ run_custom_20191210a () {
         ) &
         wait
         /bin/echo -n echo both-done.
-        poll_out=`poll_ready -w 4 2>&1`
+        poll_out=`poll_ready -w 4 0 2>&1`
         if [ $? -ne 0 -o ! -z "$poll_out" ]; then
             echo "BUMMER A: pause the world: $poll_out"
-            poll_out=`poll_ready -w 4 2>&1`
+            poll_out=`poll_ready -w 4 0 2>&1`
             if [ $? -ne 0 -o ! -z "$poll_out" ]; then
                 echo "BUMMER B: pause the world: $poll_out"
                 pause_the_world
@@ -644,19 +708,81 @@ run_custom_20191210a () {
     done
 }
 
-touch $STATUS_CRASH_WORKER
-touch $STATUS_CRASH_SINK
+run_custom_20191223a () {
+    ## Assume that we are run with `./master-crasher.sh 2 run_custom_20191223a`
+
+    while [ 1 ]; do
+    #    (
+    #        sleep 4.9
+    #        /bin/echo -n c0
+    #        crash_worker 0
+    #        mv /tmp/wallaroo.0 /tmp/wallaroo.0.`date +%s` && gzip /tmp/wallaroo.0.`date +%s` > /dev/null 2>&1 &
+    #        sleep 0.9
+    #        /bin/echo -n r0
+    #        start_initializer
+    #    ) &
+        (
+            sleep 3.7
+            /bin/echo -n cS
+            crash_sink
+            sleep 1.0
+            /bin/echo -n rS
+            start_sink
+        ) &
+        wait
+        /bin/echo -n echo done.
+        poll_out=`poll_ready -w 4 0 2>&1`
+        if [ $? -ne 0 -o ! -z "$poll_out" ]; then
+            echo "BUMMER A: pause the world: $poll_out"
+            poll_out=`poll_ready -w 4 0 2>&1`
+            if [ $? -ne 0 -o ! -z "$poll_out" ]; then
+                echo "BUMMER B: pause the world: $poll_out"
+                pause_the_world
+                break
+            fi
+        fi
+        sleep 1
+    done
+}
+
+rm -f $STABILIZE_PREFIX.*
+STABILIZE_COUNT=0
+for arg in $*; do
+    case $arg in
+        crash-sink*)
+            touch $STABILIZE_PREFIX.sink
+            STABILIZE_COUNT=`expr $STABILIZE_COUNT + 1`
+            ;;
+        crash[0-9]*)
+            worker=`echo $arg | sed -e 's/crash//' -e 's/\..*//'`
+            touch $STABILIZE_PREFIX.$worker
+            STABILIZE_COUNT=`expr $STABILIZE_COUNT + 1`
+            ;;
+    esac
+done
+export STABILIZE_COUNT
+
 reset
 start_sink ; sleep 1
 start_all_workers
 start_senders &
 
+run_ack_progress_loop=true
+run_registry_progress_loop=true
 run_sanity=true
 for arg in $*; do
     case $arg in
         crash-sink)
             echo RUN: run_crash_sink_loop
             run_crash_sink_loop &
+            ;;
+        no-ack-progress)
+            echo NO RUN: run_ack_progress_loop
+            run_ack_progress_loop=false
+            ;;
+        no-registry-progress)
+            echo NO RUN: run_registry_progress_loop
+            run_registry_progress_loop=false
             ;;
         no-sanity)
             echo NO RUN: run_sanity_loop
@@ -692,6 +818,12 @@ for arg in $*; do
     esac
 done
 
+if [ $run_ack_progress_loop = true ]; then
+    run_ack_progress_loop &
+fi
+if [ $run_registry_progress_loop = true ]; then
+    run_registry_progress_loop &
+fi
 if [ $run_sanity = true ]; then
     run_sanity_loop &
 fi

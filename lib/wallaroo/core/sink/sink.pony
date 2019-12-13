@@ -24,6 +24,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/recovery"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
+use "wallaroo_labs/mort"
 
 trait tag Sink is (Consumer & DisposableActor & BarrierProcessor)
   be checkpoint_complete(checkpoint_id: CheckpointId)
@@ -34,12 +35,10 @@ trait tag Sink is (Consumer & DisposableActor & BarrierProcessor)
     barrier_token: BarrierToken)
   // Called by SinkMessageProcessor when the sink needs to do final
   // cleanup work for rollback.
-  fun ref finish_preparing_for_rollback()
+  fun ref finish_preparing_for_rollback(token: (BarrierToken | None))
   fun ref receive_immediate_ack() =>
     None
   fun ref use_normal_processor() =>
-    None
-  fun ref resume_processing_messages_queued() =>
     None
 
 interface val SinkConfig[Out: Any val]

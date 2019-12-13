@@ -38,6 +38,7 @@ use @w_process_category_overrides[None]()
 // make_sev_cat() or the PR that added this file.
 type LogSeverity is U16
 type LogCategory is U16
+type LogSevCat is U16
 
 primitive Log
   // severity levels

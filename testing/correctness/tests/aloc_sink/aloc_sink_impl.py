@@ -20,6 +20,11 @@ if os.environ.get('USE_FAKE_S3', '') == 'on':
 
 from wallaroo.experimental import connector_wire_messages as cwm
 
+if os.environ.get("ALOC_SINK_PHASE1_SLEEP") is not None:
+    ALOC_SINK_PHASE1_SLEEP=float(os.environ.get("ALOC_SINK_PHASE1_SLEEP"))
+else:
+    ALOC_SINK_PHASE1_SLEEP=0.0
+
 # NOTES:
 #
 # 1. This server will truncate the out_path & out_path+".txnlog" files.
@@ -194,6 +199,7 @@ class AsyncServer(asynchat.async_chat, object):
             except Exception as e:
                 logging.critical('{}'.format(e))
                 sys.exit(66)
+        logging.info('ALOC_SINK_PHASE1_SLEEP value is {}'.format(ALOC_SINK_PHASE1_SLEEP))
 
     def collect_incoming_data(self, data):
         """Buffer the data"""
@@ -409,6 +415,10 @@ class AsyncServer(asynchat.async_chat, object):
                     self._txn_commit_next = False
                     logging.error('2PC: Phase 1 invalid stream_id {} in {}'
                         .format(stream_id, msg2))
+                if start_por != self._last_committed_offset:
+                    self._txn_commit_next = False
+                    logging.error('2PC: Phase 1 invalid start_por {} _last_committed_offset {}'
+                        .format(start_por, self._last_committed_offset))
                 if start_por > end_por:
                     self._txn_commit_next = False
                     logging.error('2PC: Phase 1 invalid start_por {} end_por {}'
@@ -487,8 +497,7 @@ class AsyncServer(asynchat.async_chat, object):
             reply = cwm.TwoPCReply(str(msg2.txn_id).encode('utf-8'), success)
             reply_bytes = cwm.TwoPCFrame.encode(reply)
             msg = cwm.Message(0, 0, 0, None, reply_bytes)
-            ##time.sleep(0.151)      ### TESTING ONLY! DELETE ME
-            time.sleep(0.25)      ### TESTING ONLY! DELETE ME
+            time.sleep(ALOC_SINK_PHASE1_SLEEP)
             self.write(msg)
 
             self._txn_commit_next = True
@@ -589,6 +598,7 @@ class AsyncServer(asynchat.async_chat, object):
             # unlikely in the current Wallaroo implementation, but possible.
             #
             self._twopc_out.leaving_workers(msg2.leaving_workers)
+            self.log_it(['workers-left', '{}'.format(msg2.leaving_workers)])
             for w in msg2.leaving_workers:
                 # NOTE: When streamIds > 1 are used, this iteration needs change
                 key = (w, 1)

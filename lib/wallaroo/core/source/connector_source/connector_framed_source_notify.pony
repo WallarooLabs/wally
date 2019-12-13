@@ -1,6 +1,6 @@
 /*
 
-Copyright 2017-2019 The Wallaroo Authors.
+Copyright 2017-2020 The Wallaroo Authors.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -67,7 +67,7 @@ class _StreamState
   var last_acked: PointOfReference // last message id that was checkpointed
   var last_seen: PointOfReference  // last seen message id
   var last_checkpoint: CheckpointId // last checkpoint id
-  var close_on_or_after: CheckpointId = 0 // First checkpoint where sream ca be closed
+  var close_on_or_after: CheckpointId = 0 // First checkpoint where stream can be closed
 
   new ref create(stream_id: StreamId, stream_name: String,
     last_seen': PointOfReference,
@@ -80,6 +80,8 @@ class _StreamState
   last_checkpoint = last_checkpoint'
 
   fun serialize(wb: Writer = Writer): Writer =>
+    @l(Log.debug(), Log.conn_source(),
+      "_Stream_state: serialize: id %s name %s last_acked %lu last_seen %lu last_checkpoint %lu".cstring(), id.string().cstring(), name.cstring(), last_acked, last_seen, last_checkpoint)
     wb.u64_be(id)
     wb.u16_be(name.size().u16())
     wb.write(name)
@@ -95,6 +97,8 @@ class _StreamState
     last_acked = rb.u64_be()?
     last_seen = rb.u64_be()?
     last_checkpoint = rb.u64_be()?
+    @l(Log.debug(), Log.conn_source(),
+      "_Stream_state: deserialize: id %s name %s last_acked %lu last_seen %lu last_checkpoint %lu".cstring(), id.string().cstring(), name.cstring(), last_acked, last_seen, last_checkpoint)
 
 class val NotifyResult[In: Any val]
   """
@@ -184,6 +188,7 @@ class ConnectorSourceNotify[In: Any val]
 
   // stream state management
   var _pending_notify: Set[StreamId] = _pending_notify.create()
+  var _pending_notify_checkpoint_id: (None|CheckpointId) = None
   var _active_streams: Map[StreamId, _StreamState]= _active_streams.create()
   var _pending_close: Map[StreamId, _StreamState] = _pending_close.create()
   var _pending_relinquish: Array[StreamTuple] = _pending_relinquish.create()
@@ -199,9 +204,9 @@ class ConnectorSourceNotify[In: Any val]
   var _credits: U32 = 0
   var _program_name: String = ""
   var _instance_name: String = ""
+  var _rolling_back: Bool = false
   var _prep_for_rollback: Bool = false
   let _debug_disconnect: Bool = false
-  var _commit_successful: Bool = true
 
   // Watermark !TODO! How do we handle this respecting per-connector-type
   // policies
@@ -353,12 +358,16 @@ class ConnectorSourceNotify[In: Any val]
           return _to_error_state(source, "Bad protocol FSM state")
         end
 
-        if _pending_notify.contains(m.stream_id) or
+        if _rolling_back or
+           _pending_notify.contains(m.stream_id) or
            _active_streams.contains(m.stream_id) or
            _pending_close.contains(m.stream_id)
         then
-          // This notifier is already handling this stream
+          // We are rolling back, or else this notifier is already
+          // handling this stream.
           // So reject directly
+          @ll(_conn_debug, "TODO: got NotifyMsg: _rolling_back %s\n".cstring(),
+            _rolling_back.string().cstring())
           send_notify_ack(source, false, m.stream_id, m.point_of_ref)
         else
           _process_notify(where source=source, stream_id=m.stream_id,
@@ -411,6 +420,19 @@ class ConnectorSourceNotify[In: Any val]
         // check that we're in state that allows processing messages
         if _fsm_state isnt _ProtoFsmStreaming then
           return _to_error_state(source, "Bad protocol FSM state")
+        end
+
+        if _rolling_back then
+          // We are going to roll back sometime, so do not accept any
+          // new incoming data.
+          //
+          // TODO: I think it's OK to ignore credit management.  If we
+          // wait long enough for a real rollback + send RESTART, then
+          // perhaps the client would run out of credits and stop
+          // sending, which is just fine, then we don't have to throw
+          // these messages away.
+          @ll(_conn_debug, "TODO: _rolling_back, discarding msg".cstring())
+          return _continue_perhaps(source)
         end
 
         // try to process message
@@ -624,7 +646,7 @@ class ConnectorSourceNotify[In: Any val]
     _header = true
     _session_active = true
     _session_id = session_id
-    _clear_streams()
+    _clear_and_relinquish_all()
     _credits = _max_credits
     _prep_for_rollback = false
     source.expect(_header_size)
@@ -702,6 +724,16 @@ class ConnectorSourceNotify[In: Any val]
   // Checkpoint / Rollback // Barrier
   ///////////////////////////////////
 
+  fun ref trigger_checkpoint_state(source: ConnectorSource[In] ref,
+    checkpoint_id: CheckpointId)
+  =>
+    if _pending_notify.size() == 0 then
+      source.log_checkpoint_state(checkpoint_id, create_checkpoint_state())
+    else
+      @ll(_conn_debug, "0x%lx defer checkpoint state for CheckpointId %lu".cstring(), source, checkpoint_id)
+      _pending_notify_checkpoint_id = checkpoint_id
+    end
+
   fun create_checkpoint_state(): Array[ByteSeq val] val =>
     let w: Writer = w.create()
 
@@ -712,13 +744,20 @@ class ConnectorSourceNotify[In: Any val]
     w.u8(nonempty_magic())
 
     for s_map in [_active_streams ; _pending_close].values() do
+      @l(Log.debug(), Log.conn_source(), "map size = %lu".cstring(), s_map.size())
       for stream_state in s_map.values() do
         stream_state.serialize(w)
       end
     end
+    @l(Log.debug(), Log.conn_source(), "_pending_relinquish size = %lu".cstring(), _pending_relinquish.size())
+    for pr in _pending_relinquish.values() do
+      let stream_state = _StreamState(pr.id, pr.name, pr.last_acked, pr.last_acked, 0)
+      stream_state.serialize(w)
+    end
     w.done()
 
   fun ref prepare_for_rollback(source: ConnectorSource[In] ref) =>
+    _rolling_back = true
     if _session_active then
       _prep_for_rollback = true
       source.close()
@@ -754,6 +793,7 @@ class ConnectorSourceNotify[In: Any val]
         // TODO: should we remove s.id from all my other lists, _active_streams, etc??
       end
     end
+    _rolling_back = false
     _relinquish_streams()
     rollback_complete(source, checkpoint_id)
 
@@ -765,7 +805,7 @@ class ConnectorSourceNotify[In: Any val]
     _clear_and_relinquish_all()
     source.close()
 
-  fun ref initiate_checkpoint(checkpoint_id: CheckpointId): Bool =>
+  fun ref initiate_checkpoint(checkpoint_id: CheckpointId) =>
     if not _prep_for_rollback then
       ifdef debug then
         Invariant(checkpoint_id > _barrier_checkpoint_id)
@@ -778,7 +818,7 @@ class ConnectorSourceNotify[In: Any val]
         for s_map in [_active_streams ; _pending_close].values() do
           for s in s_map.values() do
             ifdef debug then
-              @ll(_conn_debug, "%s ::: Updating stream_id %s last acked to %s\n"
+              @ll(_conn_debug, "%s ::: Updating stream_id %s last_acked to %s\n"
                 .cstring(), WallClock.seconds().string().cstring(),
                 s.id.string().cstring(), s.last_seen.string().cstring())
             end
@@ -787,12 +827,6 @@ class ConnectorSourceNotify[In: Any val]
           end
         end
       end
-    end
-    if _commit_successful then
-      return true
-    else
-      _commit_successful = true // for the next iteration
-      return false
     end
 
   fun ref checkpoint_complete(source: ConnectorSource[In] ref,
@@ -887,6 +921,7 @@ class ConnectorSourceNotify[In: Any val]
 
   fun ref _clear_streams() =>
     _pending_notify.clear()
+    _pending_notify_checkpoint_id = None
     _active_streams.clear()
     _pending_close.clear()
     _pending_relinquish.clear()
@@ -939,48 +974,46 @@ class ConnectorSourceNotify[In: Any val]
 
     if (session_id != _session_id) or (not _session_active) then
       // This is a reply from a query that we'd sent in a prior TCP
-      // connection, or else the TCP connection is closed now. If the
-      // connection has been closed, any state about this query would
-      // have already been purged from any local state ... which makes
-      // it difficult to recover from the situation we're in here.
-      // After all, that stream ID may already be registered & in active
-      // use on some other worker right now.
-      //
-      // TODO: The one hammer that we have in our toolbox is a complete
-      // rollback to the prior state: we can force the next checkpoint
-      // to rollback. That would cause the entire cluster to rollback,
-      // and each worker would tell all active ConnectorSource sessions
-      // to RESTART and close. Then the entire stream registry starts
-      // from a clean slate.  However, Wallaroo sources cannot abort
-      // a checkpoint, so we cannot use this method.  Either, we need
-      // to allow sources to abort a checkpoint, or else we need
-      // another way to address the problem of leaked stream ids.
-      //
-      // If the global stream registry sends a success=true reply but
-      // this worker were to crash immediately afterward and drop that
-      // reply, then we might have a "leak" of the stream id,
-      // permanently stuck in active state.  Also, we don't have
-      // Erlang's process link and monitor mechanisms to help repair
-      // such "leaked" stream id registrations. Fortunately, because
-      // this worker crashed, when this worker restarts, it will cause a
-      // global rollback and thus, as noted above, restart the stream
-      // registry from a clean slate.
+      // connection, or else the TCP connection is closed now.
+
       @ll(_conn_debug, "Notify request session_id is old. Rejecting result\n"
           .cstring())
-      _commit_successful = false
-      return
+      if success then
+        // Stream.id's state in the registry is now active, but it was
+        // became active during session_id.
+
+        // a. If we're now in a new session, so we know that all clients
+        // from the old session_id are no longer connected.
+        // b. If we're disconnected, then we are definitely not connected.  
+        //
+        // In either case, we can relinquish this ID safely, and we
+        // must relinquish it because, right now, this ID is "leaked"
+        // and unusable by anybody.  We must use the _pending_relinquish
+        // mechanism, because we must maintain checkpoint-safe state
+        // invariants.
+        _pending_relinquish.push(stream)
+      end
+    else
+      if success then
+        // create _StreamState to place in _active_streams
+        let s = _StreamState(stream.id, stream.name, stream.last_acked,
+          stream.last_acked, _barrier_checkpoint_id)
+        _active_streams(stream.id) = s
+      end
+      // send response either way
+      send_notify_ack(source, success, stream.id, stream.last_acked)
+      for s_map in [_active_streams ; _pending_close].values() do
+        @ll(_conn_debug, "after send_notify_ack: s_map.size = %lu".cstring(), s_map.size())
+      end
     end
 
-    if success then
-      // create _StreamState to place in _active_streams
-      let s = _StreamState(stream.id, stream.name, stream.last_acked,
-        stream.last_acked, _barrier_checkpoint_id)
-      _active_streams(stream.id) = s
-    end
-    // send response either way
-    send_notify_ack(source, success, stream.id, stream.last_acked)
-    for s_map in [_active_streams ; _pending_close].values() do
-      @ll(_conn_debug, "after send_notify_ack: s_map.size = %lu".cstring(), s_map.size())
+    if _pending_notify.size() == 0 then
+      match _pending_notify_checkpoint_id
+      | let checkpoint_id: CheckpointId =>
+        @ll(_conn_debug, "0x%lx now write our deferred checkpoint state for CheckpointId %lu".cstring(), source, checkpoint_id)
+        source.log_checkpoint_state(checkpoint_id, create_checkpoint_state())
+        _pending_notify_checkpoint_id = None
+      end
     end
 
   fun ref send_notify_ack(source: ConnectorSource[In] ref, success: Bool,
@@ -1044,9 +1077,33 @@ class ConnectorSourceNotify[In: Any val]
     """An arbitrary constant."""
     84
 
-  fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
+  fun _print_array[A: U8](array: Array[A] val): String =>
     """
     Generate a printable string of the contents of the given readseq to use in
     error messages.
     """
-    "[len=" + array.size().string() + ": " + ", ".join(array.values()) + "]"
+    ifdef "verbose_debug" then
+      if (array.size() == 97) or (array.size() == 98) then
+        let hack = recover trn Array[U8] end
+        let skip = array.size() - match array.size()
+          | 97 =>
+            49
+          | 98 => 50
+          else
+            49
+          end
+        var count: USize = 0
+        for b in array.values() do
+          if count >= skip then
+            hack.push(b)
+          end
+          count = count + 1
+        end
+        let hack2 = consume hack
+        String.from_array(consume hack2)
+      else
+        "[len=" + array.size().string() + ": " + ",".join(array.values()) + "]"
+      end
+    else
+      "[len=" + array.size().string() + ": " + "...]"
+    end
