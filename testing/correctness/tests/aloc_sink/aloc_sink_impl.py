@@ -66,7 +66,7 @@ def reload_phase1_txn_state(lines, instance_name):
         if (a[1] == '2-ok') or (a[1] == '2-rollback'):
             del txn_state[a[2]]
     if len(txn_state) > 1:
-        logging.critical('reload_phase1_txn_state: bad txn_state: {} instance {}'.format(txn_state, instance))
+        logging.critical('reload_phase1_txn_state: bad txn_state: {} instance {}'.format(txn_state, instance_name))
         sys.exit(66)
     return txn_state
 
@@ -415,8 +415,8 @@ class AsyncServer(asynchat.async_chat, object):
                         .format(start_por, end_por))
                 if end_por > self._output_offset:
                     self._txn_commit_next = False
-                    m = '2PC: Phase 1 invalid end_por {} self._output_offset {} file size {} msg2 {}'.format(
-                        end_por, self._output_offset, self._twopc_out.out_tell(), msg2)
+                    m = '2PC: Phase 1 invalid start_por {} end_por {} self._output_offset {} file size {} msg2 {}'.format(
+                        start_por, end_por, self._output_offset, self._twopc_out.out_tell(), msg2)
                     if self._output_offset == start_por:
                         ## We probably restarted, we've truncated uncommitted
                         ## bytes at the end of the file, and here's Wallaroo
@@ -611,15 +611,15 @@ class AsyncServer(asynchat.async_chat, object):
 
         key = (self._worker_name, msg.stream_id)
         if msg.message_id != None:
-            logging.debug('msg.message_id = {}'.format(msg.message_id))
+            logging.debug('msg.message_id = {} worker {}'.format(msg.message_id, self._worker_name))
             if self._output_offset == msg.message_id:
                 (ret1, new_offset) = self._twopc_out.append_output(bs, self._output_offset)
                 if len(bs) != ret1:
                     self._txn_commit_next = False
-                    raise Exception("File write error? {} != {}".format(len(bs), ret1))
+                    raise Exception("File write error? {} != {} worker {}".format(len(bs), ret1, self._worker_name))
                 self._output_offset += len(bs)
                 self._streams[key][2] = self._output_offset
-                logging.debug('_output_offset is now {} tell {}'.format(self._output_offset, self._twopc_out.out_tell()))
+                logging.debug('_output_offset is now {} tell {} worker {}'.format(self._output_offset, self._twopc_out.out_tell(), self._worker_name))
             elif self._output_offset < msg.message_id:
                 m = 'MISSING DATA: self._output_offset {} tell {} < msg.message_id {} worker {}'.format(self._output_offset, self._twopc_out.out_tell(), msg.message_id, self._worker_name)
                 self._txn_commit_next = False
@@ -642,7 +642,7 @@ class AsyncServer(asynchat.async_chat, object):
                     sys.exit(66)
             elif self._output_offset > msg.message_id:
                 ## The message_id has gone backward.
-                logging.fatal('duplicate data: self._output_offset {} tell {} > msg.message_id {}'.format(self._output_offset, self._twopc_out.out_tell(), msg.message_id))
+                logging.fatal('duplicate data: self._output_offset {} tell {} > msg.message_id {} worker {}'.format(self._output_offset, self._twopc_out.out_tell(), msg.message_id, self._worker_name))
                 ## Deduplication case: we've already seen this, so
                 ## we don't take any further action.
 
@@ -653,15 +653,15 @@ class AsyncServer(asynchat.async_chat, object):
                 except:
                     diag = "<-<exception>->"
                 if diag == msg.message:
-                    logging.fatal('diag: file bytes match message')
+                    logging.fatal('diag: file bytes match message worker {}'.format(self._worker_name))
                 else:
-                    logging.fatal('diag: msg = {}'.format(msg))
-                    logging.fatal('diag: bytes in opath = {}'.format(diag))
+                    logging.fatal('diag: msg = {} worker {}'.format(msg, self._worker_name))
+                    logging.fatal('diag: bytes in opath = {} worker {}'.format(diag, self._worker_name))
                 ## End DIAGNOSTIC
                 self._twopc_out.flush_fsync_all()
                 sys.exit(66)
         else:
-            logging.critical('message has no message_id')
+            logging.critical('message has no message_id, worker {}'.format(self._worker_name))
             sys.exit(66)
         self._last_msg = msg
 
@@ -892,8 +892,8 @@ class TwoPC_Output_LocalFilesystem(TwoPC_Output):
                 self._instance_name, append_offset, self._out_offset))
         ret = self._out.write(bs)
         self._out_offset += ret
-        logging.debug("write_out: ret = {} len(bs) = {} new offset {}".format(
-            ret, len(bs), self._out_offset))
+        logging.debug("write_out: ret = {} len(bs) = {} new offset {} _out_path {}".format(
+            ret, len(bs), self._out_offset, self._out_path))
         return (ret, self._out_offset)
 
     def append_txnlog(self, log_item):

@@ -218,30 +218,24 @@ Let's restart 1 worker, `worker5`.
 
 ### Prerequisites
 
-Create a large input file, approx 12MB, using the command:
-
-For connector source & sink testing:
+Create a large input file, approx 12MB, using the commands:
 
 ```
-dd if=$WALLAROO_TOP/testing/data/market_spread/nbbo/r3k-symbols_nbbo-fixish.msg bs=1000000 count=4 | od -x | sed 's/^/T/' > /tmp/input-file.txt
+./remove-input-files.sh
+./create-input-files.sh
 ```
 
-For TCP source & sink testing:
-
-```
-dd if=$WALLAROO_TOP/testing/data/market_spread/nbbo/r3k-symbols_nbbo-fixish.msg bs=1000000 count=1 | od -x | sed 's/^/T/' | sed -n '1,/T3641060/p' | perl -ne 'print "\0\0\0"; print "1"; print' > /tmp/input-file.txt
-```
-
-All lines in this ASCII file will begin with the letter "T". The
-`passthrough` Wallaroo app uses the first character of each line
+All lines in the `/tmp/input-file.A.txt` file will begin with the letter "A".
+The `passthrough` Wallaroo app uses the first character of each line
 as the "key" for routing in a multi-worker cluster.  Therefore, all
 lines in the file will be processed by the same worker; this property
-makes correctness checking easier.
+makes correctness checking easier.  This same beginning-of-line-key-
+character convention is used for the files `/tmp/input-file.?.txt`,
+where the wildcard represents the key used for all lines in the file.
 
 Note that the metrics UI will only report stats from the worker that
-is assigned the "T" key; all other workers will be reporting no
-activity because there is no data in the /tmp/input-file.txt file with
-another key.
+is assigned a routing key; all workers that process no routing keys
+will report no activity because they aren't doing any work.
 
 ### Run without errors
 
@@ -254,13 +248,13 @@ In Window 1:
 In Window 2:
 
 ```
-env PYTHONPATH=$WALLAROO_TOP/machida/lib:examples/python/celsius_connectors $WALLAROO_TOP/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 21222 |& tee /tmp/feed.out
+env PYTHONPATH=$WALLAROO_TOP/machida/lib:examples/python/celsius_connectors $WALLAROO_TOP/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.A.txt 21222 |& tee /tmp/feed.out
 ```
 
 In Window 1:
 
 ```
-while [ 1 ]; do ./1-to-1-passthrough-verify.sh /tmp/input-file.txt  ; if [ $? -ne 0 ]; then killall -STOP passthrough; echo STOPPED; break; fi ; sleep 1; done
+while [ 1 ]; do ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt  ; if [ $? -ne 0 ]; then killall -STOP passthrough; echo STOPPED; break; fi ; sleep 1; done
 ```
 
 ### Repeatedly crashing and restarting the sink
@@ -268,7 +262,7 @@ while [ 1 ]; do ./1-to-1-passthrough-verify.sh /tmp/input-file.txt  ; if [ $? -n
 TODO replace hack
 
 ```
-for i in `seq 1 100`; do ps axww | grep aloc_sink | grep -v grep | awk '{print $1}' | xargs kill ; amount=`date | sed -e 's/.*://' -e 's/ .*//'`; echo i is $i, amount is $amount; sleep 2.$amount ; env PYTHONPATH=$WALLAROO_TOP/machida/lib $WALLAROO_TOP/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 >> /tmp/sink-out/stdout-stderr 2>&1 & sleep 2 ; ./1-to-1-passthrough-verify.sh /tmp/input-file.txt ; if [ $? -eq 0 ]; then echo OK; else killall -STOP passthrough ; echo STOPPED; break; fi ; egrep -v 'DEBUG|INFO' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then killall -STOP passthrough ; echo STOP-grep; break; fi; done
+for i in `seq 1 100`; do ps axww | grep aloc_sink | grep -v grep | awk '{print $1}' | xargs kill ; amount=`date | sed -e 's/.*://' -e 's/ .*//'`; echo i is $i, amount is $amount; sleep 2.$amount ; env PYTHONPATH=$WALLAROO_TOP/machida/lib $WALLAROO_TOP/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 >> /tmp/sink-out/stdout-stderr 2>&1 & sleep 2 ; ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt ; if [ $? -eq 0 ]; then echo OK; else killall -STOP passthrough ; echo STOPPED; break; fi ; egrep -v 'DEBUG|INFO' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then killall -STOP passthrough ; echo STOP-grep; break; fi; done
 ```
 
 ### Repeatedly crashing and restarting a non-initializer worker
@@ -277,7 +271,7 @@ TODO replace hack
 
 ```
 TO_CRASH=1
-for i in `seq 1 100`; do echo -n $i; crash-worker.sh $TO_CRASH ; sleep 0.2 ; mv /tmp/wallaroo.$TO_CRASH /tmp/wallaroo.$TO_CRASH.$i ; gzip -f /tmp/wallaroo.$TO_CRASH.$i & start-worker.sh $TO_CRASH ; sleep 1.2; poll-ready.sh -w 2 -a; if [ $? -ne 0 ]; then echo BREAK0; break; fi; egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then echo BREAK; break; fi; ./1-to-1-passthrough-verify.sh /tmp/input-file.txt; if [ $? -ne 0 ]; then echo BREAK2; break; fi ;sleep 0.2; done
+for i in `seq 1 100`; do echo -n $i; crash-worker.sh $TO_CRASH ; sleep 0.2 ; mv /tmp/wallaroo.$TO_CRASH /tmp/wallaroo.$TO_CRASH.$i ; gzip -f /tmp/wallaroo.$TO_CRASH.$i & start-worker.sh $TO_CRASH ; sleep 1.2; poll-ready.sh -w 2 -a; if [ $? -ne 0 ]; then echo BREAK0; break; fi; egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then echo BREAK; break; fi; ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt; if [ $? -ne 0 ]; then echo BREAK2; break; fi ;sleep 0.2; done
 ```
 
 ### Repeatedly crashing and restarting the initializer worker
@@ -288,7 +282,7 @@ NOTE: There's a limitation in the Python connector client
 w.r.t. reconnecting after a close.  Read below for more detail.
 
 ```
-for i in `seq 1 100`; do echo -n $i; crash-worker.sh 0 ; sleep 0.2 ; mv /tmp/wallaroo.0 /tmp/wallaroo.0.$i ; gzip -f /tmp/wallaroo.0.$i & start-initializer.sh ; sleep 1.2; poll-ready.sh -w 2 -a; if [ $? -ne 0 ]; then echo BREAK0; break; fi; egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then echo BREAK; break; fi; ./1-to-1-passthrough-verify.sh /tmp/input-file.txt; if [ $? -ne 0 ]; then echo BREAK2; break; fi ;sleep 0.2; done
+for i in `seq 1 100`; do echo -n $i; crash-worker.sh 0 ; sleep 0.2 ; mv /tmp/wallaroo.0 /tmp/wallaroo.0.$i ; gzip -f /tmp/wallaroo.0.$i & start-initializer.sh ; sleep 1.2; poll-ready.sh -w 2 -a; if [ $? -ne 0 ]; then echo BREAK0; break; fi; egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then echo BREAK; break; fi; ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt; if [ $? -ne 0 ]; then echo BREAK2; break; fi ;sleep 0.2; done
 ```
 
 The Python connector client is not 100% reliable in reconnecting to
@@ -304,5 +298,5 @@ restart the `at_least_once_line_file_feed` script.
 TODO replace hack
 
 ```
-while [ 1 ]; do env PYTHONPATH=$WALLAROO_TOP/machida/lib:$WALLAROO_TOP/examples/python/celsius_connectors $WALLAROO_TOP/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.txt 41000 & amount=`date | sed -e 's/.*://' -e 's/ .*//'`; echo amount is $amount; sleep 1.$amount ; kill -9 `ps axww | grep -v grep | grep feed | awk '{print $1}'`; sleep 0.$amount; done
+while [ 1 ]; do env PYTHONPATH=$WALLAROO_TOP/machida/lib:$WALLAROO_TOP/examples/python/celsius_connectors $WALLAROO_TOP/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.A.txt 41000 & amount=`date | sed -e 's/.*://' -e 's/ .*//'`; echo amount is $amount; sleep 1.$amount ; kill -9 `ps axww | grep -v grep | grep feed | awk '{print $1}'`; sleep 0.$amount; done
 ```
