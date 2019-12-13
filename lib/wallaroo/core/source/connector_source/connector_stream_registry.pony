@@ -1,6 +1,6 @@
 /*
 
-Copyright (C) 2016-2017, Wallaroo Labs
+Copyright (C) 2016-2020, Wallaroo Labs
 Copyright (C) 2016-2017, The Pony Developers
 Copyright (c) 2014-2015, Causality Ltd.
 All rights reserved.
@@ -191,6 +191,14 @@ class GlobalConnectorStreamRegistry[In: Any val]
     let serialized: Array[U8] val =
       Serialised(SerialiseAuth(_auth), state)?
         .output(OutputSerialisedAuth(_auth))
+
+    @ll(_debug, "serialize: _active_streams.size = %lu _inactive_streams.size = %lu".cstring(), _active_streams.size(), _inactive_streams.size())
+    for (s, w) in _active_streams.pairs() do
+      @ll(_debug, "serialize: _active_streams.key = %s worker = %s".cstring(), s.string().cstring(), w.cstring())
+    end
+    for (s, t) in _inactive_streams.pairs() do
+      @ll(_debug, "serialize: _inactive_streams.key = %s last_acked %s".cstring(), s.string().cstring(), t.last_acked.string().cstring())
+    end
     [serialized]
 
   fun ref set_local_registry(
@@ -515,7 +523,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
             (false, stream)
           end
         end
-      @ll(_debug, "stream_notify: success %s name %s id %s last_acked %lu".cstring(),
+      @ll(_debug, "stream_notify: A: success %s name %s id %s last_acked %lu".cstring(),
         success.string().cstring(), stream'.name.cstring(),
         stream'.id.string().cstring(), stream'.last_acked)
       // respond to local registry
@@ -552,7 +560,7 @@ class GlobalConnectorStreamRegistry[In: Any val]
             (false, msg.stream)
           end
         end
-      @ll(_debug, "stream_notify: success %s name %s id %s last_acked %lu".cstring(),
+      @ll(_debug, "stream_notify: B: success %s name %s id %s last_acked %lu".cstring(),
         success.string().cstring(), stream'.name.cstring(),
         stream'.id.string().cstring(), stream'.last_acked)
       ConnectorStreamRegistryMessenger.respond_to_stream_notify(
@@ -1013,7 +1021,7 @@ class LocalConnectorStreamRegistry[In: Any val]
         // stream_id in _active_streams
         let stream = _active_streams(stream_id)?
           // reject: already owned by a source in this registry
-        @ll(_debug, "stream_notify: success %s name %s id %s last_acked %lu".cstring(),
+        @ll(_debug, "stream_notify: C: success %s name %s id %s last_acked %lu".cstring(),
           "false".cstring(), stream_name.cstring(),
           stream_id.string().cstring(), point_of_ref)
         stream_notify_local_result(false, StreamTuple(stream_id, stream_name,

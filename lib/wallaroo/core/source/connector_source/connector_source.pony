@@ -1,6 +1,6 @@
 /*
 
-Copyright (C) 2016-2017, Wallaroo Labs
+Copyright (C) 2016-2020, Wallaroo Labs
 Copyright (C) 2016-2017, The Pony Developers
 Copyright (c) 2014-2015, Causality Ltd.
 All rights reserved.
@@ -81,8 +81,6 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
 
   let _metrics_reporter: MetricsReporter
 
-  let _pending_barriers: Array[BarrierToken] = _pending_barriers.create()
-
   // Connector
   let _listen: ConnectorSourceCoordinator[In]
   let _notify: ConnectorSourceNotify[In]
@@ -101,9 +99,6 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
 
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
-
-  // Checkpoint
-  var _next_checkpoint_id: CheckpointId = 1
 
   //Session Id
   var _session_id: RoutingId = 0
@@ -169,7 +164,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     end
 
     ifdef "identify_routing_ids" then
-      @l(Log.info(), Log.conn_source(), "===ConnectorSource %s created===\n".cstring(),
+      @l(Log.info(), Log.conn_source(), "===ConnectorSource %s created===".cstring(),
         _source_id.string().cstring())
     end
 
@@ -344,7 +339,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
       _outgoing_boundaries.remove(worker)?
     else
       ifdef debug then
-        @l(Log.debug(), Log.conn_source(), "ConnectorSource couldn't find boundary to %s to disconnect\n"
+        @l(Log.debug(), Log.conn_source(), "ConnectorSource couldn't find boundary to %s to disconnect"
           .cstring(), worker.cstring())
       end
     end
@@ -377,7 +372,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
       _source_registry.unregister_source(this, _source_id)
       _event_log.unregister_resilient(_source_id, this)
       _unregister_all_outputs()
-      @l(Log.info(), Log.conn_source(), "Shutting down ConnectorSource\n".cstring())
+      @l(Log.info(), Log.conn_source(), "Shutting down ConnectorSource".cstring())
       for b in _outgoing_boundaries.values() do
         b.dispose()
       end
@@ -404,7 +399,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
         | let ob: OutgoingBoundary => b_count = b_count + 1
         end
       end
-      @l(Log.info(), Log.conn_source(), "ConnectorSource %s has %s boundaries.\n".cstring(),
+      @l(Log.info(), Log.conn_source(), "ConnectorSource %s has %s boundaries.".cstring(),
         _source_id.string().cstring(), b_count.string().cstring())
     end
 
@@ -423,7 +418,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
   //////////////
   be initiate_barrier(token: BarrierToken) =>
     if not _disposed then
-      @l(Log.debug(), Log.conn_source(), "ConnectorSource 0x%lx received initiate_barrier %s\n".cstring(), this, token.string().cstring())
+      @l(Log.debug(), Log.conn_source(), "ConnectorSource 0x%lx received initiate_barrier %s".cstring(), this, token.string().cstring())
       _initiate_barrier(token)
     end
 
@@ -435,14 +430,8 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
 
     match token
     | let sbt: CheckpointBarrierToken =>
-      if not _notify.initiate_checkpoint(sbt.id) then
-        // TODO This abort decision is based on an earlier decision
-        // by _notify.stream_notify_result().  However, a source
-        // currently has no ability to abort a checkpoint.
-        None
-      else
-        checkpoint_state(sbt.id)
-      end
+      _notify.initiate_checkpoint(sbt.id)
+      checkpoint_state(sbt.id)
     end
     for (o_id, o) in _outputs.pairs() do
       match o
@@ -454,15 +443,18 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     end
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
-    @l(Log.debug(), Log.conn_source(), "Checkpoint %s complete at ConnectorSource %s\n".cstring(), checkpoint_id.string().cstring(), _source_id.string().cstring())
+    @l(Log.debug(), Log.conn_source(), "Checkpoint %s complete at ConnectorSource %s".cstring(), checkpoint_id.string().cstring(), _source_id.string().cstring())
     _notify.checkpoint_complete(this, checkpoint_id)
 
   //////////////
   // CHECKPOINTS
   //////////////
   fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
-    _next_checkpoint_id = checkpoint_id + 1
-    let state = _notify.create_checkpoint_state()
+    _notify.trigger_checkpoint_state(this, checkpoint_id)
+
+  fun ref log_checkpoint_state(checkpoint_id: CheckpointId,
+    state: Array[ByteSeq val] val)
+  =>
     _event_log.checkpoint_state(_source_id, checkpoint_id, state)
 
   be prepare_for_rollback() =>
@@ -484,13 +476,12 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
       end
     end
     ifdef "trace" then
-      @l(Log.debug(), Log.conn_source(), "TRACE: %s.%s my source_id = %s, payload.size = %d\n".cstring(),
+      @l(Log.debug(), Log.conn_source(), "TRACE: %s.%s my source_id = %s, payload.size = %d".cstring(),
         __loc.type_name().cstring(), __loc.method_name().cstring(),
         _source_id.string().cstring(), p.size())
     end
 
     _notify.rollback(this, checkpoint_id, payload)
-    _next_checkpoint_id = checkpoint_id + 1
     event_log.ack_rollback(_source_id)
 
     // ConnectorSourceCoordinator will take care of muting and unmuting
@@ -524,7 +515,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     _notify.stream_notify_result(this, session_id', success, stream)
 
   be begin_shrink() =>
-    @l(Log.info(), Log.conn_source(), "ConnectorSource %s beginning shrink migration.\n"
+    @l(Log.info(), Log.conn_source(), "ConnectorSource %s beginning shrink migration."
       .cstring(), _source_id.string().cstring())
     _notify.shrink(this)
 
@@ -534,7 +525,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
     should reconnect to.
     """
     @l(Log.info(), Log.conn_source(), ("ConnectorSource %s completed shrink migration with " +
-      "new address: (%s, %s).\n").cstring(),
+      "new address: (%s, %s).").cstring(),
       _source_id.string().cstring(),
       host.cstring(),
       service.cstring())
@@ -549,14 +540,14 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
   ///////////////
   fun ref _mute() =>
     ifdef debug then
-      @l(Log.debug(), Log.conn_source(), "Muting ConnectorSource\n".cstring())
+      @l(Log.debug(), Log.conn_source(), "Muting ConnectorSource".cstring())
     end
     _muted = true
     _tcp_handler.mute()
 
   fun ref _unmute() =>
     ifdef debug then
-      @l(Log.debug(), Log.conn_source(), "Unmuting ConnectorSource\n".cstring())
+      @l(Log.debug(), Log.conn_source(), "Unmuting ConnectorSource".cstring())
     end
     _muted = false
     _tcp_handler.unmute()

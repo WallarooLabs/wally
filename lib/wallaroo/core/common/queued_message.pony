@@ -1,5 +1,28 @@
+/*
+
+Copyright 2018-2020 The Wallaroo Authors.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ implied. See the License for the specific language governing
+ permissions and limitations under the License.
+
+*/
+
+use "wallaroo/core/sink/connector_sink"
+use "wallaroo_labs/mort"
+
 trait val QueuedMessage
   fun process_message(consumer: Consumer ref)
+  fun run(consumer: Consumer ref)
+  fun post_valve_process_message(sink: ConnectorSink ref)
 
 class val TypedQueuedMessage[D: Any val] is QueuedMessage
   let metric_name: String
@@ -40,5 +63,15 @@ class val TypedQueuedMessage[D: Any val] is QueuedMessage
 
   fun process_message(consumer: Consumer ref) =>
     consumer.process_message[D](metric_name, pipeline_time_spent, data, key,
+      event_ts, watermark_ts, i_producer_id, i_producer, msg_uid, frac_ids,
+      i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
+
+  fun run(consumer: Consumer ref) =>
+    consumer._run[D](metric_name, pipeline_time_spent, data, key,
+      event_ts, watermark_ts, i_producer_id, i_producer, msg_uid, frac_ids,
+      i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
+
+  fun post_valve_process_message(sink: ConnectorSink ref) =>
+    sink.process_message2[D](metric_name, pipeline_time_spent, data, key,
       event_ts, watermark_ts, i_producer_id, i_producer, msg_uid, frac_ids,
       i_seq_id, latest_ts, metrics_id, worker_ingress_ts)

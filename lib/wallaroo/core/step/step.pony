@@ -526,9 +526,9 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
 
   be prepare_for_rollback() =>
-    finish_preparing_for_rollback()
+    finish_preparing_for_rollback(None)
 
-  fun ref finish_preparing_for_rollback() =>
+  fun ref finish_preparing_for_rollback(token: (BarrierToken | None)) =>
     _phase = _NormalStepPhase(this)
 
   be rollback(payload: ByteSeq val, event_log: EventLog,

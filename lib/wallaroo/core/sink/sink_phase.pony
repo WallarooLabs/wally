@@ -17,6 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo/core/common"
 use "wallaroo/core/invariant"
@@ -24,6 +25,8 @@ use "wallaroo/core/topology"
 use "wallaroo/core/barrier"
 use "wallaroo/core/checkpoint"
 use "wallaroo/core/sink/connector_sink"
+
+use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag, ...)
 
 trait SinkPhase
   fun name(): String
@@ -51,14 +54,11 @@ trait SinkPhase
     _invalid_call(__loc.method_name()); Fail()
     Array[SinkPhaseQueued]
 
-  fun ref swap_barrier_to_queued(sink: ConnectorSink ref) =>
+  fun ref drop_app_msgs() =>
     _invalid_call(__loc.method_name()); Fail()
 
   fun ref maybe_use_normal_processor() =>
     None
-
-  fun ref resume_processing_messages() =>
-    _invalid_call(__loc.method_name()); Fail()
 
   fun _invalid_call(method_name: String) =>
     @printf[I32]("Invalid call to %s on sink phase %s\n".cstring(),
@@ -80,12 +80,6 @@ class EarlySinkPhase is SinkPhase
     // lifecycle messages that triggers using the normal processor.
     // But we need the normal processor phase *now*.
     _sink.use_normal_processor()
-
-  fun ref resume_processing_messages() =>
-    // If we're @ InitialSinkPhase, and we've restarted after a crash,
-    // it's possible to hit checkpoint_complete() extremely early in
-    // our restart process.  There's nothing to do here.
-    None
 
 class NormalSinkPhase is SinkPhase
   let _sink: Sink ref
@@ -119,8 +113,8 @@ class NormalSinkPhase is SinkPhase
   fun ref queued(): Array[SinkPhaseQueued] =>
     Array[SinkPhaseQueued]
 
-  fun ref resume_processing_messages() =>
-    _sink.resume_processing_messages_queued()
+  fun ref drop_app_msgs() =>
+    None
 
 type SinkPhaseQueued is (QueuedMessage | QueuedBarrier)
 
@@ -129,7 +123,7 @@ class BarrierSinkPhase is SinkPhase
   let _sink: Sink ref
   var _barrier_token: BarrierToken
   let _inputs_blocking: Map[RoutingId, Producer] = _inputs_blocking.create()
-  let _queued: Array[SinkPhaseQueued] = _queued.create()
+  var _queued: Array[SinkPhaseQueued] = _queued.create()
 
   new create(sink_id: RoutingId, sink: Sink ref, token: BarrierToken) =>
     _sink_id = sink_id
@@ -185,7 +179,7 @@ class BarrierSinkPhase is SinkPhase
 
   fun ref prepare_for_rollback(token: BarrierToken) =>
     if higher_priority(token) then
-      _sink.finish_preparing_for_rollback()
+      _sink.finish_preparing_for_rollback(token)
     end
 
   fun ref queued(): Array[SinkPhaseQueued] =>
@@ -217,58 +211,23 @@ class BarrierSinkPhase is SinkPhase
     _check_completion(_sink.inputs())
 
   fun ref _check_completion(inputs: Map[RoutingId, Producer] box) =>
+    @l(Log.debug(), Log.conn_sink(), "check_completion: inputs %lu inputs_blocking %lu %s".cstring(), inputs.size(), _inputs_blocking.size(), _barrier_token.string().cstring())
     if inputs.size() == _inputs_blocking.size() then
       _sink.barrier_complete(_barrier_token)
     end
 
-  fun ref swap_barrier_to_queued(sink: ConnectorSink ref) =>
-    sink.swap_barrier_to_queued(_queued)
+  fun ref drop_app_msgs() =>
+    let new_queue = Array[SinkPhaseQueued]
+    var count: USize = 0
 
-  fun ref resume_processing_messages() =>
-    _sink.resume_processing_messages_queued()
-
-class QueuingSinkPhase is SinkPhase
-  let _sink_id: RoutingId
-  let _sink: Sink ref
-  let _queued: Array[SinkPhaseQueued]
-
-  new create(sink_id: RoutingId, sink: Sink ref,
-    q: Array[SinkPhaseQueued] = Array[SinkPhaseQueued].create())
-  =>
-    _sink_id = sink_id
-    _sink = sink
-    _queued = q
-
-  fun name(): String => __loc.type_name()
-
-  fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
-    watermark_ts: U64, i_producer_id: RoutingId, i_producer: Producer,
-    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    let msg = TypedQueuedMessage[D](metric_name, pipeline_time_spent,
-      data, key, event_ts, watermark_ts, i_producer_id, i_producer, msg_uid,
-      frac_ids, i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
-    _queued.push(msg)
-
-  fun ref receive_barrier(input_id: RoutingId, producer: Producer,
-    barrier_token: BarrierToken)
-  =>
-    ifdef debug then
-      @printf[I32]("SinkPhase %s: receive_barrier: push %s\n".cstring(), name().cstring(), barrier_token.string().cstring())
-    end
-    _queued.push(QueuedBarrier(input_id, producer, barrier_token))
-
-  fun ref prepare_for_rollback(token: BarrierToken) =>
-    _sink.finish_preparing_for_rollback()
-
-  fun ref queued(): Array[SinkPhaseQueued] =>
-    let qd = Array[SinkPhaseQueued]
     for q in _queued.values() do
-      qd.push(q)
+      match q
+      | let qb: QueuedBarrier =>
+        new_queue.push(qb)
+      | let qm: QueuedMessage =>
+        count = count + 1
+      end
     end
-    qd
-
-  fun ref resume_processing_messages() =>
-    _sink.resume_processing_messages_queued()
+    @l(Log.debug(), Log.conn_sink(), "%s: drop_app_msgs: count %lu new size %lu".cstring(),
+      __loc.type_name().cstring(), count, new_queue.size())
+    _queued = new_queue

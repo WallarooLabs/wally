@@ -240,7 +240,7 @@ class _BarrierStepPhase is StepPhase
 
   fun ref prepare_for_rollback(token: BarrierToken) =>
     if higher_priority(token) then
-      _step.finish_preparing_for_rollback()
+      _step.finish_preparing_for_rollback(token)
     end
 
   fun ref remove_input(input_id: RoutingId) =>
@@ -317,7 +317,7 @@ class _RecoveringStepPhase is StepPhase
 
   fun ref prepare_for_rollback(token: BarrierToken) =>
     if higher_priority(token) then
-      _step.finish_preparing_for_rollback()
+      _step.finish_preparing_for_rollback(token)
     end
 
   fun ref queued(): Array[_Queued] =>
