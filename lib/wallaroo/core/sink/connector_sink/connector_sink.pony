@@ -429,6 +429,7 @@ actor ConnectorSink is Sink
     This is a callback used by the ConnectorSinkNotify class to Inform
     us that it received a 2PC phase 1 reply.
     """
+    @ll(_twopc_debug, "QQQ: twopc_phase1_reply: _twopc.ph1_barrier_token %s _twopc.ph1_barrier_token_initial %s".cstring(), _twopc.ph1_barrier_token.string().cstring(), _twopc.ph1_barrier_token_initial.string().cstring())
     match _twopc.twopc_phase1_reply(this, txn_id, commit)
     | true =>
       if _twopc.ph1_barrier_token != _twopc.ph1_barrier_token_initial then
@@ -765,20 +766,14 @@ actor ConnectorSink is Sink
     @ll(_twopc_debug, "2PC: Rollback: _twopc.last_offset %lu _twopc.current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s".cstring(), _twopc.last_offset, _twopc.current_offset, _notify.acked_point_of_ref, _notify.twopc_txn_id_last_committed_helper().cstring(), _sink_id.string().cstring())
 
     if _connected and _notify.twopc_intro_done then
-/****
- TODO: Delete this, I think: nowadays, we can't send data because we're in queueing state??
- ANSWER: No, this is necessary in a case where a rollback is triggered
-         by some other Wallaroo worker crashing & restarting & rollback:
-         we may not notice anything wrong until prepare_for_rollback()
-         and rollback() are called.  We probably sent data to the sink,
-         so we need to send Phase1 and Phase2 to discard that data.
-****/
-
+      // Rollback has been started, perhaps by some other Wallaroo
+      // worker crashing & restarting & rollback: we may not notice
+      // anything wrong until now.
       if _twopc.state_is_start() or _twopc.state_is_1precommit() then
         // We may have sent data to the sink that has not been committed,
         // and also we haven't sent a phase1 message.  Do that now,
         // and we'll immediately abort it below.
-        if rollback_to_c_id == _notify.twopc_txn_id_last_committed_helper() then
+        if false then // SLF TODO fix up
           @ll(_twopc_info, "Txn id %s is last_committed id, no phase 1 required".cstring(), _twopc.txn_id.cstring())
         else
           let bt = CheckpointBarrierToken(checkpoint_id)
@@ -799,7 +794,7 @@ actor ConnectorSink is Sink
       end
 
       if not (_twopc.state_is_start() or _twopc.state_is_2abort()) then
-        if rollback_to_c_id == _notify.twopc_txn_id_last_committed_helper() then
+        if false then // SLF TODO fix up
           @ll(_twopc_info, "Txn id %s is last_committed id, no phase 2 required".cstring(), _twopc.txn_id.cstring())
         elseif rollback_to_c_id == _twopc.txn_id then
           // This is an interesting case: we are rolling back to but have not
@@ -825,7 +820,7 @@ actor ConnectorSink is Sink
         _twopc.send_phase2(this, false)
       end
     else
-      // We aren't connector and/or 2PC intro is not done.
+      // We aren't connected and/or 2PC intro is not done.
       // When we are finally are connected & 2PC intro done, then
       // any 2PC actions that need doing will be done at that time.
       @ll(_conn_info, "TODO any other info to log here?".cstring())
