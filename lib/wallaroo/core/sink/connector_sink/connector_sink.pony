@@ -642,9 +642,14 @@ actor ConnectorSink is Sink
     @ll(_twopc_debug, "2PC: Checkpoint complete %d _twopc.txn_id is %s".cstring(), checkpoint_id, _twopc.txn_id.cstring())
 
     // Global txn result is commit; update our state accordingly
-    let checkpoint_complete_c_id = _twopc.make_txn_id_string(checkpoint_id)
-    _notify.twopc_txn_id_last_committed = checkpoint_complete_c_id
-    _notify.twopc_txn_id_rollback = checkpoint_complete_c_id
+    let s_prefix = "skip--.--"
+    if _twopc.txn_id.compare_sub(s_prefix, s_prefix.size()) is Equal then
+      @ll(_twopc_debug, "2PC: Checkpoint complete %d, skip _notify update".cstring(), checkpoint_id)
+    else
+      let checkpoint_complete_c_id = _twopc.make_txn_id_string(checkpoint_id)
+      _notify.twopc_txn_id_last_committed = checkpoint_complete_c_id
+      _notify.twopc_txn_id_rollback = checkpoint_complete_c_id
+    end
 
     let conn_ready: Bool = _connected and _notify.twopc_intro_done
     @ll(_twopc_debug, "2PC: Checkpoint complete %d at ConnectorSink %s, conn_ready = %s".cstring(), checkpoint_id, _sink_id.string().cstring(), conn_ready.string().cstring())
