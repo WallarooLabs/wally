@@ -456,7 +456,11 @@ actor ConnectorSink is Sink
       //    via this None.
       None
     end
-    _twopc.clear_ph1_barrier_token()
+    if txn_id == _twopc.txn_id then
+      _twopc.clear_ph1_barrier_token()
+    else
+      @ll(_twopc_debug, "Skip calling clear_ph1_barrier_token: %s != %s".cstring(), txn_id.cstring(), _twopc.txn_id.cstring())
+    end
 
   fun ref abort_decision(reason: String, txn_id: String,
     barrier_token: CheckpointBarrierToken)
