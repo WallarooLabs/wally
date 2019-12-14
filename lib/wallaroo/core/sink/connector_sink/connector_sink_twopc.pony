@@ -98,6 +98,7 @@ class ConnectorSink2PC
     ph1_barrier_token = sbt
 
   fun ref barrier_complete(sbt: CheckpointBarrierToken,
+    conn: ConnectorSink ref,
     is_rollback: Bool = false,
     stream_id: cwm.StreamId = 223344 /* arbitrary integer != 1 or 0 */):
   (None | Array[cwm.Message])
@@ -125,7 +126,7 @@ class ConnectorSink2PC
       end
 
       state = TwoPCFsm1Precommit
-      let prefix = if is_rollback then "rollback--.--" else "" end
+      let prefix = if is_rollback then conn.prefix_rollback() else "" end
       txn_id = prefix + make_txn_id_string(sbt.id)
       ph1_barrier_token = sbt
       current_txn_end_offset = current_offset

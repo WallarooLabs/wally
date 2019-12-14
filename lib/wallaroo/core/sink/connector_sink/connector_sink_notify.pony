@@ -297,8 +297,8 @@ class ConnectorSinkNotify
             Fail()
           end
 
-          @ll(_conn_debug, "TRACE: uncommitted txns = %d".cstring(),
-              mi.txn_ids.size())
+          @ll(_conn_debug, "TRACE: uncommitted txns = %s".cstring(),
+            _print_array[String](mi.txn_ids).cstring())
           _twopc_uncommitted_list = mi.txn_ids
           process_uncommitted_list(conn as ConnectorSink ref)
 
@@ -408,7 +408,7 @@ class ConnectorSinkNotify
     end
 
     // Unconditionally abort any txn id that starts with r_prefix.
-    let r_prefix = "rollback--.--"
+    let r_prefix = conn.prefix_rollback()
     match _twopc_uncommitted_list
     | let uncommitted: Array[String] val =>
       for txn_id in uncommitted.values() do
@@ -480,7 +480,7 @@ class ConnectorSinkNotify
       // There hasn't been a rollback() as part of our startup, so we
       // are starting for the first time.  There is no prior committed
       // txn_id.
-      twopc_txn_id_last_committed = "skip--.--ready_to_work"
+      twopc_txn_id_last_committed = conn.prefix_skip() + "ready_to_work"
       @ll(_twopc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.".cstring(), twopc_txn_id_last_committed_helper().cstring())
       process_uncommitted_list(conn)
     end

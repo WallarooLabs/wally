@@ -578,13 +578,13 @@ actor ConnectorSink is Sink
         @ll(_twopc_info, "2PC: _twopc.state = %d, skip checkpoint_state(%s)".cstring(), _twopc.state(), barrier_token.string().cstring())
       end
       _notify.twopc_txn_id_current = _twopc.txn_id
-      match _twopc.barrier_complete(sbt)
+      match _twopc.barrier_complete(sbt, this)
       | None =>
         // If no data has been processed by the sink since the last
         // checkpoint, then don't bother with 2PC, return early.
         _barrier_coordinator.ack_barrier(this, sbt)
         @ll(_twopc_debug, "2PC: no data written during this checkpoint interval, skipping 2PC round".cstring())
-        _twopc.txn_id = "skip--.--" + barrier_token.string()
+        _twopc.txn_id = prefix_skip() + barrier_token.string()
         return
 
       | let msgs: Array[cwm.Message] =>
@@ -642,7 +642,7 @@ actor ConnectorSink is Sink
     @ll(_twopc_debug, "2PC: Checkpoint complete %d _twopc.txn_id is %s".cstring(), checkpoint_id, _twopc.txn_id.cstring())
 
     // Global txn result is commit; update our state accordingly
-    let s_prefix = "skip--.--"
+    let s_prefix = prefix_skip()
     if _twopc.txn_id.compare_sub(s_prefix, s_prefix.size()) is Equal then
       @ll(_twopc_debug, "2PC: Checkpoint complete %d, skip _notify update".cstring(), checkpoint_id)
     else
@@ -773,13 +773,13 @@ actor ConnectorSink is Sink
         // and also we haven't sent a phase1 message.  Do that now,
         // and we'll immediately abort it below.
         let bt = CheckpointBarrierToken(checkpoint_id)
-        match _twopc.barrier_complete(bt where
+        match _twopc.barrier_complete(bt, this where
           is_rollback = true, stream_id = _notify.stream_id)
         | None =>
           // No data has been processed by the sink since the last
           // checkpoint.
           @ll(_twopc_debug, "no data written during this checkpoint interval, skipping phase 1".cstring())
-          _twopc.txn_id = "skip--.--" + bt.string()
+          _twopc.txn_id = prefix_skip() + bt.string()
         | let msgs: Array[cwm.Message] =>
           for msg in msgs.values() do
             _notify.send_msg(this, msg)
@@ -1368,6 +1368,12 @@ actor ConnectorSink is Sink
 
   fun get_twopc_state(): U8 =>
     _twopc.state()
+
+  fun prefix_skip(): String =>
+    "skip--.--"
+
+  fun prefix_rollback(): String =>
+    "rollback--.--"
 
 class PauseBeforeReconnectConnectorSink is TimerNotify
   let _tcp_sink: ConnectorSink
