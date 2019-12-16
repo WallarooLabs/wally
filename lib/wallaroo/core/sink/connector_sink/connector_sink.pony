@@ -642,6 +642,8 @@ actor ConnectorSink is Sink
     @ll(_twopc_debug, "2PC: Checkpoint complete %d _twopc.txn_id is %s".cstring(), checkpoint_id, _twopc.txn_id.cstring())
 
     // Global txn result is commit; update our state accordingly
+/**** SLF: Do not consider our local skip/no-data-written optimization.
+           The global txn result is unambiguous.
     let s_prefix = prefix_skip()
     if _twopc.txn_id.compare_sub(s_prefix, s_prefix.size()) is Equal then
       @ll(_twopc_debug, "2PC: Checkpoint complete %d, skip _notify update".cstring(), checkpoint_id)
@@ -650,6 +652,10 @@ actor ConnectorSink is Sink
       _notify.twopc_txn_id_last_committed = checkpoint_complete_c_id
       _notify.twopc_txn_id_rollback = checkpoint_complete_c_id
     end
+****/
+    let checkpoint_complete_c_id = _twopc.make_txn_id_string(checkpoint_id)
+    _notify.twopc_txn_id_last_committed = checkpoint_complete_c_id
+    _notify.twopc_txn_id_rollback = checkpoint_complete_c_id
 
     let conn_ready: Bool = _connected and _notify.twopc_intro_done
     @ll(_twopc_debug, "2PC: Checkpoint complete %d at ConnectorSink %s, conn_ready = %s".cstring(), checkpoint_id, _sink_id.string().cstring(), conn_ready.string().cstring())
@@ -760,7 +766,7 @@ actor ConnectorSink is Sink
 
     _notify.process_uncommitted_list(this)
     _notify.twopc_txn_id_last_committed = rollback_to_c_id
-    _notify.twopc_txn_id_rollback = None
+    /// SLF: problematic! _notify.twopc_txn_id_rollback = None
 
     @ll(_twopc_debug, "2PC: Rollback: _twopc.last_offset %lu _twopc.current_offset %lu acked_point_of_ref %lu last committed txn %s at ConnectorSink %s".cstring(), _twopc.last_offset, _twopc.current_offset, _notify.acked_point_of_ref, _notify.twopc_txn_id_last_committed_helper().cstring(), _sink_id.string().cstring())
 
