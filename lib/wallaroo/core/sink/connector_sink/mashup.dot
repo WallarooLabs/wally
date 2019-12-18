@@ -24,7 +24,8 @@ digraph mashup {
 	}
 	subgraph rollback {
 		PreparedForRollback [label="PreparedForRollback\nsink phase=drop app msgs, forward tokens"];
-		RollingBack [label="RollingBack\nsend rollback_info\nsend advertise_status=true\nsink phase=queue app msgs, forward tokens"];
+		RollingBack [label="RollingBack\nsend rollback_info\nsend advertise_status=true\nsink phase=crash on app msgs, forward tokens"];
+		RolledBack [label="RolledBack\nack rollback barrier to barrier coordinator"];
 
 		PreparedForRollback -> RollingBack [label=rollback,fontcolor=red,color=red];
 	}
@@ -44,8 +45,11 @@ digraph mashup {
 	CPStarts -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
 	CPGotLocalVote -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
 
-	RollingBack -> WaitingForCheckpoint [label=conn_ready];
+	RollingBack -> RolledBack [label=conn_ready];
 	RollingBack -> PreparedForRollback [label=prepare_for_rollback,fontcolor=red,color=red];
+
+	RolledBack -> WaitingForCheckpoint [label="RollbackResume_barrier_complete"];
+	RolledBack -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
      }
 
 	subgraph external {
