@@ -9,7 +9,7 @@ digraph mashup {
 	}
 	subgraph cp {
 		WaitingForCheckpoint [label="WaitingForCheckpoint\nsink phase=normal"];
-		ConnBroken [label="ConnBroken\nsink phase=drop app msgs, forward tokens\nabort checkpoint when checkpoint ID is known"];
+		AbortCheckpoint [label="AbortCheckpoint\nsink phase=drop app msgs, forward tokens\nabort checkpoint when checkpoint ID is known"];
 	}
 	subgraph sacp {
 		CPStarts [label="CPStarts\nsink phase=queue app msgs, forward tokens"];
@@ -17,7 +17,7 @@ digraph mashup {
 		// CPGotGlobalVote; // Can we remove this node?
 
 		CPStarts -> CPGotLocalVote [label="Phase1-commit"];
-		CPStarts -> ConnBroken [label="Phase1-abort"];
+		CPStarts -> AbortCheckpoint [label="Phase1-abort"];
 		CPGotLocalVote -> WaitingForCheckpoint [label=checkpoint_complete];
 		// CPGotLocalVote -> CPGotGlobalVote [label=checkpoint_complete];
 		// CPGotGlobalVote -> WaitingForCheckpoint [label=what_happens_here]; // Can we remove this node?
@@ -33,16 +33,16 @@ digraph mashup {
 	ChRbInit -> WaitingForCheckpoint [label=conn_ready];
 
 	WaitingForCheckpoint -> CPStarts [label=CP_barrier_complete];
-	ConnBroken -> ConnBroken [label=CP_barrier_complete];
+	AbortCheckpoint -> AbortCheckpoint [label=CP_barrier_complete];
 
 	WaitingForCheckpoint -> PreparedForRollback [label=prepare_for_rollback,fontcolor=red,color=red];
-	ConnBroken -> PreparedForRollback [label=prepare_for_rollback,fontcolor=red,color=red];
+	AbortCheckpoint -> PreparedForRollback [label=prepare_for_rollback,fontcolor=red,color=red];
 	CPStarts -> PreparedForRollback [label=prepare_for_rollback,fontcolor=red,color=red];
 	CPGotLocalVote -> PreparedForRollback [label=prepare_for_rollback,fontcolor=red,color=red];
 
-	WaitingForCheckpoint -> ConnBroken [label="conn_broken\nfrom ExtConn",fontcolor=red,color=red];
-	CPStarts -> ConnBroken [label="conn_broken\nfrom ExtConn",fontcolor=red,color=red];
-	CPGotLocalVote -> ConnBroken [label="conn_broken\nfrom ExtConn",fontcolor=red,color=red];
+	WaitingForCheckpoint -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
+	CPStarts -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
+	CPGotLocalVote -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
 
 	RollingBack -> WaitingForCheckpoint [label=conn_ready];
 	RollingBack -> PreparedForRollback [label=prepare_for_rollback,fontcolor=red,color=red];
@@ -56,7 +56,7 @@ digraph mashup {
 	    ExtInit -> Connected [label=TCP_connected];
 	    Connected -> Disconnected [label=TCP_closed,fontcolor=red,color=red];
 	    Connected -> Connected [label="advertise_status\nfrom CpRb"];
-	    Disconnected [label="Disconnected\nsend conn_broken if advertise_status\nadvertise_status=false"];
+	    Disconnected [label="Disconnected\nsend abort_next_checkpoint if advertise_status\nadvertise_status=false"];
 	    Disconnected -> Connected [label=TCP_connected];
 	    Disconnected -> Disconnected [label=reconn_timer];
 	    Disconnected -> Disconnected [label="advertise_status\nfrom CpRb"];
@@ -70,7 +70,7 @@ digraph mashup {
 	    TwoPCReady -> Disconnected [label=TCP_closed,fontcolor=red,color=red];
 	    TwoPCReady -> TwoPCReady [label="advertise_status\nfrom CpRb"]
         }
-    ## Not supported by dot, booooo: Connected -> AA [label=conn_broken,style=dashed,fontcolor=red,color=red];
+    ## Not supported by dot, booooo: Connected -> AA [label=abort_next_checkpoint,style=dashed,fontcolor=red,color=red];
     {rank=same; ChRbInit; ExtInit; };
     ## {rank=same; Disconnected; RollingBack; ; };
 }
