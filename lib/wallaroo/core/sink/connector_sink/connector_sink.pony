@@ -168,15 +168,7 @@ actor ConnectorSink is Sink
   var _report_ready_to_work_requested: Bool = false
   var _report_ready_to_work_done: Bool = false
 
-  // 2PC
-  let _twopc: ConnectorSink2PC
-  var _twopc_seen_checkpointbarriertoken: (CheckpointBarrierToken | None) = None
-  var _twopc_last_autoscale_barrier_token: AutoscaleBarrierToken =
-    AutoscaleBarrierToken("no such worker", 0, [], [])
-  var _twopc_txn_id_last_committed: (None|String) = None
-  var _twopc_txn_id_current: String = ""
-  var _twopc_uncommitted_list: (None|Array[String] val) = None
-  var _twopc_txn_id_rollback: (None|String) = None
+  // Connector Protocol
   var _rtag: U64 = 77777
   var _seq_id: SeqId = 0
   var _ext_conn_state: ExtConnStateState = ExtConnStateDisconnected
@@ -185,6 +177,9 @@ actor ConnectorSink is Sink
   var _message_id: cwm.MessageId = _acked_point_of_ref
   let _stream_id: cwm.StreamId = 1
   let _stream_name: String
+
+  // 2PC
+  let _twopc: ConnectorSink2PC
 
   new create(sink_id: RoutingId, sink_name: String, event_log: EventLog,
     recovering: Bool, env: Env, encoder_wrapper: ConnectorEncoderWrapper,
@@ -497,7 +492,7 @@ actor ConnectorSink is Sink
     | let srt: CheckpointRollbackBarrierToken =>
       _phase.prepare_for_rollback(barrier_token)
     | let sbt: CheckpointBarrierToken =>
-      _twopc_seen_checkpointbarriertoken = sbt
+      //TODO//_twopc_seen_checkpointbarriertoken = sbt
       if _connected then
         @ll(_conn_debug, "process_barrier: connected & 2PC intro done".cstring())
       else
@@ -524,25 +519,25 @@ actor ConnectorSink is Sink
       None//TODO
       //TODO//_phase.swap_barrier_to_queued(this)
     | let srt: CheckpointRollbackBarrierToken =>
-      _twopc_seen_checkpointbarriertoken = None
+      None//TODO _twopc_seen_checkpointbarriertoken = None
       //TODO//_use_normal_processor()
     | let rbrt: CheckpointRollbackResumeBarrierToken =>
-      _twopc_seen_checkpointbarriertoken = None
+      //TODO//_twopc_seen_checkpointbarriertoken = None
       None//TODO
       //TODO//_resume_processing_messages()
     | let sat: AutoscaleBarrierToken =>
-      _twopc_last_autoscale_barrier_token = sat
+      //TODO//_twopc_last_autoscale_barrier_token = sat
       //TODO//_resume_processing_messages()
       None//TODO
     | let sart: AutoscaleResumeBarrierToken =>
-      if sart.id() == _twopc_last_autoscale_barrier_token.id() then
-        let lws = _twopc_last_autoscale_barrier_token.leaving_workers()
-        @ll(_conn_debug, "autoscale: leaving_workers size = %lu".cstring(),
-          lws.size())
-        if (lws.size() > 0) and _connected then
-          _twopc.send_workers_left(this, 7 /*unused by sink*/, lws)
-        end
-      end
+      // if sart.id() == _twopc_last_autoscale_barrier_token.id() then
+      //   let lws = _twopc_last_autoscale_barrier_token.leaving_workers()
+      //   @ll(_conn_debug, "autoscale: leaving_workers size = %lu".cstring(),
+      //     lws.size())
+      //   if (lws.size() > 0) and _connected then
+      //     _twopc.send_workers_left(this, 7 /*unused by sink*/, lws)
+      //   end
+      // end
       None//TODO _resume_processing_messages()
     else
       // Any other remaining barrier token
@@ -654,10 +649,6 @@ actor ConnectorSink is Sink
     // we didn't know if the txn-in-progress had committed globally.
     // When rollback() is called here, we now know the global txn
     // commit status: commit for checkpoint_id, all greater are invalid.
-    _twopc_txn_id_rollback = rollback_to_c_id
-    @ll(_twopc_debug, "2PC: _twopc_txn_id_last_committed = %s, twopc_txn_id_rollback = %s".cstring(),
-      _twopc_txn_id_last_committed_helper().cstring(),
-      twopc_txn_id_rollback_helper().cstring())
 
     None//TODO
 
@@ -1376,19 +1367,6 @@ actor ConnectorSink is Sink
     end
     cwm.MessageMsg(_stream_id, base_message_id, event_time, key, encoded1)
 
-  fun none_helper(x: (None|String)): String =>
-    try
-      x as String
-    else
-      "--<<{{None}}>>--"
-    end
-
-  fun _twopc_txn_id_last_committed_helper(): String =>
-    none_helper(_twopc_txn_id_last_committed)
-
-  fun twopc_txn_id_rollback_helper(): String =>
-    none_helper(_twopc_txn_id_rollback)
-
   fun ref send_msg(msg: cwm.Message) =>
     let w1: Writer = w1.create()
 
@@ -1405,14 +1383,14 @@ actor ConnectorSink is Sink
     end
 
   fun ref cb_report_ready_to_work() =>
-    if _twopc_txn_id_last_committed is None then
-      // There hasn't been a rollback() as part of our startup, so we
-      // are starting for the first time.  There is no prior committed
-      // txn_id.
-      _twopc_txn_id_last_committed = prefix_skip() + "ready_to_work"
-      @ll(_twopc_debug, "DBGDBG: 2PC: _twopc_txn_id_last_committed = %s.".cstring(), _twopc_txn_id_last_committed_helper().cstring())
-      //TODO//process_uncommitted_list(conn)
-    end
+    // if _twopc_txn_id_last_committed is None then
+    //   // There hasn't been a rollback() as part of our startup, so we
+    //   // are starting for the first time.  There is no prior committed
+    //   // txn_id.
+    //   _twopc_txn_id_last_committed = prefix_skip() + "ready_to_work"
+    //   //TODO//process_uncommitted_list(conn)
+    // end
+    None//TODO
 
   fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
     """
