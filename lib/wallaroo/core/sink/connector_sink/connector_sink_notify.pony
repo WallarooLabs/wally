@@ -28,38 +28,19 @@ use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 
 class ConnectorSinkNotify
-  var _fsm_state: ConnectorProtoFsmState = ConnectorProtoFsmDisconnected
   var _header: Bool = true
   var _connected: Bool = false
   var _throttled: Bool = false
-  let stream_id: cwm.StreamId = 1
   let _sink_id: RoutingId
   let _app_name: String
   let _worker_name: WorkerName
   let _protocol_version: String
   let _cookie: String
   let _auth: ApplyReleaseBackpressureAuth
-  let stream_name: String
-  var credits: U32 = 0
-  var acked_point_of_ref: cwm.MessageId = 0
-  var message_id: cwm.MessageId = acked_point_of_ref
-  var _ready_to_work: Bool = false
-  var _report_ready_to_work_requested: Bool = false
-  var _report_ready_to_work_done: Bool = false
   let _conn_debug: U16 = Log.make_sev_cat(Log.debug(), Log.conn_sink())
   let _conn_info: U16 = Log.make_sev_cat(Log.info(), Log.conn_sink())
   let _conn_err: U16 = Log.make_sev_cat(Log.err(), Log.conn_sink())
-  let _twopc_debug: U16 = Log.make_sev_cat(Log.debug(), Log.twopc())
-  let _twopc_info: U16 = Log.make_sev_cat(Log.info(), Log.twopc())
-  let _twopc_err: U16 = Log.make_sev_cat(Log.err(), Log.twopc())
-
-  // 2PC
-  var _rtag: U64 = 77777
   var twopc_intro_done: Bool = false
-  var twopc_txn_id_last_committed: (None|String) = None
-  var twopc_txn_id_current: String = ""
-  var _twopc_uncommitted_list: (None|Array[String] val) = None
-  var twopc_txn_id_rollback: (None|String) = None
 
   new create(sink_id: RoutingId, app_name: String, worker_name: WorkerName,
     protocol_version: String, cookie: String,
@@ -72,19 +53,17 @@ class ConnectorSinkNotify
     _cookie = cookie
     _auth = auth
 
-    stream_name = _app_name + "-w-" + worker_name + "-id-" + _sink_id.string()
-
-  fun ref accepted(conn: WallarooOutgoingNetworkActor ref) =>
+  fun ref accepted(conn: ConnectorSink ref) =>
     Unreachable()
 
-  fun ref auth_failed(conn: WallarooOutgoingNetworkActor ref) =>
+  fun ref auth_failed(conn: ConnectorSink ref) =>
     Unreachable()
 
-  fun ref connecting(conn: WallarooOutgoingNetworkActor ref, count: U32) =>
+  fun ref connecting(conn: ConnectorSink ref, count: U32) =>
     @ll(_conn_debug, "ConnectorSink connecting".cstring())
     None
 
-  fun ref connected(conn: WallarooOutgoingNetworkActor ref,
+  fun ref connected(conn: ConnectorSink ref,
     twopc: ConnectorSink2PC)
   =>
     @ll(_conn_info, "ConnectorSink connected".cstring())
@@ -93,32 +72,14 @@ class ConnectorSinkNotify
     _throttled = false
     twopc.notify1_sent = false
     twopc_intro_done = false
-    _twopc_uncommitted_list = None
     // Apply runtime throttle until we're done with initial 2PC ballet.
     throttled(conn)
     conn.set_nodelay(true)
     conn.expect(4)
 
-    let hello = cwm.HelloMsg(_protocol_version, _cookie,
-      _app_name, _worker_name)
-    send_msg(conn, hello)
+    conn.cb_connected()
 
-    // 2PC: We don't know how many transactions the sink has that
-    // have been waiting for a phase 2 message.  We need to discover
-    // their txn_id strings and abort/commit them.
-    _rtag = _rtag + 1
-    let list_u = TwoPCEncode.list_uncommitted(_rtag)
-    let list_u_msg = cwm.MessageMsg(0, 0, 0, None, list_u)
-    send_msg(conn, list_u_msg)
-
-    // 2PC: We also don't know how much fine-grained control the sink
-    // has for selectively aborting & committing the stuff that we
-    // send to it.  Thus, we should not send any Wallaroo app messages
-    // to the sink until we get a ReplyUncommittedMsg response.
-
-    _fsm_state = ConnectorProtoFsmHandshake
-
-  fun ref closed(conn: WallarooOutgoingNetworkActor ref,
+  fun ref closed(conn: ConnectorSink ref,
     twopc: ConnectorSink2PC)
   =>
     """
@@ -142,20 +103,18 @@ class ConnectorSinkNotify
     _throttled = false
     twopc.notify1_sent = false
     twopc_intro_done = false
-    _twopc_uncommitted_list = None
     throttled(conn)
 
   fun ref dispose() =>
     @ll(_conn_info, "ConnectorSink connection dispose".cstring())
 
-  fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
+  fun ref connect_failed(conn: ConnectorSink ref) =>
     @ll(_conn_info, "ConnectorSink connection failed".cstring())
 
-  fun ref expect(conn: WallarooOutgoingNetworkActor ref, qty: USize): USize =>
+  fun ref expect(conn: ConnectorSink ref, qty: USize): USize =>
     qty
 
-  fun ref received(conn: WallarooOutgoingNetworkActor ref,
-    twopc: ConnectorSink2PC, data: Array[U8] iso, times: USize): Bool
+  fun ref received(conn: ConnectorSink ref, data: Array[U8] iso, times: USize): Bool
   =>
     if _header then
       try
@@ -172,18 +131,21 @@ class ConnectorSinkNotify
         conn.expect(4)
         _header = true
         let data' = recover val consume data end
-        _process_connector_sink_v2_data(conn, twopc, data')?
+        conn.cb_received(data')?
       else
         Fail()
       end
       true
     end
 
-  fun ref sent(conn: WallarooOutgoingNetworkActor ref, data: (String val | Array[U8 val] val))
+  fun _payload_length(data: Array[U8] iso): USize ? =>
+    Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
+
+  fun ref sent(conn: ConnectorSink ref, data: (String val | Array[U8 val] val))
     : (String val | Array[U8 val] val)
   =>
     """
-    All 2PC messages are sent via this class's send_msg(), which uses
+    All 2PC messages are sent via send_msg(), which uses
     conn._write_final(), which does *not* filter its data through the
     sent() callback.
 
@@ -192,7 +154,7 @@ class ConnectorSinkNotify
     Unreachable()
     data
 
-  fun ref sentv(conn: WallarooOutgoingNetworkActor ref,
+  fun ref sentv(conn: ConnectorSink ref,
     data: ByteSeqIter): ByteSeqIter
   =>
     """
@@ -207,7 +169,7 @@ class ConnectorSinkNotify
       []
     end
 
-  fun ref throttled(conn: WallarooOutgoingNetworkActor ref) =>
+  fun ref throttled(conn: ConnectorSink ref) =>
     if (not _throttled) or (not twopc_intro_done) then
       _throttled = true
       Backpressure.apply(_auth)
@@ -215,295 +177,12 @@ class ConnectorSinkNotify
         "connected = %s").cstring(), _connected.string().cstring())
     end
 
-  fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
+  fun ref unthrottled(conn: ConnectorSink ref) =>
     if _throttled and twopc_intro_done then
       _throttled = false
       Backpressure.release(_auth)
       @ll(_conn_info, ("ConnectorSink is no longer experiencing" +
         " back pressure, connected = %s").cstring(),
         _connected.string().cstring())
-      try @ll(_twopc_debug, "DBGDBG: unthrottled: buffer check, FSM state = %d".cstring(), (conn as ConnectorSink ref).get_twopc_state()) else Fail() end
-      @ll(_twopc_debug, "DBGDBG: unthrottled: buffer: current txn=%s.".cstring(), twopc_txn_id_current.cstring())
+      @ll(_conn_debug, "DBGDBG: unthrottled: buffer check, FSM state = %d".cstring(), conn.get_twopc_state())
     end
-
-  fun ref ready_to_work_requested(conn: ConnectorSink ref) =>
-    _report_ready_to_work_requested = true
-    if _ready_to_work then
-      conn.report_ready_to_work()
-      _report_ready_to_work_done = true
-    end
-
-  fun send_msg(conn: WallarooOutgoingNetworkActor ref, msg: cwm.Message) =>
-    let w1: Writer = w1.create()
-
-    let bs = cwm.Frame.encode(msg, w1)
-    for item in Bytes.length_encode(bs).values() do
-      try (conn as ConnectorSink ref)._write_final(item, None) else Fail() end
-    end
-
-  fun ref _process_connector_sink_v2_data(
-    conn: WallarooOutgoingNetworkActor ref,
-    twopc: ConnectorSink2PC, data: Array[U8] val): None ?
-  =>
-    match cwm.Frame.decode(data)?
-    | let m: cwm.HelloMsg =>
-      Fail()
-    | let m: cwm.OkMsg =>
-      if _fsm_state is ConnectorProtoFsmHandshake then
-        _fsm_state = ConnectorProtoFsmStreaming
-
-        credits = m.initial_credits
-        if credits < 2 then
-          _error_and_close(conn, "HEY, too few credits: " + credits.string())
-        else
-          @ll(_conn_debug, "Notify: stream_id %d stream_name %s p-o-r/message_id %lu".cstring(), stream_id, stream_name.cstring(), message_id)
-          let notify = cwm.NotifyMsg(stream_id, stream_name, message_id)
-          send_msg(conn, notify)
-          twopc.notify1_sent = true
-          credits = credits - 1
-        end
-      else
-        _error_and_close(conn, "Bad FSM State: A" + _fsm_state().string())
-      end
-    | let m: cwm.ErrorMsg =>
-      _error_and_close(conn, "Bad FSM State: B" + _fsm_state().string())
-    | let m: cwm.NotifyMsg =>
-      _error_and_close(conn, "Bad FSM State: C" + _fsm_state().string())
-    | let m: cwm.NotifyAckMsg =>
-      if _fsm_state is ConnectorProtoFsmStreaming then
-        @ll(_conn_debug, "NotifyAck: success %s stream_id %d p-o-r %lu".cstring(), m.success.string().cstring(), m.stream_id, m.point_of_ref)
-        // We ignore the point of reference sent to us by
-        // the connector sink.
-      else
-        _error_and_close(conn, "Bad FSM State: D" + _fsm_state().string())
-      end
-    | let m: cwm.MessageMsg =>
-      // 2PC messages are sent via MessageMsg on stream_id 0.
-      if (m.stream_id != 0) or (m.message is None) then
-        _error_and_close(conn, "Bad FSM State: Ea" + _fsm_state().string())
-        return
-      end
-      @ll(_twopc_debug, "2PC: GOT MessageMsg".cstring())
-      try
-        let inner = cwm.TwoPCFrame.decode(m.message as Array[U8] val)?
-        match inner
-        | let mi: cwm.ReplyUncommittedMsg =>
-          // This is a reply to a ListUncommitted message that we sent
-          // perhaps some time ago.  Meanwhile, it's possible that we
-          // have already started a new round of 2PC ... so our new
-          // round's txn_id may be in the txn_id's list.
-          if mi.rtag != _rtag then
-            @ll(_twopc_err, "2PC: bad rtag match: %lu != %lu".cstring(), mi.rtag, _rtag)
-            Fail()
-          end
-
-          @ll(_conn_debug, "TRACE: uncommitted txns = %s".cstring(),
-            _print_array[String](mi.txn_ids).cstring())
-          _twopc_uncommitted_list = mi.txn_ids
-          process_uncommitted_list(conn as ConnectorSink ref)
-
-          // The 2PC intro dance has finished.  We can permit the rest
-          // of the sink's operation to resume.  The txns in the
-          // _twopc_uncommitted_list will be committed/aborted as soon
-          // as we have all the relevant information is available (and
-          // may already have been done by the process_uncommitted_list()
-          // call above).
-          twopc_intro_done = true
-          unthrottled(conn)
-          if not _report_ready_to_work_done then
-            _ready_to_work = true
-            if _report_ready_to_work_requested then
-              try
-                (conn as ConnectorSink ref).report_ready_to_work()
-                _report_ready_to_work_done = true
-              else
-                Fail()
-              end
-            end
-          end
-          try (conn as ConnectorSink ref).twopc_intro_done() else Fail() end
-        | let mi: cwm.TwoPCReplyMsg =>
-          @ll(_twopc_debug, "2PC: reply for txn_id %s was %s".cstring(), mi.txn_id.cstring(), mi.commit.string().cstring())
-          try (conn as ConnectorSink ref).twopc_phase1_reply(
-            mi.txn_id, mi.commit)
-          else Fail() end
-        else
-          Fail()
-        end
-      else
-        _error_and_close(conn, "Bad FSM State: Eb" + _fsm_state().string())
-        return
-      end
-    | let m: cwm.AckMsg =>
-      if _fsm_state is ConnectorProtoFsmStreaming then
-        // NOTE: we aren't actually using credits
-        credits = credits + m.credits
-        for (s_id, p_o_r) in m.credit_list.values() do
-          if s_id == stream_id then
-            if p_o_r > message_id then
-              // This is possible with 2PC, but it's harmless if
-              // we recognize it and ignore it.
-              // 0. The connector sink's p_o_r is 4000.
-              // 1. The connector sink sends phase1=abort.
-              // 2. We send phase2=abort.
-              // 3. The connector sink decides to send an ACK with p_o_r=4000.
-              //    This message is delayed just a little bit to make a race.
-              // 4. We process prepare_to_rollback & rollback.  Our
-              //    message_id is reset to message_id=0.  Wallaroo
-              //    has fully rolled back state and is ready to resume
-              //    all of its work from offset=0.
-              // 5. The ACK from step #3 arrives.
-              //    4000 > 0, which looks like a terrible state:
-              //    we haven't sent anything, but the sink is ACKing
-              //    4000 bytes.
-              //
-              // I am going to disable unsolicited ACK'ing by the
-              // connector sink.  Disabling unsolicited ACKs would
-              // definitely prevent late-arriving ACKs.  (Will still
-              // send ACK in response to Eos.)
-              // TODO: Otherwise I believe we'd have to
-              // add a checkpoint #/rollback #/state-something to
-              // the ACK message to be able to identify late-arriving
-              // ACKs.
-              None
-            elseif p_o_r < acked_point_of_ref then
-              @ll(_conn_err, "Error: Ack: stream-id %lu p_o_r %lu acked_point_of_ref %lu".cstring(), stream_id, p_o_r, acked_point_of_ref)
-              Fail()
-            else
-              acked_point_of_ref = p_o_r
-            end
-          else
-            @ll(_conn_err, "Ack: unknown stream_id %d".cstring(), s_id)
-            Fail()
-          end
-        end
-      else
-        _error_and_close(conn, "Bad FSM State: F" + _fsm_state().string())
-      end
-    | let m: cwm.RestartMsg =>
-      @ll(_conn_debug, "TRACE: got restart message, closing connection".cstring())
-      conn.close()
-    end
-
-  fun ref process_uncommitted_list(conn: ConnectorSink ref) =>
-    """
-    In case of a Wallaroo failure, we need to do two things that can
-    happen in either order: 1. get list of uncommitted transactions,
-    2. get the initial rollback() message + payload blob of state.
-    After both have happened, then we need to commit/abort any
-    uncommitted txns outstanding at the connector sink.
-    """
-
-    @ll(_twopc_debug, "2PC: process_uncommitted_list top: 1 %s 2 %s 3 %s".cstring(),
-      twopc_txn_id_last_committed_helper().cstring(),
-      twopc_txn_id_rollback_helper().cstring(),
-      (if _twopc_uncommitted_list is None then "None" else "Array" end).cstring())
-    match (twopc_txn_id_last_committed, twopc_txn_id_rollback)
-    | (let x1: None, let x2: String) =>
-      // last_committed is None, which means that we restarted recently,
-      // but also x2 is a string, so we know that we are rolling back
-      // now.  Set last_committed to a not-None value so that the next
-      // match will do useful stuff.
-      twopc_txn_id_last_committed = "special-case--.--"
-    end
-
-    // Unconditionally abort any txn id that starts with r_prefix.
-    let r_prefix = conn.prefix_rollback()
-    match _twopc_uncommitted_list
-    | let uncommitted: Array[String] val =>
-      for txn_id in uncommitted.values() do
-        if txn_id.compare_sub(r_prefix, r_prefix.size()) is Equal then
-          @ll(_twopc_debug, "2PC: force abort rollback txn txn_id %s".cstring(), txn_id.cstring())
-          let p2 = TwoPCEncode.phase2(txn_id, false)
-          let p2_msg = cwm.MessageMsg(0, 0, 0, None, p2)
-          send_msg(conn, p2_msg)
-        end
-      end
-    end
-
-    // This match is intended to do nothing substantial if any
-    // of the match vars' types are None.
-    match (twopc_txn_id_last_committed,
-           twopc_txn_id_rollback,
-           _twopc_uncommitted_list)
-    | (let last_committed: String,
-       let rollback_id: String,
-       let uncommitted: Array[String] val) =>
-      @ll(_twopc_debug, "2PC: process_uncommitted_list processing %d items, last_committed = %s".cstring(), uncommitted.size(), last_committed.cstring())
-      for txn_id in uncommitted.values() do
-        let do_commit =
-          if txn_id == last_committed then
-            true
-          elseif txn_id == rollback_id then
-            true
-          else
-            false
-          end
-        @ll(_twopc_debug, "2PC: uncommitted txn_id %s commit=%s".cstring(), txn_id.cstring(), do_commit.string().cstring())
-        if not do_commit and (txn_id == twopc_txn_id_current) then
-          @ll(_twopc_debug, "2PC: current txn_id %s was aborted".cstring(), twopc_txn_id_current.cstring())
-        end
-        let p2 = TwoPCEncode.phase2(txn_id, do_commit)
-        let p2_msg = cwm.MessageMsg(0, 0, 0, None, p2)
-        send_msg(conn, p2_msg)
-      end
-      twopc_txn_id_rollback = None
-      _twopc_uncommitted_list = None
-    else
-      @ll(_twopc_debug, "2PC: process_uncommitted_list waiting: 1 %s 2 %s 3 %s".cstring(),
-        (if twopc_txn_id_last_committed is None then "None" else "String" end).cstring(),
-        (if twopc_txn_id_rollback is None then "None" else "String" end).cstring(),
-        (if _twopc_uncommitted_list is None then "None" else "Array" end).cstring())
-    end
-
-
-  fun ref _error_and_close(conn: WallarooOutgoingNetworkActor ref,
-    msg: String)
-  =>
-    send_msg(conn, cwm.ErrorMsg(msg))
-    conn.close()
-
-  fun ref make_message(encoded1: Array[(String val | Array[U8 val] val)] val):
-    cwm.MessageMsg
-  =>
-    let event_time: cwm.EventTimeType = 0
-    let key = None
-
-    let base_message_id = message_id
-    for e in encoded1.values() do
-      message_id = message_id + e.size().u64()
-    end
-    cwm.MessageMsg(stream_id, base_message_id, event_time, key, encoded1)
-
-  fun ref application_ready_to_work(conn: ConnectorSink ref) =>
-    if twopc_txn_id_last_committed is None then
-      // There hasn't been a rollback() as part of our startup, so we
-      // are starting for the first time.  There is no prior committed
-      // txn_id.
-      twopc_txn_id_last_committed = conn.prefix_skip() + "ready_to_work"
-      @ll(_twopc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.".cstring(), twopc_txn_id_last_committed_helper().cstring())
-      process_uncommitted_list(conn)
-    end
-
-  fun _payload_length(data: Array[U8] iso): USize ? =>
-    Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
-
-  fun none_helper(x: (None|String)): String =>
-    try
-      x as String
-    else
-      "--<<{{None}}>>--"
-    end
-
-  fun twopc_txn_id_last_committed_helper(): String =>
-    none_helper(twopc_txn_id_last_committed)
-
-  fun twopc_txn_id_rollback_helper(): String =>
-    none_helper(twopc_txn_id_rollback)
-
-  fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
-    """
-    Generate a printable string of the contents of the given readseq to use in
-    error messages.
-    """
-    "[len=" + array.size().string() + ": " + ", ".join(array.values()) + "]"

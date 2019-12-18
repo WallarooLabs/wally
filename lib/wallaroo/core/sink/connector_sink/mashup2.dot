@@ -1,0 +1,77 @@
+digraph mashup {
+    graph [label="Checkpoint/Rollback Component + External Connection Component",labelloc=t,fontsize=30];
+    subgraph AA {
+	graph [label="SUB Checkpoint/Rollback Component",labelloc=t,fontsize=20];
+
+	// Subgraphs
+	subgraph init {
+		ChRbInit;
+		## MsgBus [shape=box];
+	}
+	subgraph cp {
+		WaitingForCheckpoint;
+		AbortCheckpoint;
+	}
+	subgraph sacp {
+		SACPStarts;
+		SACPGotLocalVote;
+		// SACPGotGlobalVote; // Can we remove this node?
+
+		SACPStarts -> SACPGotLocalVote [label=MessageMsg];
+		SACPGotLocalVote -> WaitingForCheckpoint [label=checkpoint_complete];
+		// SACPGotLocalVote -> SACPGotGlobalVote [label=checkpoint_complete];
+		// SACPGotGlobalVote -> WaitingForCheckpoint [label=what_happens_here]; // Can we remove this node?
+	}
+	subgraph rollback {
+		PreparedForRollback;
+		RollingBack;
+
+		PreparedForRollback -> RollingBack [label=rollback,fontcolor=red,color=red];
+		## RollingBack -> MsgBus [label="Rollback payload+rb_id",style=dashed];
+	}
+
+	// Other Edges
+	ChRbInit -> WaitingForCheckpoint [label=complete_init];
+
+	WaitingForCheckpoint -> SACPStarts [label=CP_barrier_complete];
+	AbortCheckpoint -> AbortCheckpoint [label=CP_barrier_complete];
+
+	WaitingForCheckpoint -> PreparedForRollback [label=prepare_for_rollback,fontcolor=red,color=red];
+	AbortCheckpoint -> PreparedForRollback [label=prepare_for_rollback,fontcolor=red,color=red];
+	SACPStarts -> PreparedForRollback [label=prepare_for_rollback,fontcolor=red,color=red];
+	SACPGotLocalVote -> PreparedForRollback [label=prepare_for_rollback,fontcolor=red,color=red];
+
+	WaitingForCheckpoint -> AbortCheckpoint [label="abort_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
+	SACPStarts -> AbortCheckpoint [label="abort_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
+	SACPGotLocalVote -> AbortCheckpoint [label="abort_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
+
+	RollingBack -> WaitingForCheckpoint [label=sink_rollback_complete];
+     }
+
+	subgraph external {
+            graph [label="External Connection Component",labelloc=t,fontsize=30];
+
+	    ExtInit -> ExtInit [label=reconn_timer];
+	    ExtInit -> Connected [label=TCP_connected];
+	    Connected -> DisconnectedPre [label=TCP_closed,fontcolor=red,color=red];
+	    Disconnected -> Connected [label=TCP_connected];
+	    Disconnected -> Disconnected [label=reconn_timer];
+	    Connected -> WaitingForRollbackPayload [label="TwoPC intro:\nuncommitted txn\nlist not empty"];
+	    Connected -> TwoPCReady [label="TwoPC intro:\nuncommited txn\nlist is empty"];
+	    WaitingForRollbackPayload -> TwoPCReady [label="rollback info\nfrom ChRb"];
+
+	    DisconnectedPre [shape=box,color=red,fontcolor=red];
+	    TwoPCReady -> DisconnectedPre [label=TCP_closed,fontcolor=red,color=red];
+	    ## TwoPCReady -> MsgBus [label=complete_init,style=dashed];
+
+	    DisconnectedPre -> Disconnected [label=TCP_closed,fontcolor=red,color=red];
+	    ##DisconnectedPre -> WaitingForCheckpoint [label=abort_checkpoint,style=dashed,fontcolor=red,color=red];
+	    ##DisconnectedPre -> SACPStarts [label=abort_checkpoint,style=dashed,fontcolor=red,color=red];
+	    ##DisconnectedPre -> SACPGotLocalVote [label=abort_checkpoint,style=dashed,fontcolor=red,color=red];
+	    ## DisconnectedPre -> MsgBus [label=abort_checkpoint,style=dashed,fontcolor=red,color=red];
+        }
+    ## Not supported by dot, booooo: Connected -> AA [label=abort_checkpoint,style=dashed,fontcolor=red,color=red];
+    {rank=same; ChRbInit; ExtInit; };
+    ## {rank=same; Disconnected; RollingBack; ; };
+    ## {rank=same; MsgBus; };
+}
