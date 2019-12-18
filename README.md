@@ -25,71 +25,116 @@ You can learn more about [Wallaroo][home-page] from our ["Hello Wallaroo!" blog 
 
 ## Usage
 
-Once you've installed Wallaroo, Take a look at some of our examples. A great place to start are our [word_count][word_count] or [market spread][market-spread] examples in [Python](python-examples).
+Once you've installed Wallaroo, Take a look at some of our examples. A great place to start are our [word_count][word_count] or [market spread][market-spread] examples in [Pony](pony-examples).
 
-```python
+```pony
 """
-This is a complete example application that receives lines of text and counts each word.
+Word Count App
 """
-import string
-import struct
-import wallaroo
+use "assert"
+use "buffered"
+use "collections"
+use "net"
+use "serialise"
+use "wallaroo_labs/bytes"
+use "wallaroo"
+use "wallaroo_labs/logging"
+use "wallaroo_labs/mort"
+use "wallaroo_labs/time"
+use "wallaroo/core/common"
+use "wallaroo/core/metrics"
+use "wallaroo/core/sink/tcp_sink"
+use "wallaroo/core/source"
+use "wallaroo/core/source/tcp_source"
+use "wallaroo/core/state"
+use "wallaroo/core/topology"
 
-def application_setup(args):
-    in_name, in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
-    out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
+actor Main
+  new create(env: Env) =>
+    Log.set_defaults()
+    try
+      let pipeline = recover val
+        let lines = Wallaroo.source[String]("Word Count",
+          TCPSourceConfig[String].from_options(StringFrameHandler,
+                TCPSourceConfigCLIParser("Word Count", env.args)?, 1))
 
-    lines = wallaroo.source("Split and Count",
-                        wallaroo.TCPSourceConfig(in_name, in_host, in_port,
-                            decode_line))
-    pipeline = (lines
-        .to(split)
-        .key_by(extract_word)
-        .to(count_word)
-        .to_sink(wallaroo.TCPSinkConfig(out_host, out_port,
-            encode_word_count)))
+        lines
+          .to[String](Split)
+          .key_by(ExtractWord)
+          .to[RunningTotal](AddCount)
+          .to_sink(TCPSinkConfig[RunningTotal].from_options(
+            RunningTotalEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
+      end
+      Wallaroo.build_application(env, "Word Count", pipeline)
+    else
+      @printf[I32]("Couldn't build topology\n".cstring())
+    end
 
-    return wallaroo.build_application("Word Count Application", pipeline)
+primitive Split is StatelessComputation[String, String]
+  fun name(): String => "Split"
 
-@wallaroo.computation_multi(name="split into words")
-def split(data):
-    punctuation = " !\"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~"
+  fun apply(s: String): Array[String] val =>
+    let punctuation = """ !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~ """
+    let words = recover trn Array[String] end
+    for line in s.split("\n").values() do
+      let cleaned =
+        recover val s.clone().>lower().>lstrip(punctuation)
+          .>rstrip(punctuation) end
+      for word in cleaned.split(punctuation).values() do
+        words.push(word)
+      end
+    end
+    consume words
 
-    words = []
+class val RunningTotal
+  let word: String
+  let count: U64
 
-    for line in data.split("\n"):
-        clean_line = line.lower().strip(punctuation)
-        for word in clean_line.split(" "):
-            clean_word = word.strip(punctuation)
-            words.append(clean_word)
+  new val create(w: String, c: U64) =>
+    word = w
+    count = c
 
-    return words
+class WordTotal is State
+  var count: U64
 
-class WordTotal(object):
-    count = 0
+  new create(c: U64) =>
+    count = c
 
-@wallaroo.state_computation(name="count word", state=WordTotal)
-def count_word(word, word_total):
-    word_total.count = word_total.count + 1
-    return WordCount(word, word_total.count)
+primitive AddCount is StateComputation[String, RunningTotal, WordTotal]
+  fun name(): String => "Add Count"
 
-class WordCount(object):
-    def __init__(self, word, count):
-        self.word = word
-        self.count = count
+  fun apply(word: String, state: WordTotal): RunningTotal =>
+    state.count = state.count + 1
+    RunningTotal(word, state.count)
 
-@wallaroo.key_extractor
-def extract_word(word):
-    return word
+  fun initial_state(): WordTotal =>
+    WordTotal(0)
 
-@wallaroo.decoder(header_length=4, length_fmt=">I")
-def decode_line(bs):
-    return bs.decode("utf-8")
+primitive StringFrameHandler is FramedSourceHandler[String]
+  fun header_length(): USize =>
+    4
 
-@wallaroo.encoder
-def encode_word_count(word_count):
-    output = word_count.word + " => " + str(word_count.count) + "\n"
-    return output.encode("utf-8")
+  fun payload_length(data: Array[U8] iso): USize ? =>
+    Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
+
+  fun decode(data: Array[U8] val): String =>
+    String.from_array(data)
+
+primitive ExtractWord
+  fun apply(input: String): Key =>
+    input
+
+primitive RunningTotalEncoder
+  fun apply(t: RunningTotal, wb: Writer = Writer): Array[ByteSeq] val =>
+    let result =
+      recover val
+        String().>append(t.word).>append(", ").>append(t.count.string())
+          .>append("\n")
+      end
+    @printf[I32]("!!%s".cstring(), result.cstring())
+    wb.write(result)
+
+    wb.done()
 ```
 
 ## Documentation
@@ -128,9 +173,7 @@ Wallaroo is licensed under the [Apache version 2][apache-2-license] license.
 [group-link]: https://groups.io/g/wallaroo
 [hello-wallaroo-post]: https://blog.wallaroolabs.com/2017/03/hello-wallaroo/
 [home-page]: https://www.wallaroolabs.com/
-[word_count]: examples/python/word_count/
-[market-spread]: examples/python/market_spread/
-[overview-video]: https://vimeo.com/234753585
-[python-examples]: examples/python/
-[reverse]: examples/python/reverse/
+[word_count]: examples/pony/word_count/
+[market-spread]: examples/pony/market_spread/
+[pony-examples]: examples/pony/
 [wallaroo-license-readme]: #license
