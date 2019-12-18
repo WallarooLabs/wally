@@ -1,0 +1,75 @@
+digraph mashup {
+    graph [label="Checkpoint/Rollback Component + External Connection Component\nAssume all 'send' ops are synchronous.",labelloc=t,fontsize=30];
+    subgraph AA {
+	graph [label="SUB Checkpoint/Rollback Component",labelloc=t,fontsize=20];
+
+	// Subgraphs
+	subgraph init {
+		ChRbInit [label="ChRbInit\nsink phase=normal"];
+	}
+	subgraph cp {
+		WaitingForCheckpoint [label="WaitingForCheckpoint\nsink phase=normal"];
+		ConnBroken [label="ConnBroken\nsink phase=drop app msgs, forward tokens"];
+	}
+	subgraph sacp {
+		CPStarts [label="CPStarts\nsink phase=queue both"];
+		CPGotLocalVote;
+		// CPGotGlobalVote; // Can we remove this node?
+
+		CPStarts -> CPGotLocalVote [label=MessageMsg];
+		CPGotLocalVote -> WaitingForCheckpoint [label=checkpoint_complete];
+		// CPGotLocalVote -> CPGotGlobalVote [label=checkpoint_complete];
+		// CPGotGlobalVote -> WaitingForCheckpoint [label=what_happens_here]; // Can we remove this node?
+	}
+	subgraph rollback {
+		PreparedForRollback [label="PreparedForRollback\nsink phase=drop app msgs, forward tokens"];
+		RollingBack [label="RollingBack\nsend rollback_info\nsend advertise_status=true"];
+
+		PreparedForRollback -> RollingBack [label=rollback,fontcolor=red,color=red];
+		PreparedForRollback -> PreparedForRollback [label=rollback,fontcolor=red,color=red];
+	}
+
+	// Other Edges
+	ChRbInit -> WaitingForCheckpoint [label=conn_ready];
+
+	WaitingForCheckpoint -> CPStarts [label=CP_barrier_complete];
+	ConnBroken -> ConnBroken [label=CP_barrier_complete];
+
+	WaitingForCheckpoint -> PreparedForRollback [label=prepare_for_rollback,fontcolor=red,color=red];
+	ConnBroken -> PreparedForRollback [label=prepare_for_rollback,fontcolor=red,color=red];
+	CPStarts -> PreparedForRollback [label=prepare_for_rollback,fontcolor=red,color=red];
+	CPGotLocalVote -> PreparedForRollback [label=prepare_for_rollback,fontcolor=red,color=red];
+
+	WaitingForCheckpoint -> ConnBroken [label="conn_broken\nfrom ExtConn",fontcolor=red,color=red];
+	CPStarts -> ConnBroken [label="conn_broken\nfrom ExtConn",fontcolor=red,color=red];
+	CPGotLocalVote -> ConnBroken [label="conn_broken\nfrom ExtConn",fontcolor=red,color=red];
+
+	RollingBack -> WaitingForCheckpoint [label=conn_ready];
+     }
+
+	subgraph external {
+            graph [label="External Connection Component",labelloc=t,fontsize=30];
+
+        ExtInit [label="ExtInit\nadvertise_status=true"];
+	    ExtInit -> ExtInit [label=reconn_timer];
+	    ExtInit -> Connected [label=TCP_connected];
+	    Connected -> Disconnected [label=TCP_closed,fontcolor=red,color=red];
+	    Connected -> Connected [label="advertise_status\nfrom CpRb"];
+	    Disconnected [label="Disconnected\nsend conn_broken if advertise_status\nadvertise_status=false"];
+	    Disconnected -> Connected [label=TCP_connected];
+	    Disconnected -> Disconnected [label=reconn_timer];
+	    Disconnected -> Disconnected [label="advertise_status\nfrom CpRb"];
+	    Connected -> WaitingForRollbackPayload [label="TwoPC intro:\nuncommitted txn\nlist not empty"];
+	    Connected -> TwoPCReady [label="TwoPC intro:\n1st connection\nhas no\nuncommitted list"];
+	    Connected -> TwoPCReady [label="TwoPC intro:\nNth connection\nuncommited txn\nlist is empty"];
+	    WaitingForRollbackPayload -> TwoPCReady [label="rollback info\nfrom ChRb"];
+	    WaitingForRollbackPayload -> WaitingForRollbackPayload [label="advertise_status\nfrom CpRb"];
+
+	    TwoPCReady [label="TwoPCReady\nsend conn_ready if advertise_status"]
+	    TwoPCReady -> Disconnected [label=TCP_closed,fontcolor=red,color=red];
+	    TwoPCReady -> TwoPCReady [label="advertise_status\nfrom CpRb"]
+        }
+    ## Not supported by dot, booooo: Connected -> AA [label=conn_broken,style=dashed,fontcolor=red,color=red];
+    {rank=same; ChRbInit; ExtInit; };
+    ## {rank=same; Disconnected; RollingBack; ; };
+}
