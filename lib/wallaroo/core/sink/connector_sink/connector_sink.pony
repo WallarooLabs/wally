@@ -1232,6 +1232,11 @@ actor ConnectorSink is Sink
     // to the sink until we get a ReplyUncommittedMsg response.
 
     _ext_conn_state = ExtConnStateHandshake
+    if true then //TODO//
+      @ll(_conn_err, "//TODO// unthrottle early".cstring())
+      _notify.twopc_intro_done = true
+      _notify.unthrottled(this)
+    end
 
   fun ref cb_received(data: Array[U8] val): None ?
   =>
