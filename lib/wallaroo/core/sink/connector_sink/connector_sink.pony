@@ -214,8 +214,7 @@ actor ConnectorSink is Sink
     _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
-    _notify = ConnectorSinkNotify(
-      _sink_id, app_name, worker_name, protocol_version, cookie, auth)
+    _notify = ConnectorSinkNotify(auth)
     _initial_msgs = initial_msgs
     _reconnect_pause = reconnect_pause
     _host = host
@@ -456,11 +455,6 @@ actor ConnectorSink is Sink
     _twopc.set_state_abort()
     _barrier_coordinator.abort_barrier(barrier_token)
 
-  fun ref todo_twopc_intro_done() =>
-    """
-    TODO
-    """
-    None//TODO
 
   ///////////////
   // BARRIER
@@ -503,7 +497,7 @@ actor ConnectorSink is Sink
       _phase.prepare_for_rollback(barrier_token)
     | let sbt: CheckpointBarrierToken =>
       _seen_checkpointbarriertoken = sbt
-      if _connected and _notify.twopc_intro_done then
+      if _connected then
         @ll(_conn_debug, "process_barrier: connected & 2PC intro done".cstring())
       else
         @ll(_conn_debug, "process_barrier: connected & 2PC intro not done".cstring())
@@ -544,7 +538,7 @@ actor ConnectorSink is Sink
         let lws = _last_autoscale_barrier_token.leaving_workers()
         @ll(_conn_debug, "autoscale: leaving_workers size = %lu".cstring(),
           lws.size())
-        if (lws.size() > 0) and _connected and _notify.twopc_intro_done then
+        if (lws.size() > 0) and _connected then
           _twopc.send_workers_left(this, 7 /*unused by sink*/, lws)
         end
       end
@@ -1234,7 +1228,6 @@ actor ConnectorSink is Sink
     _ext_conn_state = ExtConnStateHandshake
     if true then //TODO//
       @ll(_conn_err, "//TODO// unthrottle early".cstring())
-      _notify.twopc_intro_done = true
       _notify.unthrottled(this)
     end
 
@@ -1290,7 +1283,6 @@ actor ConnectorSink is Sink
         | let mi: cwm.ReplyUncommittedMsg =>
           None//TODO
 
-          None//TODO twopc_intro_done = true
           _notify.unthrottled(this)
           if not _report_ready_to_work_done then
             _ready_to_work = true
@@ -1299,7 +1291,6 @@ actor ConnectorSink is Sink
               _report_ready_to_work_done = true
             end
           end
-          None//TODO twopc_intro_done()
         | let mi: cwm.TwoPCReplyMsg =>
           @ll(_twopc_debug, "2PC: reply for txn_id %s was %s".cstring(), mi.txn_id.cstring(), mi.commit.string().cstring())
           twopc_phase1_reply(mi.txn_id, mi.commit)

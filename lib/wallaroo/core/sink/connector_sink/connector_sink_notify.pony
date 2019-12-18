@@ -31,26 +31,12 @@ class ConnectorSinkNotify
   var _header: Bool = true
   var _connected: Bool = false
   var _throttled: Bool = false
-  let _sink_id: RoutingId
-  let _app_name: String
-  let _worker_name: WorkerName
-  let _protocol_version: String
-  let _cookie: String
   let _auth: ApplyReleaseBackpressureAuth
   let _conn_debug: U16 = Log.make_sev_cat(Log.debug(), Log.conn_sink())
   let _conn_info: U16 = Log.make_sev_cat(Log.info(), Log.conn_sink())
   let _conn_err: U16 = Log.make_sev_cat(Log.err(), Log.conn_sink())
-  var twopc_intro_done: Bool = false
 
-  new create(sink_id: RoutingId, app_name: String, worker_name: WorkerName,
-    protocol_version: String, cookie: String,
-    auth: ApplyReleaseBackpressureAuth)
-  =>
-    _sink_id = sink_id
-    _app_name = app_name
-    _worker_name = worker_name
-    _protocol_version = protocol_version
-    _cookie = cookie
+  new create(auth: ApplyReleaseBackpressureAuth) =>
     _auth = auth
 
   fun ref accepted(conn: ConnectorSink ref) =>
@@ -71,7 +57,6 @@ class ConnectorSinkNotify
     _connected = true
     _throttled = false
     twopc.notify1_sent = false
-    twopc_intro_done = false
     // Apply runtime throttle until we're done with initial 2PC ballet.
     throttled(conn)
     conn.set_nodelay(true)
@@ -102,7 +87,6 @@ class ConnectorSinkNotify
     _connected = false
     _throttled = false
     twopc.notify1_sent = false
-    twopc_intro_done = false
     throttled(conn)
 
   fun ref dispose() =>
@@ -170,7 +154,7 @@ class ConnectorSinkNotify
     end
 
   fun ref throttled(conn: ConnectorSink ref) =>
-    if (not _throttled) or (not twopc_intro_done) then
+    if (not _throttled) then
       _throttled = true
       Backpressure.apply(_auth)
       @ll(_conn_info, ("ConnectorSink is experiencing back pressure, " +
@@ -178,7 +162,7 @@ class ConnectorSinkNotify
     end
 
   fun ref unthrottled(conn: ConnectorSink ref) =>
-    if _throttled and twopc_intro_done then
+    if _throttled then
       _throttled = false
       Backpressure.release(_auth)
       @ll(_conn_info, ("ConnectorSink is no longer experiencing" +
