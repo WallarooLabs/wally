@@ -6,5 +6,5 @@ Reference the issue your code change relates to if possible
 ref #
 
 <!--
-Include any other necessary information below. If you have any questions don't hesitate to reach out on the mailing list or on IRC.
+Include any other necessary information below. If you have any questions don't hesitate to reach out on the mailing list.
 -->
