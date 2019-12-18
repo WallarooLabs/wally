@@ -5,28 +5,28 @@ digraph mashup {
 
 	// Subgraphs
 	subgraph init {
-		ChRbInit [label="ChRbInit\nsink phase=normal"];
+		ChRbInit [label="ChRbInit\nsink phase=queue both"];
 	}
 	subgraph cp {
 		WaitingForCheckpoint [label="WaitingForCheckpoint\nsink phase=normal"];
-		ConnBroken [label="ConnBroken\nsink phase=drop app msgs, forward tokens"];
+		ConnBroken [label="ConnBroken\nsink phase=drop app msgs, forward tokens\nabort checkpoint when checkpoint ID is known"];
 	}
 	subgraph sacp {
-		CPStarts [label="CPStarts\nsink phase=queue both"];
-		CPGotLocalVote;
+		CPStarts [label="CPStarts\nsink phase=queue app msgs, forward tokens"];
+		CPGotLocalVote [label="CPGotLocalVote\nsend commit to barrier coordinator"];
 		// CPGotGlobalVote; // Can we remove this node?
 
-		CPStarts -> CPGotLocalVote [label=MessageMsg];
+		CPStarts -> CPGotLocalVote [label="Phase1-commit"];
+		CPStarts -> ConnBroken [label="Phase1-abort"];
 		CPGotLocalVote -> WaitingForCheckpoint [label=checkpoint_complete];
 		// CPGotLocalVote -> CPGotGlobalVote [label=checkpoint_complete];
 		// CPGotGlobalVote -> WaitingForCheckpoint [label=what_happens_here]; // Can we remove this node?
 	}
 	subgraph rollback {
 		PreparedForRollback [label="PreparedForRollback\nsink phase=drop app msgs, forward tokens"];
-		RollingBack [label="RollingBack\nsend rollback_info\nsend advertise_status=true"];
+		RollingBack [label="RollingBack\nsend rollback_info\nsend advertise_status=true\nsink phase=queue app msgs, forward tokens"];
 
 		PreparedForRollback -> RollingBack [label=rollback,fontcolor=red,color=red];
-		PreparedForRollback -> PreparedForRollback [label=rollback,fontcolor=red,color=red];
 	}
 
 	// Other Edges
@@ -45,6 +45,7 @@ digraph mashup {
 	CPGotLocalVote -> ConnBroken [label="conn_broken\nfrom ExtConn",fontcolor=red,color=red];
 
 	RollingBack -> WaitingForCheckpoint [label=conn_ready];
+	RollingBack -> PreparedForRollback [label=prepare_for_rollback,fontcolor=red,color=red];
      }
 
 	subgraph external {
