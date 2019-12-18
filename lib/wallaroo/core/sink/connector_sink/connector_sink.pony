@@ -163,27 +163,28 @@ actor ConnectorSink is Sink
   // Producer (Resilience)
   let _timers: Timers = Timers
 
-  var _seq_id: SeqId = 0
-
-  // 2PC
-  let _twopc: ConnectorSink2PC
-  var _seen_checkpointbarriertoken: (CheckpointBarrierToken | None) = None
-  var _last_autoscale_barrier_token: AutoscaleBarrierToken =
-    AutoscaleBarrierToken("no such worker", 0, [], [])
-  var twopc_txn_id_last_committed: (None|String) = None
-  var twopc_txn_id_current: String = ""
-  var _twopc_uncommitted_list: (None|Array[String] val) = None
-  var _twopc_txn_id_rollback: (None|String) = None
-  var _rtag: U64 = 77777
-  var _ext_conn_state: ExtConnStateState = ExtConnStateDisconnected
-  var _credits: U32 = 0
-  var acked_point_of_ref: cwm.MessageId = 0
-  var _message_id: cwm.MessageId = acked_point_of_ref
-  let _stream_id: cwm.StreamId = 1
-  let _stream_name: String
+  // Lifecycle
   var _ready_to_work: Bool = false
   var _report_ready_to_work_requested: Bool = false
   var _report_ready_to_work_done: Bool = false
+
+  // 2PC
+  let _twopc: ConnectorSink2PC
+  var _twopc_seen_checkpointbarriertoken: (CheckpointBarrierToken | None) = None
+  var _twopc_last_autoscale_barrier_token: AutoscaleBarrierToken =
+    AutoscaleBarrierToken("no such worker", 0, [], [])
+  var _twopc_txn_id_last_committed: (None|String) = None
+  var _twopc_txn_id_current: String = ""
+  var _twopc_uncommitted_list: (None|Array[String] val) = None
+  var _twopc_txn_id_rollback: (None|String) = None
+  var _rtag: U64 = 77777
+  var _seq_id: SeqId = 0
+  var _ext_conn_state: ExtConnStateState = ExtConnStateDisconnected
+  var _credits: U32 = 0
+  var _acked_point_of_ref: cwm.MessageId = 0
+  var _message_id: cwm.MessageId = _acked_point_of_ref
+  let _stream_id: cwm.StreamId = 1
+  let _stream_name: String
 
   new create(sink_id: RoutingId, sink_name: String, event_log: EventLog,
     recovering: Bool, env: Env, encoder_wrapper: ConnectorEncoderWrapper,
@@ -496,7 +497,7 @@ actor ConnectorSink is Sink
     | let srt: CheckpointRollbackBarrierToken =>
       _phase.prepare_for_rollback(barrier_token)
     | let sbt: CheckpointBarrierToken =>
-      _seen_checkpointbarriertoken = sbt
+      _twopc_seen_checkpointbarriertoken = sbt
       if _connected then
         @ll(_conn_debug, "process_barrier: connected & 2PC intro done".cstring())
       else
@@ -523,19 +524,19 @@ actor ConnectorSink is Sink
       None//TODO
       //TODO//_phase.swap_barrier_to_queued(this)
     | let srt: CheckpointRollbackBarrierToken =>
-      _seen_checkpointbarriertoken = None
+      _twopc_seen_checkpointbarriertoken = None
       //TODO//_use_normal_processor()
     | let rbrt: CheckpointRollbackResumeBarrierToken =>
-      _seen_checkpointbarriertoken = None
+      _twopc_seen_checkpointbarriertoken = None
       None//TODO
       //TODO//_resume_processing_messages()
     | let sat: AutoscaleBarrierToken =>
-      _last_autoscale_barrier_token = sat
+      _twopc_last_autoscale_barrier_token = sat
       //TODO//_resume_processing_messages()
       None//TODO
     | let sart: AutoscaleResumeBarrierToken =>
-      if sart.id() == _last_autoscale_barrier_token.id() then
-        let lws = _last_autoscale_barrier_token.leaving_workers()
+      if sart.id() == _twopc_last_autoscale_barrier_token.id() then
+        let lws = _twopc_last_autoscale_barrier_token.leaving_workers()
         @ll(_conn_debug, "autoscale: leaving_workers size = %lu".cstring(),
           lws.size())
         if (lws.size() > 0) and _connected then
@@ -608,11 +609,11 @@ actor ConnectorSink is Sink
       Fail()
     end
 
-    @ll(_twopc_debug, "2PC: Checkpoint state %s at ConnectorSink %s, txn-id %s current_offset %lu acked_point_of_ref %lu _pending_writev_total %lu".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring(), _twopc.txn_id.cstring(), _twopc.current_offset.u64(), acked_point_of_ref, _pending_writev_total)
+    @ll(_twopc_debug, "2PC: Checkpoint state %s at ConnectorSink %s, txn-id %s current_offset %lu _acked_point_of_ref %lu _pending_writev_total %lu".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring(), _twopc.txn_id.cstring(), _twopc.current_offset.u64(), _acked_point_of_ref, _pending_writev_total)
 
     let wb: Writer = wb.create()
     wb.u64_be(_twopc.current_offset.u64())
-    wb.u64_be(acked_point_of_ref)
+    wb.u64_be(_acked_point_of_ref)
     let bs = wb.done()
 
     _event_log.checkpoint_state(_sink_id, checkpoint_id,
@@ -645,7 +646,7 @@ actor ConnectorSink is Sink
     let current_offset = try r.u64_be()?.usize() else Fail(); 0 end
     _twopc.rollback(current_offset)
     None//TODO
-    acked_point_of_ref = try r.u64_be()? else Fail(); 0 end
+    _acked_point_of_ref = try r.u64_be()? else Fail(); 0 end
     _message_id = _twopc.last_offset.u64()
 
     // The EventLog's payload's data doesn't include the last
@@ -654,8 +655,8 @@ actor ConnectorSink is Sink
     // When rollback() is called here, we now know the global txn
     // commit status: commit for checkpoint_id, all greater are invalid.
     _twopc_txn_id_rollback = rollback_to_c_id
-    @ll(_twopc_debug, "2PC: twopc_txn_id_last_committed = %s, twopc_txn_id_rollback = %s".cstring(),
-      twopc_txn_id_last_committed_helper().cstring(),
+    @ll(_twopc_debug, "2PC: _twopc_txn_id_last_committed = %s, twopc_txn_id_rollback = %s".cstring(),
+      _twopc_txn_id_last_committed_helper().cstring(),
       twopc_txn_id_rollback_helper().cstring())
 
     None//TODO
@@ -1334,11 +1335,11 @@ actor ConnectorSink is Sink
               // the ACK message to be able to identify late-arriving
               // ACKs.
               None
-            elseif p_o_r < acked_point_of_ref then
-              @ll(_conn_err, "Error: Ack: stream-id %lu p_o_r %lu acked_point_of_ref %lu".cstring(), _stream_id, p_o_r, acked_point_of_ref)
+            elseif p_o_r < _acked_point_of_ref then
+              @ll(_conn_err, "Error: Ack: stream-id %lu p_o_r %lu _acked_point_of_ref %lu".cstring(), _stream_id, p_o_r, _acked_point_of_ref)
               Fail()
             else
-              acked_point_of_ref = p_o_r
+              _acked_point_of_ref = p_o_r
             end
           else
             @ll(_conn_err, "Ack: unknown stream_id %d".cstring(), s_id)
@@ -1382,8 +1383,8 @@ actor ConnectorSink is Sink
       "--<<{{None}}>>--"
     end
 
-  fun twopc_txn_id_last_committed_helper(): String =>
-    none_helper(twopc_txn_id_last_committed)
+  fun _twopc_txn_id_last_committed_helper(): String =>
+    none_helper(_twopc_txn_id_last_committed)
 
   fun twopc_txn_id_rollback_helper(): String =>
     none_helper(_twopc_txn_id_rollback)
@@ -1404,12 +1405,12 @@ actor ConnectorSink is Sink
     end
 
   fun ref cb_report_ready_to_work() =>
-    if twopc_txn_id_last_committed is None then
+    if _twopc_txn_id_last_committed is None then
       // There hasn't been a rollback() as part of our startup, so we
       // are starting for the first time.  There is no prior committed
       // txn_id.
-      twopc_txn_id_last_committed = prefix_skip() + "ready_to_work"
-      @ll(_twopc_debug, "DBGDBG: 2PC: twopc_txn_id_last_committed = %s.".cstring(), twopc_txn_id_last_committed_helper().cstring())
+      _twopc_txn_id_last_committed = prefix_skip() + "ready_to_work"
+      @ll(_twopc_debug, "DBGDBG: 2PC: _twopc_txn_id_last_committed = %s.".cstring(), _twopc_txn_id_last_committed_helper().cstring())
       //TODO//process_uncommitted_list(conn)
     end
 
