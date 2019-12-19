@@ -23,6 +23,10 @@ When we set out to build Wallaroo, we had several high-level goals in mind:
 
 You can learn more about [Wallaroo][home-page] from our ["Hello Wallaroo!" blog post][hello-wallaroo-post] and the [Wallaroo overview video][overview-video].
 
+## APIs
+
+The primary API for Wallaroo is written in [Pony][pony]. If you are interested in writing Wallaroo applications in other high-performance languages such as C, C++ or Rust, [drop us a line][commercial-support-email]; we'd be happy to engage on a commercial basis in creating language bindings that meet your needs.
+
 ## Usage
 
 Once you've installed Wallaroo, Take a look at some of our examples. A great place to start are our [word_count][word_count] or [market spread][market-spread] examples in [Pony](pony-examples).
@@ -175,5 +179,6 @@ Wallaroo is licensed under the [Apache version 2][apache-2-license] license.
 [home-page]: https://www.wallaroolabs.com/
 [word_count]: examples/pony/word_count/
 [market-spread]: examples/pony/market_spread/
+[pony]: https://www.ponylang.io/
 [pony-examples]: examples/pony/
 [wallaroo-license-readme]: #license
