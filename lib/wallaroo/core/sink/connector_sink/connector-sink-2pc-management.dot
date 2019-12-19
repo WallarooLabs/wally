@@ -67,8 +67,7 @@ digraph mashup {
         Disconnected -> Disconnected [label="reconn_timer"];
         Disconnected -> Disconnected [label="advertise_status\nfrom CpRb"];
         Connected -> WaitingForRollbackPayload [label="twopc_intro:\nuncommitted txn\nlist not empty"];
-        Connected -> TwoPCReady [label="twopc_intro:\n1st connection\nhas no\nuncommitted list"];
-        Connected -> TwoPCReady [label="twopc_intro:\nNth connection\nuncommited txn\nlist is empty"];
+        Connected -> TwoPCReady [label="twopc_intro:\nuncommited txn\nlist is empty"];
         WaitingForRollbackPayload -> TwoPCReady [label="rollback_info\nfrom ChRb"];
         WaitingForRollbackPayload -> WaitingForRollbackPayload [label="advertise_status\nfrom CpRb"];
 

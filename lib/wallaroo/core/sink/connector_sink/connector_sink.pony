@@ -132,6 +132,7 @@ actor ConnectorSink is Sink
   var _in_sent: Bool = false
   var _expect: USize = 0
   var _connected: Bool = false
+  var connected_count: USize = 0
   var _closed: Bool = false
   var _writeable: Bool = false
   var _event: AsioEventID = AsioEvent.none()
@@ -1198,6 +1199,7 @@ actor ConnectorSink is Sink
     TwoPCEncode.list_uncommitted(_rtag)
 
   fun ref cb_connected() =>
+    connected_count = connected_count + 1
     _ec = _ec.tcp_connected(this)
     if true then //TODO//
       @ll(_conn_err, "//TODO// unthrottle early".cstring())
