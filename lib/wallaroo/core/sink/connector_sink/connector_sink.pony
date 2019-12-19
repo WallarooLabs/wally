@@ -269,7 +269,7 @@ actor ConnectorSink is Sink
     @ll(_conn_info, "Lifecycle: %s.%s at %s".cstring(),
       __loc.type_name().cstring(), __loc.method_name().cstring(),
       _sink_id.string().cstring())
-    cb_report_ready_to_work()
+    report_ready_to_work()
     //TODO//_use_normal_processor()
 
   be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
@@ -1208,40 +1208,20 @@ actor ConnectorSink is Sink
   =>
     match cwm.Frame.decode(data)?
     | let m: cwm.HelloMsg =>
-      Fail()
+      _error_and_close("Protocol error: Sink sent us HelloMsg")
     | let m: cwm.OkMsg =>
-      if _ext_conn_state is ExtConnStateHandshake then
-        _ext_conn_state = ExtConnStateStreaming
-
-        _credits = m.initial_credits
-        if _credits < 2 then
-          _error_and_close("HEY, too few credits: " + _credits.string())
-        else
-          @ll(_conn_debug, "Notify: stream_id %d stream_name %s p-o-r/message_id %lu".cstring(), _stream_id, _stream_name.cstring(), _message_id)
-          let notify = cwm.NotifyMsg(_stream_id, _stream_name, _message_id)
-          send_msg(notify)
-          _twopc.notify1_sent = true
-          _credits = _credits - 1
-        end
+      _credits = m.initial_credits
+      if _credits < 2 then
+        _error_and_close("HEY, too few credits: " + _credits.string())
       else
-        _error_and_close("Bad External Connection State: A" +
-          _ext_conn_state().string())
+        _ec = _ec.handle_message(this, m)
       end
     | let m: cwm.ErrorMsg =>
-      _error_and_close("Bad External Connection State: B" +
-        _ext_conn_state().string())
+      _error_and_close("Protocol error: Sink sent us ErrorMsg: %s" + m.message)
     | let m: cwm.NotifyMsg =>
-      _error_and_close("Bad External Connection State: C" +
-        _ext_conn_state().string())
+      _error_and_close("Protocol error: Sink sent us NotifyMsg")
     | let m: cwm.NotifyAckMsg =>
-      if _ext_conn_state is ExtConnStateStreaming then
-        @ll(_conn_debug, "NotifyAck: success %s stream_id %d p-o-r %lu".cstring(), m.success.string().cstring(), m.stream_id, m.point_of_ref)
-        // We ignore the point of reference sent to us by
-        // the connector sink.
-      else
-        _error_and_close("Bad External Connection State: D" +
-          _ext_conn_state().string())
-      end
+      _ec = _ec.handle_message(this, m)
     | let m: cwm.MessageMsg =>
       // 2PC messages are sent via MessageMsg on stream_id 0.
       if (m.stream_id != 0) or (m.message is None) then
@@ -1249,32 +1229,7 @@ actor ConnectorSink is Sink
           _ext_conn_state().string())
         return
       end
-      @ll(_twopc_debug, "2PC: GOT MessageMsg".cstring())
-      try
-        let inner = cwm.TwoPCFrame.decode(m.message as Array[U8] val)?
-        match inner
-        | let mi: cwm.ReplyUncommittedMsg =>
-          None//TODO
-
-          _notify.unthrottled(this)
-          if not _report_ready_to_work_done then
-            _ready_to_work = true
-            if _report_ready_to_work_requested then
-              report_ready_to_work()
-              _report_ready_to_work_done = true
-            end
-          end
-        | let mi: cwm.TwoPCReplyMsg =>
-          @ll(_twopc_debug, "2PC: reply for txn_id %s was %s".cstring(), mi.txn_id.cstring(), mi.commit.string().cstring())
-          twopc_phase1_reply(mi.txn_id, mi.commit)
-        else
-          Fail()
-        end
-      else
-        _error_and_close("Bad External Connection State: Eb" +
-          _ext_conn_state().string())
-        return
-      end
+      _ec = _ec.handle_message(this, m)
     | let m: cwm.AckMsg =>
       if _ext_conn_state is ExtConnStateStreaming then
         // NOTE: we aren't actually using credits
@@ -1359,19 +1314,9 @@ actor ConnectorSink is Sink
   fun ref ready_to_work_requested(conn: ConnectorSink ref) =>
     _report_ready_to_work_requested = true
     if _ready_to_work then
-      cb_report_ready_to_work()
+      report_ready_to_work()
       _report_ready_to_work_done = true
     end
-
-  fun ref cb_report_ready_to_work() =>
-    // if _twopc_txn_id_last_committed is None then
-    //   // There hasn't been a rollback() as part of our startup, so we
-    //   // are starting for the first time.  There is no prior committed
-    //   // txn_id.
-    //   _twopc_txn_id_last_committed = prefix_skip() + "ready_to_work"
-    //   //TODO//process_uncommitted_list(conn)
-    // end
-    None//TODO
 
   fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
     """

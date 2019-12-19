@@ -43,7 +43,6 @@ class ConnectorSink2PC
   var current_offset: USize = 0
   var current_txn_end_offset: USize = 0
   let stream_name: String
-  var notify1_sent: Bool = false
   let _twopc_debug: U16 = Log.make_sev_cat(Log.debug(), Log.twopc())
   let _twopc_info: U16 = Log.make_sev_cat(Log.info(), Log.twopc())
   let _twopc_err: U16 = Log.make_sev_cat(Log.err(), Log.twopc())

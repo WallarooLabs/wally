@@ -56,7 +56,6 @@ class ConnectorSinkNotify
     _header = true
     _connected = true
     _throttled = false
-    twopc.notify1_sent = false
     // Apply runtime throttle until we're done with initial 2PC ballet.
     throttled(conn)
     conn.set_nodelay(true)
@@ -86,7 +85,6 @@ class ConnectorSinkNotify
     @ll(_conn_info, "ConnectorSink connection closed, throttling".cstring())
     _connected = false
     _throttled = false
-    twopc.notify1_sent = false
     throttled(conn)
 
   fun ref dispose() =>
