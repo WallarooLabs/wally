@@ -16,6 +16,7 @@ Copyright 2019 The Wallaroo Authors.
 
 */
 
+use "wallaroo/core/barrier"
 use "wallaroo/core/sink"
 use cwm = "wallaroo_labs/connector_wire_messages"
 use "wallaroo_labs/logging"
@@ -65,7 +66,7 @@ trait _CpRbOps
   fun ref prepare_for_rollback(sink: ConnectorSink ref):
     _CpRbOps ref
   =>
-    _invalid_call(__loc.method_name()); Fail(); this
+    _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
   fun ref rollback(sink: ConnectorSink ref):
     _CpRbOps ref
@@ -97,7 +98,20 @@ Boilerplate: sed -n '/BEGIN LEFT/,/END LEFT/p' connector-sink-2pc-management.dot
 ****/
 
 class _CpRbAbortCheckpoint is _CpRbOps
+  var _checkpoint_to_abort: (None | CheckpointBarrierToken)
+
   fun name(): String => __loc.type_name()
+
+  new create(checkpoint_to_abort: (None | CheckpointBarrierToken)) =>
+    _checkpoint_to_abort = checkpoint_to_abort
+    match _checkpoint_to_abort
+    | let cbt: CheckpointBarrierToken =>
+        @l(Log.err(), Log.conn_sink(),
+          "TODO: call cprb_abort_checkpoint".cstring())
+    end
+
+  fun ref enter(sink: ConnectorSink ref) =>
+    sink.swap_barrier_to_queued(where drop_app_msgs = true)
 
 class _CpRbCPGotLocalVote is _CpRbOps
   fun name(): String => __loc.type_name()
@@ -109,11 +123,15 @@ class _CpRbInit is _CpRbOps
   fun name(): String => __loc.type_name()
 
   fun ref enter(sink: ConnectorSink ref) =>
-    let empty = Array[SinkPhaseQueued]
-    sink.swap_barrier_to_queued(empty)
+    sink.swap_barrier_to_queued()
 
   fun ref conn_ready(sink: ConnectorSink ref): _CpRbOps =>
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
+
+  fun ref prepare_for_rollback(sink: ConnectorSink ref):
+    _CpRbOps ref
+  =>
+    _invalid_call(__loc.method_name()); Fail(); this
 
 class _CpRbPreparedForRollback is _CpRbOps
   fun name(): String => __loc.type_name()
@@ -126,6 +144,11 @@ class _CpRbRollingBack is _CpRbOps
 
 class _CpRbWaitingForCheckpoint is _CpRbOps
   fun name(): String => __loc.type_name()
+
+  fun ref abort_next_checkpoint(sink: ConnectorSink ref):
+    _CpRbOps ref
+  =>
+    _CpRbTransition(this, _CpRbAbortCheckpoint(None), sink)
 
   fun ref enter(sink: ConnectorSink ref) =>
     sink._resume_processing_messages()

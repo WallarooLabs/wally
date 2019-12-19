@@ -554,8 +554,9 @@ actor ConnectorSink is Sink
       _barrier_coordinator.ack_barrier(this, barrier_token)
     end
 
-  fun ref swap_barrier_to_queued(queue: Array[SinkPhaseQueued]) =>
-    _phase = QueuingSinkPhase(_sink_id, this, queue)
+  fun ref swap_barrier_to_queued(queue: Array[SinkPhaseQueued] = [],
+    drop_app_msgs: Bool = false, drop_tokens: Bool = false) =>
+    _phase = QueuingSinkPhase(_sink_id, this, queue, drop_app_msgs, drop_tokens)
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
     let cpoint_id = ifdef "test_disconnect_at_5" then "5" else "" end
@@ -1211,9 +1212,13 @@ actor ConnectorSink is Sink
     _rtag = _rtag + 1
     TwoPCEncode.list_uncommitted(_rtag)
 
-  fun ref send_conn_ready() =>
+  fun ref cprb_send_conn_ready() =>
     @ll(_conn_debug, "Send conn_ready to CpRb".cstring())
-    _cprb.conn_ready(this)
+    _cprb = _cprb.conn_ready(this)
+
+  fun ref cprb_send_abort_next_checkpoint() =>
+    @ll(_conn_debug, "Send abort_next_checkpoint to CpRb".cstring())
+    _cprb = _cprb.abort_next_checkpoint(this)
 
   ///////////////////
   // NOTIFY CALLBACKS
