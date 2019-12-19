@@ -112,7 +112,7 @@ class _CpRbInit is _CpRbOps
     let empty = Array[SinkPhaseQueued]
     sink.swap_barrier_to_queued(empty)
 
-  fun ref conn_read(sink: ConnectorSink ref): _CpRbOps =>
+  fun ref conn_ready(sink: ConnectorSink ref): _CpRbOps =>
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
 class _CpRbPreparedForRollback is _CpRbOps

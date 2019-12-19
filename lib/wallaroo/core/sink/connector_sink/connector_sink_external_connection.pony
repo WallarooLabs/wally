@@ -95,6 +95,16 @@ primitive _CRTransitionDisconnected
     next.enter()
     next
 
+primitive _CRTransitionTwoPCReady
+  fun apply(curr: _ExtConnOps, advertise_status: Bool,
+    sink: ConnectorSink ref): _ExtConnOps =>
+    let next = _ExtConnTwoPCReady(advertise_status)
+    @l(Log.debug(), Log.conn_sink(),
+      "CRTransition:: %s -> %s".cstring(),
+      curr.name().cstring(), next.name().cstring())
+    next.enter(sink)
+    next
+
 /****
 Boilerplate: sed -n '/BEGIN RIGHT/,/END RIGHT/p' connector-sink-2pc-management.dot | grep -e '->' | awk '{print $1}' | sort -u | grep -v START | awk '{ printf("class _ExtConn%s is _ExtConnOps\n  fun name(): String => __loc.type_name()\n\n", $1); }'
 ****/
@@ -145,7 +155,7 @@ class _ExtConnConnected is _ExtConnOps
           if mi.txn_ids.size() == 0 then
             @l(Log.debug(), Log.conn_sink(),
               "Uncommitted txns list is empty".cstring())
-            _CRTransition(this, _ExtConnTwoPCReady(_advertise_status))
+            _CRTransitionTwoPCReady(this, _advertise_status, sink)
           else
             @l(Log.debug(), Log.conn_sink(),
               "Uncommitted txns list is NOT empty, TODOTODO".cstring())
@@ -240,9 +250,17 @@ class _ExtConnTwoPCReady is _ExtConnOps
   new create(advertise_status: Bool) =>
     _advertise_status = advertise_status
 
+  fun ref enter(sink: ConnectorSink ref) =>
+    if _advertise_status then
+      sink.send_conn_ready()
+    end
+
   fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool):
     _ExtConnOps ref
   =>
+    if (not _advertise_status) and status then
+      sink.send_conn_ready()
+    end
     _advertise_status = status
     this
 

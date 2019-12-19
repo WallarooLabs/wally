@@ -1197,6 +1197,10 @@ actor ConnectorSink is Sink
   fun prefix_rollback(): String =>
     "rollback--.--"
 
+  //////////////////////
+  // EXTERNAL CONNECTION
+  //////////////////////
+
   fun _make_hello_msg(): cwm.HelloMsg =>
     cwm.HelloMsg(_protocol_version, _cookie, _app_name, _worker_name)
 
@@ -1206,6 +1210,14 @@ actor ConnectorSink is Sink
   fun ref _make_list_uncommitted_msg_encoded(): Array[U8] val =>
     _rtag = _rtag + 1
     TwoPCEncode.list_uncommitted(_rtag)
+
+  fun ref send_conn_ready() =>
+    @ll(_conn_debug, "Send conn_ready to CpRb".cstring())
+    _cprb.conn_ready(this)
+
+  ///////////////////
+  // NOTIFY CALLBACKS
+  ///////////////////
 
   fun ref cb_connected() =>
     connected_count = connected_count + 1
