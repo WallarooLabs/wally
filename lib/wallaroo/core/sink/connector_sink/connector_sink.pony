@@ -519,11 +519,9 @@ actor ConnectorSink is Sink
     match barrier_token
     | let sbt: CheckpointBarrierToken =>
       None//TODO
-      //TODO//_phase.swap_barrier_to_queued(this)
       @ll(_conn_debug, "TODO: checkpoint & sink phase games".cstring())
       checkpoint_state(sbt.id)
-      _phase.swap_barrier_to_queued(this)
-      resume_processing_messages_queued()
+      _cprb = _cprb.cp_barrier_complete(this, sbt)
     | let srt: CheckpointRollbackBarrierToken =>
       None//TODO _twopc_seen_checkpointbarriertoken = None
       //TODO//_use_normal_processor()
@@ -554,8 +552,10 @@ actor ConnectorSink is Sink
       _barrier_coordinator.ack_barrier(this, barrier_token)
     end
 
-  fun ref swap_barrier_to_queued(queue: Array[SinkPhaseQueued] = []) =>
-    _phase = QueuingSinkPhase(_sink_id, this, queue)
+  fun ref swap_barrier_to_queued(queue: Array[SinkPhaseQueued] = [],
+    forward_tokens: Bool = true) =>
+    @ll(_conn_debug, "swap_barrier_to_queued: forward_tokens = %s".cstring(), forward_tokens.string().cstring())
+    _phase = QueuingSinkPhase(_sink_id, this, queue, forward_tokens)
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
     let cpoint_id = ifdef "test_disconnect_at_5" then "5" else "" end
@@ -615,6 +615,7 @@ actor ConnectorSink is Sink
 
   be prepare_for_rollback() =>
     @ll(_conn_debug, "Prepare for checkpoint rollback at ConnectorSink %s".cstring(), _sink_id.string().cstring())
+    None//TODO
 
   fun ref finish_preparing_for_rollback() =>
     @ll(_conn_debug, "Finish preparing for checkpoint rollback at ConnectorSink %s".cstring(), _sink_id.string().cstring())
@@ -1214,6 +1215,15 @@ actor ConnectorSink is Sink
   fun ref cprb_send_abort_next_checkpoint() =>
     @ll(_conn_debug, "Send abort_next_checkpoint to CpRb".cstring())
     _cprb = _cprb.abort_next_checkpoint(this)
+
+  fun ref cprb_send_2pc_phase1(barrier_token: CheckpointBarrierToken) =>
+    _twopc.send_phase1(this, barrier_token.id)
+
+  fun ref cprb_send_commit_to_barrier_coordinator(
+    barrier_token: CheckpointBarrierToken)
+  =>
+    @ll(_conn_debug, "Send commit to barrier coordinator for %s".cstring(), barrier_token.string().cstring())
+    _barrier_coordinator.ack_barrier(this, barrier_token)
 
   ///////////////////
   // NOTIFY CALLBACKS

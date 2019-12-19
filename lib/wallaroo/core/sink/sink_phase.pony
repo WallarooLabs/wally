@@ -17,6 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 use "wallaroo/core/common"
 use "wallaroo/core/invariant"
@@ -24,6 +25,8 @@ use "wallaroo/core/topology"
 use "wallaroo/core/barrier"
 use "wallaroo/core/checkpoint"
 use "wallaroo/core/sink/connector_sink"
+
+use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag, ...)
 
 trait SinkPhase
   fun name(): String
@@ -37,9 +40,9 @@ trait SinkPhase
     _invalid_call(__loc.method_name()); Fail()
 
   fun ref receive_barrier(input_id: RoutingId, producer: Producer,
-    barrier_token: BarrierToken)
+    barrier_token: BarrierToken): Bool
   =>
-    _invalid_call(__loc.method_name()); Fail()
+    _invalid_call(__loc.method_name()); Fail(); false
 
   fun ref queued(): Array[SinkPhaseQueued] =>
     _invalid_call(__loc.method_name()); Fail()
@@ -105,9 +108,10 @@ class NormalSinkPhase is SinkPhase
       i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
 
   fun ref receive_barrier(input_id: RoutingId, producer: Producer,
-    barrier_token: BarrierToken)
+    barrier_token: BarrierToken): Bool
   =>
     _sink.receive_new_barrier(input_id, producer, barrier_token)
+    false
 
   fun ref queued(): Array[SinkPhaseQueued] =>
     Array[SinkPhaseQueued]
@@ -123,12 +127,15 @@ class BarrierSinkPhase is SinkPhase
   var _barrier_token: BarrierToken
   let _inputs_blocking: Map[RoutingId, Producer] = _inputs_blocking.create()
   let _queued: Array[SinkPhaseQueued] = _queued.create()
+  let _completion_notifies_sink: Bool
 
-  new create(sink_id: RoutingId, sink: Sink ref, token: BarrierToken) =>
+  new create(sink_id: RoutingId, sink: Sink ref, token: BarrierToken,
+    completion_notifies_sink: Bool = true) =>
     _sink_id = sink_id
     _sink = sink
     _barrier_token = token
-    @printf[I32]("QQQ: new %s\n".cstring(), name().cstring())
+    _completion_notifies_sink = completion_notifies_sink
+    @printf[I32]("QQQ: new %s barrier %s completion_notifies_sink %s\n".cstring(), name().cstring(), _barrier_token.string().cstring(), _completion_notifies_sink.string().cstring())
 
   fun name(): String => __loc.type_name()
 
@@ -150,13 +157,14 @@ class BarrierSinkPhase is SinkPhase
     end
 
   fun ref receive_barrier(input_id: RoutingId, producer: Producer,
-    barrier_token: BarrierToken)
+    barrier_token: BarrierToken): Bool
   =>
     if input_blocking(input_id) then
       ifdef debug then
         @printf[I32]("SinkPhase %s: receive_barrier: push %s\n".cstring(), name().cstring(), barrier_token.string().cstring())
       end
       _queued.push(QueuedBarrier(input_id, producer, barrier_token))
+      false
     else
       ifdef debug then
         if barrier_token != _barrier_token then
@@ -174,6 +182,7 @@ class BarrierSinkPhase is SinkPhase
         @printf[I32]("Failed to find input_id %s in inputs at Sink %s\n"
           .cstring(), input_id.string().cstring(), _sink_id.string().cstring())
         Fail()
+        false
       end
     end
 
@@ -212,9 +221,14 @@ class BarrierSinkPhase is SinkPhase
     end
     _check_completion(_sink.inputs())
 
-  fun ref _check_completion(inputs: Map[RoutingId, Producer] box) =>
+  fun ref _check_completion(inputs: Map[RoutingId, Producer] box): Bool =>
     if inputs.size() == _inputs_blocking.size() then
-      _sink.barrier_complete(_barrier_token)
+      if _completion_notifies_sink then
+        _sink.barrier_complete(_barrier_token)
+      end
+      true
+    else
+      false
     end
 
   fun ref swap_barrier_to_queued(sink: ConnectorSink ref) =>
@@ -231,14 +245,17 @@ class QueuingSinkPhase is SinkPhase
   let _sink_id: RoutingId
   let _sink: Sink ref
   let _queued: Array[SinkPhaseQueued]
+  let _forward_tokens: Bool
+  var _forward_token_phase: (None|BarrierSinkPhase) = None
 
   new create(sink_id: RoutingId, sink: Sink ref,
-    q: Array[SinkPhaseQueued] = Array[SinkPhaseQueued].create())
+    q: Array[SinkPhaseQueued], forward_tokens: Bool)
   =>
     _sink_id = sink_id
     _sink = sink
     _queued = q
-    @printf[I32]("QQQ: new %s\n".cstring(), name().cstring())
+    _forward_tokens = forward_tokens
+    @printf[I32]("QQQ: new %s size %lu forward %s\n".cstring(), name().cstring(), q.size(), forward_tokens.string().cstring())
 
   fun name(): String => __loc.type_name()
 
@@ -254,12 +271,32 @@ class QueuingSinkPhase is SinkPhase
     _queued.push(msg)
 
   fun ref receive_barrier(input_id: RoutingId, producer: Producer,
-    barrier_token: BarrierToken)
+    barrier_token: BarrierToken): Bool
   =>
-    ifdef debug then
-      @printf[I32]("SinkPhase %s: receive_barrier: push %s\n".cstring(), name().cstring(), barrier_token.string().cstring())
+    if _forward_tokens then
+      match _forward_token_phase
+      | None =>
+        @l(Log.debug(), Log.conn_sink(), "QueuingSinkPhase: receive_barrier: 1st for %s".cstring(), barrier_token.string().cstring())
+        _forward_token_phase =
+          BarrierSinkPhase(_sink_id, _sink, barrier_token
+          where completion_notifies_sink = false)
+        false
+      | let phase: BarrierSinkPhase =>
+        @l(Log.debug(), Log.conn_sink(), "QueuingSinkPhase: receive_barrier: Nth for %s".cstring(), barrier_token.string().cstring())
+        let ret = phase.receive_barrier(input_id, producer, barrier_token)
+        if ret then
+          @l(Log.debug(), Log.conn_sink(), "QueuingSinkPhase: receive_barrier: complete for %s".cstring(), barrier_token.string().cstring())
+          _sink.barrier_complete(barrier_token)
+        end
+        ret
+      end
+    else
+      ifdef debug then
+        @printf[I32]("SinkPhase %s: receive_barrier: push %s\n".cstring(), name().cstring(), barrier_token.string().cstring())
+      end
+      _queued.push(QueuedBarrier(input_id, producer, barrier_token))
+      false
     end
-    _queued.push(QueuedBarrier(input_id, producer, barrier_token))
 
   fun ref queued(): Array[SinkPhaseQueued] =>
     let qd = Array[SinkPhaseQueued]

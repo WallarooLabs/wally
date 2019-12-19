@@ -45,8 +45,8 @@ trait _CpRbOps
   =>
     _invalid_call(__loc.method_name()); Fail(); this
 
-  fun ref cp_barrier_complete(sink: ConnectorSink ref):
-    _CpRbOps ref
+  fun ref cp_barrier_complete(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken): _CpRbOps ref
   =>
     _invalid_call(__loc.method_name()); Fail(); this
 
@@ -58,8 +58,8 @@ trait _CpRbOps
   =>
     _invalid_call(__loc.method_name()); Fail(); this
 
-  fun ref phase1_commit(sink: ConnectorSink ref):
-    _CpRbOps ref
+  fun ref phase1_commit(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken): _CpRbOps ref
   =>
     _invalid_call(__loc.method_name()); Fail(); this
 
@@ -111,21 +111,54 @@ class _CpRbAbortCheckpoint is _CpRbOps
     end
 
   fun ref enter(sink: ConnectorSink ref) =>
-    //TODO sink.swap_barrier_to_queued()
-    @l(Log.err(), Log.conn_sink(),
-      "TODO: _CpRbAbortCheckpoint: call sink.swap_barrier_to_queuedMumbleSomethingYeah".cstring())
+    sink.swap_barrier_to_queued(where forward_tokens = true)
 
-class _CpRbCPGotLocalVote is _CpRbOps
+class _CpRbCPGotLocalCommit is _CpRbOps
+  let _barrier_token: CheckpointBarrierToken
+
+  new create(barrier_token: CheckpointBarrierToken) =>
+    _barrier_token = barrier_token
+
   fun name(): String => __loc.type_name()
+
+  fun ref enter(sink: ConnectorSink ref) =>
+    sink.cprb_send_commit_to_barrier_coordinator(_barrier_token)
 
 class _CpRbCPStarts is _CpRbOps
+  let _barrier_token: CheckpointBarrierToken
+
+  new create(barrier_token: CheckpointBarrierToken) =>
+    _barrier_token = barrier_token
+
   fun name(): String => __loc.type_name()
+
+  fun ref enter(sink: ConnectorSink ref) =>
+    sink.swap_barrier_to_queued(where forward_tokens = true)
+    sink.cprb_send_2pc_phase1(_barrier_token)
+
+  fun ref phase1_abort(sink: ConnectorSink ref):
+    _CpRbOps ref
+  =>
+    @l(Log.err(), Log.conn_sink(),
+      "TODO: call phase1_abort".cstring())
+    _invalid_call(__loc.method_name()); Fail(); this
+
+  fun ref phase1_commit(sink: ConnectorSink ref, barrier_token: CheckpointBarrierToken):
+    _CpRbOps ref
+  =>
+    if barrier_token != _barrier_token then
+      @l(Log.crit(), Log.conn_sink(),
+        "Got barrier_token %s but expected %s".cstring(),
+        barrier_token.string().cstring(), _barrier_token.string().cstring())
+      Fail()
+    end
+    _CpRbTransition(this, _CpRbCPGotLocalCommit(barrier_token), sink)
 
 class _CpRbInit is _CpRbOps
   fun name(): String => __loc.type_name()
 
   fun ref enter(sink: ConnectorSink ref) =>
-    sink.swap_barrier_to_queued()
+    sink.swap_barrier_to_queued(where forward_tokens = false)
 
   fun ref conn_ready(sink: ConnectorSink ref): _CpRbOps =>
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
@@ -147,11 +180,15 @@ class _CpRbRollingBack is _CpRbOps
 class _CpRbWaitingForCheckpoint is _CpRbOps
   fun name(): String => __loc.type_name()
 
+  fun ref enter(sink: ConnectorSink ref) =>
+    sink.resume_processing_messages_queued()
+
   fun ref abort_next_checkpoint(sink: ConnectorSink ref):
     _CpRbOps ref
   =>
     _CpRbTransition(this, _CpRbAbortCheckpoint(None), sink)
 
-  fun ref enter(sink: ConnectorSink ref) =>
-    sink.resume_processing_messages_queued()
-
+  fun ref cp_barrier_complete(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken): _CpRbOps ref
+  =>
+    _CpRbTransition(this, _CpRbCPStarts(barrier_token), sink)

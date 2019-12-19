@@ -7,25 +7,25 @@ digraph mashup {
 
 	// Subgraphs
 	subgraph init {
-            ChRbInit [label="ChRbInit\nsink phase=queue both"];
+            ChRbInit [label="ChRbInit\nenter:\nsink phase=queue both"];
 	}
 	subgraph cp {
-            WaitingForCheckpoint [label="WaitingForCheckpoint\nsink phase=normal"];
-            AbortCheckpoint [label="AbortCheckpoint\nsink phase=drop app msgs, forward tokens\nabort checkpoint when checkpoint ID is known"];
+            WaitingForCheckpoint [label="WaitingForCheckpoint\nenter:\nsink phase=normal"];
+            AbortCheckpoint [label="AbortCheckpoint\nenter:\nsink phase=drop app msgs, forward tokens\nabort checkpoint when checkpoint ID is known"];
 	}
 	subgraph sacp {
-            CPStarts [label="CPStarts\nsink phase=queue app msgs, forward tokens"];
-            CPGotLocalVote [label="CPGotLocalVote\nsend commit to barrier coordinator"];
+            CPStarts [label="CPStarts\nenter:\nsink phase=queue app msgs, forward tokens\nsend TwoPCPhase1Msg"];
+            CPGotLocalCommit [label="CPGotLocalCommit\nenter:\nsend commit to barrier coordinator\nsend TwoPCPhase2Msg=commit"];
             // CPGotGlobalVote; // Can we remove this node?
 
-                                    CPStarts -> CPGotLocalVote [label="phase1_commit"];
+            CPStarts -> CPGotLocalCommit [label="phase1_commit"];
             CPStarts -> AbortCheckpoint [label="phase1_abort"];
-            CPGotLocalVote -> WaitingForCheckpoint [label="checkpoint_complete"];
+            CPGotLocalCommit -> WaitingForCheckpoint [label="checkpoint_complete"];
 	}
 	subgraph rollback {
-            PreparedForRollback [label="PreparedForRollback\nsink phase=drop app msgs, forward tokens"];
-            RollingBack [label="RollingBack\nsend rollback_info\nsend advertise_status=true\nsink phase=crash on app msgs, forward tokens"];
-            RolledBack [label="RolledBack\nack rollback barrier to barrier coordinator"];
+            PreparedForRollback [label="PreparedForRollback\nenter:\nsink phase=drop app msgs, forward tokens"];
+            RollingBack [label="RollingBack\nenter:\nsend rollback_info\nsend advertise_status=true\nsink phase=crash on app msgs, forward tokens"];
+            RolledBack [label="RolledBack\nenter:\nack rollback barrier to barrier coordinator"];
 
             PreparedForRollback -> RollingBack [label="rollback",fontcolor=red,color=red];
 	}
@@ -39,11 +39,11 @@ digraph mashup {
 	WaitingForCheckpoint -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
 	AbortCheckpoint -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
 	CPStarts -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
-	CPGotLocalVote -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
+	CPGotLocalCommit -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
 
 	WaitingForCheckpoint -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
 	CPStarts -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
-	CPGotLocalVote -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
+	CPGotLocalCommit -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
 
 	RollingBack -> RolledBack [label="conn_ready"];
 	RollingBack -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
@@ -57,11 +57,11 @@ digraph mashup {
     subgraph external_connection_component {
         graph [label="External Connection Component",labelloc=t,fontsize=30];
 
-        ExtInit [label="ExtInit\nadvertise_status=true"];
+        ExtInit [label="ExtInit\nenter:\nadvertise_status=true"];
         ExtInit -> Connected [label="tcp_connected"];
         Connected -> Disconnected [label="tcp_closed",fontcolor=red,color=red];
         Connected -> Connected [label="set_advertise_status\nfrom CpRb"];
-        Disconnected [label="Disconnected\nsend abort_next_checkpoint if advertise_status\nadvertise_status=false"];
+        Disconnected [label="Disconnected\nenter:\nsend abort_next_checkpoint if advertise_status\nadvertise_status=false"];
         Disconnected -> Connected [label="tcp_connected"];
         Disconnected -> Disconnected [label="set_advertise_status\nfrom CpRb"];
         Connected -> WaitingForRollbackPayload [label="twopc_intro:\nuncommitted txn\nlist not empty"];
@@ -70,7 +70,7 @@ digraph mashup {
         WaitingForRollbackPayload -> WaitingForRollbackPayload [label="set_advertise_status\nfrom CpRb"];
         WaitingForRollbackPayload -> Disconnected [label="tcp_closed",fontcolor=red,color=red];
 
-        TwoPCReady [label="TwoPCReady\nsend conn_ready if advertise_status"]
+        TwoPCReady [label="TwoPCReady\nenter:\nsend conn_ready if advertise_status"]
         TwoPCReady -> Disconnected [label="tcp_closed",fontcolor=red,color=red];
         TwoPCReady -> TwoPCReady [label="set_advertise_status\nfrom CpRb"]
     }
