@@ -33,7 +33,6 @@ use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 
 class ConnectorSink2PC
-  var state: TwoPCFsmState = TwoPCFsmStart
   let txn_id_initial: String = ""
   var txn_id: String = txn_id_initial
   var txn_id_at_close: String = txn_id_initial
@@ -55,48 +54,6 @@ class ConnectorSink2PC
   fun ref update_offset(encoded1_len: USize) =>
     current_offset = current_offset + encoded1_len
 
-  fun ref reset_fsm_state() =>
-    state = TwoPCFsmStart
-    txn_id = txn_id_initial
-    clear_ph1_barrier_token()
-    @ll(_twopc_debug, "2PC: reset 2PC state".cstring())
-    @ll(_twopc_debug, "2PC: set 2PC state => %d".cstring(), state())
-
-  fun state_is_start(): Bool =>
-    state is TwoPCFsmStart
-
-  fun state_is_1precommit(): Bool =>
-    state is TwoPCFsm1Precommit
-
-  fun state_is_2abort(): Bool =>
-    state is TwoPCFsm2Abort
-
-  fun state_is_2commit(): Bool =>
-    state is TwoPCFsm2Commit
-
-  fun state_is_2commit_fast(): Bool =>
-    state is TwoPCFsm2CommitFast
-
-  fun ref set_state_1precommit() =>
-    state = TwoPCFsm1Precommit
-    @ll(_twopc_debug, "2PC: set 2PC state => %d".cstring(), state())
-
-  fun ref set_state_commit() =>
-    state = TwoPCFsm2Commit
-    @ll(_twopc_debug, "2PC: set 2PC state => %d".cstring(), state())
-
-  fun ref set_state_commit_fast() =>
-    state = TwoPCFsm2CommitFast
-    @ll(_twopc_debug, "2PC: set 2PC state => %d".cstring(), state())
-
-  fun ref set_state_abort() =>
-    state = TwoPCFsm2Abort
-    @ll(_twopc_debug, "2PC: set 2PC state => %d".cstring(), state())
-
-  fun ref preemptive_txn_abort(sbt: CheckpointBarrierToken) =>
-    txn_id = "preemptive txn abort"
-    ph1_barrier_token = sbt
-
   fun ref barrier_complete(sbt: CheckpointBarrierToken,
     conn: ConnectorSink ref,
     is_rollback: Bool = false,
@@ -114,10 +71,7 @@ class ConnectorSink2PC
     current_txn_end_offset = current_offset'
 
   fun ref hard_close() =>
-    txn_id_at_close = txn_id
-    ph1_barrier_token_at_close = ph1_barrier_token
-    @ll(_twopc_debug, "2PC: DBG: hard_close: state = %s, txn_id_at_close = %s, ph1_barrier_token_at_close = %s".cstring(), state().string().cstring(), txn_id_at_close.cstring(), ph1_barrier_token_at_close.string().cstring())
-    // Do not reset_fsm_state() here.  Wait (typically) until 2PC intro is done.
+    None//TODO
 
   fun make_txn_id_string(checkpoint_id: CheckpointId): String =>
     stream_name + ":c_id=" + checkpoint_id.string()

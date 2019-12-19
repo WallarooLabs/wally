@@ -448,7 +448,7 @@ actor ConnectorSink is Sink
   =>
     @ll(_twopc_debug, "2PC: abort_decision: txn_id %s %s".cstring(), txn_id.cstring(), reason.cstring())
 
-    _twopc.set_state_abort()
+    None//TODO
     _barrier_coordinator.abort_barrier(barrier_token)
 
 
@@ -599,11 +599,6 @@ actor ConnectorSink is Sink
     Serialize hard state (i.e., can't afford to lose it) and send
     it to the local event log and reset 2PC state.
     """
-    if not (_twopc.state_is_1precommit() or _twopc.state_is_start()) then
-      @ll(_twopc_err, "2PC: ERROR: _twopc.state = %d".cstring(), _twopc.state())
-      Fail()
-    end
-
     @ll(_twopc_debug, "2PC: Checkpoint state %s at ConnectorSink %s, txn-id %s current_offset %lu _acked_point_of_ref %lu _pending_writev_total %lu".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring(), _twopc.txn_id.cstring(), _twopc.current_offset.u64(), _acked_point_of_ref, _pending_writev_total)
 
     let wb: Writer = wb.create()
@@ -632,7 +627,6 @@ actor ConnectorSink is Sink
     (But that's async from our point of view, beware tricksy bugs....)
     """
     @ll(_conn_info, "Rollback to %s at ConnectorSink %s".cstring(), checkpoint_id.string().cstring(), _sink_id.string().cstring())
-    @ll(_twopc_info, "2PC: Rollback: twopc_state %d txn_id %s.".cstring(), _twopc.state(), _twopc.txn_id.cstring())
 
     let rollback_to_c_id = _twopc.make_txn_id_string(checkpoint_id)
 
@@ -1189,9 +1183,6 @@ actor ConnectorSink is Sink
     of confirmation from the downstream.
     """
     None
-
-  fun get_twopc_state(): U8 =>
-    _twopc.state()
 
   fun prefix_skip(): String =>
     "skip--.--"

@@ -168,5 +168,4 @@ class ConnectorSinkNotify
       @ll(_conn_info, ("ConnectorSink is no longer experiencing" +
         " back pressure, connected = %s").cstring(),
         _connected.string().cstring())
-      @ll(_conn_debug, "DBGDBG: unthrottled: buffer check, FSM state = %d".cstring(), conn.get_twopc_state())
     end
