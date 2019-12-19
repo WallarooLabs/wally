@@ -239,16 +239,21 @@ class QueuingSinkPhase is SinkPhase
   let _queued: Array[SinkPhaseQueued]
   let _drop_app_msgs: Bool
   let _drop_tokens: Bool
+  let _forward_app_msgs: Bool
+  let _forward_tokens: Bool
 
   new create(sink_id: RoutingId, sink: Sink ref,
-    q: Array[SinkPhaseQueued] = [], drop_app_msgs: Bool, drop_tokens: Bool)
+    q: Array[SinkPhaseQueued] = [], drop_app_msgs: Bool, drop_tokens: Bool,
+    forward_app_msgs: Bool, forward_tokens: Bool)
   =>
     _sink_id = sink_id
     _sink = sink
     _queued = q
     _drop_app_msgs = drop_app_msgs
     _drop_tokens = drop_tokens
-    @printf[I32]("QQQ: new %s\n".cstring(), name().cstring())
+    _forward_app_msgs = forward_app_msgs
+    _forward_tokens = forward_tokens
+    @printf[I32]("QQQ: new %s: drop %s %s forward %s %s\n".cstring(), name().cstring(), _drop_app_msgs.string().cstring(), _drop_tokens.string().cstring(), _forward_app_msgs.string().cstring(), _forward_tokens.string().cstring())
 
   fun name(): String => __loc.type_name()
 
