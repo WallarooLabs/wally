@@ -77,10 +77,10 @@ Let’s talk about the aforementioned Market Spread application and some recent 
 - It has two streams of data, only one of which occasionally produces output that results in network traffic (1 out of 70,000).
 - Messages are 50 to 60 bytes in size.
 
-During a recent performance testing run using 16 cores on an AWS m4 class machine, we were able to run each stream of data at around 1.5 million messages per second for a total of 3 million messages per second across the two streams. Our processing latencies were:
+During a recent performance testing run using 16 cores on an Azure F48s v2 machine, we were able to run each stream of data at around 1.3 million messages per second for a total of 2.6 million messages per second across the two streams. Our processing latencies were:
 
 | |  50% | 95% | 99% | 99.9% | 99.99% |
 | :---: | :---: | :---: | :---: | :---: | :---: |
-| <= | 66µs | 0.5ms | 0.5ms | 0.5ms | 1 ms |
+| <= | 32µs | 260µs | 260µs | 0.5ms | 2 ms |
 
 Even with the application caveats that we laid out, we think that is some pretty impressive performance. Performance that we are committed to maintaining as we continue to add functionality to Wallaroo.
