@@ -554,11 +554,8 @@ actor ConnectorSink is Sink
       _barrier_coordinator.ack_barrier(this, barrier_token)
     end
 
-  fun ref swap_barrier_to_queued(queue: Array[SinkPhaseQueued] = [],
-    drop_app_msgs: Bool = false, drop_tokens: Bool = false,
-    forward_app_msgs: Bool = false, forward_tokens: Bool = false) =>
-    _phase = QueuingSinkPhase(_sink_id, this, queue,
-      drop_app_msgs, drop_tokens, forward_app_msgs, forward_tokens)
+  fun ref swap_barrier_to_queued(queue: Array[SinkPhaseQueued] = []) =>
+    _phase = QueuingSinkPhase(_sink_id, this, queue)
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
     let cpoint_id = ifdef "test_disconnect_at_5" then "5" else "" end

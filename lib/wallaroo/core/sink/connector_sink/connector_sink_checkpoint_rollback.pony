@@ -106,12 +106,14 @@ class _CpRbAbortCheckpoint is _CpRbOps
     _checkpoint_to_abort = checkpoint_to_abort
     match _checkpoint_to_abort
     | let cbt: CheckpointBarrierToken =>
-        @l(Log.err(), Log.conn_sink(),
-          "TODO: call cprb_abort_checkpoint".cstring())
+      @l(Log.err(), Log.conn_sink(),
+        "TODO: call cprb_abort_checkpoint".cstring())
     end
 
   fun ref enter(sink: ConnectorSink ref) =>
-    sink.swap_barrier_to_queued(where drop_app_msgs = true)
+    //TODO sink.swap_barrier_to_queued()
+    @l(Log.err(), Log.conn_sink(),
+      "TODO: _CpRbAbortCheckpoint: call sink.swap_barrier_to_queuedMumbleSomethingYeah".cstring())
 
 class _CpRbCPGotLocalVote is _CpRbOps
   fun name(): String => __loc.type_name()

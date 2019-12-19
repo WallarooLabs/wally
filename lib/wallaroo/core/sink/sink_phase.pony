@@ -67,9 +67,6 @@ trait SinkPhase
 class InitialSinkPhase is SinkPhase
   fun name(): String => __loc.type_name()
 
-  new create() =>
-    @printf[I32]("QQQ: new %s\n".cstring(), name().cstring())
-
 class EarlySinkPhase is SinkPhase
   let _sink: Sink ref
 
@@ -237,23 +234,14 @@ class QueuingSinkPhase is SinkPhase
   let _sink_id: RoutingId
   let _sink: Sink ref
   let _queued: Array[SinkPhaseQueued]
-  let _drop_app_msgs: Bool
-  let _drop_tokens: Bool
-  let _forward_app_msgs: Bool
-  let _forward_tokens: Bool
 
   new create(sink_id: RoutingId, sink: Sink ref,
-    q: Array[SinkPhaseQueued] = [], drop_app_msgs: Bool, drop_tokens: Bool,
-    forward_app_msgs: Bool, forward_tokens: Bool)
+    q: Array[SinkPhaseQueued] = Array[SinkPhaseQueued].create())
   =>
     _sink_id = sink_id
     _sink = sink
     _queued = q
-    _drop_app_msgs = drop_app_msgs
-    _drop_tokens = drop_tokens
-    _forward_app_msgs = forward_app_msgs
-    _forward_tokens = forward_tokens
-    @printf[I32]("QQQ: new %s: drop %s %s forward %s %s\n".cstring(), name().cstring(), _drop_app_msgs.string().cstring(), _drop_tokens.string().cstring(), _forward_app_msgs.string().cstring(), _forward_tokens.string().cstring())
+    @printf[I32]("QQQ: new %s\n".cstring(), name().cstring())
 
   fun name(): String => __loc.type_name()
 
@@ -263,9 +251,6 @@ class QueuingSinkPhase is SinkPhase
     msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    if _drop_app_msgs then
-      return
-    end
     let msg = TypedQueuedMessage[D](metric_name, pipeline_time_spent,
       data, key, event_ts, watermark_ts, i_producer_id, i_producer, msg_uid,
       frac_ids, i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
@@ -274,12 +259,6 @@ class QueuingSinkPhase is SinkPhase
   fun ref receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    if _drop_tokens then
-      ifdef debug then
-        @printf[I32]("SinkPhase %s: receive_barrier: drop %s\n".cstring(), name().cstring(), barrier_token.string().cstring())
-      end
-      return
-    end
     ifdef debug then
       @printf[I32]("SinkPhase %s: receive_barrier: push %s\n".cstring(), name().cstring(), barrier_token.string().cstring())
     end
