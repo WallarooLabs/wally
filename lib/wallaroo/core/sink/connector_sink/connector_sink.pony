@@ -516,6 +516,10 @@ actor ConnectorSink is Sink
     | let sbt: CheckpointBarrierToken =>
       None//TODO
       //TODO//_phase.swap_barrier_to_queued(this)
+      @ll(_conn_debug, "TODO: checkpoint & sink phase games".cstring())
+      checkpoint_state(sbt.id)
+      _phase.swap_barrier_to_queued(this)
+      _resume_processing_messages()
     | let srt: CheckpointRollbackBarrierToken =>
       None//TODO _twopc_seen_checkpointbarriertoken = None
       //TODO//_use_normal_processor()
@@ -542,6 +546,7 @@ actor ConnectorSink is Sink
       None//TODO _resume_processing_messages()
     end
     if ack_now then
+      @ll(_conn_debug, "Barrier %s acked at ConnectorSink %s".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
       _barrier_coordinator.ack_barrier(this, barrier_token)
     end
 
