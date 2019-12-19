@@ -271,13 +271,13 @@ actor ConnectorSink is Sink
       __loc.type_name().cstring(), __loc.method_name().cstring(),
       _sink_id.string().cstring())
     report_ready_to_work()
-    //TODO//_use_normal_processor()
+    _use_normal_processor()
 
   be cluster_ready_to_work(initializer: LocalTopologyInitializer) =>
     @ll(_conn_info, "Lifecycle: %s.%s at %s".cstring(),
       __loc.type_name().cstring(), __loc.method_name().cstring(),
       _sink_id.string().cstring())
-    //TODO//_use_normal_processor()
+    _use_normal_processor()
 
   fun ref _initial_connect() =>
     @ll(_conn_info, "ConnectorSink initializing connection to %s:%s".cstring(),
