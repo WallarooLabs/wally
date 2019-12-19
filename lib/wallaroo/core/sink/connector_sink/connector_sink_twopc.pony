@@ -76,11 +76,6 @@ class ConnectorSink2PC
   fun make_txn_id_string(checkpoint_id: CheckpointId): String =>
     stream_name + ":c_id=" + checkpoint_id.string()
 
-  fun ref twopc_phase1_reply(sink: ConnectorSink ref,
-    txn_id': String, commit: Bool): (Bool | None)
-  =>
-    None//TODO
-
   fun ref clear_ph1_barrier_token() =>
     ph1_barrier_token = ph1_barrier_token_initial
 

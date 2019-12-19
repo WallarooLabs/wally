@@ -1,6 +1,6 @@
 /*
 
-Copyright (C) 2016-2017, Wallaroo Labs
+Copyright (C) 2016-2019, Wallaroo Labs
 Copyright (C) 2016-2017, The Pony Developers
 Copyright (c) 2014-2015, Causality Ltd.
 All rights reserved.
@@ -169,6 +169,7 @@ actor ConnectorSink is Sink
   var _report_ready_to_work_done: Bool = false
 
   // Connector Protocol
+  var _ec: _ExtConnOps = _ExtConnInit
   var _rtag: U64 = 77777
   var _seq_id: SeqId = 0
   var _ext_conn_state: ExtConnStateState = ExtConnStateDisconnected
@@ -432,10 +433,6 @@ actor ConnectorSink is Sink
 
   be report_status(code: ReportStatusCode) =>
     None
-
-  ///////////////
-  // 2PC glue funcs between this, ConnectorSinkNotify, and ConnectorSink2PC
-  ///////////////
 
   fun ref twopc_phase1_reply(txn_id: String, commit: Bool) =>
     """
@@ -1190,25 +1187,18 @@ actor ConnectorSink is Sink
   fun prefix_rollback(): String =>
     "rollback--.--"
 
-  fun ref cb_connected() =>
-    let hello = cwm.HelloMsg(_protocol_version, _cookie,
-      _app_name, _worker_name)
-    send_msg(hello)
+  fun _make_hello_msg(): cwm.HelloMsg =>
+    cwm.HelloMsg(_protocol_version, _cookie, _app_name, _worker_name)
 
-    // 2PC: We don't know how many transactions the sink has that
-    // have been waiting for a phase 2 message.  We need to discover
-    // their txn_id strings and abort/commit them.
+  fun _make_notify1_msg(): cwm.NotifyMsg =>
+    cwm.NotifyMsg(_stream_id, _stream_name, _message_id)
+
+  fun ref _make_list_uncommitted_msg_encoded(): Array[U8] val =>
     _rtag = _rtag + 1
-    let list_u = TwoPCEncode.list_uncommitted(_rtag)
-    let list_u_msg = cwm.MessageMsg(0, 0, 0, None, list_u)
-    send_msg(list_u_msg)
+    TwoPCEncode.list_uncommitted(_rtag)
 
-    // 2PC: We also don't know how much fine-grained control the sink
-    // has for selectively aborting & committing the stuff that we
-    // send to it.  Thus, we should not send any Wallaroo app messages
-    // to the sink until we get a ReplyUncommittedMsg response.
-
-    _ext_conn_state = ExtConnStateHandshake
+  fun ref cb_connected() =>
+    _ec = _ec.tcp_connected(this)
     if true then //TODO//
       @ll(_conn_err, "//TODO// unthrottle early".cstring())
       _notify.unthrottled(this)

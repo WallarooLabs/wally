@@ -58,7 +58,7 @@ digraph mashup {
         graph [label="External Connection Component",labelloc=t,fontsize=30];
 
         ExtInit [label="ExtInit\nadvertise_status=true"];
-        ExtInit -> ExtInit [label="reconn_timer"];
+        ## ExtInit -> ExtInit [label="reconn_timer"];
         ExtInit -> Connected [label="tcp_connected"];
         Connected -> Disconnected [label="tcp_closed",fontcolor=red,color=red];
         Connected -> Connected [label="advertise_status\nfrom CpRb"];
