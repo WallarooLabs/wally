@@ -1211,6 +1211,9 @@ actor ConnectorSink is Sink
       _notify.unthrottled(this)
     end
 
+  fun ref cb_closed() =>
+    _ec = _ec.tcp_closed(this)
+
   fun ref cb_received(data: Array[U8] val): None ?
   =>
     match cwm.Frame.decode(data)?

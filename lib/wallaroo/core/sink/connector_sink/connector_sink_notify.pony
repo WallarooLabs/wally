@@ -86,6 +86,7 @@ class ConnectorSinkNotify
     _connected = false
     _throttled = false
     throttled(conn)
+    conn.cb_closed()
 
   fun ref dispose() =>
     @ll(_conn_info, "ConnectorSink connection dispose".cstring())

@@ -58,22 +58,21 @@ digraph mashup {
         graph [label="External Connection Component",labelloc=t,fontsize=30];
 
         ExtInit [label="ExtInit\nadvertise_status=true"];
-        ## ExtInit -> ExtInit [label="reconn_timer"];
         ExtInit -> Connected [label="tcp_connected"];
         Connected -> Disconnected [label="tcp_closed",fontcolor=red,color=red];
-        Connected -> Connected [label="advertise_status\nfrom CpRb"];
+        Connected -> Connected [label="set_advertise_status\nfrom CpRb"];
         Disconnected [label="Disconnected\nsend abort_next_checkpoint if advertise_status\nadvertise_status=false"];
         Disconnected -> Connected [label="tcp_connected"];
-        Disconnected -> Disconnected [label="reconn_timer"];
-        Disconnected -> Disconnected [label="advertise_status\nfrom CpRb"];
+        Disconnected -> Disconnected [label="set_advertise_status\nfrom CpRb"];
         Connected -> WaitingForRollbackPayload [label="twopc_intro:\nuncommitted txn\nlist not empty"];
         Connected -> TwoPCReady [label="twopc_intro:\nuncommited txn\nlist is empty"];
         WaitingForRollbackPayload -> TwoPCReady [label="rollback_info\nfrom ChRb"];
-        WaitingForRollbackPayload -> WaitingForRollbackPayload [label="advertise_status\nfrom CpRb"];
+        WaitingForRollbackPayload -> WaitingForRollbackPayload [label="set_advertise_status\nfrom CpRb"];
+        WaitingForRollbackPayload -> Disconnected [label="tcp_closed",fontcolor=red,color=red];
 
         TwoPCReady [label="TwoPCReady\nsend conn_ready if advertise_status"]
         TwoPCReady -> Disconnected [label="tcp_closed",fontcolor=red,color=red];
-        TwoPCReady -> TwoPCReady [label="advertise_status\nfrom CpRb"]
+        TwoPCReady -> TwoPCReady [label="set_advertise_status\nfrom CpRb"]
     }
     # END RIGHT
 
