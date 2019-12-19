@@ -343,11 +343,6 @@ actor TCPSink is Sink
   fun ref process_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    match barrier_token
-    | let srt: CheckpointRollbackBarrierToken =>
-      _phase.prepare_for_rollback(barrier_token)
-    end
-
     _phase.receive_barrier(input_id, producer,
       barrier_token)
 

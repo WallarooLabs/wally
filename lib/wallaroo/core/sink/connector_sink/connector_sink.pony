@@ -492,7 +492,7 @@ actor ConnectorSink is Sink
 
     match barrier_token
     | let srt: CheckpointRollbackBarrierToken =>
-      _phase.prepare_for_rollback(barrier_token)
+      None//TODO
     | let sbt: CheckpointBarrierToken =>
       //TODO//_twopc_seen_checkpointbarriertoken = sbt
       if _connected then
@@ -615,11 +615,10 @@ actor ConnectorSink is Sink
 
   be prepare_for_rollback() =>
     @ll(_conn_debug, "Prepare for checkpoint rollback at ConnectorSink %s".cstring(), _sink_id.string().cstring())
-    _phase.early_prepare_for_rollback()
 
   fun ref finish_preparing_for_rollback() =>
+    @ll(_conn_debug, "Finish preparing for checkpoint rollback at ConnectorSink %s".cstring(), _sink_id.string().cstring())
     None//TODO
-    //TODO//_use_normal_processor()
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
