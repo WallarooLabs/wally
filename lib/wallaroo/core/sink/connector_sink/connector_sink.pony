@@ -523,17 +523,17 @@ actor ConnectorSink is Sink
       @ll(_conn_debug, "TODO: checkpoint & sink phase games".cstring())
       checkpoint_state(sbt.id)
       _phase.swap_barrier_to_queued(this)
-      _resume_processing_messages()
+      resume_processing_messages_queued()
     | let srt: CheckpointRollbackBarrierToken =>
       None//TODO _twopc_seen_checkpointbarriertoken = None
       //TODO//_use_normal_processor()
     | let rbrt: CheckpointRollbackResumeBarrierToken =>
       //TODO//_twopc_seen_checkpointbarriertoken = None
       None//TODO
-      //TODO//_resume_processing_messages()
+      //TODO//resume_processing_messages_queued()
     | let sat: AutoscaleBarrierToken =>
       //TODO//_twopc_last_autoscale_barrier_token = sat
-      //TODO//_resume_processing_messages()
+      //TODO//resume_processing_messages_queued()
       None//TODO
     | let sart: AutoscaleResumeBarrierToken =>
       // if sart.id() == _twopc_last_autoscale_barrier_token.id() then
@@ -544,10 +544,10 @@ actor ConnectorSink is Sink
       //     _twopc.send_workers_left(this, 7 /*unused by sink*/, lws)
       //   end
       // end
-      None//TODO _resume_processing_messages()
+      None//TODO resume_processing_messages_queued()
     else
       // Any other remaining barrier token
-      None//TODO _resume_processing_messages()
+      None//TODO resume_processing_messages_queued()
     end
     if ack_now then
       @ll(_conn_debug, "Barrier %s acked at ConnectorSink %s".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
@@ -574,10 +574,7 @@ actor ConnectorSink is Sink
       _schedule_reconnect()
     end
 
-  fun ref _resume_processing_messages(discard_app_msgs: Bool = false) =>
-    _phase.resume_processing_messages(discard_app_msgs)
-
-  fun ref resume_processing_messages_queued(discard_app_msgs: Bool) =>
+  fun ref resume_processing_messages_queued(discard_app_msgs: Bool = false) =>
     let queued = _phase.queued()
     _use_normal_processor()
     for q in queued.values() do

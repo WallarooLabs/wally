@@ -88,6 +88,9 @@ class EarlySinkPhase is SinkPhase
     // our restart process.  There's nothing to do here.
     None
 
+  fun ref queued(): Array[SinkPhaseQueued] =>
+    Array[SinkPhaseQueued]
+
 class NormalSinkPhase is SinkPhase
   let _sink: Sink ref
 
@@ -231,6 +234,10 @@ class BarrierSinkPhase is SinkPhase
     _sink.resume_processing_messages_queued(discard_message_type)
 
 class QueuingSinkPhase is SinkPhase
+  """
+  NOTE: This stage is used only by ConnectorSink and does not follow
+        the conventions of callbacks used by generic Sinks.
+  """
   let _sink_id: RoutingId
   let _sink: Sink ref
   let _queued: Array[SinkPhaseQueued]

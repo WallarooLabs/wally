@@ -153,5 +153,5 @@ class _CpRbWaitingForCheckpoint is _CpRbOps
     _CpRbTransition(this, _CpRbAbortCheckpoint(None), sink)
 
   fun ref enter(sink: ConnectorSink ref) =>
-    sink._resume_processing_messages()
+    sink.resume_processing_messages_queued()
 
