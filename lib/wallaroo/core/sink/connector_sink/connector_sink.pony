@@ -171,6 +171,7 @@ actor ConnectorSink is Sink
 
   // Connector Protocol
   var _ec: _ExtConnOps = _ExtConnInit
+  var _cprb: _CpRbOps
   var _rtag: U64 = 77777
   var _seq_id: SeqId = 0
   var _ext_conn_state: ExtConnStateState = ExtConnStateDisconnected
@@ -240,6 +241,9 @@ actor ConnectorSink is Sink
       @ll(_conn_info, "===ConnectorSink %s created===".cstring(),
         _sink_id.string().cstring())
     end
+    _cprb = _CpRbInit
+    // _CpRbInit is the starting state, so we must call enter() ourselves.
+    try (_cprb as _CpRbInit).enter(this) else Fail() end
     _phase = EarlySinkPhase(this)
 
   //
