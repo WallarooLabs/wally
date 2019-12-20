@@ -160,6 +160,9 @@ class _CpRbCPGotLocalCommit is _CpRbOps
 
   fun ref enter(sink: ConnectorSink ref) =>
     sink.cprb_send_commit_to_barrier_coordinator(_barrier_token)
+    @l(Log.info(), Log.conn_sink(),
+      "QQQ: DISCONNECT HACK".cstring())
+    sink.cprb_inject_hard_close()
 
   fun ref checkpoint_complete(sink: ConnectorSink ref,
     checkpoint_id: CheckpointId): _CpRbOps ref
@@ -172,6 +175,7 @@ class _CpRbCPGotLocalCommit is _CpRbOps
     end
     let txn_id = sink.cprb_make_txn_id_string(_barrier_token.id)
     sink.cprb_send_2pc_phase2(txn_id, true)
+
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
   fun ref abort_next_checkpoint(sink: ConnectorSink ref):

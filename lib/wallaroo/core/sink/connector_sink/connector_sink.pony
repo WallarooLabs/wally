@@ -1235,6 +1235,13 @@ actor ConnectorSink is Sink
   fun ref cprb_make_txn_id_string(checkpoint_id: CheckpointId): String =>
     _twopc.make_txn_id_string(checkpoint_id)
 
+  be cprb_inject_hard_close() =>
+    // FSM state transitions can be lost in cross-CpRb-ExtConn calling.
+    // In _hard_close's case, the circular cross-FSM call happens via
+    // the ConnectorSinkNotify.closed() -> cb_closed() -> ...
+    _hard_close()
+    _schedule_reconnect()
+
   ///////////////////
   // NOTIFY CALLBACKS
   ///////////////////
