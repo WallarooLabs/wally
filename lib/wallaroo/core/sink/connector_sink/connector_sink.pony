@@ -1223,6 +1223,12 @@ actor ConnectorSink is Sink
     @ll(_conn_debug, "Send commit to barrier coordinator for %s".cstring(), barrier_token.string().cstring())
     _barrier_coordinator.ack_barrier(this, barrier_token)
 
+  fun ref cprb_send_abort_to_barrier_coordinator(
+    barrier_token: CheckpointBarrierToken, txn_id: String)
+  =>
+    @ll(_conn_debug, "Send abort to barrier coordinator for %s".cstring(), barrier_token.string().cstring())
+    abort_decision("Phase 2 abort", txn_id, barrier_token)
+
   fun ref cprb_make_txn_id_string(checkpoint_id: CheckpointId): String =>
     _twopc.make_txn_id_string(checkpoint_id)
 

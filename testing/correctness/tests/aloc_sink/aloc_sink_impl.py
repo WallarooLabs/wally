@@ -409,6 +409,10 @@ class AsyncServer(asynchat.async_chat, object):
                     self._txn_commit_next = False
                     logging.error('2PC: Phase 1 invalid stream_id {} in {}'
                         .format(stream_id, msg2))
+                if start_por != self._last_committed_offset:
+                    self._txn_commit_next = False
+                    logging.error('2PC: Phase 1 invalid start_por {} _last_committed_offset {}'
+                        .format(start_por, self._last_committed_offset))
                 if start_por > end_por:
                     self._txn_commit_next = False
                     logging.error('2PC: Phase 1 invalid start_por {} end_por {}'

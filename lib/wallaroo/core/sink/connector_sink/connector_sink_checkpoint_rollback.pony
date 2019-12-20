@@ -100,19 +100,44 @@ Boilerplate: sed -n '/BEGIN LEFT/,/END LEFT/p' connector-sink-2pc-management.dot
 
 class _CpRbAbortCheckpoint is _CpRbOps
   var _checkpoint_to_abort: (None | CheckpointBarrierToken)
+  var _abort_sent: Bool = false
+  let _send_phase1: Bool
 
   fun name(): String => __loc.type_name()
 
   new create(checkpoint_to_abort: (None | CheckpointBarrierToken)) =>
     _checkpoint_to_abort = checkpoint_to_abort
-    match _checkpoint_to_abort
-    | let cbt: CheckpointBarrierToken =>
-      @l(Log.err(), Log.conn_sink(),
-        "TODO: call cprb_abort_checkpoint".cstring())
-    end
+    _send_phase1 = match checkpoint_to_abort
+      | None =>
+        true
+      else
+        false
+      end
 
   fun ref enter(sink: ConnectorSink ref) =>
     sink.swap_barrier_to_queued(where forward_tokens = true)
+    _is_checkpoint_id_known(sink)
+
+  fun ref _is_checkpoint_id_known(sink: ConnectorSink ref) =>
+    match _checkpoint_to_abort
+    | let cbt: CheckpointBarrierToken =>
+      if not _abort_sent then
+        let txn_id = sink.cprb_make_txn_id_string(cbt.id)
+        if _send_phase1 then
+          sink.cprb_send_2pc_phase1(cbt)
+        end
+        sink.cprb_send_2pc_phase2(txn_id, false)
+        sink.cprb_send_abort_to_barrier_coordinator(cbt, txn_id)
+        _abort_sent = true
+      end
+    end
+
+  fun ref cp_barrier_complete(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken): _CpRbOps ref
+  =>
+    _checkpoint_to_abort = barrier_token
+    _is_checkpoint_id_known(sink)
+    this
 
 class _CpRbCPGotLocalCommit is _CpRbOps
   let _barrier_token: CheckpointBarrierToken
@@ -153,9 +178,15 @@ class _CpRbCPStarts is _CpRbOps
   fun ref phase1_abort(sink: ConnectorSink ref, txn_id: String):
     _CpRbOps ref
   =>
-    @l(Log.err(), Log.conn_sink(),
-      "TODO: call phase1_abort".cstring())
-    _invalid_call(__loc.method_name()); Fail(); this
+    let expected_txn_id = sink.cprb_make_txn_id_string(_barrier_token.id)
+    if txn_id != expected_txn_id then
+      @l(Log.crit(), Log.conn_sink(),
+        "Got txn_id %s but expected %s".cstring(),
+        txn_id.cstring(), expected_txn_id.cstring())
+      Fail()
+    end
+    sink.cprb_send_abort_to_barrier_coordinator(_barrier_token, txn_id)
+    _CpRbTransition(this, _CpRbAbortCheckpoint(_barrier_token), sink)
 
   fun ref phase1_commit(sink: ConnectorSink ref, txn_id: String):
     _CpRbOps ref

@@ -51,6 +51,9 @@ class ConnectorSink2PC
     stream_name = stream_name'
 
   fun ref update_offset(encoded1_len: USize) =>
+    if txn_id != txn_id_initial then
+      Fail()
+    end
     current_offset = current_offset + encoded1_len
 
   fun ref barrier_complete(sbt: CheckpointBarrierToken,
@@ -78,7 +81,7 @@ class ConnectorSink2PC
   fun ref clear_ph1_barrier_token() =>
     ph1_barrier_token = ph1_barrier_token_initial
 
-  fun send_phase1(sink: ConnectorSink ref, checkpoint_id: CheckpointId) =>
+  fun ref send_phase1(sink: ConnectorSink ref, checkpoint_id: CheckpointId) =>
     let tid = make_txn_id_string(checkpoint_id)
     let where_list: cwm.WhereList =
       [(1, last_offset.u64(), current_offset.u64())]
@@ -86,13 +89,23 @@ class ConnectorSink2PC
     let msg: cwm.MessageMsg = cwm.MessageMsg(0, 0, 0, None, bs)
     sink.send_msg(msg)
     @ll(_twopc_debug, "2PC: sent phase 1 where_list 1,%s,%s tid/txn_id %s".cstring(), last_offset.string().cstring(), current_offset.string().cstring(), tid.cstring())
+    txn_id = tid
+    current_txn_end_offset = current_offset
 
-  fun send_phase2(sink: ConnectorSink ref, tid: String, commit: Bool)
+  fun ref send_phase2(sink: ConnectorSink ref, tid: String, commit: Bool)
   =>
     let bs: Array[U8] val = TwoPCEncode.phase2(tid, commit)
     let msg: cwm.MessageMsg = cwm.MessageMsg(0, 0, 0, None, bs)
     sink.send_msg(msg)
     @ll(_twopc_debug, "2PC: sent phase 2 commit=%s for tid/txn_id %s".cstring(), commit.string().cstring(), tid.cstring())
+    txn_id = txn_id_initial
+    if commit and false then
+      last_offset = current_txn_end_offset
+      if last_offset != current_offset then
+        @ll(_twopc_err, "Offset error during txn: last_offset %lu current_offset %lu".cstring(), last_offset, current_offset)
+        Fail()
+      end
+    end
 
   fun send_workers_left(sink: ConnectorSink ref,
     rtag: U64, leaving_workers: Array[cwm.WorkerName val] val)
