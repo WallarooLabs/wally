@@ -85,7 +85,7 @@ class _ExtConnState
 primitive _ECTransition
   fun apply(curr: _ExtConnOps, next: _ExtConnOps): _ExtConnOps =>
     @l(Log.debug(), Log.conn_sink(),
-      "CRTransition:: %s -> %s".cstring(),
+      "ECTransition:: %s -> %s".cstring(),
       curr.name().cstring(), next.name().cstring())
     next
 
@@ -95,7 +95,7 @@ primitive _ECTransitionConnected
   =>
     let next = _ExtConnConnected(state)
     @l(Log.debug(), Log.conn_sink(),
-      "CRTransition:: %s -> %s".cstring(),
+      "ECTransition:: %s -> %s".cstring(),
       curr.name().cstring(), next.name().cstring())
     next.enter(sink)
     next
@@ -106,7 +106,7 @@ primitive _ECTransitionDisconnected
   =>
     let next = _ExtConnDisconnected(state)
     @l(Log.debug(), Log.conn_sink(),
-      "CRTransition:: %s -> %s".cstring(),
+      "ECTransition:: %s -> %s".cstring(),
       curr.name().cstring(), next.name().cstring())
     next.enter(sink)
     next
@@ -117,7 +117,7 @@ primitive _ECTransitionTwoPCReady
   =>
     let next = _ExtConnTwoPCReady(state)
     @l(Log.debug(), Log.conn_sink(),
-      "CRTransition:: %s -> %s".cstring(),
+      "ECTransition:: %s -> %s".cstring(),
       curr.name().cstring(), next.name().cstring())
     next.enter(sink)
     next
@@ -174,8 +174,6 @@ class _ExtConnConnected is _ExtConnOps
               "Uncommitted txns list is empty".cstring())
             _ECTransitionTwoPCReady(this, _state, sink)
           else
-            @l(Log.debug(), Log.conn_sink(),
-              "Uncommitted txns list is NOT empty, TODOTODO".cstring())
             _state.uncommitted_txn_ids = mi.txn_ids
             _ECTransition(this, _ExtConnWaitingForRollbackPayload(
               _state))
@@ -332,7 +330,24 @@ class _ExtConnWaitingForRollbackPayload is _ExtConnOps
     barrier_token: CheckpointBarrierToken): _ExtConnOps ref
   =>
     _state.rollback_info = barrier_token
-    @l(Log.crit(), Log.conn_sink(), "TODO: real rollback stuff".cstring())
+    match _state.uncommitted_txn_ids
+    | None =>
+      Fail()
+    | let uncommitted: Array[String val] val =>
+      @l(Log.crit(), Log.conn_sink(), "TODO: uncommitted.size() = %lu".cstring(), uncommitted.size())
+      if uncommitted.size() != 1 then
+        Fail()
+      end
+      let commited_txn_id = sink.cprb_make_txn_id_string(barrier_token.id)
+      try
+        let precommitted_txn_id = uncommitted(0)?
+        let decision = precommitted_txn_id == commited_txn_id
+        @l(Log.crit(), Log.conn_sink(), "QQQ: Uncommitted decision: %s for uncommitted %s committed %s".cstring(),
+          decision.string().cstring(), precommitted_txn_id.cstring(),
+          commited_txn_id.cstring())
+        sink.cprb_send_2pc_phase2(precommitted_txn_id, decision)
+      end
+    end
     _ECTransitionTwoPCReady(this, _state, sink)
 
   fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool):

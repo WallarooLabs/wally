@@ -518,8 +518,6 @@ actor ConnectorSink is Sink
     var ack_now = true
     match barrier_token
     | let sbt: CheckpointBarrierToken =>
-      None//TODO
-      @ll(_conn_debug, "TODO: checkpoint & sink phase games".cstring())
       checkpoint_state(sbt.id)
       let queued = _phase.queued()
       _cprb = _cprb.cp_barrier_complete(this, sbt, queued)
@@ -530,9 +528,7 @@ actor ConnectorSink is Sink
       // and rollback messages that we're expecting.
       None
     | let rbrt: CheckpointRollbackResumeBarrierToken =>
-      //TODO//_twopc_seen_checkpointbarriertoken = None
-      None//TODO
-      //TODO//resume_processing_messages_queued()
+      _cprb = _cprb.rollbackresume_barrier_complete(this)
     | let sat: AutoscaleBarrierToken =>
       //TODO//_twopc_last_autoscale_barrier_token = sat
       //TODO//resume_processing_messages_queued()

@@ -176,9 +176,11 @@ class _CpRbCPGotLocalCommit is _CpRbOps
 
   fun ref enter(sink: ConnectorSink ref) =>
     sink.cprb_send_commit_to_barrier_coordinator(_barrier_token)
-    @l(Log.info(), Log.conn_sink(),
-      "QQQ: DISCONNECT HACK".cstring())
-    sink.cprb_inject_hard_close()
+    if _barrier_token.id == 2 then
+      @l(Log.info(), Log.conn_sink(),
+        "QQQ: DISCONNECT HACK".cstring())
+      sink.cprb_inject_hard_close()
+    end
 
   fun ref checkpoint_complete(sink: ConnectorSink ref,
     checkpoint_id: CheckpointId): _CpRbOps ref
@@ -303,6 +305,11 @@ class _CpRbRolledBack is _CpRbOps
 
   fun ref prepare_for_rollback(sink: ConnectorSink ref): _CpRbOps =>
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
+
+  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref):
+    _CpRbOps ref
+  =>
+    _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
 class _CpRbRollingBack is _CpRbOps
   fun name(): String => __loc.type_name()
