@@ -525,8 +525,10 @@ actor ConnectorSink is Sink
       _cprb = _cprb.cp_barrier_complete(this, sbt, queued)
       ack_now = false
     | let srt: CheckpointRollbackBarrierToken =>
-      None//TODO _twopc_seen_checkpointbarriertoken = None
-      //TODO//_use_normal_processor()
+      // No action required here.  When we ack this token at the end of
+      // this function, Wallaroo will send use the prepare_to_rollback
+      // and rollback messages that we're expecting.
+      None
     | let rbrt: CheckpointRollbackResumeBarrierToken =>
       //TODO//_twopc_seen_checkpointbarriertoken = None
       None//TODO

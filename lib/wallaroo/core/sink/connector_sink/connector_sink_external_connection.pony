@@ -191,6 +191,12 @@ class _ExtConnConnected is _ExtConnOps
       Fail(); this
     end
 
+  fun ref rollback_info(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken): _ExtConnOps ref
+  =>
+    _state.rollback_info = barrier_token
+    this
+
   fun ref tcp_closed(sink: ConnectorSink ref): _ExtConnOps =>
     _ECTransitionDisconnected(this, _state, sink)
 
@@ -231,7 +237,8 @@ class _ExtConnDisconnected is _ExtConnOps
     end
     // This is a bit unusual, to change status like this.  But it's a
     // state change that the Checkpoint/Rollback component knows about.
-    _state.advertise_status = false
+    _state = _ExtConnState(where advertise_status' = false,
+      rollback_info' = None, uncommitted_txn_ids' = None)
 
 class _ExtConnInit is _ExtConnOps
   var _state: _ExtConnState = _ExtConnState(
@@ -320,6 +327,13 @@ class _ExtConnWaitingForRollbackPayload is _ExtConnOps
 
   new create(state: _ExtConnState) =>
     _state = state
+
+  fun ref rollback_info(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken): _ExtConnOps ref
+  =>
+    _state.rollback_info = barrier_token
+    @l(Log.crit(), Log.conn_sink(), "TODO: real rollback stuff".cstring())
+    _ECTransitionTwoPCReady(this, _state, sink)
 
   fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool):
     _ExtConnOps ref

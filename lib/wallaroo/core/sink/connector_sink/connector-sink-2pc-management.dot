@@ -61,6 +61,7 @@ digraph mashup {
         ExtInit -> Connected [label="tcp_connected"];
         Connected -> Disconnected [label="tcp_closed",fontcolor=red,color=red];
         Connected -> Connected [label="set_advertise_status\nfrom CpRb"];
+        Connected -> Connected [label="rollback_info\nfrom CpRb"];
         Disconnected [label="Disconnected\nenter:\nsend abort_next_checkpoint if advertise_status\nadvertise_status=false"];
         Disconnected -> Connected [label="tcp_connected"];
         Disconnected -> Disconnected [label="set_advertise_status\nfrom CpRb"];
