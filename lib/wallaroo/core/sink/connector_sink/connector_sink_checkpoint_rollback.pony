@@ -53,13 +53,13 @@ trait _CpRbOps
   fun ref enter(sink: ConnectorSink ref) =>
     None
 
-  fun ref phase1_abort(sink: ConnectorSink ref):
+  fun ref phase1_abort(sink: ConnectorSink ref, txn_id: String):
     _CpRbOps ref
   =>
     _invalid_call(__loc.method_name()); Fail(); this
 
-  fun ref phase1_commit(sink: ConnectorSink ref,
-    barrier_token: CheckpointBarrierToken): _CpRbOps ref
+  fun ref phase1_commit(sink: ConnectorSink ref, txn_id: String):
+    _CpRbOps ref
   =>
     _invalid_call(__loc.method_name()); Fail(); this
 
@@ -136,23 +136,24 @@ class _CpRbCPStarts is _CpRbOps
     sink.swap_barrier_to_queued(where forward_tokens = true)
     sink.cprb_send_2pc_phase1(_barrier_token)
 
-  fun ref phase1_abort(sink: ConnectorSink ref):
+  fun ref phase1_abort(sink: ConnectorSink ref, txn_id: String):
     _CpRbOps ref
   =>
     @l(Log.err(), Log.conn_sink(),
       "TODO: call phase1_abort".cstring())
     _invalid_call(__loc.method_name()); Fail(); this
 
-  fun ref phase1_commit(sink: ConnectorSink ref, barrier_token: CheckpointBarrierToken):
+  fun ref phase1_commit(sink: ConnectorSink ref, txn_id: String):
     _CpRbOps ref
   =>
-    if barrier_token != _barrier_token then
+    let expected_txn_id = sink.cprb_make_txn_id_string(_barrier_token.id)
+    if txn_id != expected_txn_id then
       @l(Log.crit(), Log.conn_sink(),
-        "Got barrier_token %s but expected %s".cstring(),
-        barrier_token.string().cstring(), _barrier_token.string().cstring())
+        "Got txn_id %s but expected %s".cstring(),
+        txn_id.cstring(), expected_txn_id.cstring())
       Fail()
     end
-    _CpRbTransition(this, _CpRbCPGotLocalCommit(barrier_token), sink)
+    _CpRbTransition(this, _CpRbCPGotLocalCommit(_barrier_token), sink)
 
 class _CpRbInit is _CpRbOps
   fun name(): String => __loc.type_name()

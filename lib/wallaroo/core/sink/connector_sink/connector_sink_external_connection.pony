@@ -165,11 +165,6 @@ class _ExtConnConnected is _ExtConnOps
             _ECTransition(this, _ExtConnWaitingForRollbackPayload(
               _advertise_status, mi.txn_ids))
           end
-/****
-        | let mi: cwm.TwoPCReplyMsg =>
-          @ll(_twopc_debug, "2PC: reply for txn_id %s was %s".cstring(), mi.txn_id.cstring(), mi.commit.string().cstring())
-          twopc_phase1_reply(mi.txn_id, mi.commit)
-****/
         else
           Fail(); this
         end
@@ -256,6 +251,34 @@ class _ExtConnTwoPCReady is _ExtConnOps
   fun ref enter(sink: ConnectorSink ref) =>
     if _advertise_status then
       sink.cprb_send_conn_ready()
+    end
+
+  fun ref handle_message(sink: ConnectorSink ref, msg: cwm.Message):
+    _ExtConnOps ref
+  =>
+    match msg
+    | let m: cwm.MessageMsg =>
+      try
+        let inner = cwm.TwoPCFrame.decode(m.message as Array[U8] val)?
+        match inner
+        | let mi: cwm.ReplyUncommittedMsg =>
+          Fail()
+        | let mi: cwm.TwoPCReplyMsg =>
+          @l(Log.debug(), Log.conn_sink(),
+            "2PC: reply for txn_id %s was %s".cstring(),
+            mi.txn_id.cstring(), mi.commit.string().cstring())
+          sink.cprb_send_phase1_result(mi.txn_id, mi.commit)
+        else
+          Fail()
+        end
+        this
+      else
+        sink._error_and_close("Bad msg @ line " + __loc.line().string())
+        _ECTransitionDisconnected(this, _advertise_status, sink)
+      end
+    else
+      sink._error_and_close("Bad msg @ line " + __loc.line().string())
+      _ECTransitionDisconnected(this, _advertise_status, sink)
     end
 
   fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool):

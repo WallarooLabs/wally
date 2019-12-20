@@ -82,7 +82,7 @@ class ConnectorSink2PC
     let tid = make_txn_id_string(checkpoint_id)
     let where_list: cwm.WhereList =
       [(1, last_offset.u64(), current_offset.u64())]
-    let bs = TwoPCEncode.phase1(txn_id, where_list)
+    let bs = TwoPCEncode.phase1(tid, where_list)
     let msg: cwm.MessageMsg = cwm.MessageMsg(0, 0, 0, None, bs)
     sink.send_msg(msg)
     @ll(_twopc_debug, "2PC: sent phase 1 where_list 1,%s,%s tid/txn_id %s".cstring(), last_offset.string().cstring(), current_offset.string().cstring(), tid.cstring())

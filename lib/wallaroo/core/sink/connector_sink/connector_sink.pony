@@ -1219,11 +1219,21 @@ actor ConnectorSink is Sink
   fun ref cprb_send_2pc_phase1(barrier_token: CheckpointBarrierToken) =>
     _twopc.send_phase1(this, barrier_token.id)
 
+  fun ref cprb_send_phase1_result(txn_id: String, commit: Bool) =>
+    if commit then
+      _cprb = _cprb.phase1_commit(this, txn_id)
+    else
+      _cprb = _cprb.phase1_abort(this, txn_id)
+    end
+
   fun ref cprb_send_commit_to_barrier_coordinator(
     barrier_token: CheckpointBarrierToken)
   =>
     @ll(_conn_debug, "Send commit to barrier coordinator for %s".cstring(), barrier_token.string().cstring())
     _barrier_coordinator.ack_barrier(this, barrier_token)
+
+  fun ref cprb_make_txn_id_string(checkpoint_id: CheckpointId): String =>
+    _twopc.make_txn_id_string(checkpoint_id)
 
   ///////////////////
   // NOTIFY CALLBACKS
