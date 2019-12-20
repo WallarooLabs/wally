@@ -606,7 +606,7 @@ actor ConnectorSink is Sink
 
   be prepare_for_rollback() =>
     @ll(_conn_debug, "Prepare for checkpoint rollback at ConnectorSink %s".cstring(), _sink_id.string().cstring())
-    None//TODO
+    _cprb = _cprb.prepare_for_rollback(this)
 
   fun ref finish_preparing_for_rollback() =>
     @ll(_conn_debug, "Finish preparing for checkpoint rollback at ConnectorSink %s".cstring(), _sink_id.string().cstring())
@@ -639,7 +639,8 @@ actor ConnectorSink is Sink
     // When rollback() is called here, we now know the global txn
     // commit status: commit for checkpoint_id, all greater are invalid.
 
-    None//TODO
+    let cbt = CheckpointBarrierToken(checkpoint_id)
+    _cprb = _cprb.rollback(this, cbt)
 
     None//TODO _twopc.reset_ext_conn_state()
     event_log.ack_rollback(_sink_id)
@@ -1231,6 +1232,10 @@ actor ConnectorSink is Sink
   =>
     @ll(_conn_debug, "Send abort to barrier coordinator for %s".cstring(), barrier_token.string().cstring())
     abort_decision("Phase 2 abort", txn_id, barrier_token)
+
+  fun ref cprb_send_rollback_info(barrier_token: CheckpointBarrierToken) =>
+    @ll(_conn_debug, "Send rollback_info for %s".cstring(), barrier_token.string().cstring())
+    _ec = _ec.rollback_info(this, barrier_token)
 
   fun ref cprb_make_txn_id_string(checkpoint_id: CheckpointId): String =>
     _twopc.make_txn_id_string(checkpoint_id)

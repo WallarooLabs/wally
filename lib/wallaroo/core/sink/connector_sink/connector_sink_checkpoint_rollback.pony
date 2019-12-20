@@ -70,8 +70,8 @@ trait _CpRbOps
   =>
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
-  fun ref rollback(sink: ConnectorSink ref):
-    _CpRbOps ref
+  fun ref rollback(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken): _CpRbOps ref
   =>
     _invalid_call(__loc.method_name()); Fail(); this
 
@@ -133,6 +133,21 @@ class _CpRbAbortCheckpoint is _CpRbOps
       end
     end
 
+  fun ref checkpoint_complete(sink: ConnectorSink ref,
+    checkpoint_id: CheckpointId): _CpRbOps ref
+  =>
+    let txn_id = sink.cprb_make_txn_id_string(checkpoint_id)
+    sink.cprb_send_2pc_phase2(txn_id, true)
+    //TODO
+    @l(Log.info(), Log.conn_sink(),
+      "QQQ: TODO: we sent Phase2=commit, but this message may be dropped!".cstring())
+
+    // This checkpoint is complete, so there's no way that we can
+    // abort it later.  We must wait for the next checkpoint to
+    // start.
+    _checkpoint_to_abort = None
+    this
+
   fun ref phase1_abort(sink: ConnectorSink ref, txn_id: String):
     _CpRbOps ref
   =>
@@ -147,6 +162,7 @@ class _CpRbAbortCheckpoint is _CpRbOps
     _CpRbOps ref
   =>
     _checkpoint_to_abort = barrier_token
+    _abort_sent = false
     _is_checkpoint_id_known(sink)
     this
 
@@ -181,7 +197,7 @@ class _CpRbCPGotLocalCommit is _CpRbOps
   fun ref abort_next_checkpoint(sink: ConnectorSink ref):
     _CpRbOps ref
   =>
-    _CpRbTransition(this, _CpRbPreparedForRollback, sink)
+    _CpRbTransition(this, _CpRbAbortCheckpoint(_barrier_token), sink) // bugfix, chat with John
 
 class _CpRbCPStarts is _CpRbOps
   let _barrier_token: CheckpointBarrierToken
@@ -249,6 +265,7 @@ class _CpRbPreparedForRollback is _CpRbOps
   fun ref enter(sink: ConnectorSink ref) =>
     sink.swap_barrier_to_queued(where forward_tokens = true)
 
+/**** bugfix, chat with John: no longer necessary here
   fun ref checkpoint_complete(sink: ConnectorSink ref,
     checkpoint_id: CheckpointId): _CpRbOps ref
   =>
@@ -268,17 +285,30 @@ class _CpRbPreparedForRollback is _CpRbOps
     let txn_id = sink.cprb_make_txn_id_string(checkpoint_id)
     sink.cprb_send_2pc_phase2(txn_id, true)
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
+****/
 
   fun ref prepare_for_rollback(sink: ConnectorSink ref):
     _CpRbOps ref
   =>
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
+  fun ref rollback(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken): _CpRbOps ref
+  =>
+    sink.cprb_send_rollback_info(barrier_token)
+    _CpRbTransition(this, _CpRbRolledBack, sink)
+
 class _CpRbRolledBack is _CpRbOps
   fun name(): String => __loc.type_name()
 
+  fun ref prepare_for_rollback(sink: ConnectorSink ref): _CpRbOps =>
+    _CpRbTransition(this, _CpRbPreparedForRollback, sink)
+
 class _CpRbRollingBack is _CpRbOps
   fun name(): String => __loc.type_name()
+
+  fun ref prepare_for_rollback(sink: ConnectorSink ref): _CpRbOps =>
+    _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
 class _CpRbWaitingForCheckpoint is _CpRbOps
   fun name(): String => __loc.type_name()
@@ -296,3 +326,7 @@ class _CpRbWaitingForCheckpoint is _CpRbOps
     _CpRbOps ref
   =>
     _CpRbTransition(this, _CpRbCPStarts(barrier_token, queued), sink)
+
+  fun ref prepare_for_rollback(sink: ConnectorSink ref): _CpRbOps =>
+    _CpRbTransition(this, _CpRbPreparedForRollback, sink)
+

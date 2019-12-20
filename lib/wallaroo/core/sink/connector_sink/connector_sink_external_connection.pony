@@ -16,6 +16,7 @@ Copyright 2019 The Wallaroo Authors.
 
 */          
 
+use "wallaroo/core/barrier"
 use cwm = "wallaroo_labs/connector_wire_messages"
 use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
@@ -43,8 +44,8 @@ trait _ExtConnOps
   =>
     _invalid_call(__loc.method_name()); Fail(); this
 
-  fun ref rollback_info(sink: ConnectorSink ref):
-    _ExtConnOps ref
+  fun ref rollback_info(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken): _ExtConnOps ref
   =>
     _invalid_call(__loc.method_name()); Fail(); this
 

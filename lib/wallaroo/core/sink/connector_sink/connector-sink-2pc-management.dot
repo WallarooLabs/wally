@@ -28,7 +28,6 @@ digraph mashup {
             RolledBack [label="RolledBack\nenter:\nack rollback barrier to barrier coordinator"];
 
             PreparedForRollback -> RollingBack [label="rollback",fontcolor=red,color=red];
-            PreparedForRollback -> WaitingForCheckpoint [label="checkpoint_complete\nglobal txn\nstatus=commit"]
 	}
 
 	// Other Edges
