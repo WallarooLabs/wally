@@ -47,7 +47,8 @@ trait _CpRbOps
     _invalid_call(__loc.method_name()); Fail(); this
 
   fun ref cp_barrier_complete(sink: ConnectorSink ref,
-    barrier_token: CheckpointBarrierToken): _CpRbOps ref
+    barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued]):
+    _CpRbOps ref
   =>
     _invalid_call(__loc.method_name()); Fail(); this
 
@@ -133,10 +134,12 @@ class _CpRbAbortCheckpoint is _CpRbOps
     end
 
   fun ref cp_barrier_complete(sink: ConnectorSink ref,
-    barrier_token: CheckpointBarrierToken): _CpRbOps ref
+    barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued]):
+    _CpRbOps ref
   =>
     _checkpoint_to_abort = barrier_token
     _is_checkpoint_id_known(sink)
+    // We're aborting the checkpoint, so discard queued app messages.
     this
 
 class _CpRbCPGotLocalCommit is _CpRbOps
@@ -165,14 +168,18 @@ class _CpRbCPGotLocalCommit is _CpRbOps
 
 class _CpRbCPStarts is _CpRbOps
   let _barrier_token: CheckpointBarrierToken
+  let _queued: Array[SinkPhaseQueued]
 
-  new create(barrier_token: CheckpointBarrierToken) =>
+  new create(barrier_token: CheckpointBarrierToken,
+    queued: Array[SinkPhaseQueued])
+  =>
     _barrier_token = barrier_token
+    _queued = queued
 
   fun name(): String => __loc.type_name()
 
   fun ref enter(sink: ConnectorSink ref) =>
-    sink.swap_barrier_to_queued(where forward_tokens = true)
+    sink.swap_barrier_to_queued(where queue = _queued, forward_tokens = true)
     sink.cprb_send_2pc_phase1(_barrier_token)
 
   fun ref phase1_abort(sink: ConnectorSink ref, txn_id: String):
@@ -235,6 +242,7 @@ class _CpRbWaitingForCheckpoint is _CpRbOps
     _CpRbTransition(this, _CpRbAbortCheckpoint(None), sink)
 
   fun ref cp_barrier_complete(sink: ConnectorSink ref,
-    barrier_token: CheckpointBarrierToken): _CpRbOps ref
+    barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued]):
+    _CpRbOps ref
   =>
-    _CpRbTransition(this, _CpRbCPStarts(barrier_token), sink)
+    _CpRbTransition(this, _CpRbCPStarts(barrier_token, queued), sink)

@@ -521,7 +521,8 @@ actor ConnectorSink is Sink
       None//TODO
       @ll(_conn_debug, "TODO: checkpoint & sink phase games".cstring())
       checkpoint_state(sbt.id)
-      _cprb = _cprb.cp_barrier_complete(this, sbt)
+      let queued = _phase.queued()
+      _cprb = _cprb.cp_barrier_complete(this, sbt, queued)
       ack_now = false
     | let srt: CheckpointRollbackBarrierToken =>
       None//TODO _twopc_seen_checkpointbarriertoken = None
