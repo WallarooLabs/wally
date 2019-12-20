@@ -136,12 +136,6 @@ class _CpRbAbortCheckpoint is _CpRbOps
   fun ref checkpoint_complete(sink: ConnectorSink ref,
     checkpoint_id: CheckpointId): _CpRbOps ref
   =>
-    let txn_id = sink.cprb_make_txn_id_string(checkpoint_id)
-    sink.cprb_send_2pc_phase2(txn_id, true)
-    //TODO
-    @l(Log.info(), Log.conn_sink(),
-      "QQQ: TODO: we sent Phase2=commit, but this message may be dropped!".cstring())
-
     // This checkpoint is complete, so there's no way that we can
     // abort it later.  We must wait for the next checkpoint to
     // start.

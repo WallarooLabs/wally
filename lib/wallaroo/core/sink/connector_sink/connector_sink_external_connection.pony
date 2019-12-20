@@ -334,7 +334,7 @@ class _ExtConnWaitingForRollbackPayload is _ExtConnOps
     | None =>
       Fail()
     | let uncommitted: Array[String val] val =>
-      @l(Log.crit(), Log.conn_sink(), "TODO: uncommitted.size() = %lu".cstring(), uncommitted.size())
+      @l(Log.info(), Log.conn_sink(), "uncommitted.size() = %lu".cstring(), uncommitted.size())
       if uncommitted.size() != 1 then
         Fail()
       end
@@ -342,7 +342,7 @@ class _ExtConnWaitingForRollbackPayload is _ExtConnOps
       try
         let precommitted_txn_id = uncommitted(0)?
         let decision = precommitted_txn_id == commited_txn_id
-        @l(Log.crit(), Log.conn_sink(), "QQQ: Uncommitted decision: %s for uncommitted %s committed %s".cstring(),
+        @l(Log.info(), Log.conn_sink(), "Uncommitted decision = %s for uncommitted %s committed %s".cstring(),
           decision.string().cstring(), precommitted_txn_id.cstring(),
           commited_txn_id.cstring())
         sink.cprb_send_2pc_phase2(precommitted_txn_id, decision)
