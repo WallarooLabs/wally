@@ -11,7 +11,7 @@ digraph mashup {
 	}
 	subgraph cp {
             WaitingForCheckpoint [label="WaitingForCheckpoint\nenter:\nsink phase=normal"];
-            AbortCheckpoint [label="AbortCheckpoint\nenter:\nsink phase=drop app msgs, forward tokens\nabort checkpoint when checkpoint ID is known"];
+            AbortCheckpoint [label="AbortCheckpoint\nenter:\nsink phase=queue app msgs, forward tokens\nabort checkpoint when checkpoint ID is known"];
 	}
 	subgraph sacp {
             CPStarts [label="CPStarts\nenter:\nsink phase=queue app msgs, forward tokens\nsend TwoPCPhase1Msg"];
@@ -23,11 +23,12 @@ digraph mashup {
             CPGotLocalCommit -> WaitingForCheckpoint [label="checkpoint_complete"];
 	}
 	subgraph rollback {
-            PreparedForRollback [label="PreparedForRollback\nenter:\nsink phase=drop app msgs, forward tokens"];
-            RollingBack [label="RollingBack\nenter:\nsend rollback_info\nsend advertise_status=true\nsink phase=crash on app msgs, forward tokens"];
+            PreparedForRollback [label="PreparedForRollback\nenter:\nsink phase=queue app msgs, forward tokens"];
+            RollingBack [label="RollingBack\nenter:\nsend rollback_info\nsend advertise_status=true\ndrop queued app msgs!\nsink phase=crash on app msgs, forward tokens"];
             RolledBack [label="RolledBack\nenter:\nack rollback barrier to barrier coordinator"];
 
             PreparedForRollback -> RollingBack [label="rollback",fontcolor=red,color=red];
+            PreparedForRollback -> WaitingForCheckpoint [label="checkpoint_complete\nglobal txn\nstatus=commit"]
 	}
 
 	// Other Edges

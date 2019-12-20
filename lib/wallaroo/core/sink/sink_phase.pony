@@ -222,7 +222,7 @@ class BarrierSinkPhase is SinkPhase
     _check_completion(_sink.inputs())
 
   fun ref _check_completion(inputs: Map[RoutingId, Producer] box): Bool =>
-    // @printf[I32]("2PC: _check_completion: inputs %lu inputs_blocking %lu\n".cstring(), inputs.size(), _inputs_blocking.size())
+    @printf[I32]("2PC: _check_completion: inputs %lu inputs_blocking %lu\n".cstring(), inputs.size(), _inputs_blocking.size())
     if inputs.size() == _inputs_blocking.size() then
       if _completion_notifies_sink then
         _sink.barrier_complete(_barrier_token)
@@ -266,6 +266,7 @@ class QueuingSinkPhase is SinkPhase
     msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    // @printf[I32]("QQQ: QueuingSinkPhase: process_message\n".cstring())
     let msg = TypedQueuedMessage[D](metric_name, pipeline_time_spent,
       data, key, event_ts, watermark_ts, i_producer_id, i_producer, msg_uid,
       frac_ids, i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
@@ -274,6 +275,7 @@ class QueuingSinkPhase is SinkPhase
   fun ref receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken): Bool
   =>
+    @printf[I32]("QQQ: QueuingSinkPhase: receive_barrier\n".cstring())
     if _forward_tokens then
       match _forward_token_phase
       | None =>

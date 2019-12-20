@@ -196,6 +196,11 @@ class _CpRbCPStarts is _CpRbOps
     sink.swap_barrier_to_queued(where queue = _queued, forward_tokens = true)
     sink.cprb_send_2pc_phase1(_barrier_token)
 
+  fun ref abort_next_checkpoint(sink: ConnectorSink ref):
+    _CpRbOps ref
+  =>
+    _CpRbTransition(this, _CpRbAbortCheckpoint(_barrier_token), sink)
+
   fun ref phase1_abort(sink: ConnectorSink ref, txn_id: String):
     _CpRbOps ref
   =>
@@ -241,12 +246,30 @@ class _CpRbPreparedForRollback is _CpRbOps
   fun ref enter(sink: ConnectorSink ref) =>
     sink.swap_barrier_to_queued(where forward_tokens = true)
 
-/****
+  fun ref checkpoint_complete(sink: ConnectorSink ref,
+    checkpoint_id: CheckpointId): _CpRbOps ref
+  =>
+    """
+    We got here via CPGotLocalCommit -> disconnected/abort_next_checkpoint.
+    But before the disconnection, we received the Phase1 reply=commit,
+    and the rest of Wallaroo has decided that the global txn committed.
+
+    Send a Phase2 commit again: the original Phase2 commit message may
+    have been lost when the TCP connection was broken.  If ours is a
+    duplicate, the sink will ignore it.
+
+    TODO: Looks like we've been queuing app messages. I think we can
+          simply keep that queue and let _CpRbWaitingForCheckpoint dequeue
+          and reprocess them, yes?
+    """
+    let txn_id = sink.cprb_make_txn_id_string(checkpoint_id)
+    sink.cprb_send_2pc_phase2(txn_id, true)
+    _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
+
   fun ref prepare_for_rollback(sink: ConnectorSink ref):
     _CpRbOps ref
   =>
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
-****/
 
 class _CpRbRolledBack is _CpRbOps
   fun name(): String => __loc.type_name()
