@@ -1049,4 +1049,4 @@ class ConnectorSourceNotify[In: Any val]
     Generate a printable string of the contents of the given readseq to use in
     error messages.
     """
-    "[len=" + array.size().string() + ": " + ", ".join(array.values()) + "]"
+    "[len=" + array.size().string() + ": " + ",".join(array.values()) + "]"

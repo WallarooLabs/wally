@@ -566,6 +566,7 @@ actor ConnectorSink is Sink
   fun ref resume_processing_messages_queued(discard_app_msgs: Bool = false) =>
     let queued = _phase.queued()
     _use_normal_processor()
+    @ll(_conn_debug, "resume_processing_messages_queued: size = %lu".cstring(), queued.size())
     for q in queued.values() do
       match q
       | let qm: QueuedMessage =>
@@ -1367,7 +1368,7 @@ actor ConnectorSink is Sink
     Generate a printable string of the contents of the given readseq to use in
     error messages.
     """
-    "[len=" + array.size().string() + ": " + ", ".join(array.values()) + "]"
+    "[len=" + array.size().string() + ": " + ",".join(array.values()) + "]"
 
 class PauseBeforeReconnectConnectorSink is TimerNotify
   let _tcp_sink: ConnectorSink
