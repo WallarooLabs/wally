@@ -148,7 +148,6 @@ class _CpRbAbortCheckpoint is _CpRbOps
   =>
     _checkpoint_to_abort = barrier_token
     _is_checkpoint_id_known(sink)
-    // We're aborting the checkpoint, so discard queued app messages.
     this
 
 class _CpRbCPGotLocalCommit is _CpRbOps

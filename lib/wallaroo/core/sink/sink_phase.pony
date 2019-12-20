@@ -222,7 +222,7 @@ class BarrierSinkPhase is SinkPhase
     _check_completion(_sink.inputs())
 
   fun ref _check_completion(inputs: Map[RoutingId, Producer] box): Bool =>
-    @printf[I32]("2PC: _check_completion: inputs %lu inputs_blocking %lu\n".cstring(), inputs.size(), _inputs_blocking.size())
+    @printf[I32]("2PC: _check_completion: inputs %lu inputs_blocking %lu %s\n".cstring(), inputs.size(), _inputs_blocking.size(), _barrier_token.string().cstring())
     if inputs.size() == _inputs_blocking.size() then
       if _completion_notifies_sink then
         _sink.barrier_complete(_barrier_token)
@@ -291,6 +291,10 @@ class QueuingSinkPhase is SinkPhase
         if ret then
           @l(Log.debug(), Log.conn_sink(), "QueuingSinkPhase: receive_barrier: complete for %s".cstring(), barrier_token.string().cstring())
           _sink.barrier_complete(barrier_token)
+          // We may receive multiple unique tokens while we sit waiting
+          // to be discarded.  Reset _forward_token_phase so that we'll
+          // recognize the next token.
+          _forward_token_phase = None
         end
         ret
       end
