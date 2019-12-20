@@ -166,6 +166,11 @@ class _CpRbCPGotLocalCommit is _CpRbOps
     sink.cprb_send_2pc_phase2(txn_id, true)
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
+  fun ref abort_next_checkpoint(sink: ConnectorSink ref):
+    _CpRbOps ref
+  =>
+    _CpRbTransition(this, _CpRbPreparedForRollback, sink)
+
 class _CpRbCPStarts is _CpRbOps
   let _barrier_token: CheckpointBarrierToken
   let _queued: Array[SinkPhaseQueued]
@@ -223,6 +228,16 @@ class _CpRbInit is _CpRbOps
 
 class _CpRbPreparedForRollback is _CpRbOps
   fun name(): String => __loc.type_name()
+
+  fun ref enter(sink: ConnectorSink ref) =>
+    sink.swap_barrier_to_queued(where forward_tokens = true)
+
+/****
+  fun ref prepare_for_rollback(sink: ConnectorSink ref):
+    _CpRbOps ref
+  =>
+    _CpRbTransition(this, _CpRbPreparedForRollback, sink)
+****/
 
 class _CpRbRolledBack is _CpRbOps
   fun name(): String => __loc.type_name()

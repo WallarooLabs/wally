@@ -249,6 +249,9 @@ class _ExtConnTwoPCReady is _ExtConnOps
     _advertise_status = advertise_status
 
   fun ref enter(sink: ConnectorSink ref) =>
+    @l(Log.debug(), Log.conn_sink(),
+      "2PC: _ExtConnTwoPCReady _advertise_status %s".cstring(),
+      _advertise_status.string().cstring())
     if _advertise_status then
       sink.cprb_send_conn_ready()
     end

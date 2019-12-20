@@ -1252,6 +1252,7 @@ actor ConnectorSink is Sink
 
   fun ref cb_received(data: Array[U8] val): None ?
   =>
+    @ll(_conn_debug, "cb_received: top".cstring())
     match cwm.Frame.decode(data)?
     | let m: cwm.HelloMsg =>
       _error_and_close("Protocol error: Sink sent us HelloMsg")
