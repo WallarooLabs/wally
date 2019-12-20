@@ -561,6 +561,7 @@ actor ConnectorSink is Sink
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
     @ll(_twopc_debug, "2PC: Checkpoint complete %d _twopc.txn_id is %s".cstring(), checkpoint_id, _twopc.txn_id.cstring())
     _cprb = _cprb.checkpoint_complete(this, checkpoint_id)
+    @ll(_twopc_debug, "2PC: Checkpoint complete %d _twopc.txn_id is %s _cprb.name = %s".cstring(), checkpoint_id, _twopc.txn_id.cstring(), _cprb.name().cstring())
 
   fun ref resume_processing_messages_queued(discard_app_msgs: Bool = false) =>
     let queued = _phase.queued()

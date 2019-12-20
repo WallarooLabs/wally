@@ -99,7 +99,7 @@ class ConnectorSink2PC
     sink.send_msg(msg)
     @ll(_twopc_debug, "2PC: sent phase 2 commit=%s for tid/txn_id %s".cstring(), commit.string().cstring(), tid.cstring())
     txn_id = txn_id_initial
-    if commit and false then
+    if commit then
       last_offset = current_txn_end_offset
       if last_offset != current_offset then
         @ll(_twopc_err, "Offset error during txn: last_offset %lu current_offset %lu".cstring(), last_offset, current_offset)
