@@ -133,6 +133,15 @@ class _CpRbAbortCheckpoint is _CpRbOps
       end
     end
 
+  fun ref phase1_abort(sink: ConnectorSink ref, txn_id: String):
+    _CpRbOps ref
+  =>
+    // This is in response to the 2PC Phase1 message that we (probably)
+    // sent in _is_checkpoint_id_known().
+    // Call _is_checkpoint_id_known(), just in case.
+    _is_checkpoint_id_known(sink)
+    this
+
   fun ref cp_barrier_complete(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued]):
     _CpRbOps ref
