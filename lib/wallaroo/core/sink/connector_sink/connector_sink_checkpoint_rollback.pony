@@ -17,6 +17,7 @@ Copyright 2019 The Wallaroo Authors.
 */
 
 use "wallaroo/core/barrier"
+use "wallaroo/core/checkpoint"
 use "wallaroo/core/sink"
 use cwm = "wallaroo_labs/connector_wire_messages"
 use "wallaroo_labs/logging"
@@ -35,8 +36,8 @@ trait _CpRbOps
   =>
     _invalid_call(__loc.method_name()); Fail(); this
 
-  fun ref checkpoint_complete(sink: ConnectorSink ref):
-    _CpRbOps ref
+  fun ref checkpoint_complete(sink: ConnectorSink ref,
+    checkpoint_id: CheckpointId): _CpRbOps ref
   =>
     _invalid_call(__loc.method_name()); Fail(); this
 
@@ -123,6 +124,19 @@ class _CpRbCPGotLocalCommit is _CpRbOps
 
   fun ref enter(sink: ConnectorSink ref) =>
     sink.cprb_send_commit_to_barrier_coordinator(_barrier_token)
+
+  fun ref checkpoint_complete(sink: ConnectorSink ref,
+    checkpoint_id: CheckpointId): _CpRbOps ref
+  =>
+    if checkpoint_id != _barrier_token.id then
+      @l(Log.crit(), Log.conn_sink(),
+        "checkpoint_complete got id %lu but expected %lu".cstring(),
+        checkpoint_id, _barrier_token.id)
+      Fail()
+    end
+    let txn_id = sink.cprb_make_txn_id_string(_barrier_token.id)
+    sink.cprb_send_2pc_phase2(txn_id, true)
+    _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
 class _CpRbCPStarts is _CpRbOps
   let _barrier_token: CheckpointBarrierToken

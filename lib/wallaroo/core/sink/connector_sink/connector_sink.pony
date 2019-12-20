@@ -522,6 +522,7 @@ actor ConnectorSink is Sink
       @ll(_conn_debug, "TODO: checkpoint & sink phase games".cstring())
       checkpoint_state(sbt.id)
       _cprb = _cprb.cp_barrier_complete(this, sbt)
+      ack_now = false
     | let srt: CheckpointRollbackBarrierToken =>
       None//TODO _twopc_seen_checkpointbarriertoken = None
       //TODO//_use_normal_processor()
@@ -558,21 +559,8 @@ actor ConnectorSink is Sink
     _phase = QueuingSinkPhase(_sink_id, this, queue, forward_tokens)
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
-    let cpoint_id = ifdef "test_disconnect_at_5" then "5" else "" end
-    let drop_phase2_msg_test_option = try if _twopc.txn_id.split("=")(1)? == cpoint_id then true else false end else false end
-
     @ll(_twopc_debug, "2PC: Checkpoint complete %d _twopc.txn_id is %s".cstring(), checkpoint_id, _twopc.txn_id.cstring())
-
-    None//TODO
-
-    if drop_phase2_msg_test_option then
-      // Because we're using TCP, we get message loss only when
-      // the TCP connection is closed.  It doesn't matter why the
-      // connection is closed.  We have direct control over the
-      // timing here, so close it now.
-      _hard_close()
-      _schedule_reconnect()
-    end
+    _cprb = _cprb.checkpoint_complete(this, checkpoint_id)
 
   fun ref resume_processing_messages_queued(discard_app_msgs: Bool = false) =>
     let queued = _phase.queued()
@@ -1218,6 +1206,9 @@ actor ConnectorSink is Sink
 
   fun ref cprb_send_2pc_phase1(barrier_token: CheckpointBarrierToken) =>
     _twopc.send_phase1(this, barrier_token.id)
+
+  fun ref cprb_send_2pc_phase2(txn_id: String, commit: Bool) =>
+    _twopc.send_phase2(this, txn_id, commit)
 
   fun ref cprb_send_phase1_result(txn_id: String, commit: Bool) =>
     if commit then

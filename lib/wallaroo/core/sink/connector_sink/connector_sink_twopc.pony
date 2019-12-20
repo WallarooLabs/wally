@@ -87,10 +87,8 @@ class ConnectorSink2PC
     sink.send_msg(msg)
     @ll(_twopc_debug, "2PC: sent phase 1 where_list 1,%s,%s tid/txn_id %s".cstring(), last_offset.string().cstring(), current_offset.string().cstring(), tid.cstring())
 
-  fun send_phase2(sink: ConnectorSink ref, commit: Bool,
-    override_txn_id: String = "")
+  fun send_phase2(sink: ConnectorSink ref, tid: String, commit: Bool)
   =>
-    let tid = if override_txn_id != "" then override_txn_id else txn_id end
     let bs: Array[U8] val = TwoPCEncode.phase2(tid, commit)
     let msg: cwm.MessageMsg = cwm.MessageMsg(0, 0, 0, None, bs)
     sink.send_msg(msg)
