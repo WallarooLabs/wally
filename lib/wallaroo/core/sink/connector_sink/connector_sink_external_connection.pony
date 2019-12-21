@@ -221,6 +221,14 @@ class _ExtConnDisconnected is _ExtConnOps
   new create(state: _ExtConnState) =>
     _state = state
 
+  fun ref rollback_info(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken): _ExtConnOps ref
+  =>
+    // This message can arrive at this state if we went directly
+    // from Connected -> TwoPCReady, because the uncommited txn list
+    // was empty.  We don't need this info; ignore it.
+    this
+
   fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool):
     _ExtConnOps ref
   =>

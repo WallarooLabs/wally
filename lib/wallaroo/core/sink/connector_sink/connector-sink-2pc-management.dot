@@ -23,11 +23,13 @@ digraph mashup {
             CPGotLocalCommit -> WaitingForCheckpoint [label="checkpoint_complete"];
 	}
 	subgraph rollback {
-            PreparedForRollback [label="PreparedForRollback\nenter:\nsink phase=queue app msgs, forward tokens"];
-            RollingBack [label="RollingBack\nenter:\nsend rollback_info\nsend advertise_status=true\nsink phase=crash on app msgs, forward tokens"];
+            PreparedForRollback [label="PreparedForRollback\nenter:\nsink phase=queue app msgs, forward tokens\nforce ExtConn closed"];
+            RollingBack [label="RollingBack\nenter:\nsink phase=crash on app msgs, forward tokens\nsend rollback_info\nsend advertise_status=true"];
             RolledBack [label="RolledBack\nenter:\nack rollback barrier to barrier coordinator\ndrop queued app msgs!"];
+            RollingBackResumed [label="RollingBackResumed\nexit:\nack rollback barrier to barrier coordinator\ndrop queued app msgs!"];
 
             PreparedForRollback -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
+			PreparedForRollback -> PreparedForRollback [label="abort_next_checkpoint",fontcolor=red,color=red];
             PreparedForRollback -> RollingBack [label="rollback",fontcolor=red,color=red];
 	}
 
@@ -36,6 +38,7 @@ digraph mashup {
 
 	WaitingForCheckpoint -> CPStarts [label="cp_barrier_complete"];
 	AbortCheckpoint -> AbortCheckpoint [label="cp_barrier_complete"];
+	AbortCheckpoint -> AbortCheckpoint [label="abort_next_checkpoint",fontcolor=red,color=red];
 
 	WaitingForCheckpoint -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
 	AbortCheckpoint -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
@@ -46,11 +49,19 @@ digraph mashup {
 	CPStarts -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
 	CPGotLocalCommit -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
 
+	RollingBack -> RollingBack [label="abort_next_checkpoint",fontcolor=red,color=red];
 	RollingBack -> RolledBack [label="conn_ready"];
+	RollingBack -> RollingBackResumed [label="rollbackresume_barrier_complete"];
 	RollingBack -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
 
+	RolledBack -> RolledBack [label="abort_next_checkpoint",fontcolor=red,color=red];
 	RolledBack -> WaitingForCheckpoint [label="rollbackresume_barrier_complete"];
 	RolledBack -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
+
+	RollingBackResumed -> RollingBackResumed [label="abort_next_checkpoint",fontcolor=red,color=red];
+	RollingBackResumed -> WaitingForCheckpoint [label="conn_ready"];
+	RollingBackResumed -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
+	RollingBackResumed -> RollingBackResumed [label="cp_barrier_complete"];
     }
     ## END LEFT
 
