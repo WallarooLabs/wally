@@ -245,7 +245,7 @@ class QueuingSinkPhase is SinkPhase
   """
   let _sink_id: RoutingId
   let _sink: Sink ref
-  let _queued: Array[SinkPhaseQueued]
+  var _queued: Array[SinkPhaseQueued]
   let _forward_tokens: Bool
   var _forward_token_phase: (None|BarrierSinkPhase) = None
 
@@ -282,9 +282,9 @@ class QueuingSinkPhase is SinkPhase
         @l(Log.debug(), Log.conn_sink(), "QueuingSinkPhase: receive_barrier: 1st for %s".cstring(), barrier_token.string().cstring())
         let p = BarrierSinkPhase(_sink_id, _sink, barrier_token
           where completion_notifies_sink = false)
-        p.receive_barrier(input_id, producer, barrier_token)
+        let ret = p.receive_barrier(input_id, producer, barrier_token)
         _forward_token_phase = p
-        false
+        ret
       | let phase: BarrierSinkPhase =>
         @l(Log.debug(), Log.conn_sink(), "QueuingSinkPhase: receive_barrier: Nth for %s".cstring(), barrier_token.string().cstring())
         let ret = phase.receive_barrier(input_id, producer, barrier_token)
@@ -315,3 +315,13 @@ class QueuingSinkPhase is SinkPhase
 
   fun ref resume_processing_messages(discard_message_type: Bool) =>
     _sink.resume_processing_messages_queued(discard_message_type)
+
+  fun ref drop_app_msg_queue() =>
+    let qd = Array[SinkPhaseQueued]
+    for q in _queued.values() do
+      match q
+      | let qb: QueuedBarrier =>
+        qd.push(qb)
+      end
+    end
+    _queued = qd

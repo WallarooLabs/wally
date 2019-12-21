@@ -557,11 +557,6 @@ actor ConnectorSink is Sink
       _barrier_coordinator.ack_barrier(this, barrier_token)
     end
 
-  fun ref swap_barrier_to_queued(queue: Array[SinkPhaseQueued] = [],
-    forward_tokens: Bool = true) =>
-    @ll(_conn_debug, "QQQ: swap_barrier_to_queued: forward_tokens = %s queue.size = %lu".cstring(), forward_tokens.string().cstring(), queue.size())
-    _phase = QueuingSinkPhase(_sink_id, this, queue, forward_tokens)
-
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
     @ll(_twopc_debug, "2PC: Checkpoint complete %d _twopc.txn_id is %s".cstring(), checkpoint_id, _twopc.txn_id.cstring())
     _cprb = _cprb.checkpoint_complete(this, checkpoint_id)
@@ -1189,9 +1184,9 @@ actor ConnectorSink is Sink
   fun prefix_rollback(): String =>
     "rollback--.--"
 
-  //////////////////////
-  // EXTERNAL CONNECTION
-  //////////////////////
+  /////////////////////////////////////////////////////////
+  // EXTERNAL CONNECTION AND CHECKPOINT/ROLLBACK COMPONENTS
+  /////////////////////////////////////////////////////////
 
   fun _make_hello_msg(): cwm.HelloMsg =>
     cwm.HelloMsg(_protocol_version, _cookie, _app_name, _worker_name)
@@ -1202,6 +1197,25 @@ actor ConnectorSink is Sink
   fun ref _make_list_uncommitted_msg_encoded(): Array[U8] val =>
     _rtag = _rtag + 1
     TwoPCEncode.list_uncommitted(_rtag)
+
+  fun ref swap_barrier_to_queued(queue: Array[SinkPhaseQueued] = [],
+    forward_tokens: Bool = true) =>
+    match _phase
+    | let x: QueuingSinkPhase =>
+      @ll(_conn_debug, "QQQ: swap_barrier_to_queued: already queuing".cstring())
+      None
+    else
+      @ll(_conn_debug, "QQQ: swap_barrier_to_queued: forward_tokens = %s queue.size = %lu".cstring(), forward_tokens.string().cstring(), queue.size())
+      _phase = QueuingSinkPhase(_sink_id, this, queue, forward_tokens)
+    end
+
+  fun ref cprb_queuing_barrier_drop_app_msgs() =>
+    match _phase
+    | let qp: QueuingSinkPhase =>
+      qp.drop_app_msg_queue()
+    else
+      Fail()
+    end
 
   fun ref cprb_send_conn_ready() =>
     @ll(_conn_debug, "Send conn_ready to CpRb".cstring())

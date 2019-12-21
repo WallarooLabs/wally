@@ -116,7 +116,7 @@ class _CpRbAbortCheckpoint is _CpRbOps
       end
 
   fun ref enter(sink: ConnectorSink ref) =>
-    _ChangeSinkPhaseDropAllQueuedMsgs(sink)
+    _ChangeSinkPhaseQueueMsgsForwardTokens(sink)
     _is_checkpoint_id_known(sink)
 
   fun ref _is_checkpoint_id_known(sink: ConnectorSink ref) =>
@@ -272,7 +272,7 @@ class _CpRbPreparedForRollback is _CpRbOps
   fun name(): String => __loc.type_name()
 
   fun ref enter(sink: ConnectorSink ref) =>
-    sink.swap_barrier_to_queued(where forward_tokens = true)
+    _ChangeSinkPhaseQueueMsgsForwardTokens(sink)
     sink.cprb_inject_hard_close()
 
   fun ref abort_next_checkpoint(sink: ConnectorSink ref):
@@ -289,7 +289,7 @@ class _CpRbRolledBack is _CpRbOps
   fun name(): String => __loc.type_name()
 
   fun ref enter(sink: ConnectorSink ref) =>
-    _ChangeSinkPhaseDropAllQueuedMsgs(sink)
+    _DropQueuedAppMsgs(sink)
 
   fun ref abort_next_checkpoint(sink: ConnectorSink ref):
     _CpRbOps ref
@@ -305,7 +305,7 @@ class _CpRbRolledBack is _CpRbOps
   fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref):
     _CpRbOps ref
   =>
-    _ChangeSinkPhaseDropAllQueuedMsgs(sink)
+    _ChangeSinkPhaseQueueMsgsForwardTokens(sink)
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
 class _CpRbRollingBack is _CpRbOps
@@ -317,7 +317,7 @@ class _CpRbRollingBack is _CpRbOps
     _barrier_token = barrier_token
 
   fun ref enter(sink: ConnectorSink ref) =>
-    _ChangeSinkPhaseDropAllQueuedMsgs(sink)
+    _DropQueuedAppMsgs(sink)
     sink.cprb_send_rollback_info(_barrier_token)
     sink.cprb_send_advertise_status(true)
 
@@ -346,7 +346,7 @@ class _CpRbRollingBackResumed is _CpRbOps
     _barrier_token = barrier_token
 
   fun ref conn_ready(sink: ConnectorSink ref): _CpRbOps =>
-    _ChangeSinkPhaseDropAllQueuedMsgs(sink)
+    _DropQueuedAppMsgs(sink)
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
   fun ref abort_next_checkpoint(sink: ConnectorSink ref):
@@ -389,7 +389,10 @@ class _CpRbWaitingForCheckpoint is _CpRbOps
   fun ref prepare_for_rollback(sink: ConnectorSink ref): _CpRbOps =>
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
-primitive _ChangeSinkPhaseDropAllQueuedMsgs
+primitive _ChangeSinkPhaseQueueMsgsForwardTokens
   fun apply(sink: ConnectorSink ref) =>
-    // Change sink phase, dropping all queued messages
     sink.swap_barrier_to_queued(where forward_tokens = true)
+
+primitive _DropQueuedAppMsgs
+  fun apply(sink: ConnectorSink ref) =>
+    sink.cprb_queuing_barrier_drop_app_msgs()
