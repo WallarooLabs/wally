@@ -298,7 +298,12 @@ actor ConnectorSink is Sink
     i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef "trace" then
-      @ll(_conn_debug, "Rcvd msg at ConnectorSink.run".cstring())
+    try
+      let dq = data as Array[U8] val
+      @ll(_conn_debug, "Rcvd msg at ConnectorSink.run: phase %s data %s".cstring(), _phase.name().cstring(), _print_array[U8](dq).cstring())
+    else
+      Fail()
+    end
     end
     _phase.process_message[D](metric_name, pipeline_time_spent,
       data, key, event_ts, watermark_ts, i_producer_id, i_producer, msg_uid,
@@ -554,7 +559,7 @@ actor ConnectorSink is Sink
 
   fun ref swap_barrier_to_queued(queue: Array[SinkPhaseQueued] = [],
     forward_tokens: Bool = true) =>
-    @ll(_conn_debug, "swap_barrier_to_queued: forward_tokens = %s".cstring(), forward_tokens.string().cstring())
+    @ll(_conn_debug, "QQQ: swap_barrier_to_queued: forward_tokens = %s queue.size = %lu".cstring(), forward_tokens.string().cstring(), queue.size())
     _phase = QueuingSinkPhase(_sink_id, this, queue, forward_tokens)
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>

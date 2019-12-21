@@ -24,9 +24,10 @@ digraph mashup {
 	}
 	subgraph rollback {
             PreparedForRollback [label="PreparedForRollback\nenter:\nsink phase=queue app msgs, forward tokens"];
-            RollingBack [label="RollingBack\nenter:\nsend rollback_info\nsend advertise_status=true\ndrop queued app msgs!\nsink phase=crash on app msgs, forward tokens"];
-            RolledBack [label="RolledBack\nenter:\nack rollback barrier to barrier coordinator"];
+            RollingBack [label="RollingBack\nenter:\nsend rollback_info\nsend advertise_status=true\nsink phase=crash on app msgs, forward tokens"];
+            RolledBack [label="RolledBack\nenter:\nack rollback barrier to barrier coordinator\ndrop queued app msgs!"];
 
+            PreparedForRollback -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
             PreparedForRollback -> RollingBack [label="rollback",fontcolor=red,color=red];
 	}
 
