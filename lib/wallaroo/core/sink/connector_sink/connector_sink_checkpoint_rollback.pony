@@ -305,6 +305,7 @@ class _CpRbRolledBack is _CpRbOps
   fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref):
     _CpRbOps ref
   =>
+    _ChangeSinkPhaseDropAllQueuedMsgs(sink)
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
 class _CpRbRollingBack is _CpRbOps
@@ -345,6 +346,7 @@ class _CpRbRollingBackResumed is _CpRbOps
     _barrier_token = barrier_token
 
   fun ref conn_ready(sink: ConnectorSink ref): _CpRbOps =>
+    _ChangeSinkPhaseDropAllQueuedMsgs(sink)
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
   fun ref abort_next_checkpoint(sink: ConnectorSink ref):
@@ -361,8 +363,10 @@ class _CpRbRollingBackResumed is _CpRbOps
     barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued]):
     _CpRbOps ref
   =>
-    // We don't care about this checkpoint, which is the one that is
-    // triggered immediately after rollback is complete.
+    // This checkpoint is the one that is triggered immediately after
+    // rollback is complete.  Our sink phase has prevented any new
+    // output to reach the sink.  Ack now.
+    sink.cprb_send_commit_to_barrier_coordinator(_barrier_token)
     this
 
 class _CpRbWaitingForCheckpoint is _CpRbOps
