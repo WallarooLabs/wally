@@ -1240,7 +1240,11 @@ actor ConnectorSink is Sink
     @ll(_conn_debug, "Send rollback_info for %s".cstring(), barrier_token.string().cstring())
     _ec = _ec.rollback_info(this, barrier_token)
 
-  fun ref cprb_send_advertise_status(advertise_status: Bool = true) =>
+  // fun ref cprb_send_advertise_status(advertise_status: Bool = true) =>
+  be cprb_send_advertise_status(advertise_status: Bool = true) =>
+    // FSM state transitions can be lost in cross-CpRb-ExtConn calling.
+    // TODO: I've been assuming that all this message stuff is sync.
+    //       A behavior makes things async. What does this break, and when?
     @ll(_conn_debug, "Send advertise_status %s".cstring(), advertise_status.string().cstring())
     _ec = _ec.set_advertise_status(this, advertise_status)
 

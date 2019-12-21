@@ -295,8 +295,7 @@ class _CpRbRollingBack is _CpRbOps
 
   fun ref enter(sink: ConnectorSink ref) =>
     sink.cprb_send_rollback_info(_barrier_token)
-    @l(Log.crit(), Log.conn_sink(), "PUT BACK cprb_send_advertise_status(true)".cstring())
-    //////////////////////// sink.cprb_send_advertise_status(true)
+    sink.cprb_send_advertise_status(true)
     _ChangeSinkPhaseDropAllQueuedMsgs(sink)
 
   fun ref conn_ready(sink: ConnectorSink ref): _CpRbOps =>
