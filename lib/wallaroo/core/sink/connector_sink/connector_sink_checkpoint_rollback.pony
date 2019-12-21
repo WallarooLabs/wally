@@ -326,16 +326,23 @@ class _CpRbRollingBack is _CpRbOps
     // We turned advertise_status on when we entered; this message tells
     // us that it's off.  We need it on again.
     sink.cprb_send_advertise_status(true)
+    // To avoid deadlock, resend rollback_info, just in case.
+    sink.cprb_send_rollback_info(_barrier_token)
     this
 
   fun ref conn_ready(sink: ConnectorSink ref): _CpRbOps =>
     _CpRbTransition(this, _CpRbRolledBack, sink)
 
   fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref): _CpRbOps =>
-    _CpRbTransition(this, _CpRbRollingBackResumed, sink)
+    _CpRbTransition(this, _CpRbRollingBackResumed(_barrier_token), sink)
 
 class _CpRbRollingBackResumed is _CpRbOps
+  let _barrier_token: CheckpointBarrierToken
+
   fun name(): String => __loc.type_name()
+
+  new create(barrier_token: CheckpointBarrierToken) =>
+    _barrier_token = barrier_token
 
   fun ref conn_ready(sink: ConnectorSink ref): _CpRbOps =>
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
@@ -346,6 +353,8 @@ class _CpRbRollingBackResumed is _CpRbOps
     // We turned advertise_status on when we entered; this message tells
     // us that it's off.  We need it on again.
     sink.cprb_send_advertise_status(true)
+    // To avoid deadlock, resend rollback_info, just in case.
+    sink.cprb_send_rollback_info(_barrier_token)
     this
 
   fun ref cp_barrier_complete(sink: ConnectorSink ref,
