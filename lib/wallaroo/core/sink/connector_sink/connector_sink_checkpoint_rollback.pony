@@ -170,7 +170,7 @@ class _CpRbCPGotLocalCommit is _CpRbOps
 
   fun ref enter(sink: ConnectorSink ref) =>
     sink.cprb_send_commit_to_barrier_coordinator(_barrier_token)
-    if _barrier_token.id == 12 then
+    if _barrier_token.id == 5 then
       @l(Log.info(), Log.conn_sink(),
         "QQQ: DISCONNECT HACK".cstring())
       sink.cprb_inject_hard_close()
@@ -269,8 +269,7 @@ class _CpRbPreparedForRollback is _CpRbOps
   fun ref rollback(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken): _CpRbOps ref
   =>
-    sink.cprb_send_rollback_info(barrier_token)
-    _CpRbTransition(this, _CpRbRollingBack, sink)
+    _CpRbTransition(this, _CpRbRollingBack(barrier_token), sink)
 
 class _CpRbRolledBack is _CpRbOps
   fun name(): String => __loc.type_name()
@@ -287,9 +286,17 @@ class _CpRbRolledBack is _CpRbOps
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
 class _CpRbRollingBack is _CpRbOps
+  let _barrier_token: CheckpointBarrierToken
+
   fun name(): String => __loc.type_name()
 
+  new create(barrier_token: CheckpointBarrierToken) =>
+    _barrier_token = barrier_token
+
   fun ref enter(sink: ConnectorSink ref) =>
+    sink.cprb_send_rollback_info(_barrier_token)
+    @l(Log.crit(), Log.conn_sink(), "PUT BACK cprb_send_advertise_status(true)".cstring())
+    //////////////////////// sink.cprb_send_advertise_status(true)
     _ChangeSinkPhaseDropAllQueuedMsgs(sink)
 
   fun ref conn_ready(sink: ConnectorSink ref): _CpRbOps =>

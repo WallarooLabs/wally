@@ -138,6 +138,7 @@ class _ExtConnConnected is _ExtConnOps
   fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool):
     _ExtConnOps ref
   =>
+    @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: %s -> %s".cstring(), _state.advertise_status.string().cstring(), status.string().cstring())
     _state.advertise_status = status
     this
 
@@ -223,6 +224,7 @@ class _ExtConnDisconnected is _ExtConnOps
   fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool):
     _ExtConnOps ref
   =>
+    @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: %s -> %s".cstring(), _state.advertise_status.string().cstring(), status.string().cstring())
     _state.advertise_status = status
     this
 
@@ -235,6 +237,7 @@ class _ExtConnDisconnected is _ExtConnOps
     end
     // This is a bit unusual, to change status like this.  But it's a
     // state change that the Checkpoint/Rollback component knows about.
+    @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: %s -> %s".cstring(), _state.advertise_status.string().cstring(), "false".cstring())
     _state = _ExtConnState(where advertise_status' = false,
       rollback_info' = None, uncommitted_txn_ids' = None)
 
@@ -251,6 +254,7 @@ class _ExtConnInit is _ExtConnOps
   fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool):
     _ExtConnOps ref
   =>
+    @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: %s -> %s".cstring(), _state.advertise_status.string().cstring(), status.string().cstring())
     _state.advertise_status = status
     this
 
@@ -309,7 +313,9 @@ class _ExtConnTwoPCReady is _ExtConnOps
   fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool):
     _ExtConnOps ref
   =>
+    @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: %s -> %s".cstring(), _state.advertise_status.string().cstring(), status.string().cstring())
     if (not _state.advertise_status) and status then
+      @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: send conn_ready".cstring(), _state.advertise_status.string().cstring(), status.string().cstring())
       sink.cprb_send_conn_ready()
     end
     _state.advertise_status = status
@@ -353,6 +359,7 @@ class _ExtConnWaitingForRollbackPayload is _ExtConnOps
   fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool):
     _ExtConnOps ref
   =>
+    @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: %s -> %s".cstring(), _state.advertise_status.string().cstring(), status.string().cstring())
     _state.advertise_status = status
     this
 

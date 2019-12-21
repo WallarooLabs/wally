@@ -1240,6 +1240,10 @@ actor ConnectorSink is Sink
     @ll(_conn_debug, "Send rollback_info for %s".cstring(), barrier_token.string().cstring())
     _ec = _ec.rollback_info(this, barrier_token)
 
+  fun ref cprb_send_advertise_status(advertise_status: Bool = true) =>
+    @ll(_conn_debug, "Send advertise_status %s".cstring(), advertise_status.string().cstring())
+    _ec = _ec.set_advertise_status(this, advertise_status)
+
   fun ref cprb_make_txn_id_string(checkpoint_id: CheckpointId): String =>
     _twopc.make_txn_id_string(checkpoint_id)
 
