@@ -24,6 +24,7 @@ class KafkaSourceReader(BaseIter, BaseSource):
         self.consumer.assign([self.topic_partition])
         self.name = str(partition).encode()
         self.key = str(partition).encode()
+        self.last_acked = None
 
     def __str__(self):
         return("KafkaConsumerSource(topic: {}, partition: {}, point_of_ref: {})"
@@ -53,14 +54,18 @@ class KafkaSourceReader(BaseIter, BaseSource):
         except:
             pass
 
+    def wallaroo_acked(self, point_of_ref):
+        self.last_acked = point_of_ref
+
 parser = argparse.ArgumentParser("ALO Kafka Source Connector")
 
 parser.add_argument("--host", required=True)
 parser.add_argument("--port", required=True)
 parser.add_argument("--topic", required=True)
 parser.add_argument("--bootstrap_servers", default="127.0.0.1:9092")
-parser.add_argument("--version". default="0.0.1")
+parser.add_argument("--version", default="0.0.1")
 parser.add_argument("--cookie", default="cookie")
+parser.add_argument("--delay", default=0)
 
 args = parser.parse_args()
 
@@ -79,9 +84,10 @@ partitions = consumer.partitions_for_topic(topic)
 sources = set()
 
 for partition in partitions:
+        print(partition)
         source = KafkaSourceReader(topic, partition, bootstrap_servers)
         sources.add(source)
-
+print(sources)
 client = MultiSourceConnector(
         version,
         cookie,

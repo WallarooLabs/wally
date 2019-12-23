@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+
+# NOTES:
+#
+# 1. This server will truncate the out_path & out_path+".txnlog" files.
+#    If you want to preserve their data, then move them out of the way
+#    before starting this server.
+
+import argparse
+import asyncore
+import logging
+import threading
+import sys
+import wallaroo.experimental
+from kafka import KafkaProducer
+
+from kafka_aloc_sink_impl import KafkaSink_TwoPC_Output_LocalFilesystem
+from aloc_sink_impl import ThreadSafeDict, SinkServer
+
+fmt = '%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
+logging.root.formatter = logging.Formatter(fmt)
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(logging.root.formatter)
+logging.root.addHandler(stream_handler)
+logging.root.setLevel(logging.INFO)
+
+parser = argparse.ArgumentParser("ALO Kafka Sink Connector")
+
+parser.add_argument("--host", required=True)
+parser.add_argument("--port", required=True)
+parser.add_argument("--topic", required=True)
+parser.add_argument("--bootstrap_servers", default="127.0.0.1:9092")
+parser.add_argument("--out_path", required=True)
+parser.add_argument("--abort_rule_path", required=True)
+parser.add_argument("--s3_scheme", default=None)
+parser.add_argument("--s3_bucket", default=None)
+parser.add_argument("--s3_prefix", default=None)
+
+args = parser.parse_args()
+
+host = args.host
+port = int(args.port)
+topic = args.topic
+bootstrap_servers = args.bootstrap_servers
+out_path = args.out_path
+abort_rule_path = args.abort_rule_path
+s3_scheme = args.s3_scheme
+s3_bucket = args.s3_bucket
+s3_prefix = args.s3_prefix
+
+make_twopc_output = lambda: KafkaSink_TwoPC_Output_LocalFilesystem(out_path, producer, topic)
+
+producer = KafkaProducer(bootstrap_servers=bootstrap_servers)
+
+logging.debug("out_path: {}".format(out_path))
+logging.debug("abort_rule_path: {}".format(abort_rule_path))
+server = SinkServer(host, port, out_path, abort_rule_path, s3_scheme, s3_bucket, s3_prefix,
+                    make_twopc_output)
+logging.debug("server: {}".format(server))
+logging.debug("asyncore file: {}".format(asyncore.__file__))
+logging.info("Process started")
+asyncore.loop(timeout=0.001)
