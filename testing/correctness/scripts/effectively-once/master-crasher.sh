@@ -644,6 +644,43 @@ run_custom_20191210a () {
     done
 }
 
+run_custom_20191223a () {
+    ## Assume that we are run with `./master-crasher.sh 2 run_custom_20191223a`
+
+    while [ 1 ]; do
+    #    (
+    #        sleep 4.9
+    #        /bin/echo -n c0
+    #        crash_worker 0
+    #        mv /tmp/wallaroo.0 /tmp/wallaroo.0.`date +%s` && gzip /tmp/wallaroo.0.`date +%s` > /dev/null 2>&1 &
+    #        sleep 0.9
+    #        /bin/echo -n r0
+    #        start_initializer
+    #    ) &
+        (
+            sleep 3.7
+            /bin/echo -n cS
+            crash_sink
+            sleep 1.0
+            /bin/echo -n rS
+            start_sink
+        ) &
+        wait
+        /bin/echo -n echo both-done.
+        poll_out=`poll_ready -w 4 2>&1`
+        if [ $? -ne 0 -o ! -z "$poll_out" ]; then
+            echo "BUMMER A: pause the world: $poll_out"
+            poll_out=`poll_ready -w 4 2>&1`
+            if [ $? -ne 0 -o ! -z "$poll_out" ]; then
+                echo "BUMMER B: pause the world: $poll_out"
+                pause_the_world
+                break
+            fi
+        fi
+        sleep 1
+    done
+}
+
 touch $STATUS_CRASH_WORKER
 touch $STATUS_CRASH_SINK
 reset

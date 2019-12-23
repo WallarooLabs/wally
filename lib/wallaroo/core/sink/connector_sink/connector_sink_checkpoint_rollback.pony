@@ -361,15 +361,31 @@ class _CpRbRollingBackResumed is _CpRbOps
     sink.cprb_send_rollback_info(_barrier_token)
     this
 
+  fun ref checkpoint_complete(sink: ConnectorSink ref,
+    checkpoint_id: CheckpointId): _CpRbOps ref
+  =>
+    // This checkpoint is the one that is triggered immediately after
+    // rollback is complete.  Our sink phase has prevented any new
+    // output to reach the sink.
+    // Nothing to do here: with no output to sink, there's no need for
+    // a 2PC round.
+    @l(Log.info(), Log.conn_sink(),
+      "No PC activity during CheckpointId %lu at %s.%s".cstring(),
+        checkpoint_id, __loc.type_name().cstring(), __loc.method_name().cstring())
+    this
+
   fun ref cp_barrier_complete(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued]):
     _CpRbOps ref
   =>
     // This checkpoint is the one that is triggered immediately after
     // rollback is complete.  Our sink phase has prevented any new
-    // output to reach the sink.  Ack now with current token, because our
-    // state's token may be quite old.
+    // output to reach the sink.
+    // Ack now with current token, because our state's token may be quite old.
     sink.cprb_send_commit_to_barrier_coordinator(barrier_token)
+    @l(Log.info(), Log.conn_sink(),
+      "No PC activity during CheckpointId %lu at %s.%s".cstring(),
+        barrier_token.id, __loc.type_name().cstring(), __loc.method_name().cstring())
     this
 
 class _CpRbWaitingForCheckpoint is _CpRbOps
@@ -382,6 +398,19 @@ class _CpRbWaitingForCheckpoint is _CpRbOps
     _CpRbOps ref
   =>
     _CpRbTransition(this, _CpRbAbortCheckpoint(None), sink)
+
+  fun ref checkpoint_complete(sink: ConnectorSink ref,
+    checkpoint_id: CheckpointId): _CpRbOps ref
+  =>
+    // This checkpoint is the one that is triggered immediately after
+    // the last rollback was complete and started during
+    // RollingBackResumed.  Our sink phase has prevented any new output
+    // to reach the sink during that last rollback. There was no 2PC
+    // round during that last checkpoint
+    @l(Log.info(), Log.conn_sink(),
+      "No PC activity during CheckpointId %lu at %s.%s".cstring(),
+        checkpoint_id, __loc.type_name().cstring(), __loc.method_name().cstring())
+    this
 
   fun ref cp_barrier_complete(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued]):
