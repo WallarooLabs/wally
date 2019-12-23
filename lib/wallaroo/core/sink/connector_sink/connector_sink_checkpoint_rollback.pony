@@ -367,8 +367,9 @@ class _CpRbRollingBackResumed is _CpRbOps
   =>
     // This checkpoint is the one that is triggered immediately after
     // rollback is complete.  Our sink phase has prevented any new
-    // output to reach the sink.  Ack now.
-    sink.cprb_send_commit_to_barrier_coordinator(_barrier_token)
+    // output to reach the sink.  Ack now with current token, because our
+    // state's token may be quite old.
+    sink.cprb_send_commit_to_barrier_coordinator(barrier_token)
     this
 
 class _CpRbWaitingForCheckpoint is _CpRbOps
