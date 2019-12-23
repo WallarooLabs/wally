@@ -1250,7 +1250,11 @@ actor ConnectorSink is Sink
     @ll(_conn_debug, "Send abort to barrier coordinator for %s".cstring(), barrier_token.string().cstring())
     abort_decision("Phase 2 abort", txn_id, barrier_token)
 
-  fun ref cprb_send_rollback_info(barrier_token: CheckpointBarrierToken) =>
+  fun ref cprb_make_txn_id_string(checkpoint_id: CheckpointId): String =>
+    _twopc.make_txn_id_string(checkpoint_id)
+
+  // fun ref cprb_send_rollback_info(barrier_token: CheckpointBarrierToken) =>
+  be cprb_send_rollback_info(barrier_token: CheckpointBarrierToken) =>
     @ll(_conn_debug, "Send rollback_info for %s".cstring(), barrier_token.string().cstring())
     _ec = _ec.rollback_info(this, barrier_token)
 
@@ -1262,13 +1266,12 @@ actor ConnectorSink is Sink
     @ll(_conn_debug, "Send advertise_status %s".cstring(), advertise_status.string().cstring())
     _ec = _ec.set_advertise_status(this, advertise_status)
 
-  fun ref cprb_make_txn_id_string(checkpoint_id: CheckpointId): String =>
-    _twopc.make_txn_id_string(checkpoint_id)
-
+  // fun ref  cprb_inject_hard_close() =>
   be cprb_inject_hard_close() =>
     // FSM state transitions can be lost in cross-CpRb-ExtConn calling.
     // In _hard_close's case, the circular cross-FSM call happens via
     // the ConnectorSinkNotify.closed() -> cb_closed() -> ...
+    @ll(_conn_info, "CpRb component is forcing closed the connection via _hard_close()".cstring())
     _hard_close()
     _schedule_reconnect()
 

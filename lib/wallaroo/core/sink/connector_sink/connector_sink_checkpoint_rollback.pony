@@ -178,11 +178,13 @@ class _CpRbCPGotLocalCommit is _CpRbOps
 
   fun ref enter(sink: ConnectorSink ref) =>
     sink.cprb_send_commit_to_barrier_coordinator(_barrier_token)
+/****
     if _barrier_token.id == 5 then
       @l(Log.info(), Log.conn_sink(),
         "QQQ: DISCONNECT HACK".cstring())
       sink.cprb_inject_hard_close()
     end
+****/
 
   fun ref checkpoint_complete(sink: ConnectorSink ref,
     checkpoint_id: CheckpointId): _CpRbOps ref
