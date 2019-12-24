@@ -115,7 +115,12 @@ class _CpRbAbortCheckpoint is _CpRbOps
           cbt.string().cstring())
       match _checkpoint_to_abort
       | None =>
-        _checkpoint_to_abort = cbt
+        // Do not update _checkpoint_to_abort now: we now know that a
+        // barrier is in progress, but we cannot act on that knowledge.
+        // Instead, do nothing and wait for the token's completion event
+        // to arrive.
+        None
+        // _checkpoint_to_abort = cbt
       | let cpta: CheckpointBarrierToken =>
         if cpta != cbt then
           @l(Log.err(), Log.conn_sink(),
