@@ -1287,7 +1287,7 @@ actor ConnectorSink is Sink
     @ll(_conn_debug, "Send advertise_status %s".cstring(), advertise_status.string().cstring())
     _ec.set_advertise_status(this, advertise_status)
 
-  fun ref  cprb_inject_hard_close() =>
+  fun ref cprb_inject_hard_close() =>
     // FSM state transitions can be lost in cross-CpRb-ExtConn calling.
     // In _hard_close's case, the circular cross-FSM call happens via
     // the ConnectorSinkNotify.closed() -> cb_closed() -> ...
