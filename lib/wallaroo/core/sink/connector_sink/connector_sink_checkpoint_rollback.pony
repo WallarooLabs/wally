@@ -271,7 +271,6 @@ class _CpRbRolledBack is _CpRbOps
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
   fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref) =>
-    _ChangeSinkPhaseQueueMsgsForwardTokens(sink)
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
 class _CpRbRollingBack is _CpRbOps
@@ -298,15 +297,17 @@ class _CpRbRollingBack is _CpRbOps
     _CpRbTransition(this, _CpRbRolledBack, sink)
 
   fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref) =>
-    _CpRbTransition(this, _CpRbRollingBackResumed(sink, _barrier_token), sink)
+    _CpRbTransition(this, _CpRbRollingBackResumed(_barrier_token), sink)
 
 class _CpRbRollingBackResumed is _CpRbOps
   let _barrier_token: CheckpointBarrierToken
 
   fun name(): String => __loc.type_name()
 
-  new create(sink: ConnectorSink ref, barrier_token: CheckpointBarrierToken) =>
+  new create(barrier_token: CheckpointBarrierToken) =>
     _barrier_token = barrier_token
+
+  fun ref enter(sink: ConnectorSink ref) =>
     // Any kind of token may arrive now that the
     // RollbackResumeBarrierToken has arrived.  In fact, some tokens
     // might be queued right now. Ignore any queued app messages, fetch

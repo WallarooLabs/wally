@@ -238,6 +238,17 @@ class BarrierSinkPhase is SinkPhase
   fun ref resume_processing_messages(discard_message_type: Bool) =>
     _sink.resume_processing_messages_queued(discard_message_type)
 
+  fun ref reconstruct_input_producer_barrier_events(): Array[SinkPhaseQueued]
+  =>
+    let qd: Array[SinkPhaseQueued] = qd.create()
+
+    //_inputs_blocking(input_id) = producer
+    for (input_id, producer) in _inputs_blocking.pairs() do
+      @printf[I32]("reconstruct_input_producer_barrier_events: input_id %s producer 0x%lx barrier_token %s\n".cstring(), input_id.string().cstring(), producer, _barrier_token.string().cstring())
+      qd.push(QueuedBarrier(input_id, producer, _barrier_token))
+    end
+    qd
+
 class QueuingSinkPhase is SinkPhase
   """
   NOTE: This stage is used only by ConnectorSink and does not follow
@@ -285,16 +296,16 @@ class QueuingSinkPhase is SinkPhase
         let ret = p.receive_barrier(input_id, producer, barrier_token)
         _forward_token_phase = p
         ret
-      | let phase: BarrierSinkPhase =>
+      | let bsp: BarrierSinkPhase =>
         @l(Log.debug(), Log.conn_sink(), "QueuingSinkPhase: receive_barrier: Nth for %s".cstring(), barrier_token.string().cstring())
-        let ret = phase.receive_barrier(input_id, producer, barrier_token)
+        let ret = bsp.receive_barrier(input_id, producer, barrier_token)
         if ret then
           @l(Log.debug(), Log.conn_sink(), "QueuingSinkPhase: receive_barrier: complete for %s".cstring(), barrier_token.string().cstring())
-          _sink.barrier_complete(barrier_token)
           // We may receive multiple unique tokens while we sit waiting
           // to be discarded.  Reset _forward_token_phase so that we'll
           // recognize the next token.
           _forward_token_phase = None
+          _sink.barrier_complete(barrier_token)
         end
         ret
       end
@@ -308,6 +319,18 @@ class QueuingSinkPhase is SinkPhase
 
   fun ref queued(): Array[SinkPhaseQueued] =>
     let qd = Array[SinkPhaseQueued]
+
+    match _forward_token_phase
+    | None =>
+      None
+    | let bsp: BarrierSinkPhase =>
+      // We are in the middle of processing a barrier.  We need to
+      // reconstruct the events that fed into the creation of this bsp
+      // object and push them first onto our list.
+      for q in bsp.reconstruct_input_producer_barrier_events().values() do
+        qd.push(q)
+      end
+    end
     for q in _queued.values() do
       qd.push(q)
     end

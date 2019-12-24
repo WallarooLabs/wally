@@ -666,7 +666,7 @@ run_custom_20191223a () {
             start_sink
         ) &
         wait
-        /bin/echo -n echo both-done.
+        /bin/echo -n echo done.
         poll_out=`poll_ready -w 4 2>&1`
         if [ $? -ne 0 -o ! -z "$poll_out" ]; then
             echo "BUMMER A: pause the world: $poll_out"
