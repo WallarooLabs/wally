@@ -1049,4 +1049,8 @@ class ConnectorSourceNotify[In: Any val]
     Generate a printable string of the contents of the given readseq to use in
     error messages.
     """
-    "[len=" + array.size().string() + ": " + ",".join(array.values()) + "]"
+    ifdef "verbose_debug" then
+      "[len=" + array.size().string() + ": " + ",".join(array.values()) + "]"
+    else
+      "[len=" + array.size().string() + ": " + "...]"
+    end
