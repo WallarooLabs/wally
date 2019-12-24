@@ -177,22 +177,30 @@ class _ExtConnDisconnected is _ExtConnOps
     _state = state
 
   fun ref enter(sink: ConnectorSink ref) =>
-    if _state.advertise_status then
-      sink.cprb_send_abort_next_checkpoint()
-    end
+    let old_state = _state
+
     // This is a bit unusual, to change status like this.  But it's a
     // state change that the Checkpoint/Rollback component knows about.
+    // Reset state now, because cprb_send_abort_next_checkpoint() may
+    // alter our state.
     @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: %s: %s -> %s".cstring(), name().cstring(), _state.advertise_status.string().cstring(), "false".cstring())
     _state = _ExtConnState(where advertise_status' = false,
       rollback_info' = None, uncommitted_txn_ids' = None)
 
+    if old_state.advertise_status then
+      sink.cprb_send_abort_next_checkpoint()
+    end
+
   fun ref rollback_info(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken)
   =>
+    /**** Not correct all the time
     // This message can arrive at this state if we went directly
     // from Connected -> TwoPCReady, because the uncommited txn list
     // was empty.  We don't need this info; ignore it.
-    @l(Log.debug(), Log.conn_sink(), "rollback_info line %lu: ignore".cstring(), __loc.line())
+    ****/
+    _state.rollback_info = barrier_token
+    @l(Log.debug(), Log.conn_sink(), "rollback_info line %lu: use".cstring(), __loc.line())
 
   fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool) =>
     @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: %s: %s -> %s".cstring(), name().cstring(), _state.advertise_status.string().cstring(), status.string().cstring())
@@ -288,6 +296,11 @@ class _ExtConnWaitingForRollbackPayload is _ExtConnOps
 
   new create(state: _ExtConnState) =>
     _state = state
+    @l(Log.debug(), Log.conn_sink(), "_ExtConnWaitingForRollbackPayload: rollback_info = %s".cstring(),
+      match _state.rollback_info
+      | None => "<None>".cstring()
+      | let x: CheckpointBarrierToken => x.string().cstring()
+      end)
 
   fun ref rollback_info(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken)
