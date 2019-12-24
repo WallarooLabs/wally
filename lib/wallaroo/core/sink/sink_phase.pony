@@ -127,7 +127,7 @@ class BarrierSinkPhase is SinkPhase
   var _barrier_token: BarrierToken
   let _inputs_blocking: Map[RoutingId, Producer] = _inputs_blocking.create()
   let _queued: Array[SinkPhaseQueued] = _queued.create()
-  let _completion_notifies_sink: Bool
+  var _completion_notifies_sink: Bool
 
   new create(sink_id: RoutingId, sink: Sink ref, token: BarrierToken,
     completion_notifies_sink: Bool = true) =>
@@ -225,6 +225,8 @@ class BarrierSinkPhase is SinkPhase
     @printf[I32]("2PC: _check_completion: inputs %lu inputs_blocking %lu %s\n".cstring(), inputs.size(), _inputs_blocking.size(), _barrier_token.string().cstring())
     if inputs.size() == _inputs_blocking.size() then
       if _completion_notifies_sink then
+        ////////// _inputs_blocking.clear()
+        @printf[I32]("2PC: _check_completion: inputs_blocking.clear()\n".cstring())
         _sink.barrier_complete(_barrier_token)
       end
       true
@@ -252,6 +254,9 @@ class BarrierSinkPhase is SinkPhase
   fun get_barrier_token(): BarrierToken =>
     _barrier_token
 
+  fun ref disable_completion_notifies_sink() =>
+    _completion_notifies_sink = false
+
 class QueuingSinkPhase is SinkPhase
   """
   NOTE: This stage is used only by ConnectorSink and does not follow
@@ -261,15 +266,17 @@ class QueuingSinkPhase is SinkPhase
   let _sink: Sink ref
   var _queued: Array[SinkPhaseQueued]
   let _forward_tokens: Bool
-  var _forward_token_phase: (None|BarrierSinkPhase) = None
+  var _forward_token_phase: (None|BarrierSinkPhase)
 
   new create(sink_id: RoutingId, sink: Sink ref,
-    q: Array[SinkPhaseQueued], forward_tokens: Bool)
+    q: Array[SinkPhaseQueued], forward_tokens: Bool,
+    forward_token_phase: (None|BarrierSinkPhase) = None)
   =>
     _sink_id = sink_id
     _sink = sink
     _queued = q
     _forward_tokens = forward_tokens
+    _forward_token_phase = forward_token_phase
     @printf[I32]("QQQ: new %s size %lu forward %s\n".cstring(), name().cstring(), q.size(), forward_tokens.string().cstring())
 
   fun name(): String => __loc.type_name()

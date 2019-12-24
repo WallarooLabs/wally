@@ -139,7 +139,7 @@ class _CpRbAbortCheckpoint is _CpRbOps
       ****/
       end
     end
-    _ChangeSinkPhaseQueueMsgsForwardTokens(sink)
+    _ChangeSinkPhaseQueueMsgsForwardTokens(sink where shear_risk = true)
     _is_checkpoint_id_known(sink)
 
   fun ref _is_checkpoint_id_known(sink: ConnectorSink ref) =>
@@ -413,8 +413,8 @@ class _CpRbWaitingForCheckpoint is _CpRbOps
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
 primitive _ChangeSinkPhaseQueueMsgsForwardTokens
-  fun apply(sink: ConnectorSink ref) =>
-    sink.swap_barrier_to_queued(where forward_tokens = true)
+  fun apply(sink: ConnectorSink ref, shear_risk: Bool = false) =>
+    sink.swap_barrier_to_queued(where forward_tokens = true, shear_risk = shear_risk)
 
 primitive _DropQueuedAppMsgs
   fun apply(sink: ConnectorSink ref) =>
