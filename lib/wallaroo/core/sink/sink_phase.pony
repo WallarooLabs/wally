@@ -249,6 +249,9 @@ class BarrierSinkPhase is SinkPhase
     end
     qd
 
+  fun get_barrier_token(): BarrierToken =>
+    _barrier_token
+
 class QueuingSinkPhase is SinkPhase
   """
   NOTE: This stage is used only by ConnectorSink and does not follow

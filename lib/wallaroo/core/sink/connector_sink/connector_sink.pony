@@ -1259,6 +1259,14 @@ actor ConnectorSink is Sink
   fun ref cprb_get_phase_queued(): Array[SinkPhaseQueued] =>
     _phase.queued()
 
+  fun ref cprb_check_sink_phase_partial_barrier(): (None | BarrierToken) =>
+    match _phase
+    | let x: BarrierSinkPhase =>
+      x.get_barrier_token()
+    else
+      None
+    end
+
   // fun ref cprb_send_rollback_info(barrier_token: CheckpointBarrierToken) =>
   // TODO return to fun ref
   be cprb_send_rollback_info(barrier_token: CheckpointBarrierToken) =>

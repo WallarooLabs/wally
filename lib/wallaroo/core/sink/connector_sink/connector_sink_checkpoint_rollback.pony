@@ -106,6 +106,31 @@ class _CpRbAbortCheckpoint is _CpRbOps
       end
 
   fun ref enter(sink: ConnectorSink ref) =>
+    match sink.cprb_check_sink_phase_partial_barrier()
+    | None =>
+      None
+    | let cbt: CheckpointBarrierToken =>
+      @l(Log.info(), Log.conn_sink(),
+        "_CpRbAbortCheckpoint: detected shear with token %s".cstring(),
+          cbt.string().cstring())
+      match _checkpoint_to_abort
+      | None =>
+        _checkpoint_to_abort = cbt
+      | let cpta: CheckpointBarrierToken =>
+        if cpta != cbt then
+          @l(Log.err(), Log.conn_sink(),
+            "Expected %s but partial barrier is %s".cstring(),
+            _checkpoint_to_abort.string().cstring(), cbt.string().cstring())
+          Fail()
+        end
+      /**** compiler says this is unreachable:
+      | let x: BarrierToken =>
+        @l(Log.err(), Log.conn_sink(),
+          "Unexpected barrier %s".cstring(), x.string().cstring())
+        Fail()
+      ****/
+      end
+    end
     _ChangeSinkPhaseQueueMsgsForwardTokens(sink)
     _is_checkpoint_id_known(sink)
 
@@ -282,7 +307,7 @@ class _CpRbRollingBack is _CpRbOps
     _barrier_token = barrier_token
 
   fun ref enter(sink: ConnectorSink ref) =>
-    _DropQueuedAppMsgs(sink)
+    // Redundant: _DropQueuedAppMsgs(sink)
     sink.cprb_send_rollback_info(_barrier_token)
     sink.cprb_send_advertise_status(true)
 
