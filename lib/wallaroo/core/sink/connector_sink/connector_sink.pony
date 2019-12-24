@@ -1256,12 +1256,17 @@ actor ConnectorSink is Sink
   fun ref cprb_make_txn_id_string(checkpoint_id: CheckpointId): String =>
     _twopc.make_txn_id_string(checkpoint_id)
 
+  fun ref cprb_get_phase_queued(): Array[SinkPhaseQueued] =>
+    _phase.queued()
+
   // fun ref cprb_send_rollback_info(barrier_token: CheckpointBarrierToken) =>
+  // TODO return to fun ref
   be cprb_send_rollback_info(barrier_token: CheckpointBarrierToken) =>
     @ll(_conn_debug, "Send rollback_info for %s".cstring(), barrier_token.string().cstring())
     _ec = _ec.rollback_info(this, barrier_token)
 
   // fun ref cprb_send_advertise_status(advertise_status: Bool = true) =>
+  // TODO return to fun ref
   be cprb_send_advertise_status(advertise_status: Bool = true) =>
     // FSM state transitions can be lost in cross-CpRb-ExtConn calling.
     // TODO: I've been assuming that all this message stuff is sync.
@@ -1270,6 +1275,7 @@ actor ConnectorSink is Sink
     _ec = _ec.set_advertise_status(this, advertise_status)
 
   // fun ref  cprb_inject_hard_close() =>
+  // TODO return to fun ref
   be cprb_inject_hard_close() =>
     // FSM state transitions can be lost in cross-CpRb-ExtConn calling.
     // In _hard_close's case, the circular cross-FSM call happens via
