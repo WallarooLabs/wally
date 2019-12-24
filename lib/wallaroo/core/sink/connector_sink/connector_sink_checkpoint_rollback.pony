@@ -24,7 +24,7 @@ use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 
 /****
-Boilerplate: sed -n '/BEGIN LEFT/,/END LEFT/p' connector-sink-2pc-management.dot | grep label | grep -e '->' | sed -e 's:.*label="::' -e 's:".*::' -e 's:\\n.*::g' | sed 's/://' | sort -u | awk 'BEGIN {print "trait _CpRbOps\n  fun name(): String\n";} {printf("  fun ref %s(sink: ConnectorSink ref):\n    _CpRbOps ref\n  =>\n    _invalid_call(__loc.method_name()); Fail(); this\n\n", $1); }'
+Boilerplate: sed -n '/BEGIN LEFT/,/END LEFT/p' connector-sink-2pc-management.dot | grep label | grep -e '->' | sed -e 's:.*label="::' -e 's:".*::' -e 's:\\n.*::g' | sed 's/://' | sort -u | awk 'BEGIN {print "trait _CpRbOps\n  fun name(): String\n";} {printf("  fun ref %s(sink: ConnectorSink ref) =>\n    _invalid_call(__loc.method_name()); Fail()\n\n", $1); }'
 Missing: enter()
 ****/
 
@@ -79,7 +79,7 @@ primitive _CpRbTransition
     @l(Log.debug(), Log.conn_sink(),
       "CpRbTransition:: %s -> %s".cstring(),
       curr.name().cstring(), next.name().cstring())
-    // We must update sinks _cprb pointer before calling .enter()!
+    // We must update sink's _cprb pointer before calling .enter()!
     // Otherwise, if .enter() also updates the _cprb pointer, then
     // a pointer update will get clobbered & lost.
     sink._update_cprb_member(next)

@@ -1209,8 +1209,11 @@ actor ConnectorSink is Sink
       _phase = QueuingSinkPhase(_sink_id, this, queue, forward_tokens)
     end
 
-  fun ref _update_cprb_member(new_cprb: _CpRbOps) =>
-    _cprb = new_cprb
+  fun ref _update_cprb_member(next: _CpRbOps) =>
+    _cprb = next
+
+  fun ref _update_ec_member(next: _ExtConnOps) =>
+    _ec = next
 
   fun ref cprb_queuing_barrier_drop_app_msgs() =>
     match _phase
@@ -1267,24 +1270,18 @@ actor ConnectorSink is Sink
       None
     end
 
-  // fun ref cprb_send_rollback_info(barrier_token: CheckpointBarrierToken) =>
-  // TODO return to fun ref
-  be cprb_send_rollback_info(barrier_token: CheckpointBarrierToken) =>
+  fun ref cprb_send_rollback_info(barrier_token: CheckpointBarrierToken) =>
     @ll(_conn_debug, "Send rollback_info for %s".cstring(), barrier_token.string().cstring())
-    _ec = _ec.rollback_info(this, barrier_token)
+    _ec.rollback_info(this, barrier_token)
 
-  // fun ref cprb_send_advertise_status(advertise_status: Bool = true) =>
-  // TODO return to fun ref
-  be cprb_send_advertise_status(advertise_status: Bool = true) =>
+  fun ref cprb_send_advertise_status(advertise_status: Bool = true) =>
     // FSM state transitions can be lost in cross-CpRb-ExtConn calling.
     // TODO: I've been assuming that all this message stuff is sync.
     //       A behavior makes things async. What does this break, and when?
     @ll(_conn_debug, "Send advertise_status %s".cstring(), advertise_status.string().cstring())
-    _ec = _ec.set_advertise_status(this, advertise_status)
+    _ec.set_advertise_status(this, advertise_status)
 
-  // fun ref  cprb_inject_hard_close() =>
-  // TODO return to fun ref
-  be cprb_inject_hard_close() =>
+  fun ref  cprb_inject_hard_close() =>
     // FSM state transitions can be lost in cross-CpRb-ExtConn calling.
     // In _hard_close's case, the circular cross-FSM call happens via
     // the ConnectorSinkNotify.closed() -> cb_closed() -> ...
@@ -1298,14 +1295,14 @@ actor ConnectorSink is Sink
 
   fun ref cb_connected() =>
     connected_count = connected_count + 1
-    _ec = _ec.tcp_connected(this)
+    _ec.tcp_connected(this)
     if true then //TODO//
       @ll(_conn_err, "//TODO// unthrottle early".cstring())
       _notify.unthrottled(this)
     end
 
   fun ref cb_closed() =>
-    _ec = _ec.tcp_closed(this)
+    _ec.tcp_closed(this)
 
   fun ref cb_received(data: Array[U8] val): None ?
   =>
@@ -1318,14 +1315,14 @@ actor ConnectorSink is Sink
       if _credits < 2 then
         _error_and_close("HEY, too few credits: " + _credits.string())
       else
-        _ec = _ec.handle_message(this, m)
+        _ec.handle_message(this, m)
       end
     | let m: cwm.ErrorMsg =>
       _error_and_close("Protocol error: Sink sent us ErrorMsg: %s" + m.message)
     | let m: cwm.NotifyMsg =>
       _error_and_close("Protocol error: Sink sent us NotifyMsg")
     | let m: cwm.NotifyAckMsg =>
-      _ec = _ec.handle_message(this, m)
+      _ec.handle_message(this, m)
     | let m: cwm.MessageMsg =>
       // 2PC messages are sent via MessageMsg on stream_id 0.
       if (m.stream_id != 0) or (m.message is None) then
@@ -1333,7 +1330,7 @@ actor ConnectorSink is Sink
           _ext_conn_state().string())
         return
       end
-      _ec = _ec.handle_message(this, m)
+      _ec.handle_message(this, m)
     | let m: cwm.AckMsg =>
       if _ext_conn_state is ExtConnStateStreaming then
         // NOTE: we aren't actually using credits

@@ -22,47 +22,37 @@ use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
 
 /****
-Boilerplate: sed -n '/BEGIN RIGHT/,/END RIGHT/p' connector-sink-2pc-management.dot | grep label | grep -e '->' | sed -e 's:.*label="::' -e 's:".*::' -e 's:\\n.*::g' | sed 's/://' | sort -u | awk 'BEGIN {print "trait _ExtConnOps\n  fun name(): String\n";} {printf("  fun ref %s(sink: ConnectorSink ref):\n    _ExtConnOps ref\n  =>\n    _invalid_call(__loc.method_name()); Fail(); this\n\n", $1); }'
-Missing: handle_message()
+Boilerplate: sed -n '/BEGIN RIGHT/,/END RIGHT/p' connector-sink-2pc-management.dot | grep label | grep -e '->' | sed -e 's:.*label="::' -e 's:".*::' -e 's:\\n.*::g' | sed 's/://' | sort -u | awk 'BEGIN {print "trait _ExtConnOps\n  fun name(): String\n";} {printf("  fun ref %s(sink: ConnectorSink ref) =>\n    _invalid_call(__loc.method_name()); Fail()\n\n", $1); }'
+Missing: enter(), handle_message()
 ****/
 
 trait _ExtConnOps
   fun name(): String
 
-  fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool):
-    _ExtConnOps ref
-  =>
-    _invalid_call(__loc.method_name()); Fail(); this
+  fun ref enter(sink: ConnectorSink ref) => None
 
-  fun ref handle_message(sink: ConnectorSink ref, msg: cwm.Message):
-    _ExtConnOps ref
-  =>
-    _invalid_call(__loc.method_name()); Fail(); this
+  fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool) =>
+    _invalid_call(__loc.method_name()); Fail()
 
-  fun ref reconn_timer(sink: ConnectorSink ref):
-    _ExtConnOps ref
-  =>
-    _invalid_call(__loc.method_name()); Fail(); this
+  fun ref handle_message(sink: ConnectorSink ref, msg: cwm.Message) =>
+    _invalid_call(__loc.method_name()); Fail()
+
+  fun ref reconn_timer(sink: ConnectorSink ref) =>
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref rollback_info(sink: ConnectorSink ref,
-    barrier_token: CheckpointBarrierToken): _ExtConnOps ref
+    barrier_token: CheckpointBarrierToken)
   =>
-    _invalid_call(__loc.method_name()); Fail(); this
+    _invalid_call(__loc.method_name()); Fail()
 
-  fun ref tcp_closed(sink: ConnectorSink ref):
-    _ExtConnOps ref
-  =>
-    _invalid_call(__loc.method_name()); Fail(); this
+  fun ref tcp_closed(sink: ConnectorSink ref) =>
+    _invalid_call(__loc.method_name()); Fail()
 
-  fun ref tcp_connected(sink: ConnectorSink ref):
-    _ExtConnOps ref
-  =>
-    _invalid_call(__loc.method_name()); Fail(); this
+  fun ref tcp_connected(sink: ConnectorSink ref) =>
+    _invalid_call(__loc.method_name()); Fail()
 
-  fun ref twopc_intro(sink: ConnectorSink ref):
-    _ExtConnOps ref
-  =>
-    _invalid_call(__loc.method_name()); Fail(); this
+  fun ref twopc_intro(sink: ConnectorSink ref) =>
+    _invalid_call(__loc.method_name()); Fail()
 
   fun _invalid_call(method_name: String) =>
     @l(Log.crit(), Log.conn_sink(),
@@ -83,44 +73,15 @@ class _ExtConnState
     uncommitted_txn_ids = uncommitted_txn_ids'
 
 primitive _ECTransition
-  fun apply(curr: _ExtConnOps, next: _ExtConnOps): _ExtConnOps =>
+  fun apply(curr: _ExtConnOps, next: _ExtConnOps, sink: ConnectorSink ref) =>
     @l(Log.debug(), Log.conn_sink(),
       "ECTransition:: %s -> %s".cstring(),
       curr.name().cstring(), next.name().cstring())
-    next
-
-primitive _ECTransitionConnected
-  fun apply(curr: _ExtConnOps, state: _ExtConnState,
-    sink: ConnectorSink ref): _ExtConnOps
-  =>
-    let next = _ExtConnConnected(state)
-    @l(Log.debug(), Log.conn_sink(),
-      "ECTransition:: %s -> %s".cstring(),
-      curr.name().cstring(), next.name().cstring())
+    // We must update sink's _ec pointer before calling .enter()!
+    // Otherwise, if .enter() also updates the _cprb pointer, then
+    // a pointer update will get clobbered & lost.
+    sink._update_ec_member(next)
     next.enter(sink)
-    next
-
-primitive _ECTransitionDisconnected
-  fun apply(curr: _ExtConnOps, state: _ExtConnState,
-    sink: ConnectorSink ref): _ExtConnOps
-  =>
-    let next = _ExtConnDisconnected(state)
-    @l(Log.debug(), Log.conn_sink(),
-      "ECTransition:: %s -> %s".cstring(),
-      curr.name().cstring(), next.name().cstring())
-    next.enter(sink)
-    next
-
-primitive _ECTransitionTwoPCReady
-  fun apply(curr: _ExtConnOps, state: _ExtConnState,
-    sink: ConnectorSink ref): _ExtConnOps
-  =>
-    let next = _ExtConnTwoPCReady(state)
-    @l(Log.debug(), Log.conn_sink(),
-      "ECTransition:: %s -> %s".cstring(),
-      curr.name().cstring(), next.name().cstring())
-    next.enter(sink)
-    next
 
 /****
 Boilerplate: sed -n '/BEGIN RIGHT/,/END RIGHT/p' connector-sink-2pc-management.dot | grep -e '->' | awk '{print $1}' | sort -u | grep -v START | awk '{ printf("class _ExtConn%s is _ExtConnOps\n  fun name(): String => __loc.type_name()\n\n", $1); }'
@@ -134,70 +95,6 @@ class _ExtConnConnected is _ExtConnOps
 
   new create(state: _ExtConnState) =>
     _state = state
-
-  fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool):
-    _ExtConnOps ref
-  =>
-    @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: %s -> %s".cstring(), _state.advertise_status.string().cstring(), status.string().cstring())
-    _state.advertise_status = status
-    this
-
-  fun ref handle_message(sink: ConnectorSink ref, msg: cwm.Message):
-    _ExtConnOps ref
-  =>
-    match msg
-    | let m: cwm.OkMsg =>
-      @l(Log.debug(), Log.conn_sink(), "Got OkMsg".cstring())
-      // _msgs_received = _msgs_received + 1
-      this
-    | let m: cwm.NotifyAckMsg =>
-      @l(Log.debug(), Log.conn_sink(), "NotifyAck: success %s stream_id %d p-o-r %lu".cstring(), m.success.string().cstring(), m.stream_id, m.point_of_ref)
-      // _msgs_received = _msgs_received + 1
-      if m.success then
-        // We ignore the point of reference sent to us by
-        // the connector sink.
-        this
-      else
-        sink._error_and_close("Got NotifyAck success=false")
-        _ECTransitionDisconnected(this, _state, sink)
-      end
-    | let m: cwm.MessageMsg =>
-      try
-        let inner = cwm.TwoPCFrame.decode(m.message as Array[U8] val)?
-        match inner
-        | let mi: cwm.ReplyUncommittedMsg =>
-          @l(Log.debug(), Log.conn_sink(), "2PC: GOT ReplyUncommittedMsg, # of items = %d".cstring(), mi.txn_ids.size())
-          sink.report_ready_to_work()
-          //TODO// sink._notify.unthrottled(this)
-
-          if mi.txn_ids.size() == 0 then
-            @l(Log.debug(), Log.conn_sink(),
-              "Uncommitted txns list is empty".cstring())
-            _ECTransitionTwoPCReady(this, _state, sink)
-          else
-            _state.uncommitted_txn_ids = mi.txn_ids
-            _ECTransition(this, _ExtConnWaitingForRollbackPayload(
-              _state))
-          end
-        else
-          Fail(); this
-        end
-      else
-        sink._error_and_close("Bad msg @ line " + __loc.line().string())
-        _ECTransitionDisconnected(this, _state, sink)
-      end
-    else
-      Fail(); this
-    end
-
-  fun ref rollback_info(sink: ConnectorSink ref,
-    barrier_token: CheckpointBarrierToken): _ExtConnOps ref
-  =>
-    _state.rollback_info = barrier_token
-    this
-
-  fun ref tcp_closed(sink: ConnectorSink ref): _ExtConnOps =>
-    _ECTransitionDisconnected(this, _state, sink)
 
   fun ref enter(sink: ConnectorSink ref) =>
     // 2PC: Send the Hello message to start things off
@@ -213,6 +110,64 @@ class _ExtConnConnected is _ExtConnOps
     let list_u_msg = cwm.MessageMsg(0, 0, 0, None, list_u)
     sink.send_msg(list_u_msg)
 
+  fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool) =>
+    @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: %s -> %s".cstring(), _state.advertise_status.string().cstring(), status.string().cstring())
+    _state.advertise_status = status
+
+  fun ref handle_message(sink: ConnectorSink ref, msg: cwm.Message) =>
+    match msg
+    | let m: cwm.OkMsg =>
+      @l(Log.debug(), Log.conn_sink(), "Got OkMsg".cstring())
+      // _msgs_received = _msgs_received + 1
+    | let m: cwm.NotifyAckMsg =>
+      @l(Log.debug(), Log.conn_sink(), "NotifyAck: success %s stream_id %d p-o-r %lu".cstring(), m.success.string().cstring(), m.stream_id, m.point_of_ref)
+      // _msgs_received = _msgs_received + 1
+      if m.success then
+        // We ignore the point of reference sent to us by
+        // the connector sink.
+        None
+      else
+        sink._error_and_close("Got NotifyAck success=false")
+        _ECTransition(this, _ExtConnDisconnected(_state), sink)
+      end
+    | let m: cwm.MessageMsg =>
+      try
+        let inner = cwm.TwoPCFrame.decode(m.message as Array[U8] val)?
+        match inner
+        | let mi: cwm.ReplyUncommittedMsg =>
+          @l(Log.debug(), Log.conn_sink(), "2PC: GOT ReplyUncommittedMsg, # of items = %d".cstring(), mi.txn_ids.size())
+          sink.report_ready_to_work()
+          //TODO// sink._notify.unthrottled(this)
+
+          if mi.txn_ids.size() == 0 then
+            @l(Log.debug(), Log.conn_sink(),
+              "Uncommitted txns list is empty".cstring())
+            _ECTransition(this, _ExtConnTwoPCReady(_state), sink)
+          else
+            _state.uncommitted_txn_ids = mi.txn_ids
+            _ECTransition(this, _ExtConnWaitingForRollbackPayload(
+              _state), sink)
+          end
+        else
+          Fail()
+        end
+      else
+        sink._error_and_close("Bad msg @ line " + __loc.line().string())
+        _ECTransition(this, _ExtConnDisconnected(_state), sink)
+      end
+    else
+      Fail()
+    end
+
+  fun ref rollback_info(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken)
+  =>
+    _state.rollback_info = barrier_token
+    @l(Log.debug(), Log.conn_sink(), "rollback_info line %lu: use".cstring(), __loc.line())
+
+  fun ref tcp_closed(sink: ConnectorSink ref) =>
+    _ECTransition(this, _ExtConnDisconnected(_state), sink)
+
 class _ExtConnDisconnected is _ExtConnOps
   var _state: _ExtConnState
 
@@ -220,24 +175,6 @@ class _ExtConnDisconnected is _ExtConnOps
 
   new create(state: _ExtConnState) =>
     _state = state
-
-  fun ref rollback_info(sink: ConnectorSink ref,
-    barrier_token: CheckpointBarrierToken): _ExtConnOps ref
-  =>
-    // This message can arrive at this state if we went directly
-    // from Connected -> TwoPCReady, because the uncommited txn list
-    // was empty.  We don't need this info; ignore it.
-    this
-
-  fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool):
-    _ExtConnOps ref
-  =>
-    @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: %s -> %s".cstring(), _state.advertise_status.string().cstring(), status.string().cstring())
-    _state.advertise_status = status
-    this
-
-  fun ref tcp_connected(sink: ConnectorSink ref): _ExtConnOps =>
-    _ECTransitionConnected(this, _state, sink)
 
   fun ref enter(sink: ConnectorSink ref) =>
     if _state.advertise_status then
@@ -249,6 +186,21 @@ class _ExtConnDisconnected is _ExtConnOps
     _state = _ExtConnState(where advertise_status' = false,
       rollback_info' = None, uncommitted_txn_ids' = None)
 
+  fun ref rollback_info(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken)
+  =>
+    // This message can arrive at this state if we went directly
+    // from Connected -> TwoPCReady, because the uncommited txn list
+    // was empty.  We don't need this info; ignore it.
+    @l(Log.debug(), Log.conn_sink(), "rollback_info line %lu: ignore".cstring(), __loc.line())
+
+  fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool) =>
+    @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: %s -> %s".cstring(), _state.advertise_status.string().cstring(), status.string().cstring())
+    _state.advertise_status = status
+
+  fun ref tcp_connected(sink: ConnectorSink ref) =>
+    _ECTransition(this, _ExtConnConnected(_state), sink)
+
 class _ExtConnInit is _ExtConnOps
   var _state: _ExtConnState = _ExtConnState(
     where advertise_status' = true, uncommitted_txn_ids' = None,
@@ -259,20 +211,15 @@ class _ExtConnInit is _ExtConnOps
   new create() =>
     None
 
-  fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool):
-    _ExtConnOps ref
-  =>
+  fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool) =>
     @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: %s -> %s".cstring(), _state.advertise_status.string().cstring(), status.string().cstring())
     _state.advertise_status = status
-    this
 
-  fun ref tcp_closed(sink: ConnectorSink ref): _ExtConnOps =>
-    _ECTransitionDisconnected(this, _state, sink)
+  fun ref tcp_closed(sink: ConnectorSink ref) =>
+    _ECTransition(this, _ExtConnDisconnected(_state), sink)
 
-  fun ref tcp_connected(sink: ConnectorSink ref):
-    _ExtConnOps ref
-  =>
-    _ECTransitionConnected(this, _state, sink)
+  fun ref tcp_connected(sink: ConnectorSink ref) =>
+    _ECTransition(this, _ExtConnConnected(_state), sink)
 
 class _ExtConnTwoPCReady is _ExtConnOps
   var _state: _ExtConnState
@@ -290,9 +237,7 @@ class _ExtConnTwoPCReady is _ExtConnOps
       sink.cprb_send_conn_ready()
     end
 
-  fun ref handle_message(sink: ConnectorSink ref, msg: cwm.Message):
-    _ExtConnOps ref
-  =>
+  fun ref handle_message(sink: ConnectorSink ref, msg: cwm.Message) =>
     match msg
     | let m: cwm.MessageMsg =>
       try
@@ -308,37 +253,33 @@ class _ExtConnTwoPCReady is _ExtConnOps
         else
           Fail()
         end
-        this
       else
         sink._error_and_close("Bad msg @ line " + __loc.line().string())
-        _ECTransitionDisconnected(this, _state, sink)
+        _ECTransition(this, _ExtConnDisconnected(_state), sink)
       end
     else
       sink._error_and_close("Bad msg @ line " + __loc.line().string())
-      _ECTransitionDisconnected(this, _state, sink)
+      _ECTransition(this, _ExtConnDisconnected(_state), sink)
     end
 
   fun ref rollback_info(sink: ConnectorSink ref,
-    barrier_token: CheckpointBarrierToken): _ExtConnOps ref
+    barrier_token: CheckpointBarrierToken)
   =>
     // This message can arrive at this state if we went directly
     // from Connected -> TwoPCReady, because the uncommited txn list
     // was empty.  We don't need this info; ignore it.
-    this
+    @l(Log.debug(), Log.conn_sink(), "rollback_info line %lu: ignore".cstring(), __loc.line())
 
-  fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool):
-    _ExtConnOps ref
-  =>
+  fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool) =>
     @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: %s -> %s".cstring(), _state.advertise_status.string().cstring(), status.string().cstring())
     if (not _state.advertise_status) and status then
       @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: send conn_ready".cstring(), _state.advertise_status.string().cstring(), status.string().cstring())
       sink.cprb_send_conn_ready()
     end
     _state.advertise_status = status
-    this
 
-  fun ref tcp_closed(sink: ConnectorSink ref): _ExtConnOps =>
-    _ECTransitionDisconnected(this, _state, sink)
+  fun ref tcp_closed(sink: ConnectorSink ref) =>
+    _ECTransition(this, _ExtConnDisconnected(_state), sink)
 
 class _ExtConnWaitingForRollbackPayload is _ExtConnOps
   var _state: _ExtConnState
@@ -349,8 +290,9 @@ class _ExtConnWaitingForRollbackPayload is _ExtConnOps
     _state = state
 
   fun ref rollback_info(sink: ConnectorSink ref,
-    barrier_token: CheckpointBarrierToken): _ExtConnOps ref
+    barrier_token: CheckpointBarrierToken)
   =>
+    @l(Log.debug(), Log.conn_sink(), "rollback_info line %lu: bingo".cstring(), __loc.line())
     _state.rollback_info = barrier_token
     match _state.uncommitted_txn_ids
     | None =>
@@ -370,14 +312,11 @@ class _ExtConnWaitingForRollbackPayload is _ExtConnOps
         sink.cprb_send_2pc_phase2(precommitted_txn_id, decision)
       end
     end
-    _ECTransitionTwoPCReady(this, _state, sink)
+    _ECTransition(this, _ExtConnTwoPCReady(_state), sink)
 
-  fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool):
-    _ExtConnOps ref
-  =>
+  fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool) =>
     @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: %s -> %s".cstring(), _state.advertise_status.string().cstring(), status.string().cstring())
     _state.advertise_status = status
-    this
 
-  fun ref tcp_closed(sink: ConnectorSink ref): _ExtConnOps =>
-    _ECTransitionDisconnected(this, _state, sink)
+  fun ref tcp_closed(sink: ConnectorSink ref)  =>
+    _ECTransition(this, _ExtConnDisconnected(_state), sink)
