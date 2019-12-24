@@ -31,54 +31,43 @@ Missing: enter()
 trait _CpRbOps
   fun name(): String
 
-  fun ref abort_next_checkpoint(sink: ConnectorSink ref):
-    _CpRbOps ref
-  =>
-    _invalid_call(__loc.method_name()); Fail(); this
+  fun eq(x: _CpRbOps): Bool =>
+    this is x
+
+  fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref checkpoint_complete(sink: ConnectorSink ref,
-    checkpoint_id: CheckpointId): _CpRbOps ref
+    checkpoint_id: CheckpointId)
   =>
-    _invalid_call(__loc.method_name()); Fail(); this
+    _invalid_call(__loc.method_name()); Fail()
 
-  fun ref conn_ready(sink: ConnectorSink ref):
-    _CpRbOps ref
-  =>
-    _invalid_call(__loc.method_name()); Fail(); this
+  fun ref conn_ready(sink: ConnectorSink ref) =>
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref cp_barrier_complete(sink: ConnectorSink ref,
-    barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued]):
-    _CpRbOps ref
+    barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued])
   =>
-    _invalid_call(__loc.method_name()); Fail(); this
+    _invalid_call(__loc.method_name()); Fail()
 
   fun ref enter(sink: ConnectorSink ref) =>
     None
 
-  fun ref phase1_abort(sink: ConnectorSink ref, txn_id: String):
-    _CpRbOps ref
-  =>
-    _invalid_call(__loc.method_name()); Fail(); this
+  fun ref phase1_abort(sink: ConnectorSink ref, txn_id: String) =>
+    _invalid_call(__loc.method_name()); Fail()
 
-  fun ref phase1_commit(sink: ConnectorSink ref, txn_id: String):
-    _CpRbOps ref
-  =>
-    _invalid_call(__loc.method_name()); Fail(); this
+  fun ref phase1_commit(sink: ConnectorSink ref, txn_id: String) =>
+    _invalid_call(__loc.method_name()); Fail()
 
-  fun ref prepare_for_rollback(sink: ConnectorSink ref):
-    _CpRbOps ref
-  =>
+  fun ref prepare_for_rollback(sink: ConnectorSink ref) =>
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
   fun ref rollback(sink: ConnectorSink ref,
-    barrier_token: CheckpointBarrierToken): _CpRbOps ref
-  =>
-    _invalid_call(__loc.method_name()); Fail(); this
+    barrier_token: CheckpointBarrierToken) =>
+    _invalid_call(__loc.method_name()); Fail()
 
-  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref):
-    _CpRbOps ref
-  =>
-    _invalid_call(__loc.method_name()); Fail(); this
+  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref) =>
+    _invalid_call(__loc.method_name()); Fail()
 
   fun _invalid_call(method_name: String) =>
     @l(Log.crit(), Log.conn_sink(),
@@ -86,14 +75,15 @@ trait _CpRbOps
       method_name.cstring(), name().cstring())
 
 primitive _CpRbTransition
-  fun apply(curr: _CpRbOps, next: _CpRbOps, sink: ConnectorSink ref)
-    : _CpRbOps
-  =>
+  fun apply(curr: _CpRbOps, next: _CpRbOps, sink: ConnectorSink ref) =>
     @l(Log.debug(), Log.conn_sink(),
       "CpRbTransition:: %s -> %s".cstring(),
       curr.name().cstring(), next.name().cstring())
+    // We must update sinks _cprb pointer before calling .enter()!
+    // Otherwise, if .enter() also updates the _cprb pointer, then
+    // a pointer update will get clobbered & lost.
+    sink._update_cprb_member(next)
     next.enter(sink)
-    next
 
 /****
 Boilerplate: sed -n '/BEGIN LEFT/,/END LEFT/p' connector-sink-2pc-management.dot | grep -e '->' | awk '{print $1}' | sort -u | grep -v START | awk '{ printf("class _CpRb%s is _CpRbOps\n  fun name(): String => __loc.type_name()\n\n", $1); }'
@@ -132,37 +122,29 @@ class _CpRbAbortCheckpoint is _CpRbOps
       end
     end
 
-  fun ref abort_next_checkpoint(sink: ConnectorSink ref):
-    _CpRbOps ref
-  =>
-    this
+  fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
+    None
 
   fun ref checkpoint_complete(sink: ConnectorSink ref,
-    checkpoint_id: CheckpointId): _CpRbOps ref
+    checkpoint_id: CheckpointId)
   =>
     // This checkpoint is complete, so there's no way that we can
     // abort it later.  We must wait for the next checkpoint to
     // start.
     _checkpoint_to_abort = None
-    this
 
-  fun ref phase1_abort(sink: ConnectorSink ref, txn_id: String):
-    _CpRbOps ref
-  =>
+  fun ref phase1_abort(sink: ConnectorSink ref, txn_id: String) =>
     // This is in response to the 2PC Phase1 message that we (probably)
     // sent in _is_checkpoint_id_known().
     // Call _is_checkpoint_id_known(), just in case.
     _is_checkpoint_id_known(sink)
-    this
 
   fun ref cp_barrier_complete(sink: ConnectorSink ref,
-    barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued]):
-    _CpRbOps ref
+    barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued])
   =>
     _checkpoint_to_abort = barrier_token
     _abort_sent = false
     _is_checkpoint_id_known(sink)
-    this
 
   // The only event that will move us out of _CpRbAbortCheckpoint
   // is prepare_for_rollback; the trait's default implementation is
@@ -187,7 +169,7 @@ class _CpRbCPGotLocalCommit is _CpRbOps
 ****/
 
   fun ref checkpoint_complete(sink: ConnectorSink ref,
-    checkpoint_id: CheckpointId): _CpRbOps ref
+    checkpoint_id: CheckpointId)
   =>
     if checkpoint_id != _barrier_token.id then
       @l(Log.crit(), Log.conn_sink(),
@@ -200,9 +182,7 @@ class _CpRbCPGotLocalCommit is _CpRbOps
 
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
-  fun ref abort_next_checkpoint(sink: ConnectorSink ref):
-    _CpRbOps ref
-  =>
+  fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
     // Do not send 2PC commands here.  Though we can assume that
     // ExtConn's TCP connection is still established, we don't know.
     // Downstream processing later will take care of all scenarios.
@@ -224,14 +204,10 @@ class _CpRbCPStarts is _CpRbOps
     sink.swap_barrier_to_queued(where queue = _queued, forward_tokens = true)
     sink.cprb_send_2pc_phase1(_barrier_token)
 
-  fun ref abort_next_checkpoint(sink: ConnectorSink ref):
-    _CpRbOps ref
-  =>
+  fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
     _CpRbTransition(this, _CpRbAbortCheckpoint(_barrier_token), sink)
 
-  fun ref phase1_abort(sink: ConnectorSink ref, txn_id: String):
-    _CpRbOps ref
-  =>
+  fun ref phase1_abort(sink: ConnectorSink ref, txn_id: String) =>
     let expected_txn_id = sink.cprb_make_txn_id_string(_barrier_token.id)
     if txn_id != expected_txn_id then
       @l(Log.crit(), Log.conn_sink(),
@@ -244,9 +220,7 @@ class _CpRbCPStarts is _CpRbOps
     // Downstream processing later will take care of all scenarios.
     _CpRbTransition(this, _CpRbAbortCheckpoint(_barrier_token), sink)
 
-  fun ref phase1_commit(sink: ConnectorSink ref, txn_id: String):
-    _CpRbOps ref
-  =>
+  fun ref phase1_commit(sink: ConnectorSink ref, txn_id: String) =>
     let expected_txn_id = sink.cprb_make_txn_id_string(_barrier_token.id)
     if txn_id != expected_txn_id then
       @l(Log.crit(), Log.conn_sink(),
@@ -262,13 +236,11 @@ class _CpRbInit is _CpRbOps
   fun ref enter(sink: ConnectorSink ref) =>
     sink.swap_barrier_to_queued(where forward_tokens = false)
 
-  fun ref conn_ready(sink: ConnectorSink ref): _CpRbOps =>
+  fun ref conn_ready(sink: ConnectorSink ref) =>
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
-  fun ref prepare_for_rollback(sink: ConnectorSink ref):
-    _CpRbOps ref
-  =>
-    _invalid_call(__loc.method_name()); Fail(); this
+  fun ref prepare_for_rollback(sink: ConnectorSink ref) =>
+    _invalid_call(__loc.method_name()); Fail()
 
 class _CpRbPreparedForRollback is _CpRbOps
   fun name(): String => __loc.type_name()
@@ -277,14 +249,11 @@ class _CpRbPreparedForRollback is _CpRbOps
     _ChangeSinkPhaseQueueMsgsForwardTokens(sink)
     sink.cprb_inject_hard_close()
 
-  fun ref abort_next_checkpoint(sink: ConnectorSink ref):
-    _CpRbOps ref
-  =>
-    this
+  fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
+    None
 
   fun ref rollback(sink: ConnectorSink ref,
-    barrier_token: CheckpointBarrierToken): _CpRbOps ref
-  =>
+    barrier_token: CheckpointBarrierToken) =>
     _CpRbTransition(this, _CpRbRollingBack(barrier_token), sink)
 
 class _CpRbRolledBack is _CpRbOps
@@ -293,20 +262,15 @@ class _CpRbRolledBack is _CpRbOps
   fun ref enter(sink: ConnectorSink ref) =>
     _DropQueuedAppMsgs(sink)
 
-  fun ref abort_next_checkpoint(sink: ConnectorSink ref):
-    _CpRbOps ref
-  =>
+  fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
     // We turned advertise_status on when we entered; this message tells
     // us that it's off.  We need it on again.
     sink.cprb_send_advertise_status(true)
-    this
 
-  fun ref prepare_for_rollback(sink: ConnectorSink ref): _CpRbOps =>
+  fun ref prepare_for_rollback(sink: ConnectorSink ref) =>
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
-  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref):
-    _CpRbOps ref
-  =>
+  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref) =>
     _ChangeSinkPhaseQueueMsgsForwardTokens(sink)
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
@@ -323,20 +287,17 @@ class _CpRbRollingBack is _CpRbOps
     sink.cprb_send_rollback_info(_barrier_token)
     sink.cprb_send_advertise_status(true)
 
-  fun ref abort_next_checkpoint(sink: ConnectorSink ref):
-    _CpRbOps ref
-  =>
+  fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
     // We turned advertise_status on when we entered; this message tells
     // us that it's off.  We need it on again.
     sink.cprb_send_advertise_status(true)
     // To avoid deadlock, resend rollback_info, just in case.
     sink.cprb_send_rollback_info(_barrier_token)
-    this
 
-  fun ref conn_ready(sink: ConnectorSink ref): _CpRbOps =>
+  fun ref conn_ready(sink: ConnectorSink ref) =>
     _CpRbTransition(this, _CpRbRolledBack, sink)
 
-  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref): _CpRbOps =>
+  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref) =>
     _CpRbTransition(this, _CpRbRollingBackResumed(_barrier_token), sink)
 
 class _CpRbRollingBackResumed is _CpRbOps
@@ -347,22 +308,19 @@ class _CpRbRollingBackResumed is _CpRbOps
   new create(barrier_token: CheckpointBarrierToken) =>
     _barrier_token = barrier_token
 
-  fun ref conn_ready(sink: ConnectorSink ref): _CpRbOps =>
+  fun ref conn_ready(sink: ConnectorSink ref) =>
     _DropQueuedAppMsgs(sink)
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
-  fun ref abort_next_checkpoint(sink: ConnectorSink ref):
-    _CpRbOps ref
-  =>
+  fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
     // We turned advertise_status on when we entered; this message tells
     // us that it's off.  We need it on again.
     sink.cprb_send_advertise_status(true)
     // To avoid deadlock, resend rollback_info, just in case.
     sink.cprb_send_rollback_info(_barrier_token)
-    this
 
   fun ref checkpoint_complete(sink: ConnectorSink ref,
-    checkpoint_id: CheckpointId): _CpRbOps ref
+    checkpoint_id: CheckpointId)
   =>
     // This checkpoint is the one that is triggered immediately after
     // rollback is complete.  Our sink phase has prevented any new
@@ -372,11 +330,9 @@ class _CpRbRollingBackResumed is _CpRbOps
     @l(Log.info(), Log.conn_sink(),
       "No PC activity during CheckpointId %lu at %s.%s".cstring(),
         checkpoint_id, __loc.type_name().cstring(), __loc.method_name().cstring())
-    this
 
   fun ref cp_barrier_complete(sink: ConnectorSink ref,
-    barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued]):
-    _CpRbOps ref
+    barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued])
   =>
     // This checkpoint is the one that is triggered immediately after
     // rollback is complete.  Our sink phase has prevented any new
@@ -386,7 +342,6 @@ class _CpRbRollingBackResumed is _CpRbOps
     @l(Log.info(), Log.conn_sink(),
       "No PC activity during CheckpointId %lu at %s.%s".cstring(),
         barrier_token.id, __loc.type_name().cstring(), __loc.method_name().cstring())
-    this
 
 class _CpRbWaitingForCheckpoint is _CpRbOps
   fun name(): String => __loc.type_name()
@@ -394,13 +349,11 @@ class _CpRbWaitingForCheckpoint is _CpRbOps
   fun ref enter(sink: ConnectorSink ref) =>
     sink.resume_processing_messages_queued()
 
-  fun ref abort_next_checkpoint(sink: ConnectorSink ref):
-    _CpRbOps ref
-  =>
+  fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
     _CpRbTransition(this, _CpRbAbortCheckpoint(None), sink)
 
   fun ref checkpoint_complete(sink: ConnectorSink ref,
-    checkpoint_id: CheckpointId): _CpRbOps ref
+    checkpoint_id: CheckpointId)
   =>
     // This checkpoint is the one that is triggered immediately after
     // the last rollback was complete and started during
@@ -410,15 +363,13 @@ class _CpRbWaitingForCheckpoint is _CpRbOps
     @l(Log.info(), Log.conn_sink(),
       "No PC activity during CheckpointId %lu at %s.%s".cstring(),
         checkpoint_id, __loc.type_name().cstring(), __loc.method_name().cstring())
-    this
 
   fun ref cp_barrier_complete(sink: ConnectorSink ref,
-    barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued]):
-    _CpRbOps ref
+    barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued])
   =>
     _CpRbTransition(this, _CpRbCPStarts(barrier_token, queued), sink)
 
-  fun ref prepare_for_rollback(sink: ConnectorSink ref): _CpRbOps =>
+  fun ref prepare_for_rollback(sink: ConnectorSink ref) =>
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
 primitive _ChangeSinkPhaseQueueMsgsForwardTokens

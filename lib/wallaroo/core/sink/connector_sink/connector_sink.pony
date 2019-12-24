@@ -525,7 +525,7 @@ actor ConnectorSink is Sink
     | let sbt: CheckpointBarrierToken =>
       checkpoint_state(sbt.id)
       let queued = _phase.queued()
-      _cprb = _cprb.cp_barrier_complete(this, sbt, queued)
+      _cprb.cp_barrier_complete(this, sbt, queued)
       ack_now = false
     | let srt: CheckpointRollbackBarrierToken =>
       // No action required here.  When we ack this token at the end of
@@ -533,7 +533,7 @@ actor ConnectorSink is Sink
       // and rollback messages that we're expecting.
       None
     | let rbrt: CheckpointRollbackResumeBarrierToken =>
-      _cprb = _cprb.rollbackresume_barrier_complete(this)
+      _cprb.rollbackresume_barrier_complete(this)
     | let sat: AutoscaleBarrierToken =>
       //TODO//_twopc_last_autoscale_barrier_token = sat
       //TODO//resume_processing_messages_queued()
@@ -559,7 +559,7 @@ actor ConnectorSink is Sink
 
   be checkpoint_complete(checkpoint_id: CheckpointId) =>
     @ll(_twopc_debug, "2PC: Checkpoint complete %d _twopc.txn_id is %s".cstring(), checkpoint_id, _twopc.txn_id.cstring())
-    _cprb = _cprb.checkpoint_complete(this, checkpoint_id)
+    _cprb.checkpoint_complete(this, checkpoint_id)
     @ll(_twopc_debug, "2PC: Checkpoint complete %d _twopc.txn_id is %s _cprb.name = %s".cstring(), checkpoint_id, _twopc.txn_id.cstring(), _cprb.name().cstring())
 
   fun ref resume_processing_messages_queued(discard_app_msgs: Bool = false) =>
@@ -604,7 +604,7 @@ actor ConnectorSink is Sink
 
   be prepare_for_rollback() =>
     @ll(_conn_debug, "Prepare for checkpoint rollback at ConnectorSink %s".cstring(), _sink_id.string().cstring())
-    _cprb = _cprb.prepare_for_rollback(this)
+    _cprb.prepare_for_rollback(this)
 
   fun ref finish_preparing_for_rollback() =>
     @ll(_conn_debug, "Finish preparing for checkpoint rollback at ConnectorSink %s".cstring(), _sink_id.string().cstring())
@@ -638,7 +638,7 @@ actor ConnectorSink is Sink
     // commit status: commit for checkpoint_id, all greater are invalid.
 
     let cbt = CheckpointBarrierToken(checkpoint_id)
-    _cprb = _cprb.rollback(this, cbt)
+    _cprb.rollback(this, cbt)
 
     None//TODO _twopc.reset_ext_conn_state()
     event_log.ack_rollback(_sink_id)
@@ -1209,6 +1209,9 @@ actor ConnectorSink is Sink
       _phase = QueuingSinkPhase(_sink_id, this, queue, forward_tokens)
     end
 
+  fun ref _update_cprb_member(new_cprb: _CpRbOps) =>
+    _cprb = new_cprb
+
   fun ref cprb_queuing_barrier_drop_app_msgs() =>
     match _phase
     | let qp: QueuingSinkPhase =>
@@ -1219,11 +1222,11 @@ actor ConnectorSink is Sink
 
   fun ref cprb_send_conn_ready() =>
     @ll(_conn_debug, "Send conn_ready to CpRb".cstring())
-    _cprb = _cprb.conn_ready(this)
+    _cprb.conn_ready(this)
 
   fun ref cprb_send_abort_next_checkpoint() =>
     @ll(_conn_debug, "Send abort_next_checkpoint to CpRb".cstring())
-    _cprb = _cprb.abort_next_checkpoint(this)
+    _cprb.abort_next_checkpoint(this)
 
   fun ref cprb_send_2pc_phase1(barrier_token: CheckpointBarrierToken) =>
     _twopc.send_phase1(this, barrier_token.id)
@@ -1233,9 +1236,9 @@ actor ConnectorSink is Sink
 
   fun ref cprb_send_phase1_result(txn_id: String, commit: Bool) =>
     if commit then
-      _cprb = _cprb.phase1_commit(this, txn_id)
+      _cprb.phase1_commit(this, txn_id)
     else
-      _cprb = _cprb.phase1_abort(this, txn_id)
+      _cprb.phase1_abort(this, txn_id)
     end
 
   fun ref cprb_send_commit_to_barrier_coordinator(
