@@ -1232,12 +1232,18 @@ actor ConnectorSink is Sink
     _cprb.abort_next_checkpoint(this)
 
   fun ref cprb_send_2pc_phase1(barrier_token: CheckpointBarrierToken) =>
+    @ll(_twopc_debug, "Send Phase 1 for %s".cstring(),
+      barrier_token.string().cstring())
     _twopc.send_phase1(this, barrier_token.id)
 
   fun ref cprb_send_2pc_phase2(txn_id: String, commit: Bool) =>
+    @ll(_twopc_debug, "Send Phase 2 commit=%s for %s".cstring(),
+      commit.string().cstring(), txn_id.cstring())
     _twopc.send_phase2(this, txn_id, commit)
 
   fun ref cprb_send_phase1_result(txn_id: String, commit: Bool) =>
+    @ll(_twopc_debug, "Got Phase 1 result: commit=%s for %s".cstring(),
+      commit.string().cstring(), txn_id.cstring())
     if commit then
       _cprb.phase1_commit(this, txn_id)
     else

@@ -84,6 +84,9 @@ primitive _CpRbTransition
     // a pointer update will get clobbered & lost.
     sink._update_cprb_member(next)
     next.enter(sink)
+    @l(Log.debug(), Log.conn_sink(),
+      "CpRbTransition:: %s -> %s DONE".cstring(),
+      curr.name().cstring(), next.name().cstring())
 
 /****
 Boilerplate: sed -n '/BEGIN LEFT/,/END LEFT/p' connector-sink-2pc-management.dot | grep -e '->' | awk '{print $1}' | sort -u | grep -v START | awk '{ printf("class _CpRb%s is _CpRbOps\n  fun name(): String => __loc.type_name()\n\n", $1); }'
