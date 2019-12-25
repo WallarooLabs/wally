@@ -52,6 +52,7 @@ class ConnectorSink2PC
 
   fun ref update_offset(encoded1_len: USize) =>
     if txn_id != txn_id_initial then
+      @ll(_twopc_err, "update_offset: txn_id %s != txn_id_initial %s".cstring(), txn_id.cstring(), txn_id_initial.cstring())
       Fail()
     end
     current_offset = current_offset + encoded1_len

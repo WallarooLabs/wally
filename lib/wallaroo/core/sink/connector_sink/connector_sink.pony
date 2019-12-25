@@ -281,6 +281,7 @@ actor ConnectorSink is Sink
     @ll(_conn_info, "Lifecycle: %s.%s at %s".cstring(),
       __loc.type_name().cstring(), __loc.method_name().cstring(),
       _sink_id.string().cstring())
+    @ll(_conn_err, "TODOTODOTODOTODO: switching to normal processor here (e.g., restart after crash) is bad if we're in the middle of rollback and and phase=QueuingSinkPhase!".cstring())
     _use_normal_processor()
 
   fun ref _initial_connect() =>
@@ -630,6 +631,7 @@ actor ConnectorSink is Sink
     None//TODO
     _acked_point_of_ref = try r.u64_be()? else Fail(); 0 end
     _message_id = _twopc.last_offset.u64()
+    @ll(_conn_debug, "rollback payload: current_offset %lu _acked_point_of_ref %lu".cstring(), current_offset, _acked_point_of_ref)
 
     // The EventLog's payload's data doesn't include the last
     // committed txn_id because at the time that payload was created,
