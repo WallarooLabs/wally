@@ -1335,6 +1335,7 @@ actor ConnectorSink is Sink
       if _credits < 2 then
         _error_and_close("HEY, too few credits: " + _credits.string())
       else
+        @ll(_conn_debug, "cb_received: OkMsg".cstring())
         _ec.handle_message(this, m)
       end
     | let m: cwm.ErrorMsg =>
@@ -1342,6 +1343,7 @@ actor ConnectorSink is Sink
     | let m: cwm.NotifyMsg =>
       _error_and_close("Protocol error: Sink sent us NotifyMsg")
     | let m: cwm.NotifyAckMsg =>
+      @ll(_conn_debug, "cb_received: NotifyAckMsg".cstring())
       _ec.handle_message(this, m)
     | let m: cwm.MessageMsg =>
       // 2PC messages are sent via MessageMsg on stream_id 0.
@@ -1350,6 +1352,7 @@ actor ConnectorSink is Sink
           _ext_conn_state().string())
         return
       end
+      @ll(_conn_debug, "cb_received: MessageMsg".cstring())
       _ec.handle_message(this, m)
     | let m: cwm.AckMsg =>
       if _ext_conn_state is ExtConnStateStreaming then

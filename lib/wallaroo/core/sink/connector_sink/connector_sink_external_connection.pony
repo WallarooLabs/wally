@@ -302,6 +302,38 @@ class _ExtConnWaitingForRollbackPayload is _ExtConnOps
       | let x: CheckpointBarrierToken => x.string().cstring()
       end)
 
+  fun ref entry(sink: ConnectorSink ref) =>
+    match _state.rollback_info
+    | let barrier_token: CheckpointBarrierToken =>
+      @l(Log.debug(), Log.conn_sink(), "QQQ: rollback_info line %lu: bingo".cstring(), __loc.line())
+      rollback_info(sink, barrier_token)
+    end
+
+  fun ref handle_message(sink: ConnectorSink ref, msg: cwm.Message) =>
+    match msg
+    | let m: cwm.MessageMsg =>
+      try
+        let inner = cwm.TwoPCFrame.decode(m.message as Array[U8] val)?
+        match inner
+        | let mi: cwm.ReplyUncommittedMsg =>
+          Fail()
+        | let mi: cwm.TwoPCReplyMsg =>
+          @l(Log.debug(), Log.conn_sink(),
+            "2PC: reply for txn_id %s was %s".cstring(),
+            mi.txn_id.cstring(), mi.commit.string().cstring())
+          Fail()
+        else
+          Fail()
+        end
+      else
+        sink._error_and_close("Bad msg @ line " + __loc.line().string())
+        _ECTransition(this, _ExtConnDisconnected(_state), sink)
+      end
+    else
+      sink._error_and_close("Bad msg @ line " + __loc.line().string())
+      _ECTransition(this, _ExtConnDisconnected(_state), sink)
+    end
+
   fun ref rollback_info(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken)
   =>
