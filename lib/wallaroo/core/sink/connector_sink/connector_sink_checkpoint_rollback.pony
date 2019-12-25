@@ -219,7 +219,10 @@ class _CpRbCPGotLocalCommit is _CpRbOps
     // Do not send 2PC commands here.  Though we can assume that
     // ExtConn's TCP connection is still established, we don't know.
     // Downstream processing later will take care of all scenarios.
-    _CpRbTransition(this, _CpRbAbortCheckpoint(_barrier_token), sink)
+    //
+    // We don't know the global commit/abort status of _barrier_token yet.
+    // So do not pass it along to _CpRbAbortCheckpoint.
+    _CpRbTransition(this, _CpRbAbortCheckpoint(None), sink)
 
 class _CpRbCPStarts is _CpRbOps
   let _barrier_token: CheckpointBarrierToken
