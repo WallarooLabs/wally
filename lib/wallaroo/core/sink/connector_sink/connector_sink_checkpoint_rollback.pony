@@ -297,6 +297,12 @@ class _CpRbPreparedForRollback is _CpRbOps
   fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
     None
 
+  fun ref cp_barrier_complete(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued])
+  =>
+    // Sneaky timer + barrier race
+    _CpRbTransition(this, _CpRbAbortCheckpoint(barrier_token), sink)
+
   fun ref rollback(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken) =>
     _CpRbTransition(this, _CpRbRollingBack(barrier_token), sink)
