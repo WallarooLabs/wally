@@ -1223,6 +1223,9 @@ actor ConnectorSink is Sink
         where forward_token_phase = forward_token_phase)
     end
 
+  fun ref _get_cprb_member(): _CpRbOps =>
+    _cprb
+
   fun ref _update_cprb_member(next: _CpRbOps) =>
     _cprb = next
 

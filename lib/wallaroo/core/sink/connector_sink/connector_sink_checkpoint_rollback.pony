@@ -193,6 +193,8 @@ class _CpRbCPGotLocalCommit is _CpRbOps
 
   fun ref enter(sink: ConnectorSink ref) =>
     sink.cprb_send_commit_to_barrier_coordinator(_barrier_token)
+    @l(Log.info(), Log.conn_sink(),
+      "QQQ: enter: get member 0x%lx this 0x%lx".cstring(), sink._get_cprb_member(), this)
 /****
     if _barrier_token.id == 5 then
       @l(Log.info(), Log.conn_sink(),
@@ -213,7 +215,14 @@ class _CpRbCPGotLocalCommit is _CpRbOps
     let txn_id = sink.cprb_make_txn_id_string(_barrier_token.id)
     sink.cprb_send_2pc_phase2(txn_id, true)
 
-    _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
+    if sink._get_cprb_member() is this then
+      _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
+    else
+      @l(Log.info(), Log.conn_sink(),
+        "QQQ: Control inversion: the Phase 2 send command failed, and we have already made a state transition.".cstring())
+      @l(Log.info(), Log.conn_sink(),
+        "QQQ: foo: get member 0x%lx this 0x%lx".cstring(), sink._get_cprb_member(), this)
+    end
 
   fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
     // Do not send 2PC commands here.  Though we can assume that
