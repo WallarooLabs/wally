@@ -302,7 +302,7 @@ class _ExtConnWaitingForRollbackPayload is _ExtConnOps
       | let x: CheckpointBarrierToken => x.string().cstring()
       end)
 
-  fun ref entry(sink: ConnectorSink ref) =>
+  fun ref enter(sink: ConnectorSink ref) =>
     match _state.rollback_info
     | let barrier_token: CheckpointBarrierToken =>
       @l(Log.debug(), Log.conn_sink(), "QQQ: rollback_info line %lu: bingo".cstring(), __loc.line())
