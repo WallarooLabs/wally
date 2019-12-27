@@ -45,6 +45,7 @@ digraph mashup {
 	CPGotLocalCommit -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
 
 	WaitingForCheckpoint -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
+	WaitingForCheckpoint -> RollingBack [label="rollback",fontcolor=red,color=red];
 	CPStarts -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
 	CPGotLocalCommit -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
 

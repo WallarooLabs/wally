@@ -301,11 +301,22 @@ class _CpRbInit is _CpRbOps
 
   fun ref prepare_for_rollback(sink: ConnectorSink ref) =>
     // We are very early in the startup process and are recovering.
-    // Let's roll back.
+    // Let's prepare to roll back.
     @l(Log.debug(), Log.conn_sink(),
       "State _CpRbInit event prepare_for_rollback: transition to _CpRbPreparedForRollback".cstring())
     sink.cprb_send_advertise_status(false)
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
+
+  fun ref rollback(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken)
+  =>
+    // We are very early in the startup process and are recovering.
+    // Let's roll back.
+    // However, we need to change phase first, and we must avoid shear.
+    @l(Log.err(), Log.conn_sink(),
+      "TODOTODOTODOTODOTODOTODOTODOTODO early rollback!".cstring())
+    _ChangeSinkPhaseQueueMsgsForwardTokens(sink where shear_risk = true)
+    _CpRbTransition(this, _CpRbRollingBack(barrier_token), sink)
 
 class _CpRbPreparedForRollback is _CpRbOps
   fun name(): String => __loc.type_name()
@@ -324,7 +335,8 @@ class _CpRbPreparedForRollback is _CpRbOps
     _CpRbTransition(this, _CpRbAbortCheckpoint(barrier_token), sink)
 
   fun ref rollback(sink: ConnectorSink ref,
-    barrier_token: CheckpointBarrierToken) =>
+    barrier_token: CheckpointBarrierToken)
+  =>
     _CpRbTransition(this, _CpRbRollingBack(barrier_token), sink)
 
 class _CpRbRollingBack is _CpRbOps
@@ -371,8 +383,7 @@ class _CpRbRollingBackResumed is _CpRbOps
     sink.cprb_send_advertise_status(true)
 
   fun ref conn_ready(sink: ConnectorSink ref) =>
-    @l(Log.err(), Log.conn_sink(),
-      "TODOTODOTODOTODOTODOTODOTODOTODO any app action, such as unmuting?".cstring())
+    //// @l(Log.err(), Log.conn_sink(), "TODOTODOTODOTODOTODOTODOTODOTODO any app action, such as unmuting?".cstring())
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
   fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
