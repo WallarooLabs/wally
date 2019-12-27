@@ -281,6 +281,12 @@ class _CpRbInit is _CpRbOps
   fun ref enter(sink: ConnectorSink ref) =>
     sink.swap_barrier_to_queued(where forward_tokens = false)
 
+  fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
+    // Oops, the sink connected but didn't finish protocol intro stuff
+    // before it was disconnected.  Try again.
+    sink.cprb_send_advertise_status(false)
+    this
+
   fun ref checkpoint_complete(sink: ConnectorSink ref,
     checkpoint_id: CheckpointId)
   =>
@@ -322,21 +328,37 @@ class _CpRbPreparedForRollback is _CpRbOps
     _CpRbTransition(this, _CpRbRollingBack(barrier_token), sink)
 
 class _CpRbRolledBack is _CpRbOps
+  var _connected: Bool = true
+
   fun name(): String => __loc.type_name()
 
   fun ref enter(sink: ConnectorSink ref) =>
+    Fail()
     _DropQueuedAppMsgs(sink)
 
   fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
-    @l(Log.err(), Log.conn_sink(),
-      "TODOTODOTODOTODOTODOTODOTODOTODO _CpRbRolledBack got abort_next_checkpoint, is going directly to AbortCheckpoint right?".cstring())
-    _CpRbTransition(this, _CpRbAbortCheckpoint(None), sink)
+    // Oops, the sink is disconnected before rollback is complete. The
+    // right thing to do here is to transition to AbortCheckpoint.
+    // However, in this case, we are also expecting rollback complete at
+    // any moment, and that event is *not* expected by AbortCheckpoint
+    // and other FSM states "downstream" of AbortCheckpoint.
+    // Instead, we use _connected to remember what to do when
+    // rollbackresume_barrier_complete arrives.
+    _connected = false
 
   fun ref prepare_for_rollback(sink: ConnectorSink ref) =>
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
   fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref) =>
-    _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
+    if _connected then
+      @l(Log.err(), Log.conn_sink(),
+        "TODOTODOTODOTODOTODOTODOTODOTODO any app action, such as unmuting?".cstring())
+      _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
+    else
+      @l(Log.err(), Log.conn_sink(),
+        "TODOTODOTODOTODOTODOTODOTODOTODO back around to AbortCheckpoint, yo".cstring())
+      _CpRbTransition(this, _CpRbAbortCheckpoint(None), sink)
+    end
 
 class _CpRbRollingBack is _CpRbOps
   let _barrier_token: CheckpointBarrierToken
@@ -347,9 +369,11 @@ class _CpRbRollingBack is _CpRbOps
     _barrier_token = barrier_token
 
   fun ref enter(sink: ConnectorSink ref) =>
-    // Redundant: _DropQueuedAppMsgs(sink)
     sink.cprb_send_rollback_info(_barrier_token)
-    sink.cprb_send_advertise_status(true)
+    // Don't change advertise_status here: wait until after rollback is
+    // complete.  Then, when we send advertise=true, we might be notified
+    // right away because the connection is already ready.
+    // sink.cprb_send_advertise_status(true)
 
   fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
     // We turned advertise_status on when we entered; this message tells
@@ -382,6 +406,7 @@ class _CpRbRollingBackResumed is _CpRbOps
     sink.cprb_queuing_barrier_drop_app_msgs()
     let queued = sink.cprb_get_phase_queued()
     sink.swap_barrier_to_queued(where queue = queued, forward_tokens = false)
+    sink.cprb_send_advertise_status(true)
 
   fun ref conn_ready(sink: ConnectorSink ref) =>
     @l(Log.err(), Log.conn_sink(),
