@@ -273,7 +273,7 @@ class _WaitingForBoundariesToAckRegistering is _RecoveryPhase
     for b in boundaries.values() do
       _boundaries.set(b)
     end
-    Invariant(_boundaries.size() > 0)
+    /////////SLF: invalid for 1-worker clusters? Invariant(_boundaries.size() > 0)
     _print_phase_transition()
 
   fun name(): String => __loc.type_name()
