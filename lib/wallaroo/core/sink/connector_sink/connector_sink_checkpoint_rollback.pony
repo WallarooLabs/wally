@@ -281,12 +281,24 @@ class _CpRbInit is _CpRbOps
   fun ref enter(sink: ConnectorSink ref) =>
     sink.swap_barrier_to_queued(where forward_tokens = false)
 
+  fun ref checkpoint_complete(sink: ConnectorSink ref,
+    checkpoint_id: CheckpointId)
+  =>
+    // We are very early in the startup process and are recovering.
+    // Ignore it.
+    @l(Log.debug(), Log.conn_sink(),
+      "State _CpRbInit event checkpoint_complete: ignore".cstring())
+    this
+
   fun ref conn_ready(sink: ConnectorSink ref) =>
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
   fun ref prepare_for_rollback(sink: ConnectorSink ref) =>
     // We are very early in the startup process and are recovering.
     // Let's roll back.
+    @l(Log.debug(), Log.conn_sink(),
+      "State _CpRbInit event prepare_for_rollback: transition to _CpRbPreparedForRollback".cstring())
+    sink.cprb_send_advertise_status(false)
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
 class _CpRbPreparedForRollback is _CpRbOps
@@ -316,9 +328,9 @@ class _CpRbRolledBack is _CpRbOps
     _DropQueuedAppMsgs(sink)
 
   fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
-    // We turned advertise_status on when we entered; this message tells
-    // us that it's off.  We need it on again.
-    sink.cprb_send_advertise_status(true)
+    @l(Log.err(), Log.conn_sink(),
+      "TODOTODOTODOTODOTODOTODOTODOTODO _CpRbRolledBack got abort_next_checkpoint, is going directly to AbortCheckpoint right?".cstring())
+    _CpRbTransition(this, _CpRbAbortCheckpoint(None), sink)
 
   fun ref prepare_for_rollback(sink: ConnectorSink ref) =>
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
@@ -347,6 +359,8 @@ class _CpRbRollingBack is _CpRbOps
     sink.cprb_send_rollback_info(_barrier_token)
 
   fun ref conn_ready(sink: ConnectorSink ref) =>
+    @l(Log.err(), Log.conn_sink(),
+      "TODOTODOTODOTODOTODOTODOTODOTODO any app action, such as unmuting?".cstring())
     _CpRbTransition(this, _CpRbRolledBack, sink)
 
   fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref) =>
@@ -370,6 +384,8 @@ class _CpRbRollingBackResumed is _CpRbOps
     sink.swap_barrier_to_queued(where queue = queued, forward_tokens = false)
 
   fun ref conn_ready(sink: ConnectorSink ref) =>
+    @l(Log.err(), Log.conn_sink(),
+      "TODOTODOTODOTODOTODOTODOTODOTODO any app action, such as unmuting?".cstring())
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
   fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
