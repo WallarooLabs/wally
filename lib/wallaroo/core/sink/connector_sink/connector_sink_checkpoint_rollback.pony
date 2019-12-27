@@ -285,7 +285,9 @@ class _CpRbInit is _CpRbOps
     _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
 
   fun ref prepare_for_rollback(sink: ConnectorSink ref) =>
-    _invalid_call(__loc.method_name()); Fail()
+    // We are very early in the startup process and are recovering.
+    // Let's roll back.
+    _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
 class _CpRbPreparedForRollback is _CpRbOps
   fun name(): String => __loc.type_name()
