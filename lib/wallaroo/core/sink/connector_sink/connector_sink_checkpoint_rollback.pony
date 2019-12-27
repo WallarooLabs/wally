@@ -327,39 +327,6 @@ class _CpRbPreparedForRollback is _CpRbOps
     barrier_token: CheckpointBarrierToken) =>
     _CpRbTransition(this, _CpRbRollingBack(barrier_token), sink)
 
-class _CpRbRolledBack is _CpRbOps
-  var _connected: Bool = true
-
-  fun name(): String => __loc.type_name()
-
-  fun ref enter(sink: ConnectorSink ref) =>
-    Fail()
-    _DropQueuedAppMsgs(sink)
-
-  fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
-    // Oops, the sink is disconnected before rollback is complete. The
-    // right thing to do here is to transition to AbortCheckpoint.
-    // However, in this case, we are also expecting rollback complete at
-    // any moment, and that event is *not* expected by AbortCheckpoint
-    // and other FSM states "downstream" of AbortCheckpoint.
-    // Instead, we use _connected to remember what to do when
-    // rollbackresume_barrier_complete arrives.
-    _connected = false
-
-  fun ref prepare_for_rollback(sink: ConnectorSink ref) =>
-    _CpRbTransition(this, _CpRbPreparedForRollback, sink)
-
-  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref) =>
-    if _connected then
-      @l(Log.err(), Log.conn_sink(),
-        "TODOTODOTODOTODOTODOTODOTODOTODO any app action, such as unmuting?".cstring())
-      _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
-    else
-      @l(Log.err(), Log.conn_sink(),
-        "TODOTODOTODOTODOTODOTODOTODOTODO back around to AbortCheckpoint, yo".cstring())
-      _CpRbTransition(this, _CpRbAbortCheckpoint(None), sink)
-    end
-
 class _CpRbRollingBack is _CpRbOps
   let _barrier_token: CheckpointBarrierToken
 
@@ -381,11 +348,6 @@ class _CpRbRollingBack is _CpRbOps
     sink.cprb_send_advertise_status(true)
     // To avoid deadlock, resend rollback_info, just in case.
     sink.cprb_send_rollback_info(_barrier_token)
-
-  fun ref conn_ready(sink: ConnectorSink ref) =>
-    @l(Log.err(), Log.conn_sink(),
-      "TODOTODOTODOTODOTODOTODOTODOTODO any app action, such as unmuting?".cstring())
-    _CpRbTransition(this, _CpRbRolledBack, sink)
 
   fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref) =>
     _CpRbTransition(this, _CpRbRollingBackResumed(_barrier_token), sink)

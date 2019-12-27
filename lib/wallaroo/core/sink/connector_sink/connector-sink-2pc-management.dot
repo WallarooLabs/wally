@@ -25,7 +25,6 @@ digraph mashup {
 	subgraph rollback {
             PreparedForRollback [label="PreparedForRollback\nenter:\nsink phase=queue app msgs, forward tokens\nforce ExtConn closed"];
             RollingBack [label="RollingBack\nenter:\nsink phase=crash on app msgs, forward tokens\nsend rollback_info\nsend advertise_status=true"];
-            RolledBack [label="RolledBack\nenter:\nack rollback barrier to barrier coordinator\ndrop queued app msgs!"];
             RollingBackResumed [label="RollingBackResumed\nexit:\nack rollback barrier to barrier coordinator\ndrop queued app msgs!"];
 
             PreparedForRollback -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
@@ -50,13 +49,8 @@ digraph mashup {
 	CPGotLocalCommit -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
 
 	RollingBack -> RollingBack [label="abort_next_checkpoint",fontcolor=red,color=red];
-	RollingBack -> RolledBack [label="conn_ready"];
 	RollingBack -> RollingBackResumed [label="rollbackresume_barrier_complete"];
 	RollingBack -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
-
-	RolledBack -> RolledBack [label="abort_next_checkpoint",fontcolor=red,color=red];
-	RolledBack -> WaitingForCheckpoint [label="rollbackresume_barrier_complete"];
-	RolledBack -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
 
 	RollingBackResumed -> RollingBackResumed [label="abort_next_checkpoint",fontcolor=red,color=red];
 	RollingBackResumed -> WaitingForCheckpoint [label="conn_ready"];
