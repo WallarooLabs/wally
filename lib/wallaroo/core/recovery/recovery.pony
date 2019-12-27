@@ -210,24 +210,32 @@ actor Recovery
   fun ref _start_reconnect(workers: Array[WorkerName] val,
     reason: RecoveryReason, recovery_priority_tracker: RecoveryPriorityTracker)
   =>
+    var should_reconnect_boundaries = false
     match reason
     | RecoveryReasons.crash_recovery() =>
       ifdef "resilience" then
         @printf[I32]("|~~ - Rolling back for crash recovery - ~~|\n".cstring())
         @printf[I32]("|~~ - Recovery Phase: Reconnect - ~~|\n".cstring())
       end
-      _recovery_phase = _BoundariesReconnect(_recovery_reconnecter, workers,
-        this, reason, recovery_priority_tracker)
-      _recovery_phase.start_reconnect()
+      if workers.size() > 1 then
+        should_reconnect_boundaries = true
+      end
     | RecoveryReasons.abort_checkpoint() =>
       ifdef "resilience" then
         @printf[I32]("|~~ - Rolling back for aborted checkpoint. Skipping reconnect phases. - ~~|\n".cstring())
       end
-      _prepare_rollback(reason, recovery_priority_tracker)
     else
       @printf[I32]("Invalid reason %s for recovery!\n".cstring(),
         reason.string().cstring())
       Fail()
+    end
+
+    if should_reconnect_boundaries then
+      _recovery_phase = _BoundariesReconnect(_recovery_reconnecter, workers,
+        this, reason, recovery_priority_tracker)
+      _recovery_phase.start_reconnect()
+    else
+      _prepare_rollback(reason, recovery_priority_tracker)
     end
 
   fun ref request_boundaries_map(reason: RecoveryReason,
