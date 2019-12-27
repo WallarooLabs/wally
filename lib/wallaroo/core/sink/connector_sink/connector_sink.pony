@@ -281,8 +281,10 @@ actor ConnectorSink is Sink
     @ll(_conn_info, "Lifecycle: %s.%s at %s".cstring(),
       __loc.type_name().cstring(), __loc.method_name().cstring(),
       _sink_id.string().cstring())
-    @ll(_conn_err, "TODOTODOTODOTODO: switching to normal processor here (e.g., restart after crash) is bad if we're in the middle of rollback and and phase=QueuingSinkPhase!".cstring())
-    _use_normal_processor()
+    ifdef "TODO-delete-me" then
+      @ll(_conn_err, "TODOTODOTODOTODO: switching to normal processor here (e.g., restart after crash) is bad if we're in the middle of rollback and and phase=QueuingSinkPhase!".cstring())
+      _use_normal_processor()
+    end
 
   fun ref _initial_connect() =>
     @ll(_conn_info, "ConnectorSink initializing connection to %s:%s".cstring(),
