@@ -453,6 +453,18 @@ class _CpRbWaitingForCheckpoint is _CpRbOps
   fun ref prepare_for_rollback(sink: ConnectorSink ref) =>
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
+  fun ref rollback(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken)
+  =>
+    // We are very early in the startup process and are recovering.
+    // Let's roll back.
+    // However, we need to change phase first, and we must avoid shear.
+    @l(Log.err(), Log.conn_sink(),
+      "TODOTODOTODOTODOTODOTODOTODOTODO early rollback!".cstring())
+    sink.cprb_send_advertise_status(false)
+    _ChangeSinkPhaseQueueMsgsForwardTokens(sink where shear_risk = true)
+    _CpRbTransition(this, _CpRbRollingBack(barrier_token), sink)
+
 primitive _ChangeSinkPhaseQueueMsgsForwardTokens
   fun apply(sink: ConnectorSink ref, shear_risk: Bool = false) =>
     sink.swap_barrier_to_queued(where forward_tokens = true, shear_risk = shear_risk)
