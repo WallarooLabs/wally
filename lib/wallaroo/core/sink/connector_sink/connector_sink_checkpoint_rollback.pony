@@ -316,6 +316,7 @@ class _CpRbInit is _CpRbOps
     // However, we need to change phase first, and we must avoid shear.
     @l(Log.err(), Log.conn_sink(),
       "TODOTODOTODOTODOTODOTODOTODOTODO early rollback!".cstring())
+    sink.cprb_send_advertise_status(false)
     _ChangeSinkPhaseQueueMsgsForwardTokens(sink where shear_risk = true)
     _CpRbTransition(this, _CpRbRollingBack(barrier_token), sink)
 
