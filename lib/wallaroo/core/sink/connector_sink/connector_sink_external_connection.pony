@@ -219,6 +219,14 @@ class _ExtConnInit is _ExtConnOps
   new create() =>
     None
 
+  fun ref rollback_info(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken)
+  =>
+    // We have crashed and recovered and rollback has started before
+    // the sink is connected the first time.
+    _state.rollback_info = barrier_token
+    @l(Log.debug(), Log.conn_sink(), "rollback_info line %lu: use".cstring(), __loc.line())
+
   fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool) =>
     @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: %s: %s -> %s".cstring(), name().cstring(), _state.advertise_status.string().cstring(), status.string().cstring())
     _state.advertise_status = status
