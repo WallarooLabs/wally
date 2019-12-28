@@ -1044,13 +1044,27 @@ class ConnectorSourceNotify[In: Any val]
     """An arbitrary constant."""
     84
 
-  fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
+  fun _print_array[A: U8](array: Array[A] val): String =>
     """
     Generate a printable string of the contents of the given readseq to use in
     error messages.
     """
     ifdef "verbose_debug" then
-      "[len=" + array.size().string() + ": " + ",".join(array.values()) + "]"
+      if array.size() == 97 then
+        let hack = recover trn Array[U8] end
+        let skip = array.size() - 49
+        var count: USize = 0
+        for b in array.values() do
+          if count >= skip then
+            hack.push(b)
+          end
+          count = count + 1
+        end
+        let hack2 = consume hack
+        String.from_array(consume hack2)
+      else
+        "[len=" + array.size().string() + ": " + ",".join(array.values()) + "]"
+      end
     else
       "[len=" + array.size().string() + ": " + "...]"
     end

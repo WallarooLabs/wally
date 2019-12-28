@@ -779,7 +779,12 @@ actor ConnectorSink is Sink
     for bytes in _notify.sentv(this, data).values() do
       ifdef "trace" then
         @ll(_conn_debug, "TRACE: ConnectorSink._writev: %s\n".cstring(), _print_array[U8](
-          bytes).cstring())
+          match bytes
+          | let s: String val =>
+            s.array()
+          | let a: Array[U8] val =>
+            a
+          end).cstring())
       end
       _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
       _pending_writev_total = _pending_writev_total + bytes.size()
@@ -1455,13 +1460,27 @@ actor ConnectorSink is Sink
       _report_ready_to_work_done = true
     end
 
-  fun _print_array[A: Stringable #read](array: ReadSeq[A]): String =>
+  fun _print_array[A: U8](array: Array[A] val): String =>
     """
     Generate a printable string of the contents of the given readseq to use in
     error messages.
     """
     ifdef "verbose_debug" then
-      "[len=" + array.size().string() + ": " + ",".join(array.values()) + "]"
+      if (array.size() == 76) or (array.size() == 49) then
+        let hack = recover trn Array[U8] end
+        let skip = array.size() - 49
+        var count: USize = 0
+        for b in array.values() do
+          if count >= skip then
+            hack.push(b)
+          end
+          count = count + 1
+        end
+        let hack2 = consume hack
+        String.from_array(consume hack2)
+      else
+        "[len=" + array.size().string() + ": " + ",".join(array.values()) + "]"
+      end
     else
       "[len=" + array.size().string() + ": " + "...]"
     end
