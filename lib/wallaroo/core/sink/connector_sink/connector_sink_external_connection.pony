@@ -29,7 +29,7 @@ Missing: enter(), handle_message()
 trait _ExtConnOps
   fun name(): String
 
-  fun ref enter(sink: ConnectorSink ref) => None
+  fun ref enter(sink: ConnectorSink ref, previous_state: _ExtConnOps) => None
 
   fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool) =>
     _invalid_call(__loc.method_name()); Fail()
@@ -81,7 +81,7 @@ primitive _ECTransition
     // Otherwise, if .enter() also updates the _cprb pointer, then
     // a pointer update will get clobbered & lost.
     sink._update_ec_member(next)
-    next.enter(sink)
+    next.enter(sink, curr)
 
 /****
 Boilerplate: sed -n '/BEGIN RIGHT/,/END RIGHT/p' connector-sink-2pc-management.dot | grep -e '->' | awk '{print $1}' | sort -u | grep -v START | awk '{ printf("class _ExtConn%s is _ExtConnOps\n  fun name(): String => __loc.type_name()\n\n", $1); }'
@@ -96,7 +96,7 @@ class _ExtConnConnected is _ExtConnOps
   new create(state: _ExtConnState) =>
     _state = state
 
-  fun ref enter(sink: ConnectorSink ref) =>
+  fun ref enter(sink: ConnectorSink ref, previous_state: _ExtConnOps) =>
     // 2PC: Send the Hello message to start things off
     sink.send_msg(sink._make_hello_msg())
 
@@ -176,7 +176,7 @@ class _ExtConnDisconnected is _ExtConnOps
   new create(state: _ExtConnState) =>
     _state = state
 
-  fun ref enter(sink: ConnectorSink ref) =>
+  fun ref enter(sink: ConnectorSink ref, previous_state: _ExtConnOps) =>
     let old_state = _state
 
     // This is a bit unusual, to change status like this.  But it's a
@@ -188,7 +188,17 @@ class _ExtConnDisconnected is _ExtConnOps
       rollback_info' = None, uncommitted_txn_ids' = None)
 
     if old_state.advertise_status then
-      sink.cprb_send_abort_next_checkpoint()
+      // The CpRb component wants to know about our status change.
+      // However, if we did *not* come from _ExtConnTwoPCReady, then
+      // we weren't really connected in a useful way, so we should not
+      // send abort_next_checkpoint.
+      match previous_state
+      | let x: _ExtConnTwoPCReady =>
+        @l(Log.debug(), Log.conn_sink(), "QQQ: call cprb_send_abort_next_checkpoint".cstring())
+        sink.cprb_send_abort_next_checkpoint()
+      else
+        @l(Log.debug(), Log.conn_sink(), "QQQ: do not call cprb_send_abort_next_checkpoint".cstring())
+      end
     end
 
   fun ref rollback_info(sink: ConnectorSink ref,
@@ -245,7 +255,7 @@ class _ExtConnTwoPCReady is _ExtConnOps
   new create(state: _ExtConnState) =>
     _state = state
 
-  fun ref enter(sink: ConnectorSink ref) =>
+  fun ref enter(sink: ConnectorSink ref, previous_state: _ExtConnOps) =>
     @l(Log.debug(), Log.conn_sink(),
       "2PC: _ExtConnTwoPCReady _advertise_status %s".cstring(),
       _state.advertise_status.string().cstring())
@@ -310,7 +320,7 @@ class _ExtConnWaitingForRollbackPayload is _ExtConnOps
       | let x: CheckpointBarrierToken => x.string().cstring()
       end)
 
-  fun ref enter(sink: ConnectorSink ref) =>
+  fun ref enter(sink: ConnectorSink ref, previous_state: _ExtConnOps) =>
     match _state.rollback_info
     | let barrier_token: CheckpointBarrierToken =>
       @l(Log.debug(), Log.conn_sink(), "QQQ: rollback_info line %lu: bingo".cstring(), __loc.line())
