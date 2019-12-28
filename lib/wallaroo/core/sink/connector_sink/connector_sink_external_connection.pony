@@ -357,7 +357,13 @@ class _ExtConnWaitingForRollbackPayload is _ExtConnOps
         sink.cprb_send_2pc_phase2(precommitted_txn_id, decision)
       end
     end
-    _ECTransition(this, _ExtConnTwoPCReady(_state), sink)
+    if sink._get_ec_member() is this then
+      _ECTransition(this, _ExtConnTwoPCReady(_state), sink)
+    else
+      @l(Log.info(), Log.conn_sink(),
+        "QQQ: Control inversion: the Phase 2 send command failed, and we have already made an EC state transition.".cstring())
+      // No explicit transition here -- use the transition already specified
+    end
 
   fun ref set_advertise_status(sink: ConnectorSink ref, status: Bool) =>
     @l(Log.debug(), Log.conn_sink(), "QQQ: set_advertise_status: %s: %s -> %s".cstring(), name().cstring(), _state.advertise_status.string().cstring(), status.string().cstring())

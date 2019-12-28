@@ -219,9 +219,10 @@ class _CpRbCPGotLocalCommit is _CpRbOps
       _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
     else
       @l(Log.info(), Log.conn_sink(),
-        "QQQ: Control inversion: the Phase 2 send command failed, and we have already made a state transition.".cstring())
+        "QQQ: Control inversion: the Phase 2 send command failed, and we have already made a CpRb state transition.".cstring())
       @l(Log.info(), Log.conn_sink(),
         "QQQ: foo: get member 0x%lx this 0x%lx".cstring(), sink._get_cprb_member(), this)
+      // No explicit transition here -- use the transition already specified
     end
 
   fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
@@ -348,6 +349,18 @@ class _CpRbRollingBack is _CpRbOps
     _barrier_token = barrier_token
 
   fun ref enter(sink: ConnectorSink ref) =>
+    // Any kind of token may arrive now that the RollbackBarrierToken
+    // has arrived.  In fact, some tokens might be queued right now.
+    // Ignore any queued app messages, fetch the queued tokens, then
+    // switch to the unconditional QueuedSinkPhase.
+    sink.cprb_queuing_barrier_drop_app_msgs()
+    // Reset ConnectorSink2PC's txn_id state (used for sanity checking)
+    sink.cprb_twopc_clear_txn_id()
+
+    // Handle shear scenario in these two steps
+    let queued = sink.cprb_get_phase_queued()
+    sink.swap_barrier_to_queued(where queue = queued, forward_tokens = false)
+
     sink.cprb_send_rollback_info(_barrier_token)
     // Don't change advertise_status here: wait until after rollback is
     // complete.  Then, when we send advertise=true, we might be notified
@@ -373,13 +386,6 @@ class _CpRbRollingBackResumed is _CpRbOps
     _barrier_token = barrier_token
 
   fun ref enter(sink: ConnectorSink ref) =>
-    // Any kind of token may arrive now that the
-    // RollbackResumeBarrierToken has arrived.  In fact, some tokens
-    // might be queued right now. Ignore any queued app messages, fetch
-    // the queued tokens, then switch to the unconditional QueuedSinkPhase.
-    sink.cprb_queuing_barrier_drop_app_msgs()
-    let queued = sink.cprb_get_phase_queued()
-    sink.swap_barrier_to_queued(where queue = queued, forward_tokens = false)
     sink.cprb_send_advertise_status(true)
 
   fun ref conn_ready(sink: ConnectorSink ref) =>
@@ -449,7 +455,3 @@ class _CpRbWaitingForCheckpoint is _CpRbOps
 primitive _ChangeSinkPhaseQueueMsgsForwardTokens
   fun apply(sink: ConnectorSink ref, shear_risk: Bool = false) =>
     sink.swap_barrier_to_queued(where forward_tokens = true, shear_risk = shear_risk)
-
-primitive _DropQueuedAppMsgs
-  fun apply(sink: ConnectorSink ref) =>
-    sink.cprb_queuing_barrier_drop_app_msgs()

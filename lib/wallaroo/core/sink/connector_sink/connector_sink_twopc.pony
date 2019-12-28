@@ -99,7 +99,7 @@ class ConnectorSink2PC
     let msg: cwm.MessageMsg = cwm.MessageMsg(0, 0, 0, None, bs)
     sink.send_msg(msg)
     @ll(_twopc_debug, "2PC: sent phase 2 commit=%s for tid/txn_id %s".cstring(), commit.string().cstring(), tid.cstring())
-    txn_id = txn_id_initial
+    clear_txn_id()
     if commit then
       last_offset = current_txn_end_offset
       if last_offset != current_offset then
@@ -107,6 +107,9 @@ class ConnectorSink2PC
         Fail()
       end
     end
+
+  fun ref clear_txn_id() =>
+    txn_id = txn_id_initial
 
   fun send_workers_left(sink: ConnectorSink ref,
     rtag: U64, leaving_workers: Array[cwm.WorkerName val] val)

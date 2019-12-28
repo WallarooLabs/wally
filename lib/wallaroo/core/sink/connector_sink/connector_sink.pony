@@ -1230,6 +1230,9 @@ actor ConnectorSink is Sink
   fun ref _get_cprb_member(): _CpRbOps =>
     _cprb
 
+  fun ref _get_ec_member(): _ExtConnOps =>
+    _ec
+
   fun ref _update_cprb_member(next: _CpRbOps) =>
     _cprb = next
 
@@ -1282,6 +1285,9 @@ actor ConnectorSink is Sink
   =>
     @ll(_conn_debug, "Send abort to barrier coordinator for %s".cstring(), barrier_token.string().cstring())
     abort_decision("Phase 2 abort", txn_id, barrier_token)
+
+  fun ref cprb_twopc_clear_txn_id() =>
+    _twopc.clear_txn_id()
 
   fun ref cprb_make_txn_id_string(checkpoint_id: CheckpointId): String =>
     _twopc.make_txn_id_string(checkpoint_id)

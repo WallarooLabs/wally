@@ -351,10 +351,15 @@ class QueuingSinkPhase is SinkPhase
 
   fun ref drop_app_msg_queue() =>
     let qd = Array[SinkPhaseQueued]
+    var count: USize = 0
+
     for q in _queued.values() do
       match q
       | let qb: QueuedBarrier =>
         qd.push(qb)
+      | let qm: QueuedMessage =>
+        count = count + 1
       end
     end
+    @l(Log.debug(), Log.conn_sink(), "QueuingSinkPhase: drop_app_msg_queue: dropped %lu".cstring(), count)
     _queued = qd
