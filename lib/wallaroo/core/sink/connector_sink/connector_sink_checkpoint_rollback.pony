@@ -333,8 +333,11 @@ class _CpRbPreparedForRollback is _CpRbOps
   fun ref cp_barrier_complete(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued])
   =>
-    // Sneaky timer + barrier race
-    _CpRbTransition(this, _CpRbAbortCheckpoint(barrier_token), sink)
+    // Sneaky timer + barrier race.
+    // Ignore it: we're waiting for rollback.
+    @l(Log.err(), Log.conn_sink(),
+      "TODOTODOTODOTODOTODOTODOTODOTODO Sneaky timer + barrier race for %s".cstring(), barrier_token.string().cstring())
+    this
 
   fun ref rollback(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken)
