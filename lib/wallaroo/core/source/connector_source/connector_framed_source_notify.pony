@@ -80,6 +80,8 @@ class _StreamState
   last_checkpoint = last_checkpoint'
 
   fun serialize(wb: Writer = Writer): Writer =>
+    @l(Log.debug(), Log.conn_source(),
+      "_Stream_state: serialize: id %s name %s last_acked %lu last_seen %lu last_checkpoint %lu".cstring(), id.string().cstring(), name.cstring(), last_acked, last_seen, last_checkpoint)
     wb.u64_be(id)
     wb.u16_be(name.size().u16())
     wb.write(name)
@@ -95,6 +97,8 @@ class _StreamState
     last_acked = rb.u64_be()?
     last_seen = rb.u64_be()?
     last_checkpoint = rb.u64_be()?
+    @l(Log.debug(), Log.conn_source(),
+      "_Stream_state: deserialize: id %s name %s last_acked %lu last_seen %lu last_checkpoint %lu".cstring(), id.string().cstring(), name.cstring(), last_acked, last_seen, last_checkpoint)
 
 class val NotifyResult[In: Any val]
   """
