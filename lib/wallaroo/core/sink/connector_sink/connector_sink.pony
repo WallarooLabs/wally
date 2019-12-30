@@ -362,8 +362,20 @@ actor ConnectorSink is Sink
       for x in encoded1.values() do
         encoded1_len = encoded1_len + x.size()
       end
+      let encoded1_offset = _twopc.current_offset
       // We do not include MessageMsg size overhead in our offset accounting
       _twopc.update_offset(encoded1_len)
+      ifdef "trace" then
+        try
+        @ll(_conn_debug, "process_msg: offset %lu msg %s".cstring(), encoded1_offset, _print_array[U8](
+          match encoded1(0)?
+          | let s: String =>
+            s.array()
+          | let a: Array[U8] val =>
+            a
+          end).cstring())
+        end
+      end
 
       let w1: Writer = w1.create()
       let msg = make_message(encoded1)
@@ -777,7 +789,7 @@ actor ConnectorSink is Sink
 
     var data_size: USize = 0
     for bytes in _notify.sentv(this, data).values() do
-      ifdef "trace" then
+      ifdef "trace-writev" then
         @ll(_conn_debug, "TRACE: ConnectorSink._writev: %s\n".cstring(), _print_array[U8](
           match bytes
           | let s: String val =>
@@ -1335,7 +1347,7 @@ actor ConnectorSink is Sink
     connected_count = connected_count + 1
     _ec.tcp_connected(this)
     if true then //TODO//
-      @ll(_conn_err, "//TODO// unthrottle early".cstring())
+      @ll(_conn_err, "unthrottle early".cstring())
       _notify.unthrottled(this)
     end
 
