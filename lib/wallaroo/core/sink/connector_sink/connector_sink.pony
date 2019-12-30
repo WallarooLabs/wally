@@ -1478,7 +1478,7 @@ actor ConnectorSink is Sink
     error messages.
     """
     ifdef "verbose_debug" then
-      if (array.size() == 76) or (array.size() == 49) then
+      if (array.size() == 76) or (array.size() == 49) or (array.size() == 50) then
         let hack = recover trn Array[U8] end
         let skip = array.size() - 49
         var count: USize = 0
