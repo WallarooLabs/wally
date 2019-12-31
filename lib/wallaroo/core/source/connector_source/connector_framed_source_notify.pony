@@ -67,7 +67,7 @@ class _StreamState
   var last_acked: PointOfReference // last message id that was checkpointed
   var last_seen: PointOfReference  // last seen message id
   var last_checkpoint: CheckpointId // last checkpoint id
-  var close_on_or_after: CheckpointId = 0 // First checkpoint where sream ca be closed
+  var close_on_or_after: CheckpointId = 0 // First checkpoint where stream can be closed
 
   new ref create(stream_id: StreamId, stream_name: String,
     last_seen': PointOfReference,
@@ -716,9 +716,15 @@ class ConnectorSourceNotify[In: Any val]
     w.u8(nonempty_magic())
 
     for s_map in [_active_streams ; _pending_close].values() do
+      @l(Log.debug(), Log.conn_source(), "QQQ: map size = %lu".cstring(), s_map.size())
       for stream_state in s_map.values() do
         stream_state.serialize(w)
       end
+    end
+    @l(Log.debug(), Log.conn_source(), "QQQ: _pending_relinquish size = %lu".cstring(), _pending_relinquish.size())
+    for pr in _pending_relinquish.values() do
+      let stream_state = _StreamState(pr.id, pr.name, pr.last_acked, pr.last_acked, 0)
+      stream_state.serialize(w)
     end
     w.done()
 
