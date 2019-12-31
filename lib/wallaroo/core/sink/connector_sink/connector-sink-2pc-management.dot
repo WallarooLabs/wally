@@ -24,8 +24,8 @@ digraph mashup {
 	}
 	subgraph rollback {
             PreparedForRollback [label="PreparedForRollback\nenter:\nsink phase=queue app msgs, forward tokens\nforce ExtConn closed"];
-            RollingBack [label="RollingBack\nenter:\nsink phase=queue app msgs, forward tokens\ndrop queued app msgs!\nsend rollback_info\nsend advertise_status=true"];
-            RollingBackResumed [label="RollingBackResumed\nexit:\nack rollback barrier to barrier coordinator"];
+            RollingBack [label="RollingBack\nenter:\nsink phase=queue app msgs, forward tokens\ndrop queued app msgs!\nsend rollback_info"];
+            RollingBackResumed [label="RollingBackResumed\nexit:\nack rollback barrier to barrier coordinator\nsend advertise_status=true"];
 
             PreparedForRollback -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
 			PreparedForRollback -> PreparedForRollback [label="abort_next_checkpoint",fontcolor=red,color=red];
