@@ -203,6 +203,7 @@ class ConnectorSourceNotify[In: Any val]
   var _credits: U32 = 0
   var _program_name: String = ""
   var _instance_name: String = ""
+  var _rolling_back: Bool = false
   var _prep_for_rollback: Bool = false
   let _debug_disconnect: Bool = false
   var _commit_successful: Bool = true
@@ -357,12 +358,16 @@ class ConnectorSourceNotify[In: Any val]
           return _to_error_state(source, "Bad protocol FSM state")
         end
 
-        if _pending_notify.contains(m.stream_id) or
+        if _rolling_back or
+           _pending_notify.contains(m.stream_id) or
            _active_streams.contains(m.stream_id) or
            _pending_close.contains(m.stream_id)
         then
-          // This notifier is already handling this stream
+          // We are rolling back, or else this notifier is already
+          // handling this stream.
           // So reject directly
+          @ll(_conn_debug, "TODO: got NotifyMsg: _rolling_back %s\n".cstring(),
+            _rolling_back.string().cstring())
           send_notify_ack(source, false, m.stream_id, m.point_of_ref)
         else
           _process_notify(where source=source, stream_id=m.stream_id,
@@ -415,6 +420,19 @@ class ConnectorSourceNotify[In: Any val]
         // check that we're in state that allows processing messages
         if _fsm_state isnt _ProtoFsmStreaming then
           return _to_error_state(source, "Bad protocol FSM state")
+        end
+
+        if _rolling_back then
+          // We are going to roll back sometime, so do not accept any
+          // new incoming data.
+          //
+          // TODO: I think it's OK to ignore credit management.  If we
+          // wait long enough for a real rollback + send RESTART, then
+          // perhaps the client would run out of credits and stop
+          // sending, which is just fine, then we don't have to throw
+          // these messages away.
+          @ll(_conn_debug, "TODO: _rolling_back, discarding msg".cstring())
+          return _continue_perhaps(source)
         end
 
         // try to process message
@@ -729,6 +747,7 @@ class ConnectorSourceNotify[In: Any val]
     w.done()
 
   fun ref prepare_for_rollback(source: ConnectorSource[In] ref) =>
+    _rolling_back = true
     if _session_active then
       _prep_for_rollback = true
       source.close()
@@ -764,6 +783,7 @@ class ConnectorSourceNotify[In: Any val]
         // TODO: should we remove s.id from all my other lists, _active_streams, etc??
       end
     end
+    _rolling_back = false
     _relinquish_streams()
     rollback_complete(source, checkpoint_id)
 
