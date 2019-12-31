@@ -81,8 +81,6 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
 
   let _metrics_reporter: MetricsReporter
 
-  let _pending_barriers: Array[BarrierToken] = _pending_barriers.create()
-
   // Connector
   let _listen: ConnectorSourceCoordinator[In]
   let _notify: ConnectorSourceNotify[In]
