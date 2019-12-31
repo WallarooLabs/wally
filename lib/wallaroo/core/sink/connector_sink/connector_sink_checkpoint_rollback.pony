@@ -327,7 +327,7 @@ class _CpRbInit is _CpRbOps
     // Let's roll back.
     // However, we need to change phase first, and we must avoid shear.
     @l(Log.err(), Log.conn_sink(),
-      "TODOTODOTODOTODOTODOTODOTODOTODO early rollback!".cstring())
+      "TODOTODOTODOTODOTODOTODOTODOTODO early rollback at %s!".cstring(), __loc.type_name().cstring())
     sink.cprb_send_advertise_status(false)
     _ChangeSinkPhaseQueueMsgsForwardTokens(sink where shear_risk = true)
     _CpRbTransition(this, _CpRbRollingBack(barrier_token), sink)
@@ -418,25 +418,35 @@ class _CpRbRollingBackResumed is _CpRbOps
   fun ref checkpoint_complete(sink: ConnectorSink ref,
     checkpoint_id: CheckpointId)
   =>
+    Fail() ; Fail() ; Fail()
+    Fail() ; Fail() ; Fail()
+    Fail() ; Fail() ; Fail()
+    Fail() ; Fail() ; Fail()
+    Fail() ; Fail() ; Fail()
     // This checkpoint is the one that is triggered immediately after
     // rollback is complete.  Our sink phase has prevented any new
     // output to reach the sink.
     // Nothing to do here: with no output to sink, there's no need for
     // a 2PC round.
     @l(Log.info(), Log.conn_sink(),
-      "No PC activity during CheckpointId %lu at %s.%s".cstring(),
+      "No 2PC activity during CheckpointId %lu at %s.%s".cstring(),
         checkpoint_id, __loc.type_name().cstring(), __loc.method_name().cstring())
 
   fun ref cp_barrier_complete(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued])
   =>
+    Fail() ; Fail() ; Fail()
+    Fail() ; Fail() ; Fail()
+    Fail() ; Fail() ; Fail()
+    Fail() ; Fail() ; Fail()
+    Fail() ; Fail() ; Fail()
     // This checkpoint is the one that is triggered immediately after
     // rollback is complete.  Our sink phase has prevented any new
     // output to reach the sink.
     // Ack now with current token, because our state's token may be quite old.
     sink.cprb_send_commit_to_barrier_coordinator(barrier_token)
     @l(Log.info(), Log.conn_sink(),
-      "No PC activity during CheckpointId %lu at %s.%s".cstring(),
+      "No 2PC activity during CheckpointId %lu at %s.%s".cstring(),
         barrier_token.id, __loc.type_name().cstring(), __loc.method_name().cstring())
 
 class _CpRbWaitingForCheckpoint is _CpRbOps
@@ -475,7 +485,7 @@ class _CpRbWaitingForCheckpoint is _CpRbOps
     // Let's roll back.
     // However, we need to change phase first, and we must avoid shear.
     @l(Log.err(), Log.conn_sink(),
-      "TODOTODOTODOTODOTODOTODOTODOTODO early rollback!".cstring())
+      "TODOTODOTODOTODOTODOTODOTODOTODO early rollback at %s!".cstring(), __loc.type_name().cstring())
     sink.cprb_send_advertise_status(false)
     _ChangeSinkPhaseQueueMsgsForwardTokens(sink where shear_risk = true)
     _CpRbTransition(this, _CpRbRollingBack(barrier_token), sink)
