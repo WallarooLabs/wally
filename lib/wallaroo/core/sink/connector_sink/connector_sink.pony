@@ -510,19 +510,6 @@ actor ConnectorSink is Sink
 
     _phase.maybe_use_normal_processor()
 
-    match barrier_token
-    | let srt: CheckpointRollbackBarrierToken =>
-      None//TODO
-    | let sbt: CheckpointBarrierToken =>
-      //TODO//_twopc_seen_checkpointbarriertoken = sbt
-      if _connected then
-        @ll(_conn_debug, "process_barrier: connected & 2PC intro done".cstring())
-      else
-        @ll(_conn_debug, "process_barrier: connected & 2PC intro not done".cstring())
-        // Don't abort checkpoint here.  Rather, wait until
-        // todo_twopc_intro_done()
-      end
-    end
     _phase.receive_barrier(input_id, producer,
       barrier_token)
 
