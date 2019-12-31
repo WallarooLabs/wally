@@ -191,6 +191,15 @@ class GlobalConnectorStreamRegistry[In: Any val]
     let serialized: Array[U8] val =
       Serialised(SerialiseAuth(_auth), state)?
         .output(OutputSerialisedAuth(_auth))
+//  let _active_streams: Map[StreamId, WorkerName]
+//  let _inactive_streams: Map[StreamId, StreamTuple]
+    @ll(_debug, "serialize: _active_streams.size = %lu _inactive_streams.size = %lu".cstring(), _active_streams.size(), _inactive_streams.size())
+    for (s, w) in _active_streams.pairs() do
+      @ll(_debug, "serialize: _active_streams.key = %s worker = %s".cstring(), s.string().cstring(), w.cstring())
+    end
+    for (s, t) in _inactive_streams.pairs() do
+      @ll(_debug, "serialize: _inactive_streams.key = %s last_acked %s".cstring(), s.string().cstring(), t.last_acked.string().cstring())
+    end
     [serialized]
 
   fun ref set_local_registry(
