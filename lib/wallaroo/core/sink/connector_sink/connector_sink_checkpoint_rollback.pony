@@ -435,19 +435,12 @@ class _CpRbRollingBackResumed is _CpRbOps
   fun ref cp_barrier_complete(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued])
   =>
-    Fail() ; Fail() ; Fail()
-    Fail() ; Fail() ; Fail()
-    Fail() ; Fail() ; Fail()
-    Fail() ; Fail() ; Fail()
-    Fail() ; Fail() ; Fail()
-    // This checkpoint is the one that is triggered immediately after
-    // rollback is complete.  Our sink phase has prevented any new
-    // output to reach the sink.
-    // Ack now with current token, because our state's token may be quite old.
-    sink.cprb_send_commit_to_barrier_coordinator(barrier_token)
     @l(Log.info(), Log.conn_sink(),
-      "No 2PC activity during CheckpointId %lu at %s.%s".cstring(),
-        barrier_token.id, __loc.type_name().cstring(), __loc.method_name().cstring())
+      "TODO: Checkpoint %s arrived at %s.%s, aborting it".cstring(),
+        barrier_token.string().cstring(), __loc.type_name().cstring(), __loc.method_name().cstring())
+    let txn_id = sink.cprb_make_txn_id_string(barrier_token.id)
+    sink.cprb_send_abort_to_barrier_coordinator(barrier_token, txn_id)//TODO//
+    _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
 class _CpRbWaitingForCheckpoint is _CpRbOps
   fun name(): String => __loc.type_name()

@@ -56,7 +56,7 @@ digraph mashup {
 	RollingBackResumed -> RollingBackResumed [label="abort_next_checkpoint",fontcolor=red,color=red];
 	RollingBackResumed -> WaitingForCheckpoint [label="conn_ready"];
 	RollingBackResumed -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
-	RollingBackResumed -> RollingBackResumed [label="cp_barrier_complete"];
+	RollingBackResumed -> PreparedForRollback [label="cp_barrier_complete\nCHECKPOINT ATTEMPT while not connected"];
     }
     ## END LEFT
 
