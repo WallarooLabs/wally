@@ -183,6 +183,18 @@ class _CpRbAbortCheckpoint is _CpRbOps
   // is prepare_for_rollback; the trait's default implementation is
   // sufficient for us.
 
+  fun ref rollback(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken)
+  =>
+    // We are very early in the startup process and are recovering.
+    // Let's roll back.
+    // However, we need to change phase first, and we must avoid shear.
+    @l(Log.err(), Log.conn_sink(),
+      "TODOTODOTODOTODOTODOTODOTODOTODO early rollback at %s!".cstring(), __loc.type_name().cstring())
+    sink.cprb_send_advertise_status(false)
+    _ChangeSinkPhaseQueueMsgsForwardTokens(sink where shear_risk = true)
+    _CpRbTransition(this, _CpRbRollingBack(barrier_token), sink)
+
 class _CpRbCPGotLocalCommit is _CpRbOps
   let _barrier_token: CheckpointBarrierToken
 
