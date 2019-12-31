@@ -1212,6 +1212,15 @@ actor ConnectorSink is Sink
     | let x: QueuingSinkPhase =>
       @ll(_conn_debug, "QQQ: swap_barrier_to_queued: already queuing".cstring())
       None
+    | let bsp: BarrierSinkPhase =>
+      @ll(_conn_debug, "QQQ: swap_barrier_to_queued: use exising BarrierSinkPhase ?= %s".cstring(), shear_risk.string().cstring())
+      if shear_risk then
+        bsp.disable_completion_notifies_sink()
+        _phase = QueuingSinkPhase(_sink_id, this, queue, forward_tokens
+          where forward_token_phase = bsp)
+      else
+        _phase = QueuingSinkPhase(_sink_id, this, queue, forward_tokens)
+      end
     else
       @ll(_conn_debug, "QQQ: swap_barrier_to_queued: forward_tokens = %s queue.size = %lu".cstring(), forward_tokens.string().cstring(), queue.size())
       let forward_token_phase =

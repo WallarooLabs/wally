@@ -333,10 +333,15 @@ class _CpRbInit is _CpRbOps
     _CpRbTransition(this, _CpRbRollingBack(barrier_token), sink)
 
 class _CpRbPreparedForRollback is _CpRbOps
+  let _shear_risk: Bool
+
+  new create(shear_risk: Bool = false) =>
+    _shear_risk = shear_risk
+
   fun name(): String => __loc.type_name()
 
   fun ref enter(sink: ConnectorSink ref) =>
-    _ChangeSinkPhaseQueueMsgsForwardTokens(sink)
+    _ChangeSinkPhaseQueueMsgsForwardTokens(sink where shear_risk = _shear_risk)
     sink.cprb_inject_hard_close()
 
   fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
@@ -469,7 +474,7 @@ class _CpRbWaitingForCheckpoint is _CpRbOps
     _CpRbTransition(this, _CpRbCPStarts(barrier_token, queued), sink)
 
   fun ref prepare_for_rollback(sink: ConnectorSink ref) =>
-    _CpRbTransition(this, _CpRbPreparedForRollback, sink)
+    _CpRbTransition(this, _CpRbPreparedForRollback(where shear_risk=true), sink)
 
   fun ref rollback(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken)
