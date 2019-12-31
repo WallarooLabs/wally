@@ -788,7 +788,7 @@ class ConnectorSourceNotify[In: Any val]
         for s_map in [_active_streams ; _pending_close].values() do
           for s in s_map.values() do
             ifdef debug then
-              @ll(_conn_debug, "%s ::: Updating stream_id %s last acked to %s\n"
+              @ll(_conn_debug, "%s ::: Updating stream_id %s last_acked to %s\n"
                 .cstring(), WallClock.seconds().string().cstring(),
                 s.id.string().cstring(), s.last_seen.string().cstring())
             end
