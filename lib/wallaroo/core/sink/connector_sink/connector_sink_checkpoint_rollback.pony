@@ -109,6 +109,7 @@ class _CpRbAbortCheckpoint is _CpRbOps
       end
 
   fun ref enter(sink: ConnectorSink ref) =>
+    sink.cprb_send_advertise_status(false)
     match sink.cprb_check_sink_phase_partial_barrier()
     | None =>
       None
@@ -154,9 +155,6 @@ class _CpRbAbortCheckpoint is _CpRbOps
         _abort_sent = true
       end
     end
-
-  fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
-    None
 
   fun ref checkpoint_complete(sink: ConnectorSink ref,
     checkpoint_id: CheckpointId)
@@ -341,11 +339,9 @@ class _CpRbPreparedForRollback is _CpRbOps
   fun name(): String => __loc.type_name()
 
   fun ref enter(sink: ConnectorSink ref) =>
+    sink.cprb_send_advertise_status(false)
     _ChangeSinkPhaseQueueMsgsForwardTokens(sink where shear_risk = _shear_risk)
     sink.cprb_inject_hard_close()
-
-  fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
-    None
 
   fun ref cp_barrier_complete(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken, queued: Array[SinkPhaseQueued])
@@ -370,6 +366,8 @@ class _CpRbRollingBack is _CpRbOps
     _barrier_token = barrier_token
 
   fun ref enter(sink: ConnectorSink ref) =>
+    sink.cprb_send_advertise_status(false)
+
     // Any kind of token may arrive now that the RollbackBarrierToken
     // has arrived.  In fact, some tokens might be queued right now.
     // Ignore any queued app messages, fetch the queued tokens, then
@@ -387,13 +385,6 @@ class _CpRbRollingBack is _CpRbOps
     // complete.  Then, when we send advertise=true, we might be notified
     // right away because the connection is already ready.
     // sink.cprb_send_advertise_status(true)
-
-  fun ref abort_next_checkpoint(sink: ConnectorSink ref) =>
-    // We turned advertise_status on when we entered; this message tells
-    // us that it's off.  We need it on again.
-    sink.cprb_send_advertise_status(true)
-    // To avoid deadlock, resend rollback_info, just in case.
-    sink.cprb_send_rollback_info(_barrier_token)
 
   fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref) =>
     _CpRbTransition(this, _CpRbRollingBackResumed(_barrier_token), sink)
