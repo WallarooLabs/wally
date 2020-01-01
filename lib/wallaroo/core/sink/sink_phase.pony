@@ -44,6 +44,9 @@ trait SinkPhase
   =>
     _invalid_call(__loc.method_name()); Fail(); false
 
+  fun ref prepare_for_rollback(token: BarrierToken) =>
+    _invalid_call(__loc.method_name()); Fail()
+
   fun ref queued(): Array[SinkPhaseQueued] =>
     _invalid_call(__loc.method_name()); Fail()
     Array[SinkPhaseQueued]
@@ -186,12 +189,10 @@ class BarrierSinkPhase is SinkPhase
       end
     end
 
-/****
   fun ref prepare_for_rollback(token: BarrierToken) =>
     if higher_priority(token) then
       _sink.finish_preparing_for_rollback()
     end
-****/
 
   fun ref queued(): Array[SinkPhaseQueued] =>
     let qd = Array[SinkPhaseQueued]
