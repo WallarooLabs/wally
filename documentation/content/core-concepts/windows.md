@@ -14,16 +14,16 @@ If you are not familiar with aggregations in Wallaroo, it might be helpful to re
 
 ## Count-based Windows
 
-Count-based windows emit an output every `n` input messages, where `n` is specified via the API. For example (using the Python API):
+Count-based windows emit an output every `n` input messages, where `n` is specified via the API. For example (using the Pony API):
 
-```python
-    (inputs
-        .to(wallaroo.count_windows(5)
-            .over(MySumAgg))
-        .to_sink(sink_config))
+```
+  inputs
+    .to[SumCount](Wallaroo.count_windows(5)
+      .over[ThingToCount, SumCount, RunningTotal](MySumAgg))
+    .to_sink(sink_config))
 ```
 
-This performs the user-defined `MySumAgg` aggregation for every 5 inputs. 
+This performs the user-defined `MySumAgg` aggregation for every 5 inputs and sends all outputs to a sink configured using the user-defined `sink_config`. `MySumAgg` takes objects of type `ThingToCount`, keeps a running total in `RunningTotal`, and emits a `SumCount` when the window is triggered.
 
 ```
 Messages:
@@ -42,12 +42,20 @@ Range-based windows are defined based on specific time-based ranges. They fall i
 Tumbling range-based windows are non-overlapping fixed-size time-based windows.
 For example, let's define windows with a range of 3 seconds:
 
-```python
-    (inputs
-        .to(wallaroo.range_windows(wallaroo.seconds(3))
-            .over(MySumAgg))
-        .to_sink(...))
 ```
+  inputs
+    .to[SumCount](Wallaroo.range_windows(Seconds(3))
+      .over[ThingToCount, SumCount, RunningTotal](MySumAgg))
+    .to_sink(sink_config)
+```
+
+`range_windows()` accepts values in nanoseconds, but for convenience, you can add the following import:
+
+```
+use "wallaroo_labs/time"
+```
+
+This makes `Microseconds`, `Milliseconds`, `Seconds`, `Minutes`, and `Hours` available.
 
 Assuming we start from time 00:00, this would produce the following tumbling windows:
 
@@ -83,17 +91,52 @@ Notice that it doesn't matter which order the messages arrive in. They will be p
 
 However, if there were no limit to how late messages can be, then we would have to keep around the state for each window indefinitely. This can add up quickly in a high-volume scenario. As a result, we currently throw away window data once the window output is triggered (i.e. the aggregation `output()` method is called and an output is produced for the window). This means that from then on, late messages are dropped on the floor. In future versions of Wallaroo, we will provide more fine-grained policies so that you can choose other options for late messages. In the meantime, the one knob we provide is a `delay` on triggering a window. For example:
 
-```python
-    (inputs
-        .to(wallaroo.range_windows(wallaroo.seconds(3))
-            .with_delay(wallaroo.seconds(3))
-            .over(MySumAgg))
-        .to_sink(sink_config))
+```
+  inputs
+    .to[SumCount](Wallaroo.range_windows(Seconds(3))
+      .with_delay(Seconds(3))
+      .over[ThingToCount, SumCount, RunningTotal](MySumAgg))
+    .to_sink(sink_config)
 ```
 
-This says that we delay triggering each window for 3 seconds. Think of the delay knob as setting either (1) an estimation of the maximum lateness for messages or (2) the lateness threshold beyond which you no longer care about messages. The knob is essentially trading off between latency (longer delays means longer waits for window outputs) and completeness (shorter delays potentially mean more ignored messages). 
+This says that we delay triggering each window for 3 seconds. Think of the delay knob as setting either (1) an estimation of the maximum lateness for messages or (2) the lateness threshold beyond which you no longer care about messages. The knob is essentially trading off between latency (longer delays means longer waits for window outputs) and completeness (shorter delays potentially mean more ignored messages). However, you can use late data policies if you want more fine-grained control than just dropping late messages.
 
-IMPORTANT NOTE: If your application requires a guarantee that no messages are ever ignored, then it's not currently safe to use the Wallaroo windowing API unless you are certain that no messages will ever be later than your delay setting. However, as mentioned above, we will be adding more fine-grained policy control for late message in future versions.
+#### Late Data Policies
+
+There are currently three late data policies you can choose from (`drop`, `fire_per_message`, and `place_in_oldest_window`). The default is to drop any late messages. If you want to make this policy explicit in the code, you can add a late data policy line: 
+
+```
+  inputs
+    .to[SumCount](Wallaroo.range_windows(Seconds(3))
+      .with_delay(Seconds(3))
+      .with_late_data_policy(LateDataPolicy.drop())
+      .over[ThingToCount, SumCount, RunningTotal](MySumAgg))
+    .to_sink(sink_config)
+```
+
+The second policy is `fire_per_message`. This means that each message counted as late will trigger a new aggregation for that message and that message alone. This means, depending on the application logic, that you might trigger a new output per late message. You can select this policy as follows:
+
+```
+  inputs
+    .to[SumCount](Wallaroo.range_windows(Seconds(3))
+      .with_delay(Seconds(3))
+      .with_late_data_policy(LateDataPolicy.fire_per_message())
+      .over[ThingToCount, SumCount, RunningTotal](MySumAgg))
+    .to_sink(sink_config)
+```
+
+The advantage of `fire_per_message` is that you can trigger all your windows according to your general timing policy (as specified by `with_delay`) and still ensure that no messages are dropped. The disadvantage is that you are creating new objects and potentially producing new outputs for every late message received, which can have a performance impact and might lead to a messier set of outputs. 
+
+This brings us to our third policy, `place_in_oldest_window`. Instead of creating a new aggregation per late message, this policy places all late messages in the oldest window that has not yet been triggered. There are a variety of scenarios where this might make sense. For example, if you are using windows primarily to reduce the cardinality (i.e. size) of a high volume stream through aggregation, then you might not really care _which_ window a given message falls into, as long as it falls into one of them. On the other hand, if it's important to you that messages always fall into the correct time window, then this policy would not be a good choice. You can select it as follows:
+
+```
+  inputs
+    .to[SumCount](Wallaroo.range_windows(Seconds(3))
+      .with_delay(Seconds(3))
+      .with_late_data_policy(LateDataPolicy.place_in_oldest_window())
+      .over[ThingToCount, SumCount, RunningTotal](MySumAgg))
+    .to_sink(sink_config)
+```
 
 ### Window Triggers
 
@@ -116,12 +159,12 @@ This is where timeouts come in. We use timeouts to periodically check if we have
 Sliding range-based windows are overlapping fixed-size time-based windows.
 For example, let's define windows with a range of 6 seconds and a slide of 3 seconds:
 
-```python
-    (inputs
-        .to(wallaroo.range_windows(wallaroo.seconds(6))
-            .with_slide(wallaroo.seconds(3))
-            .over(MySumAgg))
-        .to_sink(...))
+```
+  inputs
+    .to[SumCount](Wallaroo.range_windows(Seconds(6))
+      .with_slide(Seconds(3))
+      .over[ThingToCount, SumCount, RunningTotal](MySumAgg))
+    .to_sink(sink_config)
 ```
 
 Assuming we start from time 00:00, this would produce the following sliding windows:
