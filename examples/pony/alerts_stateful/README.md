@@ -1,32 +1,30 @@
-# Alerts (stateless)
+# Alerts (stateful)
 
 ## About The Application
 
-This is an example of a stateless application that takes a transaction
-and sends an alert if its value is above or below a threshold.
+This is an example of a stateful application that takes a transaction and updates a running total. It sends an alert if the total is above or below a threshold.
 
 ## Prerequisites
-
+	
 - ponyc
 - pony-stable
 - Wallaroo
-
+        
 See [Wallaroo Environment Setup Instructions](https://docs.wallaroolabs.com/pony-installation/).
 
 ## Building
 
-Build Alerts (stateless) with
-
+Build Alerts (stateful) with
 ```bash
 make
 ```
 
-## alerts_stateless arguments
+## alerts_stateful arguments
 
 In a shell, run the following to get help on arguments to the application:
 
 ```bash
-./alerts_stateless --help
+./alerts_stateful --help
 ```
 
 ### Input
@@ -34,19 +32,9 @@ In a shell, run the following to get help on arguments to the application:
 For simplicity, we use a generator source that creates a stream of transaction
 objects.
 
-### Processing
-
-We examine each transaction at a stateless computation. If the amount is higher
-than a certain positive threshold, we create a deposit alert. If it's lower than a certain negative threshold, we create a withdrawal alert.
-
-### Output
-
-Alerts will output messages that are string representations of triggered
-alerts. 
-
 ## Running Alerts
 
-You will need four separate shells to run this application (please see [starting a new shell](https://docs.wallaroolabs.com/python-tutorial/starting-a-new-shell/) for details depending on your installation choice). Open each shell and go to the `examples/pony/alerts_stateless` directory.
+You will need four separate shells to run this application (please see [starting a new shell](https://docs.wallaroolabs.com/python-tutorial/starting-a-new-shell/) for details depending on your installation choice). Open each shell and go to the `examples/pony/alerts_stateful` directory.
 
 ### Shell 1: Metrics
 
@@ -89,7 +77,7 @@ data_receiver --ponythreads=1 --ponynoblock --listen 127.0.0.1:7002
 Run the application:
 
 ```bash
-alerts_stateless --out 127.0.0.1:7002 \
+alerts_stateful --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --name worker-name --external 127.0.0.1:5050 --cluster-initializer \
   --ponynoblock

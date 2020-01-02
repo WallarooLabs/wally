@@ -12,7 +12,7 @@ a threshold.
 - pony-stable
 - Wallaroo
         
-See [Wallaroo Environment Setup Instructions](https://docs.wallaroolabs.com/python-installation/).
+See [Wallaroo Environment Setup Instructions](https://docs.wallaroolabs.com/pony-installation/).
 
 ## Building
 
