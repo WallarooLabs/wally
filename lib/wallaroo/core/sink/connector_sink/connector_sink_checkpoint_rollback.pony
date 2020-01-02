@@ -436,6 +436,8 @@ class _CpRbRollingBackResumed is _CpRbOps
         barrier_token.string().cstring(), __loc.type_name().cstring(), __loc.method_name().cstring())
     let txn_id = sink.cprb_make_txn_id_string(barrier_token.id)
     sink.cprb_send_abort_to_barrier_coordinator(barrier_token, txn_id)//TODO//
+    // TODO: Is it really 100% OK to ignore the queued arg?
+    // What if there are barrier tokens in it?
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
 class _CpRbWaitingForCheckpoint is _CpRbOps

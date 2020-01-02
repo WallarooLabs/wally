@@ -42,3 +42,10 @@ class val QueuedBarrier
         _barrier_token.string().cstring())
     end
     b_processor.process_barrier(_input_id, _producer, _barrier_token)
+
+  fun run(b_processor: BarrierProcessor ref) =>
+    ifdef "checkpoint_trace" then
+      @printf[I32]("Injecting queued barrier %s\n".cstring(),
+        _barrier_token.string().cstring())
+    end
+    b_processor.process_barrier(_input_id, _producer, _barrier_token)

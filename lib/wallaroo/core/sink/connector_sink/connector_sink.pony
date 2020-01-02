@@ -308,6 +308,15 @@ actor ConnectorSink is Sink
       Fail()
     end
     end
+    _run[D](metric_name, pipeline_time_spent,
+      data, key, event_ts, watermark_ts, i_producer_id, i_producer, msg_uid,
+      frac_ids, i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
+
+  fun ref _run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
+    key: Key, event_ts: U64, watermark_ts: U64, i_producer_id: RoutingId,
+    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
+    i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
     _phase.process_message[D](metric_name, pipeline_time_spent,
       data, key, event_ts, watermark_ts, i_producer_id, i_producer, msg_uid,
       frac_ids, i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
@@ -572,10 +581,16 @@ actor ConnectorSink is Sink
       match q
       | let qm: QueuedMessage =>
         if not discard_app_msgs then
-          qm.process_message(this)
+          // We cannot use qm.process_message(this), because that
+          // function will unconditionally process the message and may
+          // cause a message ordering violation wrt barriers!  Earlier
+          // in this func, we may have injected a barrier, and we must
+          // honor the processing semantics of that barrier and all
+          // messages that follow it.
+          qm.run(this)
         end
       | let qb: QueuedBarrier =>
-        qb.inject_barrier(this)
+        qb.run(this)
       end
     end
 
