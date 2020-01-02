@@ -12,7 +12,7 @@ are tallied across workers.
 - pony-stable
 - Wallaroo
         
-See [Wallaroo Environment Setup Instructions](https://docs.wallaroolabs.com/python-installation/).
+See [Wallaroo Environment Setup Instructions](https://docs.wallaroolabs.com/pony-installation/).
 
 ## Building
 
@@ -36,7 +36,7 @@ objects.
 
 ## Running Alerts
 
-You will need four separate shells to run this application (please see [starting a new shell](https://docs.wallaroolabs.com/python-tutorial/starting-a-new-shell/) for details depending on your installation choice). Open each shell and go to the `examples/pony/alerts_stateless` directory.
+You will need four separate shells to run this application (please see [starting a new shell](https://docs.wallaroolabs.com/python-tutorial/starting-a-new-shell/) for details depending on your installation choice). Open each shell and go to the `examples/pony/alerts_local_aggregations` directory.
 
 ### Shell 1: Metrics
 

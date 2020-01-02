@@ -8,7 +8,7 @@ This is an example application that will passthrough the input messages as-is.
 - pony-stable
 - Wallaroo
 
-See [Wallaroo Environment Setup Instructions](https://docs.wallaroolabs.com/python-installation/).
+See [Wallaroo Environment Setup Instructions](https://docs.wallaroolabs.com/pony-installation/).
 
 ## Building
 
