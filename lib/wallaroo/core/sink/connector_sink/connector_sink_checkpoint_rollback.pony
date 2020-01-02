@@ -357,6 +357,17 @@ class _CpRbPreparedForRollback is _CpRbOps
   =>
     _CpRbTransition(this, _CpRbRollingBack(barrier_token), sink)
 
+  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref) =>
+    // We arrive here by an interesting race: 1. prepare_for_rollback,
+    // 2. rollback, then 3. a 2nd prepare_for_rollback gets us to this
+    // FSM state.  However, the rollback @ step 2 has proceeded far
+    // enough that a RollbackResumeBarrierToken starts flowing through
+    // the system.  The events that triggered step 3 do not remove the
+    // RollbackResumeBarrierToken from the system.  This method is when
+    // that RollbackResumeBarrierToken has finished at this sink.
+    @l(Log.info(), Log.conn_sink(), "Ignoring rollbackresume_barrier_complete event".cstring())
+    this
+
 class _CpRbRollingBack is _CpRbOps
   let _barrier_token: CheckpointBarrierToken
 

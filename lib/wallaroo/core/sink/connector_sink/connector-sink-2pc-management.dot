@@ -28,6 +28,7 @@ digraph mashup {
             RollingBackResumed [label="RollingBackResumed\nexit:\nack rollback barrier to barrier coordinator\nsend advertise_status=true"];
 
             PreparedForRollback -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
+            PreparedForRollback -> PreparedForRollback [label="rollbackresume_barrier_complete"];
             PreparedForRollback -> RollingBack [label="rollback",fontcolor=red,color=red];
 	}
 
