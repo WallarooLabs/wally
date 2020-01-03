@@ -31,10 +31,10 @@ identifier = "core-concepts"
 url = "/core-concepts"
 
 [[menu.toc]]
-name = "Python Installation Guide"
+name = "Installation Guide"
 weight = 2
-identifier = "pyinstallation"
-url = "/python-installation"
+identifier = "ponyinstallation"
+url = "/pony-installation"
 
 [[menu.toc]]
 name = "Python Tutorial"
@@ -61,7 +61,7 @@ weight = 1
 
 [[menu.main]]
 name = "Installation"
-url = "/python-installation/"
+url = "/pony-installation/"
 weight = 10
 
 [[menu.main]]
