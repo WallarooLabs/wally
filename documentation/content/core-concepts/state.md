@@ -28,10 +28,10 @@ So what is a state object? Let's explain via an example. Imagine we are writing 
 
 Wallaroo allows you to define your own state objects that match your domain. For example, our example application might define a state object as:
 
-```python
-class Stock(object):
-    last_price_seen = None
-    highest_price_seen = 0.0
+```
+class Stock is State
+  var last_price_seen: F64 = 0.0
+  var highest_price_seen: F64 = 0.0
 ```
 
 State objects can be arbitrarily complex. Our example is two fields. If your application required it, you could build a deeply nested series of objects.
