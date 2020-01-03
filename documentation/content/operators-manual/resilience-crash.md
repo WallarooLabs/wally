@@ -6,7 +6,7 @@ menu:
     weight: 30
 toc: true
 ---
-Wallaroo is designed with built-in resilience. However, since the operations involved with maintaining resilience can impact performance, this mode is off by default. For python users, we provide a separate binary with resilience enabled: `machida-resilience` (and `machida3-resilience` for Python 3) as part of the default installation. For Go and Ponyc users, to enable resilience in a Wallaroo application, the binary needs to be built with `-D resilience` if using the `ponyc` compiler directly, or with `resilience=on` if using our Makefile build system (as is the case with `Machida`).
+Wallaroo is designed with built-in resilience. However, since the operations involved with maintaining resilience can impact performance, this mode is off by default. For Pony users, to enable resilience in a Wallaroo application, the binary needs to be built with `-D resilience` if using the `ponyc` compiler directly, or with `resilience=on` if using our Makefile build system.
 
 ## How Does Wallaroo Implement Resilience
 
@@ -18,11 +18,11 @@ Since recovery involves a rollback to the last successful checkpoint, any data t
 
 When a crashed worker is restarted, if it can find its resilience files in the path specified by `--resilience-dir`, it will automatically start the recovery process. The simplest way to do this is to rerun the worker using the same command it was originally run with.
 
-For example, if we were running the bundled Python example [word_count](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/python/word_count/), this might look something like:
+For example, if we were running the bundled Pony example [word_count](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/pony/word_count/), this might look something like:
 
     ```bash
-    machida-resilience --application-module word_count \
-      --in 'Split and Count'@127.0.0.1:7010 --out 127.0.0.1:7002 \
+    ./word_count --in 'Split and Count'@127.0.0.1:7010 \
+      --out 127.0.0.1:7002 \
       --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
       --my-data 127.0.0.1:6003 --my-control 127.0.0.1:6002 \
       --external 127.0.0.1:5051 \
@@ -34,7 +34,7 @@ For example, if we were running the bundled Python example [word_count](https://
 
 ### Running the resilience example
 
-In order to run the example you will need Machida with resilience enabled, Giles Sender, Data Receiver, and the Cluster Shutdown tool. If you haven't yet set up Wallaroo, please visit our [setup](/python-installation/) instructions to get started.
+In order to run the example you will need the Word Count binary compiled with resilience enabled, Giles Sender, Data Receiver, and the Cluster Shutdown tool. If you haven't yet set up Wallaroo, please visit our [setup](/pony-installation/) instructions to get started.
 
 #### Starting new shells
 
@@ -44,7 +44,7 @@ For each shell you're expected to setup, you'd have to run the following to conf
 ```bash
 cd ~/wallaroo-tutorial/wallaroo-{{% wallaroo-version %}}
 source bin/activate
-cd examples/python/word_count
+cd examples/pony/word_count
 ```
 
 1. Create the path where the workers will save their resilience snapshots.
@@ -85,10 +85,11 @@ cd examples/python/word_count
     data_receiver --listen 127.0.0.1:7002 | tee received.txt
     ```
 
-4. Shell 2: Start initializer (remember to use `machida3-resilience` if using Python 3)
+4. Shell 2: Start initializer
+
     ```bash
-    machida-resilience --application-module word_count \
-      --in 'Split and Count'@127.0.0.1:7010 --out 127.0.0.1:7002 \
+    ./word_count --in 'Split and Count'@127.0.0.1:7010 \
+      --out 127.0.0.1:7002 \
       --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
       --data 127.0.0.1:6001 --external 127.0.0.1:5050 \
       --name initializer --cluster-initializer --worker-count 2 \
@@ -97,11 +98,11 @@ cd examples/python/word_count
       | tee initializer.log
     ```
 
-5. Shell 3: Start worker (remember to use `machida3-resilience` if using Python 3)
+5. Shell 3: Start worker
 
     ```bash
-    machida-resilience --application-module word_count \
-      --in 'Split and Count'@127.0.0.1:7010 --out 127.0.0.1:7002 \
+    ./word_count --in 'Split and Count'@127.0.0.1:7010 \
+      --out 127.0.0.1:7002 \
       --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
       --my-data 127.0.0.1:6003 --my-control 127.0.0.1:6002 \
       --external 127.0.0.1:5051 \
@@ -124,7 +125,7 @@ cd examples/python/word_count
 9. Shell 4: Kill the worker to simulate a crash (using SIGKILL)
 
     ```bash
-    pkill -f -KILL machida.*worker1
+    pkill -f -KILL word_count.*worker1
     ```
 
 10. Shell 4: Send some data directly to our data receiver to mark in the sink where the crash occurred (for demonstration purposes)
@@ -133,11 +134,11 @@ cd examples/python/word_count
     echo '<<CRASH-and-RECOVER>>' | nc -q1 127.0.0.1 7002
     ```
 
-11. Shell 3: Restart worker1 with the same command we used above, but save its log output to a new file (remember to use `machida3-resilience` if using Python 3)
+11. Shell 3: Restart worker1 with the same command we used above, but save its log output to a new file.
 
     ```bash
-    machida-resilience --application-module word_count \
-      --in 'Split and Count'@127.0.0.1:7010 --out 127.0.0.1:7002 \
+    ./word_count --in 'Split and Count'@127.0.0.1:7010 \
+      --out 127.0.0.1:7002 \
       --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
       --my-data 127.0.0.1:6003 --my-control 127.0.0.1:6002 \
       --external 127.0.0.1:5051 \

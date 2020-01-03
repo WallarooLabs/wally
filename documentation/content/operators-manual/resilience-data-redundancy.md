@@ -14,7 +14,7 @@ As described in the [crash resilience chapter](../resilience-crash/), Wallaroo r
 
 * Source, sink, and pipeline topology information for the cluster's application
 
-* State information for state computations: dynamic keys processed by this worker and user-specified Python/Go/Pony data structures for state computations.
+* State information for state computations: dynamic keys processed by this worker and user-specified Pony data structures for state computations.
 
 If a Wallaroo worker process crashes and restarts, the files in the resilience data directory provide the necessary information to:
 
@@ -22,7 +22,7 @@ If a Wallaroo worker process crashes and restarts, the files in the resilience d
 
 * participate in the Chandy-Lamport snapshot algorithm's recovery procedure to, which rolls back the global cluster state to a well-defined state, and
 
-* reconfigure local state computation actors to restore the app's user-specified Python/Go/Pony data structures to match the global cluster state snapshot
+* reconfigure local state computation actors to restore the app's user-specified Pony data structures to match the global cluster state snapshot
 
 ## Loss of the resilience data directory -> crash recovery is impossible
 
@@ -60,7 +60,7 @@ Recovery from catastrophic failure requires multiple copies of the resilience di
 
 Wallaroo is bundled with a file service, called DOS, that can store many workers' I/O journal files to guard against catastrophe.  One or more DOS servers should be installed on machines or virtual machines that are physically separate from the Wallaroo workers' machines/VMs.
 
-The DOS server program is separate from the Wallaroo worker executable, such as `machida` or `machida3`.  When run, the DOS server listens to TCP port 9999.  The DOS server is capable of managing the I/O journals from several Wallaroo workers.
+The DOS server program is separate from the Wallaroo worker executable, such as `alphabet` or `word_count`.  When run, the DOS server listens to TCP port 9999.  The DOS server is capable of managing the I/O journals from several Wallaroo workers.
 
 Each Wallaroo worker must be compiled with the `resilience=on` option and must use the `--run-with-resilience` flag, the `--resilience-enable-io-journal` flag, and the `--resilience-dos-server hostnameOrIpAddress:9999` flag.
 
@@ -85,7 +85,7 @@ A DOS server may be used by multiple Wallaroo workers.  Each worker will store i
 
 ## Running Wallaroo to use a remote DOS file server (thus enabling data redundancy)
 
-NOTE: The Wallaroo executable (e.g., `machida` or `machida3`) compiled with the `resilience=on` option.
+NOTE: The Wallaroo executable compiled with the `resilience=on` option.
 
 The following command line flags are recommended to enable data redundancy.
 

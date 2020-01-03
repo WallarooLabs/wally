@@ -51,16 +51,6 @@ Wallaroo currently supports one source per pipeline, which is setup by the appli
 
 In order to monitor metrics, the target address for metrics data should be defined via the `--metrics/-m` parameter, using a `host:port` format (e.g. `127.0.0.1:5002`).
 
-## Machida specific parameters
-
-In addition to the Wallaroo command line paramters, Machida, the python-wallaroo interface, takes the additional argument
-
-```bash
-  --application-module *[Specify the Machida application module]
-```
-
-`--application-module` specifies the _name_ that machida will attempt to import as the Python Wallaroo application file. For example, if you write a Python Wallaroo application and save it as `my_application.py`, then you should provide that name to machida as `--application-module my_application`.
-
 ## Resilience
 
 If resilience is turned on, you can optionally specify the target directory for resilience files via the `--resilience-dir/-r` parameter (default is `/tmp`), and whether or not log should be rotated (`--log-rotation`, off by default). If log rotation is enabled, you may also set the file size on which to trigger log rotation (per worker, in bytes). If no file size is set, log rotation will only happen if it is requested via an external control channel message sent to the address specified in the cluster intializer worker's `--external` parameter. If a file size _is_ set, log rotation may trigger if either the log file reaches the specified file size, or if a log rotation is requested for the worker via the external control channel.
@@ -75,7 +65,5 @@ argument:
 ```
 
 If you do not specify the number of `ponythreads`, the process will try to use all available cores.
-
-Since Machida (used for the Python API) is single-threaded, you must run it with `--ponythreads 1` or Machida will refuse to start.
 
 There are additional performance flags`--ponypinasio`, `--ponypin`, and `--ponynoblock` that can be used as part of a high-performance configuration. Documentation on how to configure for best performance is coming soon.
