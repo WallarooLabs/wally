@@ -1,4 +1,4 @@
-# Application Structure
+# Repo Directory Structure
 
 Wallaroo currently exists as a mono-repo. All the source that makes Wallaroo go is in this repo. Let's take a quick walk through what you'll find in each top-level directory:
 
