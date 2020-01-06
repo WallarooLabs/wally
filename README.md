@@ -149,6 +149,8 @@ More information is also on our [blog][blog-link]. There you can find more insig
 
 > Wallaroo currently exists as a mono-repo. All the source that is Wallaroo is located in this repo. See [repo directory structure][repo-directory-structure-link] for more information.
 
+You can also take a look at our [FAQ][faq].
+
 ## Need Help?
 
 Trying to figure out how to get started? Drop us a line:
@@ -173,6 +175,7 @@ Wallaroo is licensed under the [Apache version 2][apache-2-license] license.
 [commercial-support-email]: mailto:sales@wallaroolabs.com
 [contribution-guide]: CONTRIBUTING.md
 [documentation]: https://docs.wallaroolabs.com/
+[faq]: https://wallaroolabs.com/faq
 [group-badge]: https://img.shields.io/badge/mailing%20list-join%20%E2%86%92-%23551A8B.svg
 [group-link]: https://groups.io/g/wallaroo
 [hello-wallaroo-post]: https://blog.wallaroolabs.com/2017/03/hello-wallaroo/
