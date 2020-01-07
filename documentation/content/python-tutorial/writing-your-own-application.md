@@ -1,10 +1,10 @@
 ---
 title: "Writing Your Own Application"
 menu:
-  toc:
+  hidden:
     parent: "pytutorial"
     weight: 20
-toc: true
+toc: false
 ---
 In this section, we will go over the components that are required in order to write a Wallaroo Python application. We will start with the [stateless `alerts.py` application](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/python/alerts_stateless/) from the [examples](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/) section, then move on to an application that maintains and modifies state and uses partitioning to divide its work.
 
@@ -80,7 +80,7 @@ def constant_key(input):
     return "constant"
 ```
 
-We explain `key_by` in more detail and with examples in [Writing Your Own Stateful Application](/python-tutorial/writing-your-own-stateful-application/). 
+We explain `key_by` in more detail and with examples in [Writing Your Own Stateful Application](/python-tutorial/writing-your-own-stateful-application/).
 
 Finally, after adding our computation stage, we add the sink, using a `TCPSinkConfig`:
 
@@ -95,7 +95,7 @@ After Wallaroo has loaded the application's python file, it will try to execute 
 ```python
 def application_setup(args):
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
-    
+
     gen_source = wallaroo.GenSourceConfig("Alerts", TransactionsGenerator())
     transactions = wallaroo.source("Alerts", gen_source)
 

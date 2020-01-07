@@ -1,10 +1,10 @@
 ---
 title: "Wallaroo Python API Classes"
 menu:
-  toc:
+  hidden:
     parent: "pytutorial"
     weight: 70
-toc: true
+toc: false
 ---
 The Wallaroo Python API allows developers to create Wallaroo applications in Python, which can then be run by Machida.
 
@@ -414,7 +414,7 @@ def longest_sentence_and_split_words(data, state):
 
 ### Aggregation
 
-For an overview of what aggregations are and how they must be implemented, see [here](/core-concepts/aggregations). 
+For an overview of what aggregations are and how they must be implemented, see [here](/core-concepts/aggregations).
 
 In order to implement an aggregation, you must create a class that extends `wallaroo.Aggregation`, and you must implement four methods:
 
@@ -422,7 +422,7 @@ In order to implement an aggregation, you must create a class that extends `wall
 
 `update(self, input, acc)`: uses `input` to update the accumulator `acc`.
 
-`combine(self, acc1, acc2)`: returns an accumulator created by combining `acc1` and `acc2`. This operation must be associative, and it must not mutate `acc1` or `acc2`. 
+`combine(self, acc1, acc2)`: returns an accumulator created by combining `acc1` and `acc2`. This operation must be associative, and it must not mutate `acc1` or `acc2`.
 
 `output(self, key, acc)`: produces an output based on the accumulator `acc`. The `key` is passed in from the context in case it is needed when creating the output. This operation must not mutate `acc`.
 

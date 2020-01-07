@@ -1,10 +1,10 @@
 ---
 title: "Running A Wallaroo Application"
 menu:
-  toc:
+  hidden:
     parent: "pytutorial"
     weight: 10
-toc: true
+toc: false
 ---
 {{% note %}}
 You should have already completed the [setup instructions]({{< relref "/python-installation" >}}) in the "Python Installation" guide.

@@ -1,10 +1,10 @@
 ---
 title: "Word Count"
 menu:
-  toc:
+  hidden:
     parent: "pytutorial"
     weight: 40
-toc: true
+toc: false
 ---
 Word count is the canonical streaming data application. It's canonical not because everyone needs to count words but because it's a good platform for demonstrating how to do many of the everyday tasks in a streaming application.
 
@@ -95,7 +95,7 @@ def extract_word(word):
 
 The next three classes are the core of our word counting application. By this point, our messages have been split into individual words and run through our `key_extractor` function and will arrive at a state computation based on which word it is.
 
-Let's take a look at what we have. `count_word` is a state computation. When it's run, we update our `WordTotal` state to reflect the new incoming `word`. Then, it returns the running total for that word. 
+Let's take a look at what we have. `count_word` is a state computation. When it's run, we update our `WordTotal` state to reflect the new incoming `word`. Then, it returns the running total for that word.
 
 ```python
 class WordTotal(object):
