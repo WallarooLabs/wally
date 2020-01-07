@@ -120,4 +120,4 @@ anywhere in the state definition if we don't want to (and in this case we don't 
 
 The complete stateful alerts example is available [here](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/pony/alerts_stateful/). To run it, follow the [Alerts application instructions](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/pony/alerts_stateful/README.md)
 
-To learn how to make your application resilient and able to work across multiple workers, skip ahead to [Inter-worker Serialization and Resilience](/pony-tutorial/interworker-serialization-and-resilience/). Otherwise, continue on to the next section of the tutorial, [Word Count](/pony-tutorial/word-count/).
+To learn how to write one of the canonical streaming data applications, continue on to the next section of the tutorial, [Word Count](/python-tutorial/word-count/).

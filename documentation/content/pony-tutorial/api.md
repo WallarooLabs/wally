@@ -31,7 +31,6 @@ In order to create a Wallaroo application in Pony, you need to create the functi
 * [TCPSource](#tcpsource)
 * [KafkaSource](#kafkasource)
 * [Source Decoder](#source-decoder)
-* [Inter-worker serialization](#inter-worker-serialization)
 
 ### Application Setup
 
@@ -543,8 +542,7 @@ The `TCPSourceConfig` class is used to define the properties of the TCP Source, 
 
 An instance of `TCPSourceConfig` is a required argument of [wallaroo.source](#wallaroo-source-name-source-config).
 
-##### `TCPSourceConfig[InputType].from_options(frame_handler,
-              TCPSourceConfigCLIParser(source, env.args)?)`
+##### `TCPSourceConfig[InputType].from_options(frame_handler, TCPSourceConfigCLIParser(source, env.args)?)`
 
 The class used to define the properties of a Wallaroo TCPSource.
 
