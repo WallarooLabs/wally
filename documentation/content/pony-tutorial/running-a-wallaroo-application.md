@@ -24,6 +24,10 @@ Generally, in order to build a Wallaroo Pony application, the following steps sh
 
 Once loaded, Wallaroo executes `Wallaroo.build_application`, constructs the appropriate topology, and enters a `ready` state where it awaits incoming data to process.
 
+## A Note about Precompiled Tools
+
+There are a set of tools precompiled for you, to make getting started easier. If you have installed Wallaroo as instructed and follow the [Starting a new shell for Wallaroo](/python-tutorial/starting-a-new-shell/) instructions each time you start a new shell, these tools will be available to you in your PATH.
+
 ## Next Steps
 
 To try running an example, go to [the Alerts example application](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/pony/alerts_stateless/) and follow its [instructions](https://github.com/WallarooLabs/wallaroo/tree/{{% wallaroo-version %}}/examples/pony/alerts_stateless/README.md).
