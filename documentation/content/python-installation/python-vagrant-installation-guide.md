@@ -1,10 +1,10 @@
 ---
 title: "Installing with Vagrant"
 menu:
-  toc:
+  hidden:
     parent: "pyinstallation"
     weight: 3
-toc: true
+toc: false
 ---
 To get you up and running quickly with Wallaroo, we have provided a Vagrantfile which includes Wallaroo and related tools needed to run and modify a few example applications. We should warn that this Vagrantfile was created with the intent of getting users started quickly with Wallaroo and is not intended to be suitable for production. Wallaroo in Vagrant runs on Ubuntu Linux Xenial.
 

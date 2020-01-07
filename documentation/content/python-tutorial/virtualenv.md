@@ -1,10 +1,10 @@
 ---
 title: "Wallaroo and Virtualenv"
 menu:
-  toc:
+  hidden:
     parent: "pytutorial"
     weight: 90
-toc: true
+toc: false
 ---
 We recommend using [virtualenv](https://virtualenv.pypa.io/en/stable/) to handle your application's dependencies.
 

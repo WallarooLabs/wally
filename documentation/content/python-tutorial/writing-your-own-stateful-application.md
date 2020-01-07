@@ -1,10 +1,10 @@
 ---
 title: "Writing Your Own Stateful Application"
 menu:
-  toc:
+  hidden:
     parent: "pytutorial"
     weight: 30
-toc: true
+toc: false
 ---
 In this section, we will go over how to write a stateful application with the Wallaroo Python API. If you haven't reviewed the simple stateless Alerts application example yet, you can find it [here](/python-tutorial/writing-your-own-application/).
 
@@ -93,7 +93,7 @@ def application_setup(args):
     return wallaroo.build_application("Alerts (stateful)", pipeline)
 ```
 
-The important difference between this setup and the stateless version from our last example (besides using a state computation rather than a stateless one) is the presence of: 
+The important difference between this setup and the stateless version from our last example (besides using a state computation rather than a stateless one) is the presence of:
 
 ```python
 .key_by(extract_user)

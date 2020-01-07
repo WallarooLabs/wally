@@ -1,10 +1,10 @@
 ---
 title: "Python API Introduction"
 menu:
-  toc:
+  hidden:
     parent: "pytutorial"
     weight: 1
-toc: true
+toc: false
 layout: single
 ---
 The Wallaroo Python API can be used to write Wallaroo applications entirely in Python without needing Java or a JVM. This lets developers quickly get started with Wallaroo by leveraging their existing Python knowledge. There are two different version of Machida, one for Python 2.7 on 64-bit platforms called `machida` and one for Python 3.5+ on 64-bit platforms called `machida3`. If you are using Python 3.5+ then you should substitute `machida3` for `machida` as you follow the instructions in the documentation.

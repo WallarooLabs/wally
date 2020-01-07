@@ -1,10 +1,10 @@
 ---
 title: "TCP Decoders and Encoders"
 menu:
-  toc:
+  hidden:
     parent: "pytutorial"
     weight: 85
-toc: true
+toc: false
 ---
 Earlier, we spoke of [sources and sinks](/core-concepts/) and the role they play in Wallaroo. In this section, we are going to dive more into how you work with sources and sinks. We'll be covering two key concepts: `Decoder`s and `Encoder`s.
 

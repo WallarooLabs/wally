@@ -1,10 +1,10 @@
 ---
 title: "Starting a new shell"
 menu:
-  toc:
+  hidden:
     parent: "pytutorial"
     weight: 100
-toc: true
+toc: false
 ---
 In this section, we're going to review how you can start a new shell for Wallaroo regardless of how you installed it.
 

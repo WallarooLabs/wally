@@ -1,10 +1,10 @@
 ---
 title: "Installing with Wallaroo Up"
 menu:
-  toc:
+  hidden:
     parent: "pyinstallation"
     weight: 4
-toc: true
+toc: false
 ---
 
 ## Supported Systems

@@ -1,10 +1,10 @@
 ---
 title: "Installing with Docker"
 menu:
-  toc:
+  hidden:
     parent: "pyinstallation"
     weight: 2
-toc: true
+toc: false
 ---
 To get you up and running quickly with Wallaroo, we have provided a Docker image which includes Wallaroo and related tools needed to run and modify a few example applications. We should warn that this Docker image was created with the intent of getting users started quickly with Wallaroo and is not intended to be a fully customizable development environment or suitable for production.
 

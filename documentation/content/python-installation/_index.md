@@ -1,10 +1,10 @@
 ---
 title: "Choosing an Installation Option"
 menu:
-  toc:
+  hidden:
     parent: "pyinstallation"
     weight: 1
-toc: true
+toc: false
 layout: single
 ---
 For 64-bit MacOS and Windows users, we provide two different ways for you to install Wallaroo:
