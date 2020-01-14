@@ -20,7 +20,7 @@ When we set out to build Wallaroo, we had several high-level goals in mind:
 - Manage in-memory state for the application
 - Allow applications to scale as needed, even when they are live and up-and-running
 
-You can learn more about [Wallaroo][home-page] from our ["Hello Wallaroo!" blog post][hello-wallaroo-post] and the [Wallaroo overview video][overview-video].
+You can learn more about [Wallaroo][home-page] from our ["Hello Wallaroo!" blog post][hello-wallaroo-post].
 
 ## Getting Started
 
