@@ -7,9 +7,9 @@
 [![GitHub version](https://badge.fury.io/gh/WallarooLabs%2Fwallaroo.svg)](http://badge.fury.io/gh/WallarooLabs%2Fwallaroo)
 [![Groups.io][group-badge]][group-link]
 
-A fast, stream-processing framework. Wallaroo makes it easy to react to data in real-time. By eliminating infrastructure complexity, going from prototype to production has never been simpler.
-
 ## What is Wallaroo?
+
+Wallaroo is a fast, stream-processing framework. Wallaroo makes it easy to react to data in real-time. By eliminating infrastructure complexity, going from prototype to production has never been simpler.
 
 When we set out to build Wallaroo, we had several high-level goals in mind:
 
