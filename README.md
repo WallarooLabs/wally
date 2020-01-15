@@ -74,7 +74,7 @@ actor Main
       end
       Wallaroo.build_application(env, "Word Count", pipeline)
     else
-      @printf[I32]("Couldn't build topology\n".cstring())
+      env.err.print("Couldn't build topology")
     end
 
 primitive Split is StatelessComputation[String, String]
@@ -138,7 +138,6 @@ primitive RunningTotalEncoder
         String().>append(t.word).>append(", ").>append(t.count.string())
           .>append("\n")
       end
-    @printf[I32]("!!%s".cstring(), result.cstring())
     wb.write(result)
 
     wb.done()
