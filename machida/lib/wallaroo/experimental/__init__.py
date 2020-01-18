@@ -139,8 +139,10 @@ class SourceConnector(BaseConnector):
     def connect(self, host=None, port=None):
         while True:
             try:
+                logging.debug("SourceConnector.connect: top")
                 conn = socket.socket()
                 conn.connect( (host or self._host, int(port or self._port)) )
+                logging.debug("SourceConnector: Now connected on socket {}".format(conn.fileno()))
                 self._conn = conn
                 return
             except socket.error as err:
@@ -204,6 +206,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         # live streams for this connection
         self._streams = {}  # {stream_id: {'stream': Stream, 'por': por}}
         self._pending_eos = {}  # {stream_id: point_of_ref}
+        self._retry_notify = {} # {stream_id: Stream}
 
         self.handshake_complete = False
         self.in_buffer = []
@@ -340,6 +343,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             self.set_terminator(4)
 
     def _handle_notify_ack(self, msg):
+        logging.debug("NOTIFYack {}".format(msg))
         old = self._streams.get(msg.stream_id, None)
         if old is not None:
             new = Stream(old.id, old.name, msg.point_of_ref,
@@ -348,6 +352,9 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             self.stream_added(new)
             if new.is_open:
                 self.stream_opened(new)
+            else:
+                logging.info("Stream {} id {} added to _retry_notify".format(old.name, msg.stream_id))
+                self._retry_notify[msg.stream_id] = new
         else:
             # shouldn't get an ack for a stream we never notified
             # but it's not strictly an error, so don't crash
@@ -367,6 +374,12 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 else:
                     new = old
                 self.stream_acked(new)
+        # Use this ack as a substitute for a timer that will
+        # trigger retrying these stream ID notifications.
+        for stream in self._retry_notify.values():
+            logging.info("_retry_notify for {} id {}".format(stream.name, stream.id))
+            self.notify(stream.id, stream.name, stream.point_of_ref)
+        self._retry_notify = {}
 
     ##########################
     # Outoing communications #
@@ -376,6 +389,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self.handshake_complete = False
         while True:
             try:
+                logging.debug("AtLeastOnceSourceConnector.connect: top")
                 conn = socket.socket()
                 conn.connect( (self._host, self._port) )
             except Exception as err:
@@ -408,9 +422,12 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         frame = self._conn.recv(frame_size)
         try:
             self._handle_frame(frame)
+            logging.debug("connect: Socket {} _handle_frame done".format(self._conn.fileno()))
         except Exception as err:
             # close the connection and raise the error
+            logging.debug("Socket {} exception {}".format(self._conn, err))
             self._conn.close()
+            self._conn = None
             raise err
         # set socket to nonblocking
         self._conn.setblocking(0)
@@ -483,6 +500,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             self._conn.close()
         except:
             pass
+        self._conn = None
         self.stopped.set()
 
     def writable(self):
@@ -503,10 +521,10 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 else:
                     raise
             except:
-                raise ProtocolError("Message cannot be sent. Stream ({}) is "
+                raise ProtocolError("Message {} cannot be sent. Stream ({}) is "
                                     "not in an open state. Use notify() to "
                                     "open it."
-                                    .format(msg.stream_id))
+                                    .format(msg, msg.stream_id))
         elif isinstance(msg, cwm.Notify):
             # write the message
             data = cwm.Frame.encode(msg)
@@ -612,7 +630,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
         self.stream_added(new)
 
         # send to wallaroo worker
-        logging.debug("is_open=True but sending NOTIFY: {}".format(cwm.Notify(new.id,                              new.name,                              new.point_of_ref)))
+        logging.debug("sending NOTIFY: {} on {}".format(cwm.Notify(new.id, new.name, new.point_of_ref), self._conn))
         self.write(cwm.Notify(new.id,
                               new.name,
                               new.point_of_ref))
@@ -666,7 +684,8 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             self._host = host
             self._port = port
 
-        self._reconnect_common()
+        # Raise an exception rather than burrow down the stack even further.
+        raise OSError(socket.errno.ECONNRESET)
 
     def _close_common(self):
         # reset credits
@@ -696,16 +715,23 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             c = c + 1
         logging.debug("Popping the producer_fifo: count = {}".format(c))
         self.discard_buffers()
+        self._retry_notify = {}
 
     def _reconnect_common(self):
         # try to connect again
         self._in_reconnect_loop = True
         retry_errno = [socket.errno.ECONNREFUSED, socket.errno.ECONNRESET]
         while True:
+            if self._conn is not None:
+                # We are already connected
+                logging.debug("_reconnect_common: already connected with {}".format(self._conn))
+                return
             try:
-                logging.debug("_reconnect_common: top")
+                logging.debug("AtLeastOnceSourceConnector: _reconnect_common: top")
                 self.connect()
+                logging.debug("AtLeastOnceSourceConnector: Now connected on socket {}".format(self._conn.fileno()))
                 self._in_reconnect_loop = False
+                self.handle_restarted(self._streams)
                 break
             except socket.error as err:
                 if err.errno in retry_errno:
@@ -717,7 +743,6 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
             except Exception as err:
                 logging.error("_reconnect_common: connect failed: {}".format(err))
                 raise
-        self.handle_restarted(self._streams)
 
     def handle_close(self):
         logging.error("handle_close")
