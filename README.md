@@ -9,7 +9,7 @@
 
 ## What is Wallaroo?
 
-Wallaroo is a fast, stream-processing framework. Wallaroo makes it easy to react to data in real-time. By eliminating infrastructure complexity, going from prototype to production has never been simpler.
+Wallaroo is a fast stream-processing framework. Wallaroo makes it easy to react to data in real-time. By eliminating infrastructure complexity, going from prototype to production has never been simpler.
 
 When we set out to build Wallaroo, we had several high-level goals in mind:
 
