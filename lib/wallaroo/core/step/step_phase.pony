@@ -26,8 +26,8 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/rebalancing"
 use "wallaroo/core/recovery"
 use "wallaroo/core/topology"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
-
 
 trait StepPhase
   fun name(): String
@@ -104,8 +104,10 @@ trait StepPhase
     step.finish_disposing()
 
   fun _invalid_call(method_name: String) =>
-    @printf[I32]("Invalid call to %s on step phase %s\n".cstring(),
+    @l(Log.err(), Log.step(), "Invalid call to %s on step phase %s".cstring(),
       method_name.cstring(), name().cstring())
+
+  fun ref step_waiting_report(inputs: Map[RoutingId, Producer] box): String val => "n/a"
 
 class _InitialStepPhase is StepPhase
   fun name(): String => __loc.type_name()
@@ -115,6 +117,7 @@ class _NormalStepPhase is StepPhase
 
   new create(s: Step ref) =>
     _step = s
+    @l(Log.debug(), Log.step(), "New %s".cstring(), name().cstring())
 
   fun name(): String => __loc.type_name()
 
@@ -158,6 +161,7 @@ class _BarrierStepPhase is StepPhase
     _step = s
     _step_id = s_id
     _barrier_token = token
+    @l(Log.debug(), Log.step(), "New %s".cstring(), name().cstring())
 
   fun name(): String => __loc.type_name()
 
@@ -206,7 +210,7 @@ class _BarrierStepPhase is StepPhase
     else
       ifdef debug then
         if barrier_token > _barrier_token then
-          @printf[I32](("Invariant violation: received barrier %s is " +
+          @l(Log.err(), Log.step(), ("Invariant violation: received barrier %s is " +
             "greater than current barrier %s at Step %s\n").cstring(),
             barrier_token.string().cstring(),
             _barrier_token.string().cstring(), _step_id.string().cstring())
@@ -217,7 +221,7 @@ class _BarrierStepPhase is StepPhase
 
       ifdef debug then
         if barrier_token != _barrier_token then
-          @printf[I32]("Received %s when still processing %s at step %s\n"
+          @l(Log.err(), Log.step(), "Received %s when still processing %s at step %s\n"
             .cstring(), barrier_token.string().cstring(),
             _barrier_token.string().cstring(), _step_id.string().cstring())
           Fail()
@@ -230,7 +234,7 @@ class _BarrierStepPhase is StepPhase
         check_completion(inputs)
       else
         if not _removed_inputs.contains(input_id) then
-          @printf[I32]("%s: Step %s doesn't know about %s\n".cstring(),
+          @l(Log.err(), Log.step(), "%s: Step %s doesn't know about %s".cstring(),
             barrier_token.string().cstring(), _step_id.string().cstring(),
             input_id.string().cstring())
           Fail()
@@ -240,7 +244,19 @@ class _BarrierStepPhase is StepPhase
 
   fun ref prepare_for_rollback(token: BarrierToken) =>
     if higher_priority(token) then
-      _step.finish_preparing_for_rollback(token)
+      let new_phase = match token
+        | let crbt: CheckpointRollbackBarrierToken =>
+          @l(Log.debug(), Log.step(), "prepare_for_rollback, override by %s".cstring(), token.string().cstring())
+          _BarrierStepPhase(_step, _step_id, crbt)
+        else
+          // Avoid phase "shear" here: we are in the middle of
+          // processing a barrier. If we switch phase now, then
+          // processing of our barrier will fail because the switch
+          // discards token counting history.
+          @l(Log.debug(), Log.step(), "prepare_for_rollback: shear avoided".cstring())
+          this
+        end
+      _step.finish_preparing_for_rollback(token, new_phase)
     end
 
   fun ref remove_input(input_id: RoutingId) =>
@@ -263,6 +279,7 @@ class _BarrierStepPhase is StepPhase
     check_completion(_step.inputs())
 
   fun ref check_completion(inputs: Map[RoutingId, Producer] box) =>
+    @l(Log.debug(), Log.step(), "StepPhase.check_completion: inputs %lu _inputs_blocking %lu".cstring(), inputs.size(), _inputs_blocking.size())
     if inputs.size() == _inputs_blocking.size()
     then
       for (o_id, o) in _step.outputs().pairs() do
@@ -278,6 +295,16 @@ class _BarrierStepPhase is StepPhase
       _step.barrier_complete(b_token)
     end
 
+  fun ref step_waiting_report(inputs: Map[RoutingId, Producer] box): String val =>
+    let res: String trn = recover res.create() end
+
+    for i in inputs.keys() do
+      if not _inputs_blocking.contains(i) then
+        res.append("," + i.string())
+      end
+    end
+    consume res
+
 class _RecoveringStepPhase is StepPhase
   let _step: Step ref
   let _token: (CheckpointRollbackBarrierToken | None)
@@ -287,6 +314,7 @@ class _RecoveringStepPhase is StepPhase
   =>
     _step = s
     _token = token
+    @l(Log.debug(), Log.step(), "New %s".cstring(), name().cstring())
 
   fun name(): String => __loc.type_name()
 
@@ -312,12 +340,13 @@ class _RecoveringStepPhase is StepPhase
   fun ref receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    @printf[I32]("Ignoring non-rollback barrier %s in _RecoveringStepPhase\n"
+    @l(Log.info(), Log.step(), "Ignoring non-rollback barrier %s in _RecoveringStepPhase\n"
       .cstring(), barrier_token.string().cstring())
 
   fun ref prepare_for_rollback(token: BarrierToken) =>
     if higher_priority(token) then
-      _step.finish_preparing_for_rollback(token)
+      @l(Log.debug(), Log.step(), "prepare_for_rollback: shear possible, but we must switch phase".cstring())
+      _step.finish_preparing_for_rollback(token, _NormalStepPhase(_step))
     end
 
   fun ref queued(): Array[_Queued] =>
@@ -337,6 +366,9 @@ class _DisposedStepPhase is StepPhase
     metrics_id: U16, worker_ingress_ts: U64)
   =>
     None
+
+  new create() =>
+    @l(Log.debug(), Log.step(), "New %s".cstring(), name().cstring())
 
   fun name(): String => __loc.type_name()
 

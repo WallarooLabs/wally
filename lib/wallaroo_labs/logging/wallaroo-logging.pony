@@ -68,6 +68,7 @@ primitive Log
   fun local_stream_registry(): LogCategory => LogCategory(10).shl(8)
   fun routing(): LogCategory          => LogCategory(11).shl(8)
   fun boundary(): LogCategory         => LogCategory(12).shl(8)
+  fun step(): LogCategory             => LogCategory(13).shl(8)
   fun max_category(): LogCategory     => LogCategory(40).shl(8)
   fun manual_category(n: U16): LogCategory  => LogCategory(n).shl(8)
 
@@ -99,6 +100,7 @@ primitive Log
       (default_severity(), local_stream_registry(), "LocalStreamRegistry")
       (default_severity(), routing(),          "Routing")
       (default_severity(), boundary(),         "Boundary")
+      (default_severity(), step(),             "Step")
     ] // END category_map
 
   fun set_defaults() =>

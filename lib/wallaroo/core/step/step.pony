@@ -42,7 +42,10 @@ use "wallaroo/core/state"
 use "wallaroo/core/topology"
 use "wallaroo/core/windows"
 use "wallaroo_labs/collection_helpers"
+use "wallaroo_labs/logging"
 use "wallaroo_labs/mort"
+
+use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag, ...)
 
 actor Step is (Producer & Consumer & BarrierProcessor)
   let _auth: AmbientAuth
@@ -131,8 +134,16 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
 
     ifdef "identify_routing_ids" then
-      @printf[I32]("===Step %s created===\n".cstring(),
+      @l(Log.info(), Log.step(), "===Step %s created===".cstring(),
         _id.string().cstring())
+
+      let timer = Timer(_StepWaitingReportTimer(this), 500_000_000, 500_000_000)
+      _timers(consume timer)
+    end
+
+  be step_waiting_report() =>
+    ifdef "checkpoint_trace" then
+      @l(Log.debug(), Log.step(), "step_waiting_report: id %s: %s".cstring(), _id.string().cstring(), _phase.step_waiting_report(_inputs).cstring())
     end
 
   //
@@ -287,7 +298,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef "trace" then
-      @printf[I32]("Received msg at Step\n".cstring())
+      @l(Log.debug(), Log.step(), "Received msg at Step".cstring())
     end
     _phase.run[D](metric_name, pipeline_time_spent, data, key,
       event_ts, watermark_ts, i_producer_id, i_producer, msg_uid, frac_ids,
@@ -321,7 +332,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       end
 
     ifdef "trace" then
-      @printf[I32](("Rcvd msg at " + _runner.name() + " step\n").cstring())
+      @l(Log.debug(), Log.step(), ("Rcvd msg at " + _runner.name() + " step\n").cstring())
     end
 
     (let is_finished, let last_ts) = _runner.run[D](metric_name,
@@ -331,7 +342,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
 
     if is_finished then
       ifdef "trace" then
-        @printf[I32]("Filtering\n".cstring())
+        @l(Log.debug(), Log.step(), "Filtering".cstring())
       end
 
       let end_ts = WallClock.nanoseconds()
@@ -391,7 +402,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
         | let ob: OutgoingBoundary => b_count = b_count + 1
         end
       end
-      @printf[I32]("Step %s has %s boundaries.\n".cstring(), _id.string().cstring(), b_count.string().cstring())
+      @l(Log.info(), Log.step(), "Step %s has %s boundaries.".cstring(), _id.string().cstring(), b_count.string().cstring())
     end
 
   be mute(c: Consumer) =>
@@ -412,7 +423,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     _phase.dispose(this)
 
   fun ref finish_disposing() =>
-    @printf[I32]("Disposing Step %s\n".cstring(), _id.string().cstring())
+    @l(Log.info(), Log.step(), "Disposing Step %s".cstring(), _id.string().cstring())
     _event_log.unregister_resilient(_id, this)
     _unregister_all_outputs()
     _timers.dispose()
@@ -426,7 +437,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     ifdef "autoscale" then
       StepStateMigrator.receive_state(this, _runner, step_group, key,
         state_bytes)
-      @printf[I32]("Received state for step %s\n".cstring(),
+      @l(Log.info(), Log.step(), "Received state for step %s".cstring(),
         _id.string().cstring())
     end
 
@@ -445,7 +456,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     barrier_token: BarrierToken)
   =>
     ifdef "checkpoint_trace" then
-      @printf[I32]("Step %s received barrier %s from %s\n".cstring(),
+      @l(Log.debug(), Log.step(), "Step %s received barrier %s from %s".cstring(),
         _id.string().cstring(), barrier_token.string().cstring(),
         step_id.string().cstring())
     end
@@ -456,7 +467,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   =>
     if _inputs.contains(step_id) then
       ifdef "checkpoint_trace" then
-        @printf[I32]("Process Barrier %s at Step %s from %s\n".cstring(),
+        @l(Log.debug(), Log.step(), "Process Barrier %s at Step %s from %s".cstring(),
           barrier_token.string().cstring(), _id.string().cstring(),
           step_id.string().cstring())
       end
@@ -478,7 +489,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       _phase.receive_barrier(step_id, producer,
           barrier_token)
     else
-      @printf[I32](("Received barrier from unregistered input %s at step " +
+      @l(Log.info(), Log.step(), ("Received barrier from unregistered input %s at step " +
         "%s. \n").cstring(), step_id.string().cstring(),
         _id.string().cstring())
     end
@@ -486,12 +497,17 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   fun ref receive_new_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
+    ifdef "checkpoint_trace" then
+      @l(Log.debug(), Log.step(), "Receive New Barrier %s at Step %s from %s".cstring(),
+        barrier_token.string().cstring(), _id.string().cstring(),
+        input_id.string().cstring())
+    end
     _phase = _BarrierStepPhase(this, _id, barrier_token)
     _phase.receive_barrier(input_id, producer, barrier_token)
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
     ifdef "checkpoint_trace" then
-      @printf[I32]("Barrier %s complete at Step %s\n".cstring(),
+      @l(Log.debug(), Log.step(), "Barrier %s complete at Step %s".cstring(),
         barrier_token.string().cstring(), _id.string().cstring())
     end
     match barrier_token
@@ -526,10 +542,13 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
 
   be prepare_for_rollback() =>
-    finish_preparing_for_rollback(None)
+    finish_preparing_for_rollback(None, _phase)
 
-  fun ref finish_preparing_for_rollback(token: (BarrierToken | None)) =>
-    _phase = _NormalStepPhase(this)
+  fun ref finish_preparing_for_rollback(token: (BarrierToken | None),
+    new_phase: StepPhase)
+  =>
+    @l(Log.debug(), Log.step(), "StepPhase Id %s change line %lu current _phase type %s new_phase type %s".cstring(), _id.string().cstring(), __loc.line(), _phase.name().cstring(), new_phase.name().cstring())
+    _phase = new_phase
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
@@ -577,4 +596,14 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     else
       Fail()
     end
+
+class _StepWaitingReportTimer is TimerNotify
+  let _step: Step
+
+  new iso create(step: Step) =>
+    _step = step
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    _step.step_waiting_report()
+    true
 
