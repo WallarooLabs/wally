@@ -67,11 +67,14 @@ trait _CpRbOps
   fun ref prepare_for_rollback(sink: ConnectorSink ref) =>
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
-  fun ref rollback(sink: ConnectorSink ref,
-    barrier_token: CheckpointBarrierToken) =>
+  fun ref rollback_barrier_complete(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken)
+  =>
     _invalid_call(__loc.method_name()); Fail()
 
-  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref) =>
+  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken)
+  =>
     _invalid_call(__loc.method_name()); Fail()
 
   fun _invalid_call(method_name: String) =>
@@ -154,7 +157,7 @@ class _CpRbAbortCheckpoint is _CpRbOps
   // is prepare_for_rollback; the trait's default implementation is
   // sufficient for us.
 
-  fun ref rollback(sink: ConnectorSink ref,
+  fun ref rollback_barrier_complete(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken)
   =>
     @ll(_debug, "Rollback: at %s!".cstring(), __loc.type_name().cstring())
@@ -184,7 +187,7 @@ class _CpRbCPGotLocalCommit is _CpRbOps
       Fail()
     end
     let txn_id = sink.cprb_make_txn_id_string(_barrier_token.id)
-    sink.cprb_send_2pc_phase2(txn_id, true)
+    sink.cprb_send_2pc_phase2(txn_id, true, false)
 
     if sink._get_cprb_member() is this then
       _CpRbTransition(this, _CpRbWaitingForCheckpoint, sink)
@@ -307,7 +310,7 @@ class _CpRbInit is _CpRbOps
 
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
-  fun ref rollback(sink: ConnectorSink ref,
+  fun ref rollback_barrier_complete(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken)
   =>
     // We are very early in the startup process and are recovering.
@@ -323,6 +326,23 @@ class _CpRbInit is _CpRbOps
     _ChangeSinkPhaseQueueMsgsForwardTokens(sink)
 
     _CpRbTransition(this, _CpRbRollingBack(barrier_token, true), sink)
+
+  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken)
+   =>
+    // We are very early in the startup process and are recovering.
+    // Let's resume roll back.
+
+    @ll(_debug, "Rollback resume: at %s!".cstring(), __loc.type_name().cstring())
+    // Do not call cprb_send_advertise_status() here
+
+    // However, we need to change phase first, because we're queuing
+    // but without forwarding tokens, and we need forwarding tokens now.
+    // Switch to normal processing, and then immediately change it again.
+    sink.open_valve()
+    _ChangeSinkPhaseQueueMsgsForwardTokens(sink)
+
+    _CpRbTransition(this, _CpRbRollingBackResumed(barrier_token), sink)//wwww
 
 class _CpRbPreparedForRollback is _CpRbOps
   let _debug: LogSevCat = Log.make_sev_cat(Log.debug(), Log.conn_sink())
@@ -347,12 +367,14 @@ class _CpRbPreparedForRollback is _CpRbOps
       "cp_barrier_complete: sneaky timer + barrier race for %s".cstring(), barrier_token.string().cstring())
     this
 
-  fun ref rollback(sink: ConnectorSink ref,
+  fun ref rollback_barrier_complete(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken)
   =>
     _CpRbTransition(this, _CpRbRollingBack(barrier_token, false), sink)
 
-  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref) =>
+  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken)
+   =>
     // We arrive here by an interesting race: 1. prepare_for_rollback,
     // 2. rollback, then 3. a 2nd prepare_for_rollback gets us to this
     // FSM state.  However, the rollback @ step 2 has proceeded far
@@ -360,10 +382,16 @@ class _CpRbPreparedForRollback is _CpRbOps
     // the system.  The events that triggered step 3 do not remove the
     // RollbackResumeBarrierToken from the system.  This method is when
     // that RollbackResumeBarrierToken has finished at this sink.
-    @l(Log.info(), Log.conn_sink(), "Ignoring rollbackresume_barrier_complete event".cstring())
+    @l(Log.info(), Log.conn_sink(), "Ignoring rollbackresume_barrier_complete for Id %s".cstring(), barrier_token.string().cstring())
     this
 
 class _CpRbRollingBack is _CpRbOps
+  """
+  This FSM state is entered when ConnectorSink has received a complete
+  CheckpointRollbackBarrierToken.  This event happens prior to Wallaroo
+  actually telling ConnectorSink to rollback via the rollback() behavior!
+  """
+
   let _debug: LogSevCat = Log.make_sev_cat(Log.debug(), Log.conn_sink())
   let _barrier_token: CheckpointBarrierToken
   let _force_close: Bool
@@ -390,12 +418,14 @@ class _CpRbRollingBack is _CpRbOps
 
     sink.cprb_send_rollback_info(_barrier_token)
 
-  fun ref rollback(sink: ConnectorSink ref,
+  fun ref rollback_barrier_complete(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken)
   =>
     _CpRbTransition(this, _CpRbRollingBack(barrier_token, false), sink)
 
-  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref) =>
+  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken)
+  =>
     _CpRbTransition(this, _CpRbRollingBackResumed(_barrier_token), sink)
 
 class _CpRbRollingBackResumed is _CpRbOps
@@ -438,7 +468,7 @@ class _CpRbRollingBackResumed is _CpRbOps
 
     _CpRbTransition(this, _CpRbPreparedForRollback, sink)
 
-  fun ref rollback(sink: ConnectorSink ref,
+  fun ref rollback_barrier_complete(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken)
   =>
     _CpRbTransition(this, _CpRbRollingBack(barrier_token, false), sink)
@@ -461,13 +491,19 @@ class _CpRbWaitingForCheckpoint is _CpRbOps
   fun ref prepare_for_rollback(sink: ConnectorSink ref) =>
     _CpRbTransition(this, _CpRbPreparedForRollback(where shear_risk=true), sink)
 
-  fun ref rollback(sink: ConnectorSink ref,
+  fun ref rollback_barrier_complete(sink: ConnectorSink ref,
     barrier_token: CheckpointBarrierToken)
   =>
     @ll(_debug, "Rollback: at %s!".cstring(), __loc.type_name().cstring())
     sink.cprb_send_advertise_status(false)
     _ChangeSinkPhaseQueueMsgsForwardTokens(sink)
     _CpRbTransition(this, _CpRbRollingBack(barrier_token, true), sink)
+
+  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken)
+   =>
+    @ll(_debug, "Rollback resume: at %s for Id %s".cstring(), __loc.type_name().cstring(), barrier_token.string().cstring())
+    None
 
 primitive _ChangeSinkPhaseQueueMsgsForwardTokens
   fun apply(sink: ConnectorSink ref) =>

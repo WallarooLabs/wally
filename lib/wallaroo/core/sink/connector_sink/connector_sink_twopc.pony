@@ -75,7 +75,8 @@ class ConnectorSink2PC
     txn_id = tid
     current_txn_end_offset = current_offset
 
-  fun ref send_phase2(sink: ConnectorSink ref, tid: String, commit: Bool)
+  fun ref send_phase2(sink: ConnectorSink ref, tid: String, commit: Bool,
+    is_rolling_back: Bool)
   =>
     let bs: Array[U8] val = TwoPCEncode.phase2(tid, commit)
     let msg: cwm.MessageMsg = cwm.MessageMsg(0, 0, 0, None, bs)
@@ -84,7 +85,11 @@ class ConnectorSink2PC
     clear_txn_id()
     if commit then
       last_offset = current_txn_end_offset
-      if last_offset != current_offset then
+      // This sanity check does not apply if we are rolling back. The
+      // current_offset counter may have advanced, and we haven't
+      // received the rollback payload yet to reset that counter, but
+      // right now we need to commit this 2PC txn without crashing.
+      if (not is_rolling_back) and (last_offset != current_offset) then
         @ll(_twopc_err, "Offset error during txn: last_offset %lu current_offset %lu".cstring(), last_offset, current_offset)
         Fail()
       end

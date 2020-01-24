@@ -7,7 +7,7 @@ digraph mashup {
 
 	// Subgraphs
 	subgraph init {
-        ChRbInit [label="ChRbInit\nenter:\nsink valve=closed + no token forwarding"];
+        ChRbInit [label="ChRbInit\nenter:\nsink valve=closed + forward tokens"];
 	}
 	subgraph cp {
         WaitingForCheckpoint [label="WaitingForCheckpoint\nenter:\nsink valve=open"];
@@ -29,7 +29,7 @@ digraph mashup {
 
         PreparedForRollback -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
         PreparedForRollback -> PreparedForRollback [label="rollbackresume_barrier_complete"];
-        PreparedForRollback -> RollingBack [label="rollback",fontcolor=red,color=red];
+        PreparedForRollback -> RollingBack [label="rollback_barrier_complete",fontcolor=red,color=red];
 	}
 
 	// Other Edges
@@ -38,24 +38,26 @@ digraph mashup {
 	ChRbInit -> ChRbInit [label="checkpoint_complete"];
     ChRbInit -> ChRbInit [label="cp_barrier_complete\nack barrier if id=1 else wait"];
 	ChRbInit -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
-	ChRbInit -> RollingBack [label="rollback",fontcolor=red,color=red];
+	ChRbInit -> RollingBack [label="rollback_barrier_complete",fontcolor=red,color=red];
+	ChRbInit -> RollingBackResumed [label="rollbackresume_barrier_complete",fontcolor=red,color=red];
 
 	WaitingForCheckpoint -> CPStarts [label="cp_barrier_complete"];
 	AbortCheckpoint -> AbortCheckpoint [label="cp_barrier_complete"];
 	AbortCheckpoint -> AbortCheckpoint [label="phase1_abort"];
-	AbortCheckpoint -> RollingBack [label="rollback",fontcolor=red,color=red];
+	AbortCheckpoint -> RollingBack [label="rollback_barrier_complete",fontcolor=red,color=red];
 
 	WaitingForCheckpoint -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
+    WaitingForCheckpoint -> WaitingForCheckpoint [label="rollbackresume_barrier_complete\nracing with restart & crash recovery"];
 	AbortCheckpoint -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
 	CPStarts -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
 	CPGotLocalCommit -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
 
 	WaitingForCheckpoint -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
-	WaitingForCheckpoint -> RollingBack [label="rollback",fontcolor=red,color=red];
+	WaitingForCheckpoint -> RollingBack [label="rollback_barrier_complete",fontcolor=red,color=red];
 	CPStarts -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
 	CPGotLocalCommit -> AbortCheckpoint [label="abort_next_checkpoint\nfrom ExtConn",fontcolor=red,color=red];
 
-	RollingBack -> RollingBack [label="rollback",fontcolor=red,color=red];
+	RollingBack -> RollingBack [label="rollback_barrier_complete",fontcolor=red,color=red];
 	RollingBack -> RollingBackResumed [label="rollbackresume_barrier_complete\nRACE HERE WITH\nUNMUTING SOURCES\nPRESERVE APP MSGS"];
 	RollingBack -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
 
@@ -63,7 +65,7 @@ digraph mashup {
 	RollingBackResumed -> WaitingForCheckpoint [label="conn_ready"];
 	RollingBackResumed -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
 	RollingBackResumed -> PreparedForRollback [label="cp_barrier_complete\nCHECKPOINT ATTEMPT while not connected"];
-	RollingBackResumed -> RollingBack [label="rollback"];
+	RollingBackResumed -> RollingBack [label="rollback_barrier_complete"];
     }
     ## END LEFT
 

@@ -54,9 +54,6 @@ trait SinkPhase
     _invalid_call(__loc.method_name()); Fail()
     Array[SinkPhaseQueued]
 
-  fun ref drop_app_msgs() =>
-    _invalid_call(__loc.method_name()); Fail()
-
   fun ref maybe_use_normal_processor() =>
     None
 
@@ -112,9 +109,6 @@ class NormalSinkPhase is SinkPhase
 
   fun ref queued(): Array[SinkPhaseQueued] =>
     Array[SinkPhaseQueued]
-
-  fun ref drop_app_msgs() =>
-    None
 
 type SinkPhaseQueued is (QueuedMessage | QueuedBarrier)
 
@@ -215,19 +209,3 @@ class BarrierSinkPhase is SinkPhase
     if inputs.size() == _inputs_blocking.size() then
       _sink.barrier_complete(_barrier_token)
     end
-
-  fun ref drop_app_msgs() =>
-    let new_queue = Array[SinkPhaseQueued]
-    var count: USize = 0
-
-    for q in _queued.values() do
-      match q
-      | let qb: QueuedBarrier =>
-        new_queue.push(qb)
-      | let qm: QueuedMessage =>
-        count = count + 1
-      end
-    end
-    @l(Log.debug(), Log.conn_sink(), "%s: drop_app_msgs: count %lu new size %lu".cstring(),
-      __loc.type_name().cstring(), count, new_queue.size())
-    _queued = new_queue
