@@ -372,7 +372,7 @@ class _ExtConnWaitingForRollbackPayload is _ExtConnOps
         @l(Log.info(), Log.conn_sink(), "Uncommitted decision = %s for uncommitted %s committed %s".cstring(),
           decision.string().cstring(), precommitted_txn_id.cstring(),
           commited_txn_id.cstring())
-        sink.cprb_send_2pc_phase2(precommitted_txn_id, decision)
+        sink.cprb_send_2pc_phase2(precommitted_txn_id, decision, true)
       end
     end
     if sink._get_ec_member() is this then

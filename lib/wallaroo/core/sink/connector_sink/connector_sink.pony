@@ -284,7 +284,7 @@ actor ConnectorSink is Sink
     // this is now fully initialized, reset to a real phase then enter FSMs
     _ec.enter(this, _ec)
     _phase = NormalSinkPhase(this)
-    _valve = ClosedSinkValve(this where forward_tokens = false)
+    _valve = ClosedSinkValve(this)
 
     // _CpRbInit is the starting state, so we must call enter() ourselves.
     _cprb.enter(this)
@@ -608,12 +608,17 @@ actor ConnectorSink is Sink
       _cprb.cp_barrier_complete(this, sbt)
       ack_now = false
     | let srt: CheckpointRollbackBarrierToken =>
-      // No action required here.  When we ack this token at the end of
-      // this function, Wallaroo will send use the prepare_to_rollback
-      // and rollback messages that we're expecting.
-      None
+      // The EventLog's payload's data doesn't include the last
+      // committed txn_id because at the time that payload was created,
+      // we didn't know if the txn-in-progress had committed globally.
+      // When rollback() is called here, we now know the global txn
+      // commit status: commit for checkpoint_id, all greater are invalid.
+
+      let cbt = CheckpointBarrierToken(srt.checkpoint_id)
+      _cprb.rollback_barrier_complete(this, cbt)
     | let rbrt: CheckpointRollbackResumeBarrierToken =>
-      _cprb.rollbackresume_barrier_complete(this)
+      let cbt = CheckpointBarrierToken(rbrt.checkpoint_id)
+      _cprb.rollbackresume_barrier_complete(this, cbt)
     | let sat: AutoscaleBarrierToken =>
       _twopc_last_autoscale_barrier_token = sat
     | let sart: AutoscaleResumeBarrierToken =>
@@ -724,15 +729,6 @@ actor ConnectorSink is Sink
     _acked_point_of_ref = try r.u64_be()? else Fail(); 0 end
     _message_id = _twopc.last_offset.u64()
     @ll(_conn_debug, "rollback payload for CheckpointId %lu: current_offset %lu _acked_point_of_ref %lu".cstring(), checkpoint_id, current_offset, _acked_point_of_ref)
-
-    // The EventLog's payload's data doesn't include the last
-    // committed txn_id because at the time that payload was created,
-    // we didn't know if the txn-in-progress had committed globally.
-    // When rollback() is called here, we now know the global txn
-    // commit status: commit for checkpoint_id, all greater are invalid.
-
-    let cbt = CheckpointBarrierToken(checkpoint_id)
-    _cprb.rollback(this, cbt)
 
     event_log.ack_rollback(_sink_id)
 
@@ -1315,8 +1311,26 @@ actor ConnectorSink is Sink
     close_valve()
 
   fun ref cprb_drop_app_msgs() =>
-    _phase.drop_app_msgs()
-    _valve.drop_app_msgs()
+    @ll(_conn_debug, "cprb_drop_app_msgs: force phase & valve change".cstring())
+
+    // This function is part of rollback processing.  As part of
+    // rollback, we intentionally discard all data that we may have
+    // queued in various parts of our system.  By switching to normal
+    // phase in this abrupt way, we discard any app msgs that the phase
+    // may have queued.  The phase should *not* have queued any barrier
+    // tokens, because we're processing CheckpointRollbackBarrierToken
+    // at this moment, and Wallaroo should not have injected any other
+    // barrier tokens yet.
+    _phase = NormalSinkPhase(this)
+
+    // Similarly, drop any app messages that may be queued at the
+    // valve stage.  TODO: fix the match hack
+    match _valve
+    | let open: OpenSinkValve =>
+      _valve = OpenSinkValve(this)
+    | let closed: ClosedSinkValve =>
+      _valve = ClosedSinkValve(this)
+    end
 
   fun ref cprb_send_conn_ready() =>
     @ll(_conn_debug, "Send conn_ready to CpRb".cstring())
@@ -1331,10 +1345,13 @@ actor ConnectorSink is Sink
       barrier_token.string().cstring())
     _twopc.send_phase1(this, barrier_token.id)
 
-  fun ref cprb_send_2pc_phase2(txn_id: String, commit: Bool) =>
-    @ll(_twopc_debug, "Send Phase 2 commit=%s for %s".cstring(),
-      commit.string().cstring(), txn_id.cstring())
-    _twopc.send_phase2(this, txn_id, commit)
+  fun ref cprb_send_2pc_phase2(txn_id: String, commit: Bool,
+    is_rolling_back: Bool)
+  =>
+    @ll(_twopc_debug, "Send Phase 2 commit=%s is_rolling_back=%s for %s".cstring(),
+      commit.string().cstring(), is_rolling_back.string().cstring(),
+      txn_id.cstring())
+    _twopc.send_phase2(this, txn_id, commit, is_rolling_back)
 
   fun ref cprb_send_phase1_result(txn_id: String, commit: Bool) =>
     @ll(_twopc_debug, "Got Phase 1 result: commit=%s for %s".cstring(),
@@ -1435,7 +1452,7 @@ actor ConnectorSink is Sink
               // 2. We send phase2=abort.
               // 3. The connector sink decides to send an ACK with p_o_r=4000.
               //    This message is delayed just a little bit to make a race.
-              // 4. We process prepare_to_rollback & rollback.  Our
+              // 4. We process prepare_for_rollback & rollback.  Our
               //    _message_id is reset to _message_id=0.  Wallaroo
               //    has fully rolled back state and is ready to resume
               //    all of its work from offset=0.
@@ -1572,9 +1589,6 @@ trait SinkValve
   fun ref barrier_complete(barrier_token: BarrierToken) =>
     Fail()
 
-  fun ref drop_app_msgs() =>
-    Fail()
-
   fun ref process_message[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
     watermark_ts: U64, i_producer_id: RoutingId, i_producer: Producer,
@@ -1601,10 +1615,6 @@ class OpenSinkValve is SinkValve
   fun ref barrier_complete(barrier_token: BarrierToken) =>
     _sink._barrier_complete(barrier_token)
 
-  fun ref drop_app_msgs() =>
-    @ll(_conn_debug, "drop_app_msgs: open valve, none to drop".cstring())
-    None
-
   fun ref process_message[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
     watermark_ts: U64, i_producer_id: RoutingId, i_producer: Producer,
@@ -1619,13 +1629,13 @@ class ClosedSinkValve is SinkValve
   let _conn_debug: U16 = Log.make_sev_cat(Log.debug(), Log.conn_sink())
   let _sink: ConnectorSink ref
   var _queued: Array[SinkPhaseQueued] = _queued.create()
-  let _forward_tokens: Bool
+  let _forward_tokens: Bool // TODO DELETE??
 
   fun name(): String => __loc.type_name()
 
   new create(sink: ConnectorSink ref, forward_tokens: Bool = true) =>
     _sink = sink
-    _forward_tokens = forward_tokens
+    _forward_tokens = forward_tokens // TODO DELETE???
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
     // We reuse the QueuedBarrier object but don't need input_id or producer
@@ -1636,22 +1646,6 @@ class ClosedSinkValve is SinkValve
     else
       _queued.push(QueuedBarrier(0, DummyProducer, barrier_token))
     end
-
-  fun ref drop_app_msgs() =>
-    let new_queue = Array[SinkPhaseQueued]
-    var count: USize = 0
-
-    for q in _queued.values() do
-      match q
-      | let qb: QueuedBarrier =>
-        new_queue.push(qb)
-      | let qm: QueuedMessage =>
-        count = count + 1
-      end
-    end
-    @ll(_conn_debug, "%s: drop_app_msgs: count %lu new size %lu".cstring(),
-      __loc.type_name().cstring(), count, new_queue.size())
-    _queued = new_queue
 
   fun ref process_message[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
