@@ -34,12 +34,12 @@ done
 # We skip 19 because a race condition that we can't control
 # may/may not cause a gap in Wallaroo's output and thus a
 # Phase 1 abort vote by the sink.
-# We check 20 because checkpointing should continue
+# We check 21 because checkpointing should continue
 # after 18 (some bugs related to 18's scenario can prevent
 # future checkpoints).
 # Skip the following because they may not be present
-# at all: 4, 7, 11, 16, 17
-for c in 1 2 5 8 12 13 14 18 20; do
+# at all: 4, 7, 11, 16, 17, 20
+for c in 1 2 5 8 12 13 14 18 21; do
 	pat="'Celsius[^']*c_id=$c.,"
 	egrep "$pat" $IN | grep '2-rollback' > /dev/null 2>&1
 	if [ $? -eq 0 ]; then

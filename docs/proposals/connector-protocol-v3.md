@@ -385,11 +385,17 @@ In the Start state, the following actions are valid:
 In the Notify-Sent state, the following actions are valid:
 
 - NOTIFY_ACK: Worker -> Connector
-    * The `NotifySuccess` byte indicates whether the connector has successfully processed the NOTIFY frame.  Value values are:
+    * The `NotifySuccess` byte indicates whether the connector has successfully processed the NOTIFY frame.  Valid values are:
         - 1: The connector may send MESSAGE frames for this StreamId.
             * Next state is Open
         - 0: The connector may not send MESSAGE frames for this StreamId.  Some Wallaroo worker has this StreamId in use by another connection and therefore prohibits use by this connection.
             * Next state is Closed
+    * The `PointOfRef` value is indicates the point of reference/message-id
+    of the last message for this `StreamId` that Wallaroo has successfully
+    processed.  If `StreamId` has never been used before, or if Wallaroo
+    has received data for this stream but has never successfully processed
+    that data, then `PointOfRef` shall be the value `18446744073709551615`,
+    which is the maximum value of a C `uint64_t` or Pony `U64`.
     * NOTE: The point of reference in this ACK may differ from the point of reference sent by the connector in the NOTIFY frame.  The connector must use the point of reference given in the NOTIFY_ACK frame.
     * The connector must not send MESSAGE frames for any StreamId before the connector receives a successful NOTIFY_ACK for the StreamId.
 - RESTART: Worker -> Connector
