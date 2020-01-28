@@ -127,5 +127,5 @@ time.sleep(1)
 signal.signal(signal.SIGINT, terminate)
 signal.signal(signal.SIGTERM, terminate)
 
-time.sleep(25.0)
+time.sleep(27.0)
 terminate()

@@ -44,6 +44,9 @@ use "wallaroo_labs/time"
 type StreamId is U64
 type PointOfReference is U64
 
+primitive StreamTupleNoneSeen
+  fun apply(): PointOfReference => U64.max_value()
+
 class val StreamTuple
   let id: StreamId
   let name: String
@@ -512,8 +515,10 @@ class GlobalConnectorStreamRegistry[In: Any val]
     if _is_leader then
       (let success, let stream') = try
           // new
-          _new_stream(stream, _worker_name)?
-          (true, stream)
+          let none_seen_tuple =
+            StreamTuple(stream.id, stream.name, StreamTupleNoneSeen())
+          _new_stream(none_seen_tuple, _worker_name)?
+          (true, none_seen_tuple)
         else
           try
             // already inactive or active: activate

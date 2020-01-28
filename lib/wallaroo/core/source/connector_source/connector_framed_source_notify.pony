@@ -444,7 +444,13 @@ class ConnectorSourceNotify[In: Any val]
             let s = _active_streams(m.stream_id)?
             let msg_id = m.message_id
 
-            if (msg_id > 0) and (msg_id <= s.last_seen) then
+            if s.last_seen == StreamTupleNoneSeen() then
+              // This is the first record that we've seen for this stream.
+              // We don't care if it starts at zero; we only care that
+              // all subsequent message IDs are strictly increasing from
+              // now on.
+              @ll(_conn_debug, "m.message_id %lu is the first record in this stream".cstring(), msg_id)
+            elseif msg_id <= s.last_seen then
               // skip processing of an already seen message
               @ll(_conn_debug, "Skip m.message_id %lu <= last_seen %lu".cstring(), msg_id, s.last_seen)
               return _continue_perhaps(source)

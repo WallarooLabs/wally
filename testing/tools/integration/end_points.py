@@ -792,6 +792,8 @@ class ALOSequenceGenerator(BaseIter, BaseSource):
     def reset(self, pos=None):
         if pos is None:
             pos = self.start
+        if pos == 18446744073709551615:
+            pos = self.start
         self.position = pos
 
     def __next__(self):

@@ -62,9 +62,20 @@ class BaseSource(BaseMeta):
     def reset(self, pos=0):
         """
         Reset the source to position `pos`.
-        `pos` is an integer point of reference. The source may do additional
-        transformations in order to determine what internal position to reset
-        to.
+        `pos` is an integer point of reference that specifies the last
+        point of reference that Wallaroo has processed.
+        The source may do additional transformations in order to
+        determine what internal position to reset to.
+
+        If `pos` is equal to U64.max_value() = 18446744073709551615,
+        then Wallaroo has not processed any data for this stream: either
+        because the stream is new and no data has ever been sent, or else
+        data has been sent on this stream but Wallaroo has not ACK'ed the
+        successful processing of that data.
+
+        The sender should reset its position to whatever is the position
+        of the first record to send.  For example, if sending a file,
+        then the first unsent data is at the beginning of the file.
         """
         raise NotImplementedError
 
@@ -119,9 +130,23 @@ class FramedFileReader(BaseIter, BaseSource):
             return -1
 
     def reset(self, pos=0):
-        logging.debug("resetting {} from {} to position {}"
-            .format(self.__str__(), self.point_of_ref(), pos))
-        self.file.seek(pos)
+        if pos == 18446744073709551615:
+            pos = 0
+            logging.debug("resetting {} from {} to FILE BEGINNING position {}"
+                .format(self.__str__(), self.point_of_ref(), pos))
+            self.file.seek(pos)
+        else:
+            logging.debug("resetting {} from {} to position {}"
+                    .format(self.__str__(), self.point_of_ref(), pos))
+            self.file.seek(pos)
+            ## Pos is the position of the last successfully processed message,
+            ## so advance forward one message to the start of the first unsent
+            ## message.  This isn't strictly necessary: if we don't advance
+            ## forward one message, then we will definitely be sending a
+            ## duplicate message to Wallaroo, and Wallaroo will discard it.
+            (ignore_bytes, new_pos) = self.__next()
+            logging.debug("resetting {} from {} to position {} and then advanced 1 record to {}"
+                    .format(self.__str__(), self.point_of_ref(), pos, new_pos))
 
     def __next__(self):
         # read header
@@ -180,8 +205,13 @@ class ThrottledFileReader(BaseIter, BaseSource):
             return -1
 
     def reset(self, pos=0):
-        logging.debug("resetting {} from {} to position {}"
-            .format(self.__str__(), self.point_of_ref(), pos))
+        if pos == 18446744073709551615:
+            pos = 0
+            logging.debug("resetting {} from {} to FILE BEGINNING position {}"
+                .format(self.__str__(), self.point_of_ref(), pos))
+        else:
+            logging.debug("resetting {} from {} to position {}"
+                    .format(self.__str__(), self.point_of_ref(), pos))
         self.file.seek(pos)
 
     def __next__(self):
