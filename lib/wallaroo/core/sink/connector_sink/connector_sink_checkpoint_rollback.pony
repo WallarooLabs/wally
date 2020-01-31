@@ -165,6 +165,17 @@ class _CpRbAbortCheckpoint is _CpRbOps
     _ChangeSinkPhaseQueueMsgsForwardTokens(sink)
     _CpRbTransition(this, _CpRbRollingBack(barrier_token, true), sink)
 
+  fun ref rollbackresume_barrier_complete(sink: ConnectorSink ref,
+    barrier_token: CheckpointBarrierToken)
+   =>
+    // This event is possible if: we are very early in app startup after
+    // a crash, then we were connected & disconnected from the external
+    // sink process.  That sequence of events leads us to this FSM state.
+    // Because we're very early in app startup, we now get a
+    // rollbackresume_barrier_complete event.
+    // We still need to abort the next checkpoint, so remain in this state.
+    @l(Log.info(), Log.conn_sink(), "Ignoring rollbackresume_barrier_complete at %s for Id %s".cstring(), name().cstring(), barrier_token.string().cstring())
+
 class _CpRbCPGotLocalCommit is _CpRbOps
   let _debug: LogSevCat = Log.make_sev_cat(Log.debug(), Log.conn_sink())
   let _barrier_token: CheckpointBarrierToken
@@ -382,8 +393,7 @@ class _CpRbPreparedForRollback is _CpRbOps
     // the system.  The events that triggered step 3 do not remove the
     // RollbackResumeBarrierToken from the system.  This method is when
     // that RollbackResumeBarrierToken has finished at this sink.
-    @l(Log.info(), Log.conn_sink(), "Ignoring rollbackresume_barrier_complete for Id %s".cstring(), barrier_token.string().cstring())
-    this
+    @l(Log.info(), Log.conn_sink(), "Ignoring rollbackresume_barrier_complete at %s for Id %s".cstring(), name().cstring(), barrier_token.string().cstring())
 
 class _CpRbRollingBack is _CpRbOps
   """
