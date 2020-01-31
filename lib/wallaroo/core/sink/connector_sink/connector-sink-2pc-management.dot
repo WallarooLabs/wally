@@ -44,6 +44,7 @@ digraph mashup {
 	WaitingForCheckpoint -> CPStarts [label="cp_barrier_complete"];
 	AbortCheckpoint -> AbortCheckpoint [label="cp_barrier_complete"];
 	AbortCheckpoint -> AbortCheckpoint [label="phase1_abort"];
+	AbortCheckpoint -> AbortCheckpoint [label="rollbackresume_barrier_complete"];
 	AbortCheckpoint -> RollingBack [label="rollback_barrier_complete",fontcolor=red,color=red];
 
 	WaitingForCheckpoint -> PreparedForRollback [label="prepare_for_rollback",fontcolor=red,color=red];
