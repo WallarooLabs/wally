@@ -3,43 +3,48 @@
 IN1=/tmp/aloc_sink.out.initializer.txnlog
 IN=/tmp/aloc_sink.out.initializer.txnlog.short
 
+case "$1" in
+	commit)
+		PATTERN_GOOD="2-ok"
+		PATTERN_BAD="2-rollback"
+	;;
+	abort)
+		PATTERN_GOOD="2-rollback"
+		PATTERN_BAD="2-ok"
+	;;
+	*)
+		echo "Usage: $0 commit|abort"
+		exit 1
+	;;
+esac
+
 if [ ! -f $IN1 ]; then
 	echo Error: input file $IN1 does not exist
 	exit 1
 fi
 
 # Clean up the file's transaction names a bit
-cat $IN1 | sed 's/worker-initializer-id-[0-9]*://' > $IN
+cat $IN1 | sed 's/-w-initializer-id-[0-9]*:/:/' > $IN
 
 # We expect rollbacks to happen for these checkpoint_ids
-for c in 3 6 9 15; do
+for c in 3; do
 	pat="'Celsius[^']*c_id=$c.,"
-	egrep "$pat" $IN | grep '2-ok' > /dev/null 2>&1
+	egrep "$pat" $IN | grep "$PATTERN_BAD" > /dev/null 2>&1
 	if [ $? -eq 0 ]; then
-		echo Error: unexpected phase 2-ok for checkpoint $c
+		echo Error: unexpected phase "$PATTERN_BAD" for checkpoint $c
 		cat $IN; exit 1
 	fi
-	egrep "$pat" $IN | grep '2-rollback' > /dev/null 2>&1
+	egrep "$pat" $IN | grep "$PATTERN_GOOD" > /dev/null 2>&1
 	if [ $? -ne 0 ]; then
-		echo Error: phase 2-rollback not found for checkpoint $c
+		echo Error: phase "$PATTERN_GOOD" found for checkpoint $c
 		cat $IN; exit 1
 	fi
 done
 
 # We expect commits to happen for these checkpoint_ids
-# There may be more checkpoints after 18, but we won't check
+# There may be more checkpoints after 14, but we won't check
 # because test timing can affect how many checkpoints may follow.
-# Also, 18 is the last checkpoint that aloc_sink.abort-rules
-# will affect.
-# We skip 19 because a race condition that we can't control
-# may/may not cause a gap in Wallaroo's output and thus a
-# Phase 1 abort vote by the sink.
-# We check 21 because checkpointing should continue
-# after 18 (some bugs related to 18's scenario can prevent
-# future checkpoints).
-# Skip the following because they may not be present
-# at all: 4, 7, 11, 16, 17, 20
-for c in 1 2 5 8 12 13 14 18 21; do
+for c in 14; do
 	pat="'Celsius[^']*c_id=$c.,"
 	egrep "$pat" $IN | grep '2-rollback' > /dev/null 2>&1
 	if [ $? -eq 0 ]; then

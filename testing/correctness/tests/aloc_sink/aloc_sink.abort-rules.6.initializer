@@ -1,0 +1,2 @@
+("# True, False, True does not abort the 2PC txn")
+("txnid-regexp", ":c_id=3", True , False, True )
