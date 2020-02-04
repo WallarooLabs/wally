@@ -5,6 +5,7 @@ import signal
 import struct
 import socket
 import subprocess
+import sys
 import threading
 import time
 
@@ -86,7 +87,7 @@ def terminate(_signal=None, _frame=None):
 sink_args = [
     "./aloc_sink",
     "/tmp/aloc_sink.out",
-    "./aloc_sink.abort-rules",
+    sys.argv[1],
     "7200"]
 if os.environ.get('USE_FAKE_S3', '') == 'on':
     sink_args.append('fake-s3')
@@ -127,5 +128,5 @@ time.sleep(1)
 signal.signal(signal.SIGINT, terminate)
 signal.signal(signal.SIGTERM, terminate)
 
-time.sleep(27.0)
+time.sleep(20.0)
 terminate()

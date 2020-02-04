@@ -55,6 +55,7 @@ def parse_abort_rules(path):
         with open(path, 'rb') as f:
             for l in f:
                 a.append(th.deserialize_txnlog_item(l))
+        logging.info("ABORT RULES: {}".format(a))
         return a
     except FileNotFoundError:
         return []

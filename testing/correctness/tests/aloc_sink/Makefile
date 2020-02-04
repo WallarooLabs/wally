@@ -46,10 +46,13 @@ integration-tests-testing-correctness-tests-aloc_sink: aloc_sink_tests
 
 ifeq ($(resilience),on)
 aloc_sink_tests:
-	-rm -fv /tmp/Celsius* /tmp/aloc*
 	#### -cd $(HOME)/s/src/other-repo && make start-s3-container
-	-cd $(ALOC_SINK_PATH) && ./run_aloc_sink_test > /tmp/run_aloc_sink_test.out 2>&1
-	cd $(ALOC_SINK_PATH) && ./run_aloc_sink_test.validate.sh || sh -c 'echo FAILED ; cat /tmp/run_aloc_sink_test.out; exit 1'
+	cd $(ALOC_SINK_PATH) && ./TEST-WRAPPER.sh 1 abort
+	cd $(ALOC_SINK_PATH) && ./TEST-WRAPPER.sh 2 abort
+	cd $(ALOC_SINK_PATH) && ./TEST-WRAPPER.sh 3 abort
+	cd $(ALOC_SINK_PATH) && ./TEST-WRAPPER.sh 4 commit
+	cd $(ALOC_SINK_PATH) && ./TEST-WRAPPER.sh 5 abort
+	cd $(ALOC_SINK_PATH) && ./TEST-WRAPPER.sh 6 commit
 else
 aloc_sink_tests:
 	$(QUIET)printf "aloc_sink tests not run.\nRun make with 'resilience=on' to run this test.\n"
