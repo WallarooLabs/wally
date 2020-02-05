@@ -734,6 +734,7 @@ class AtLeastOnceSourceConnector(asynchat.async_chat, BaseConnector, BaseMeta):
                 self.handle_restarted(self._streams)
                 break
             except socket.error as err:
+                self._conn = None
                 if err.errno in retry_errno:
                     logging.debug("_reconnect_common: {}".format(err))
                     time.sleep(1.0)
