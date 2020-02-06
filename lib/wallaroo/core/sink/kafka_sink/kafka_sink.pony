@@ -395,7 +395,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     for q in queued.values() do
       match q
       | let qm: QueuedMessage =>
-        qm.process_message(this)
+        qm.run(this)
       | let qb: QueuedBarrier =>
         qb.inject_barrier(this)
       end
