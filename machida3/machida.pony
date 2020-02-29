@@ -185,7 +185,8 @@ class val PyKeyExtractor
     _key_extractor = key_extractor
 
   fun apply(data: PyData val): String =>
-    recover
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]() // recursion is allowed, perhaps this is more efficient, since we're calling several Machida funcs that are also getting the GIL?
+    let ret2 = recover
       let ps = Machida.extract_key(_key_extractor, data.obj())
       Machida.print_errors()
 
@@ -200,6 +201,8 @@ class val PyKeyExtractor
 
       ret
     end
+    @PyGILState_Release[None](gil_state)
+    ret2
 
   fun _serialise_space(): USize =>
     Machida.user_serialization_get_size(_key_extractor)
@@ -220,13 +223,16 @@ class PySourceHandler is SourceHandler[(PyData val | None)]
     _source_decoder = source_decoder
 
   fun decode(data: Array[U8] val): (PyData val | None) =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]() // recursion is allowed, perhaps this is more efficient, since we're calling several Machida funcs that are also getting the GIL?
     let r = Machida.source_decoder_decode(_source_decoder, data.cpointer(),
         data.size())
-    if not Machida.is_py_none(r) then
+    let ret = if not Machida.is_py_none(r) then
       PyData(r)
     else
       None
     end
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun _serialise_space(): USize =>
     Machida.user_serialization_get_size(_source_decoder)
@@ -262,13 +268,16 @@ class PyFramedSourceHandler is FramedSourceHandler[(PyData val | None)]
       data.size())
 
   fun decode(data: Array[U8] val): (PyData val | None) =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]() // recursion is allowed, perhaps this is more efficient, since we're calling several Machida funcs that are also getting the GIL?
     let r = Machida.source_decoder_decode(_source_decoder, data.cpointer(),
         data.size())
-    if not Machida.is_py_none(r) then
+    let ret = if not Machida.is_py_none(r) then
       PyData(r)
     else
       None
     end
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun _serialise_space(): USize =>
     Machida.user_serialization_get_size(_source_decoder)
@@ -306,12 +315,15 @@ class PyGenSourceHandler is GenSourceGenerator[PyData val]
     end
 
   fun apply(data: PyData val): (PyData val | None) =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]() // recursion is allowed, perhaps this is more efficient, since we're calling several Machida funcs that are also getting the GIL?
     let r = Machida.source_generator_apply(_source_generator, data.obj())
-    if not Machida.is_py_none(r) then
+    let ret = if not Machida.is_py_none(r) then
       PyData(r)
     else
       None
     end
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun _serialise_space(): USize =>
     Machida.user_serialization_get_size(_source_generator)
@@ -336,14 +348,17 @@ class val PyComputation is StatelessComputation[PyData val, PyData val]
     _is_multi = Machida.implements_compute_multi(_computation)
 
   fun apply(input: PyData val): (PyData val | Array[PyData val] val | None) =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]() // recursion is allowed, perhaps this is more efficient, since we're calling several Machida funcs that are also getting the GIL?
     let r: Pointer[U8] val =
       Machida.computation_compute(_computation, input.obj(), _is_multi)
 
-    if not Machida.is_py_none(r) then
+    let ret = if not Machida.is_py_none(r) then
       Machida.process_computation_results(r, _is_multi)
     else
       None
     end
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun name(): String =>
     _name
@@ -373,11 +388,12 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
   fun apply(input: PyData val, state: PyState):
     (PyData val | Array[PyData val] val | None)
   =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]() // recursion is allowed, perhaps this is more efficient, since we're calling several Machida funcs that are also getting the GIL?
     let data =
       Machida.stateful_computation_compute(_computation, input.obj(),
         state.obj(), _is_multi)
 
-    let d = recover if Machida.is_py_none(data) then
+    let ret = recover if Machida.is_py_none(data) then
         Machida.dec_ref(data)
         None
       else
@@ -385,7 +401,8 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
       end
     end
 
-    d
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun name(): String =>
     _name
@@ -425,16 +442,19 @@ class val PyAggregation is
 
   fun output(key: Key, window_end_ts: U64, acc: PyState): (PyData val | None)
   =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]() // recursion is allowed, perhaps this is more efficient, since we're calling several Machida funcs that are also getting the GIL?
     let data =
       Machida.aggregation_output(_aggregation, key.cstring(), acc.obj())
 
-    recover if Machida.is_py_none(data) then
+    let ret = recover if Machida.is_py_none(data) then
         Machida.dec_ref(data)
         None
       else
         PyData(data)
       end
     end
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun name(): String =>
     _name
@@ -458,6 +478,7 @@ class PyTCPEncoder is TCPSinkEncoder[PyData val]
     _sink_encoder = sink_encoder
 
   fun apply(data: PyData val, wb: Writer): Array[ByteSeq] val =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let byte_buffer = Machida.sink_encoder_encode(_sink_encoder, data.obj())
     if not Machida.is_py_none(byte_buffer) then
       let byte_string = @py_bytes_or_unicode_as_char(byte_buffer)
@@ -474,7 +495,9 @@ class PyTCPEncoder is TCPSinkEncoder[PyData val]
         Fail()
       end
     end
-    wb.done()
+    let ret = wb.done()
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun _serialise_space(): USize =>
     Machida.user_serialization_get_size(_sink_encoder)
@@ -497,6 +520,7 @@ class PyKafkaEncoder is KafkaSinkEncoder[PyData val]
   fun apply(data: PyData val, wb: Writer):
     (Array[ByteSeq] val, (Array[ByteSeq] val | None), (None | KafkaPartitionId))
   =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let out_and_key_and_part_id = Machida.sink_encoder_encode(_sink_encoder, data.obj())
     // `out_and_key_and_part_id` is a tuple of `(out, key, part_id)`, where `out` is a
     // string and key is `None` or a string and `part_id` is `None` or a KafkaPartitionId.
@@ -525,7 +549,9 @@ class PyKafkaEncoder is KafkaSinkEncoder[PyData val]
 
     Machida.dec_ref(out_and_key_and_part_id)
 
-    (consume out, consume key, part_id)
+    let ret = (consume out, consume key, part_id)
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun _serialise_space(): USize =>
     Machida.user_serialization_get_size(_sink_encoder)
@@ -547,6 +573,7 @@ class PyConnectorEncoder is ConnectorSinkEncoder[PyData val]
     _sink_encoder = sink_encoder
 
   fun apply(data: PyData val, wb: Writer): Array[ByteSeq] val =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let byte_buffer = Machida.sink_encoder_encode(_sink_encoder, data.obj())
     if not Machida.is_py_none(byte_buffer) then
       let byte_string = @py_bytes_or_unicode_as_char(byte_buffer)
@@ -564,7 +591,9 @@ class PyConnectorEncoder is ConnectorSinkEncoder[PyData val]
         Fail()
       end
     end
-    wb.done()
+    let ret = wb.done()
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun _serialise_space(): USize =>
     Machida.user_serialization_get_size(_sink_encoder)
@@ -581,26 +610,36 @@ class PyConnectorEncoder is ConnectorSinkEncoder[PyData val]
 
 primitive Machida
   fun print_errors(): Bool =>
-    if err_occurred() then
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+    let ret = if err_occurred() then
       @PyErr_Print[None]()
       true
     else
       false
     end
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun err_occurred(): Bool =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let er = @PyErr_Occurred[Pointer[U8]]()
-    if not er.is_null() then
+    let ret = if not er.is_null() then
       true
     else
       false
     end
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun start_python() =>
+    //NO! let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     @Py_Initialize()
+    //NO! @PyGILState_Release[None](gil_state)
 
   fun load_module(module_name: String): ModuleP ? =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let r = @load_module(module_name.cstring())
+    @PyGILState_Release[None](gil_state) //.
     if print_errors() then
       error
     end
@@ -609,8 +648,10 @@ primitive Machida
   fun application_setup(module: ModuleP, args: Array[String] val):
     Pointer[U8] val ?
   =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let pyargs = Machida.pony_array_string_to_py_list_string(args)
     let r = @application_setup(module, pyargs)
+    @PyGILState_Release[None](gil_state) //.
     if print_errors() then
       error
     end
@@ -619,130 +660,173 @@ primitive Machida
   fun apply_application_setup(application_setup_data: Pointer[U8] val,
     env: Env): (String, Pipeline[PyData val] val) ?
   =>
-    recover val
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+    let ret = recover val
       let pipeline_tree = PyPipelineTree(application_setup_data, env)
       let pipeline = pipeline_tree.build()?
       (pipeline_tree.app_name, pipeline)
     end
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun framed_source_decoder_header_length(source_decoder: Pointer[U8] val): USize =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     @PyErr_Clear[None]()
     let r = @source_decoder_header_length(source_decoder)
     print_errors()
-    if (r >= 1) and (r <= 8) then
+    let ret = if (r >= 1) and (r <= 8) then
       r
     else
       @printf[U32]("ERROR: header_length() method returned invalid size\n".cstring())
       4
     end
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun framed_source_decoder_payload_length(source_decoder: Pointer[U8] val,
     data: Pointer[U8] tag, size: USize): USize
   =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     @PyErr_Clear[None]()
     let r = @source_decoder_payload_length(source_decoder, data, size)
-    if err_occurred() then
+    let ret = if err_occurred() then
       print_errors()
       4
     else
       r
     end
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun source_decoder_decode(source_decoder: Pointer[U8] val,
     data: Pointer[U8] tag, size: USize): Pointer[U8] val
   =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let r = @source_decoder_decode(source_decoder, data, size)
     print_errors()
     if r.is_null() then Fail() end
+    @PyGILState_Release[None](gil_state)
     r
 
   fun source_generator_initial_value(source_decoder: Pointer[U8] val):
     Pointer[U8] val
   =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let r = @source_generator_initial_value(source_decoder)
     print_errors()
     if r.is_null() then Fail() end
+    @PyGILState_Release[None](gil_state)
     r
 
   fun source_generator_apply(source_decoder: Pointer[U8] val,
     data: Pointer[U8] val): Pointer[U8] val
   =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let r = @source_generator_apply(source_decoder, data)
     print_errors()
     if r.is_null() then Fail() end
+    @PyGILState_Release[None](gil_state)
     r
 
   fun sink_encoder_encode(sink_encoder: Pointer[U8] val, data: Pointer[U8] val):
     Pointer[U8] val
   =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let r = @sink_encoder_encode(sink_encoder, data)
     print_errors()
     if r.is_null() then Fail() end
+    @PyGILState_Release[None](gil_state)
     r
 
   fun computation_compute(computation: Pointer[U8] val, data: Pointer[U8] val,
     multi: Bool): Pointer[U8] val
   =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let method = if multi then "compute_multi" else "compute" end
     let r = @computation_compute(computation, data, method.cstring())
     print_errors()
     if r.is_null() then Fail() end
+    @PyGILState_Release[None](gil_state)
     r
 
   fun stateful_computation_compute(computation: Pointer[U8] val,
     data: Pointer[U8] val, state: Pointer[U8] val, multi: Bool):
     Pointer[U8] val
   =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let method = if multi then "compute_multi" else "compute" end
     let r =
       @stateful_computation_compute(computation, data, state, method.cstring())
 
     print_errors()
     if r.is_null() then Fail() end
+    @PyGILState_Release[None](gil_state)
     r
 
   fun initial_state(computation: Pointer[U8] val): PyState =>
-    PyState(@initial_state(computation))
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+    let ret = PyState(@initial_state(computation))
+    @PyGILState_Release[None](gil_state)
+    ret
 
  fun initial_accumulator(aggregation: Pointer[U8] val): PyState =>
-    PyState(@initial_accumulator(aggregation))
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+    let ret = PyState(@initial_accumulator(aggregation))
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun aggregation_update(aggregation: Pointer[U8] val, data: Pointer[U8] val,
     acc: Pointer[U8] val)
   =>
-    @aggregation_update(aggregation, data, acc)
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+    let ret = @aggregation_update(aggregation, data, acc)
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun aggregation_combine(aggregation: Pointer[U8] val, acc1: Pointer[U8] val,
     acc2: Pointer[U8] val): PyState
   =>
-    PyState(@aggregation_combine(aggregation, acc1, acc2))
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+    let ret = PyState(@aggregation_combine(aggregation, acc1, acc2))
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun aggregation_output(aggregation: Pointer[U8] val, key: Pointer[U8] tag,
     acc: Pointer[U8] val): Pointer[U8] val
   =>
-    @aggregation_output(aggregation, key, acc)
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+    let ret = @aggregation_output(aggregation, key, acc)
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun key_hash(key: Pointer[U8] val): USize =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let r = @key_hash(key)
     print_errors()
+    @PyGILState_Release[None](gil_state)
     r.usize()
 
   fun key_eq(key: Pointer[U8] val, other: Pointer[U8] val): Bool =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let r = not (@key_eq(key, other) == 0)
     print_errors()
+    @PyGILState_Release[None](gil_state)
     r
 
   fun extract_key(key_extractor: Pointer[U8] val,
     data: Pointer[U8] val): Pointer[U8] val
   =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let r = @extract_key(key_extractor, data)
     print_errors()
     if r.is_null() then Fail() end
+    @PyGILState_Release[None](gil_state)
     r
 
   fun py_list_to_pony_array_string(py_array: Pointer[U8] val):
     Array[String] val
   =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let size = @PyList_Size(py_array)
     let arr = recover iso Array[String](size) end
 
@@ -750,11 +834,13 @@ primitive Machida
       arr.push(Machida.py_bytes_or_unicode_to_pony_string(@PyList_GetItem(py_array, i)))
     end
 
+    @PyGILState_Release[None](gil_state)
     consume arr
 
   fun py_list_to_filtered_pony_array_pydata(py_array: Pointer[U8] val):
     (Array[PyData val] val | None)
   =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let size = @PyList_Size(py_array)
     let arr = recover iso Array[PyData val](size) end
 
@@ -765,25 +851,30 @@ primitive Machida
         arr.push(PyData(obj))
       end
     end
-    if arr.size() == 0 then
+    let ret = if arr.size() == 0 then
       None
     else
       arr.compact()
       consume arr
     end
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun pony_array_string_to_py_list_string(args: Array[String] val):
     Pointer[U8] val
   =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let l = @PyList_New(args.size())
     for (i, v) in args.pairs() do
       @PyList_SetItem(l, i, @PyUnicode_FromStringAndSize(v.cstring(), v.size()))
     end
+    @PyGILState_Release[None](gil_state)
     l
 
   fun get_name(o: Pointer[U8] val): String =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let ps = @get_name(o)
-    recover
+    let ret = recover
       if not ps.is_null() then
         let ret = Machida.py_bytes_or_unicode_to_pony_string(ps)
         dec_ref(ps)
@@ -792,9 +883,12 @@ primitive Machida
         "undefined-name"
       end
     end
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun py_bytes_or_unicode_to_pony_string(p: Pointer[U8] box): String =>
-    recover
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+    let ret = recover
       var ps: Pointer[U8] = Pointer[U8]
       var ps_size: ISize = 0
       var err: I32 = 0
@@ -814,9 +908,12 @@ primitive Machida
         String.copy_cpointer(ps, ps_size.usize())
       end
     end
+    @PyGILState_Release[None](gil_state)
+    ret
 
     fun py_bytes_or_unicode_to_pony_array(p: Pointer[U8] box): Array[U8] iso^ =>
-      recover
+      let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+      let ret = recover
         var ps: Pointer[U8] = Pointer[U8]
         var ps_size: ISize = 0
         var err: I32 = 0
@@ -836,55 +933,80 @@ primitive Machida
           Array[U8].from_cpointer(ps, ps_size.usize()).clone()
         end
       end
+      @PyGILState_Release[None](gil_state)
+      ret
 
   fun set_command_line_args(m: ModuleP, args: Array[String val] val) =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let l = @PyList_New(args.size())
     for (i, v) in args.pairs() do
       @PyList_SetItem(l, i, @PyUnicode_FromStringAndSize(v.cstring(), v.size()))
     end
     let t = @PyList_AsTuple(l)
     dec_ref(l)
-    let result = @set_command_line_args(m, t)
+    let ret = @set_command_line_args(m, t)
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun set_user_serialization_fns(m: Pointer[U8] val) =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     @set_user_serialization_fns(m)
+    @PyGILState_Release[None](gil_state)
 
   fun user_serialization_get_size(o: Pointer[U8] tag): USize =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let r = @user_serialization_get_size(o)
     if (print_errors()) then
       FatalUserError("Serialization failed")
     end
+    @PyGILState_Release[None](gil_state)
     r
 
   fun user_serialization(o: Pointer[U8] tag, bs: Pointer[U8] tag) =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     @user_serialization(o, bs)
     if (print_errors()) then
       FatalUserError("Serialization failed")
     end
+    @PyGILState_Release[None](gil_state)
 
   fun user_deserialization(bs: Pointer[U8] tag): Pointer[U8] val =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     let r = @user_deserialization(bs)
     if (print_errors()) then
       FatalUserError("Deserialization failed")
     end
+    @PyGILState_Release[None](gil_state)
     r
 
   fun bool_check(b: Pointer[U8] val): Bool =>
-    not (@py_bool_check(b) == 0)
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+    let ret = not (@py_bool_check(b) == 0)
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun is_py_none(o: Pointer[U8] box): Bool =>
-    not (@is_py_none(o) == 0)
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+    let ret = not (@is_py_none(o) == 0)
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun inc_ref(o: Pointer[U8] box) =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     @py_incref(o)
+    @PyGILState_Release[None](gil_state)
 
   fun dec_ref(o: Pointer[U8] box) =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
     @py_decref(o)
+    @PyGILState_Release[None](gil_state)
 
   fun process_computation_results(data: Pointer[U8] val, multi: Bool):
     (PyData val | Array[PyData val] val | None)
   =>
-    if not multi then
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+
+    let ret = if not multi then
       PyData(data)
     else
       if @py_list_check(data) == 1 then
@@ -897,17 +1019,24 @@ primitive Machida
         recover val Array[PyData val] end
       end
     end
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun implements_compute_multi(o: Pointer[U8] box): Bool =>
     implements_method(o, "compute_multi")
 
   fun implements_method(o: Pointer[U8] box, method: String): Bool =>
-    @PyObject_HasAttrString(o, method.cstring()) == 1
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+    let ret = @PyObject_HasAttrString(o, method.cstring()) == 1
+    @PyGILState_Release[None](gil_state)
+    ret
 
 primitive _SourceConfig
   fun from_tuple(source_config_tuple: Pointer[U8] val, env: Env):
     SourceConfig ?
   =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+
     let type_name = recover val
       Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 0))
     end
@@ -915,7 +1044,7 @@ primitive _SourceConfig
       Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 1))
     end
 
-    match type_name
+    let ret = match type_name
     | "gen" =>
       let gen = recover val
         let g = @PyTuple_GetItem(source_config_tuple, 2)
@@ -1005,10 +1134,15 @@ primitive _SourceConfig
       ConnectorSourceConfig[(PyData val | None)](source_name, decoder, host,
         port, cookie, max_credits, refill_credits)
     else
+      @PyGILState_Release[None](gil_state)
       error
     end
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun _kafka_config_options(source_config_tuple: Pointer[U8] val): KafkaConfigOptions iso^ =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+
     let topic = recover val
       Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 2))
     end
@@ -1038,12 +1172,16 @@ primitive _SourceConfig
       Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 4))
     end
 
-    KafkaConfigOptions("Wallaroo Kafka Source", KafkaConsumeOnly, topic, brokers, log_level)
+    let ret = KafkaConfigOptions("Wallaroo Kafka Source", KafkaConsumeOnly, topic, brokers, log_level)
+    @PyGILState_Release[None](gil_state)
+    ret
 
 primitive _SinkConfig
   fun from_tuple(sink_config_tuple: Pointer[U8] val, env: Env):
     SinkConfig[PyData val] ?
   =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+
     let type_name = recover val
       Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(sink_config_tuple, 0))
     end
@@ -1051,7 +1189,7 @@ primitive _SinkConfig
       Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(sink_config_tuple, 1))
     end
 
-    match type_name
+    let ret = match type_name
     | "tcp" =>
       let host = recover val
         Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(sink_config_tuple, 2))
@@ -1110,10 +1248,15 @@ primitive _SinkConfig
 
       ConnectorSinkConfig[PyData val](encoder, host, port, "v0.0.1", cookie)
     else
+      @PyGILState_Release[None](gil_state)
       error
     end
+    @PyGILState_Release[None](gil_state)
+    ret
 
   fun _kafka_config_options(source_config_tuple: Pointer[U8] val): KafkaConfigOptions iso^ =>
+    let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+
     let topic = recover val
       Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 2))
     end
@@ -1147,7 +1290,9 @@ primitive _SinkConfig
 
     let max_message_size = @PyLong_AsLong(@PyTuple_GetItem(source_config_tuple, 6)).i32()
 
-    KafkaConfigOptions("Wallaroo Kafka Sink", KafkaProduceOnly, topic, brokers, log_level, max_produce_buffer_ms, max_message_size)
+    let ret = KafkaConfigOptions("Wallaroo Kafka Sink", KafkaProduceOnly, topic, brokers, log_level, max_produce_buffer_ms, max_message_size)
+    @PyGILState_Release[None](gil_state)
+    ret
 
   class val PyPipelineTree
     """
@@ -1170,6 +1315,9 @@ primitive _SinkConfig
     let app_name: String
 
     new val create(p_graph: Pointer[U8] val, env': Env) =>
+      let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+      @printf[I32]("SLF: PyGILState_Ensure experiment\n".cstring())
+
       env = env'
 
       // p_graph points to a tuple of the form:
@@ -1220,9 +1368,16 @@ primitive _SinkConfig
           arr
         end
 
+      @PyGILState_Release[None](gil_state)
+
     fun build(): Pipeline[PyData val] ? =>
+      let gil_state = @PyGILState_Ensure[Pointer[U8]]()
+
       // Recursively build the pipeline.
-      _build_from(root_idx)?
+      let ret = _build_from(root_idx)?
+
+      @PyGILState_Release[None](gil_state)
+      ret
 
     fun _build_from(idx: USize): Pipeline[PyData val] ? =>
       let stages = vs(idx)?

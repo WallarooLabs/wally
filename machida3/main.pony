@@ -34,9 +34,11 @@ actor Main
 
     let pony_thread_count = ThreadCount()
 
+/****
     if pony_thread_count != 1 then
       FatalUserError("You must provide Machida with the '--ponythreads 1' argument to ensure it is single-threaded for the Python API or the cluster will crash.\n")
     end
+****/
 
     Machida.start_python()
 
