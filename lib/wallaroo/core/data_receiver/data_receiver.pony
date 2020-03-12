@@ -221,14 +221,14 @@ actor DataReceiver is Producer
           end
         end
       end
-      _ack_counter = _ack_counter + 1
+      _maybe_ack()
       _last_id_seen = seq_id
       _router.route(d, pipeline_time_spent, producer_id, this, seq_id,
         latest_ts, metrics_id, worker_ingress_ts)
-      _maybe_ack()
     end
 
   fun ref _maybe_ack() =>
+    _ack_counter = _ack_counter + 1
     if (_ack_counter % 512) == 0 then
       _ack_latest()
     end
@@ -401,6 +401,7 @@ actor DataReceiver is Producer
     end
     if seq_id > _last_id_seen then
       _forward_barrier(target_step_id, origin_step_id, barrier_token, seq_id)
+      _maybe_ack()
     end
 
   fun ref _forward_barrier(target_step_id: RoutingId,
@@ -412,7 +413,7 @@ actor DataReceiver is Producer
     barrier_token: BarrierToken, seq_id: SeqId)
   =>
     if seq_id > _last_id_seen then
-      _ack_counter = _ack_counter + 1
+      _maybe_ack()
       _last_id_seen = seq_id
       _router.forward_barrier(target_step_id, origin_step_id, this,
         barrier_token)
