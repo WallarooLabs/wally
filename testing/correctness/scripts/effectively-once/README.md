@@ -21,6 +21,12 @@ to `true`.
     * I've been using an Ubuntu Xenial/16.04 LTS virtual machine with
       2 virtual CPUs and 4GB RAM.
 
+* Include this directory in your `PATH`:
+
+```
+export PATH=${PATH}:.
+```
+
 * You'll need the `logtail` utility installed.  Download
   https://github.com/kadashu/logtail/blob/master/logtail and put it
   into your $PATH somewhere (MacOS) or install with `apt install logtail` (Linux).
@@ -62,10 +68,7 @@ logging detail is required, I recommend setting the
 example:
 
 ```
-export WALLAROO_BIN=$HOME/wallaroo/examples/pony/passthrough/passthrough
-    or else
 export WALLAROO_BIN=$WALLAROO_TOP/examples/pony/passthrough/passthrough
-
 export WALLAROO_THRESHOLDS='*.8' # Turns on verbose logging @ debug level
 ```
 
@@ -107,16 +110,16 @@ already running.
 
 ```
 ./start-initializer.sh -n 1
-poll-ready.sh -v -a
+./poll-ready.sh -v 0
 ```
 
 ### Start an N-worker Wallaroo cluster
 
 The naming convention for the workers is:
 
-- 1st: `initializer`
-- 2nd: `worker1`
-- 3rd: `worker2`
+- 0th: `initializer`
+- 1st: `worker1`
+- 2nd: `worker2`
 - ...etc...
 
 WARNING: DO NOT USE THE `start-worker.sh` script to start
@@ -129,12 +132,15 @@ Let's start a 4-worker cluster by first starting `initializer` and
 then starting `worker1` through `worker3`.
 
 ```
+./reset.sh
+$WALLAROO_TOP/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 > /tmp/sink-out/stdout-stderr 2>&1 &
+
 DESIRED=4
 ./start-initializer.sh -n $DESIRED
 sleep 1
 DESIRED_1=`expr $DESIRED - 1`
 for i in `seq 1 $DESIRED_1`; do ./start-worker.sh -n $DESIRED $i; sleep 1; done
-./poll-ready.sh -v -a
+./poll-all-ready.sh -v
 ```
 
 ### Join a worker to an existing Wallaroo cluster
@@ -149,8 +155,8 @@ Let's join `worker4`.
 
 ```
 ./join-worker.sh -n 1 4
-sleep 1
-./poll-ready.sh -v -a
+sleep 2
+./poll-all-ready.sh -v
 ```
 
 ### Join N workers to an existing Wallaroo cluster
@@ -167,8 +173,7 @@ a worker joining very close in time to another worker's join.
 Let's start 4 workers: `worker5` through `worker8`.
 
 ```
-for i in `seq 5 8`; do ./join-worker.sh -n 4 $i; sleep 1; done
-./poll-ready.sh -v -a
+for i in `seq 5 8`; do ./join-worker.sh -n 4 $i; sleep 2; ./poll-all-ready.sh -v; done
 ```
 
 ### Shrink the cluster by 1 worker
@@ -183,7 +188,7 @@ Let's shrink `worker6`.
 ```
 ./shrink-worker.sh 6
 sleep 1
-./poll-ready.sh -v -a
+./poll-all-ready.sh -v
 ```
 
 ### Crash worker `N`
@@ -196,13 +201,16 @@ Let's crash `initializer`.
 ```
 ./crash-worker.sh 0
 sleep 1
-./poll-ready.sh -v -a
+./poll-ready.sh -v 0
 ```
 
 ### Restart the `initializer` after a crash
 
 ```
 ./start-initializer.sh
+sleep 1
+./poll-ready.sh -v 0
+./poll-all-ready.sh ; if [ $? -eq 0 ]; then echo All ready; else echo Bummer; fi
 ```
 
 ### Restart worker `N` instead of `initializer` after a crash
@@ -210,7 +218,11 @@ sleep 1
 Let's restart 1 worker, `worker5`.
 
 ```
+./crash-worker.sh 5
+sleep 1
 ./start-worker.sh -n 1 5
+sleep 1
+./poll-all-ready.sh -v
 ```
 
 
@@ -221,7 +233,7 @@ Let's restart 1 worker, `worker5`.
 Create a large input file, approx 12MB, using the commands:
 
 ```
-./remove-input-files.sh
+./delete-input-files.sh
 ./create-input-files.sh
 ```
 
@@ -243,7 +255,7 @@ In Window 1:
 
 * Run `reset.sh`
 * Start the Wallaroo cluster with the desired number of workers.
-* Be sure to run `poll-ready.sh -a -v` to verify that all workers are ready for work.
+* Be sure to run `poll-all-ready.sh -v` to verify that all workers are ready for work.
 
 In Window 2:
 
@@ -259,6 +271,7 @@ while [ 1 ]; do ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt  ; if [ $
 
 ### Repeatedly crashing and restarting the sink
 
+SLF LEFT OFF HERE
 TODO replace hack
 
 ```
@@ -271,7 +284,7 @@ TODO replace hack
 
 ```
 TO_CRASH=1
-for i in `seq 1 100`; do echo -n $i; crash-worker.sh $TO_CRASH ; sleep 0.2 ; mv /tmp/wallaroo.$TO_CRASH /tmp/wallaroo.$TO_CRASH.$i ; gzip -f /tmp/wallaroo.$TO_CRASH.$i & start-worker.sh $TO_CRASH ; sleep 1.2; poll-ready.sh -w 2 -a; if [ $? -ne 0 ]; then echo BREAK0; break; fi; egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then echo BREAK; break; fi; ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt; if [ $? -ne 0 ]; then echo BREAK2; break; fi ;sleep 0.2; done
+for i in `seq 1 100`; do echo -n $i; crash-worker.sh $TO_CRASH ; sleep 0.2 ; mv /tmp/wallaroo.$TO_CRASH /tmp/wallaroo.$TO_CRASH.$i ; gzip -f /tmp/wallaroo.$TO_CRASH.$i & start-worker.sh $TO_CRASH ; sleep 1.2; poll-all-ready.sh -w 2; if [ $? -ne 0 ]; then echo BREAK0; break; fi; egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then echo BREAK; break; fi; ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt; if [ $? -ne 0 ]; then echo BREAK2; break; fi ;sleep 0.2; done
 ```
 
 ### Repeatedly crashing and restarting the initializer worker
@@ -282,7 +295,7 @@ NOTE: There's a limitation in the Python connector client
 w.r.t. reconnecting after a close.  Read below for more detail.
 
 ```
-for i in `seq 1 100`; do echo -n $i; crash-worker.sh 0 ; sleep 0.2 ; mv /tmp/wallaroo.0 /tmp/wallaroo.0.$i ; gzip -f /tmp/wallaroo.0.$i & start-initializer.sh ; sleep 1.2; poll-ready.sh -w 2 -a; if [ $? -ne 0 ]; then echo BREAK0; break; fi; egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then echo BREAK; break; fi; ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt; if [ $? -ne 0 ]; then echo BREAK2; break; fi ;sleep 0.2; done
+for i in `seq 1 100`; do echo -n $i; crash-worker.sh 0 ; sleep 0.2 ; mv /tmp/wallaroo.0 /tmp/wallaroo.0.$i ; gzip -f /tmp/wallaroo.0.$i & start-initializer.sh ; sleep 1.2; poll-all-ready.sh -w 2; if [ $? -ne 0 ]; then echo BREAK0; break; fi; egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then echo BREAK; break; fi; ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt; if [ $? -ne 0 ]; then echo BREAK2; break; fi ;sleep 0.2; done
 ```
 
 The Python connector client is not 100% reliable in reconnecting to
