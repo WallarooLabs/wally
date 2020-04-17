@@ -13,6 +13,17 @@ to test plain TCP sources and sinks also.  To test TCP source and
 sinks, the `WALLAROO_TCP_SOURCE_SINK` environment variable must be set
 to `true`.
 
+The order of presentation for major sections of this document are:
+
+* How to build
+* Basics about how to stop & start clusters, crash & restart workers, etc.
+    * For most use cases, I expect that you'd use the `master-crasher.sh` script for managing the entire testing lifecycle.
+* How to run & test clusters using a high-level automated script ("`master-crasher.sh`")
+    * This is my recommended method for testing.
+* How to run & test clusters using low-level shell scripts ("Testing Recipes")
+    * These scripts were designed for higher-level orchestration, by something like the `master-crasher.sh` script.  They are a bit cumbersome to use manually, but I've found them to be useful on rare occasions.
+
+
 ## Build prerequisites
 
 * I've only run this stuff on Linux, but the scripts have now been
@@ -77,7 +88,7 @@ Finally, all of the Bourne/Bash shell variables in the
 
 ```
 . ./sample-env-vars.sh
-    or else
+    or else (to use regular TCP sources & sinks instead of effectively-once)
 . ./sample-env-vars.sh.tcp-source+sink
 ```
 
@@ -201,7 +212,7 @@ Let's crash `initializer`.
 ```
 ./crash-worker.sh 0
 sleep 1
-./poll-ready.sh -v 0
+./poll-ready.sh -v -w 2 0
 ```
 
 ### Restart the `initializer` after a crash
@@ -215,7 +226,7 @@ sleep 1
 
 ### Restart worker `N` instead of `initializer` after a crash
 
-Let's restart 1 worker, `worker5`.
+Let's crash & restart 1 worker, `worker5`.
 
 ```
 ./crash-worker.sh 5
@@ -224,6 +235,11 @@ sleep 1
 sleep 1
 ./poll-all-ready.sh -v
 ```
+
+
+## `master-crasher.sh`
+
+TODO
 
 
 ## Testing Recipes
@@ -260,19 +276,38 @@ In Window 1:
 In Window 2:
 
 ```
-env PYTHONPATH=$WALLAROO_TOP/machida/lib:examples/python/celsius_connectors $WALLAROO_TOP/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.A.txt 21222 |& tee /tmp/feed.out
+env PYTHONPATH=$WALLAROO_TOP/machida/lib:examples/python/celsius_connectors $WALLAROO_TOP/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.A.txt 21222 > /tmp/sender.out 2>&1 &
+tail -f /tmp/sender.out | egrep 'acked.*is_open=True'
 ```
 
-In Window 1:
+The `tail -f` process is watching for stream ack events.  If the cluster is working correctly, these events should be logged approximately every 1 second.  Stream ack events pause when some part of the Wallaroo cluster (source, Wallaroo worker(s), sink) have crashed and have not been restarted.  After all procs have restarted, the stream ack events should resume.
+
+The input file, `/tmp/input-file.A.txt`, is approximately 12MB in size.  Once the sender has reached the end of the file, the `at_least_once_line_file_feed` process will periodically reconnect and re-send.  This logic is present in cases when new data might be appended to the input file.  Our test procedures does not use this feature.
+
+In Window 3:
 
 ```
-while [ 1 ]; do ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt  ; if [ $? -ne 0 ]; then killall -STOP passthrough; echo STOPPED; break; fi ; sleep 1; done
+while [ 1 ]; do /bin/echo -n ,; ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt  ; if [ $? -ne 0 ]; then killall -STOP passthrough; echo STOPPED; break; fi ; sleep 1; done
 ```
 
 ### Repeatedly crashing and restarting the sink
 
-SLF LEFT OFF HERE
-TODO replace hack
+This is a long 1-liner that I've used for testing, before `master-crasher.sh` was written.
+
+Prerequisites:
+
+* Start the sink
+* Start the Wallaroo cluster of desired size
+* Start the `at_least_once_line_file_feed` sender for the `/tmp/input-file.A.txt` file.  Also, monitor with the `is_open=True` loop.
+
+This 1-liner will do the following 100 times:
+
+1. Kill the sink with a combination of `ps`, `grep`, `awk`, and `xargs kill`.
+2. Sleep a random amount of time, 2-3 seconds.
+3. Restart the sink process.
+4. Run the `1-to-1-passthrough-verify.sh` script to verify that no sink data has been lost, duplicated, or re-ordered.
+
+This test should be monitored with the `is_open=True` grep command.  One sign of failure is that `is_open=True` entries are no longer logged; such a failure can indicate that the Stream ID registry has become corrupted, or that a Wallaroo worker has crashed.
 
 ```
 for i in `seq 1 100`; do ps axww | grep aloc_sink | grep -v grep | awk '{print $1}' | xargs kill ; amount=`date | sed -e 's/.*://' -e 's/ .*//'`; echo i is $i, amount is $amount; sleep 2.$amount ; env PYTHONPATH=$WALLAROO_TOP/machida/lib $WALLAROO_TOP/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 >> /tmp/sink-out/stdout-stderr 2>&1 & sleep 2 ; ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt ; if [ $? -eq 0 ]; then echo OK; else killall -STOP passthrough ; echo STOPPED; break; fi ; egrep -v 'DEBUG|INFO' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then killall -STOP passthrough ; echo STOP-grep; break; fi; done
@@ -280,7 +315,20 @@ for i in `seq 1 100`; do ps axww | grep aloc_sink | grep -v grep | awk '{print $
 
 ### Repeatedly crashing and restarting a non-initializer worker
 
-TODO replace hack
+Prerequisites:
+
+* Start the sink
+* Start the Wallaroo cluster of desired size
+* Start the `at_least_once_line_file_feed` sender for the `/tmp/input-file.A.txt` file.  Also, monitor with the `is_open=True` loop.
+
+This 2-liner will do the following 100 times:
+
+1. Kill the worker named by $TO_CRASH.
+2. Sleep a random amount of time, 2-3 seconds.
+3. Restart the crashed worker.
+4. Run the `1-to-1-passthrough-verify.sh` script to verify that no sink data has been lost, duplicated, or re-ordered.
+
+This test should be monitored with the `is_open=True` grep loop.  See also: previous subsection. In the event of a Wallaroo failure, the output from the crashed/restarted Wallaroo workers is kept in files named `/tmp/wallaroo.$TO_CRASH.{crash iteration number}.`
 
 ```
 TO_CRASH=1
@@ -289,9 +337,9 @@ for i in `seq 1 100`; do echo -n $i; crash-worker.sh $TO_CRASH ; sleep 0.2 ; mv 
 
 ### Repeatedly crashing and restarting the initializer worker
 
-TODO replace hack
+See prerequisites & advice from previous subsection.
 
-NOTE: There's a limitation in the Python connector client
+WARNING: There's a limitation in the Python connector client
 w.r.t. reconnecting after a close.  Read below for more detail.
 
 ```
@@ -308,8 +356,9 @@ restart the `at_least_once_line_file_feed` script.
 
 ### Repeatedly crashing and restarting the source
 
-TODO replace hack
+See prerequisites & advice from previous subsection.
 
 ```
 while [ 1 ]; do env PYTHONPATH=$WALLAROO_TOP/machida/lib:$WALLAROO_TOP/examples/python/celsius_connectors $WALLAROO_TOP/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.A.txt 41000 & amount=`date | sed -e 's/.*://' -e 's/ .*//'`; echo amount is $amount; sleep 1.$amount ; kill -9 `ps axww | grep -v grep | grep feed | awk '{print $1}'`; sleep 0.$amount; done
 ```
+
