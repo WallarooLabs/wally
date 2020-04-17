@@ -239,7 +239,16 @@ sleep 1
 
 ## `master-crasher.sh`
 
-TODO
+The environment variables found in the [sample-env-vars.sh](sample-env-vars.sh) control many aspects of the total system under test.  This section will mention a few useful variables to experiment with.
+
+The `master-crasher.sh` script is a one-size-fits-many orchestration script that takes care of the following general steps on a single machine.  No special container orchestration or OS features are required.  All processes are assigned non-conflicting TCP ports for use on a single host/virtual machine.
+
+1. Kill all Python processes related to sources & sinks, Wallaroo processes, etc. and delete their related files in `/tmp`.
+
+2. Start the sink, Wallaroo, and source/sender processes to create a Wallaroo cluster of a desired size.
+    * TODO SLF LEFT OFF HERE
+
+TODO write up bug where source isn't started @ first step -> Wallaroo Fail().
 
 
 ## Testing Recipes
