@@ -22,6 +22,7 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
      category: category, msg_timestamp: msg_timestamp] = args
     msg_log_name = message_log_name(app_name, category, pipeline_key, interval_key)
     stats_msg_log_name = stats_message_log_name(app_name, category, pipeline_key, interval_key)
+    send_to_statsd = Application.get_env(:metrics_reporter_ui, :send_to_statsd)
     bins_type = Application.get_env(:metrics_reporter_ui, :bins_type)
     bins = if bins_type == "demo" do
       ["10", "12", "14", "16", "18", "20", "22", "24", "26", "28", "30", "64"]
@@ -34,13 +35,13 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
     {:ok, %{
       log_name: log_name, interval_key: interval_key, aggregate_interval: aggregate_interval, bins: bins, all_bins: all_bins,
       category: category, pipeline_key: pipeline_key, msg_log_name: msg_log_name, stats_msg_log_name: stats_msg_log_name,
-      time_diff: time_diff, start_time: msg_timestamp, app_name: app_name}}
+      time_diff: time_diff, start_time: msg_timestamp, app_name: app_name, send_to_statsd: send_to_statsd}}
   end
 
   def handle_info(:calculate_and_publish_latency_percentage_bins_msgs, state) do
     %{log_name: log_name, msg_log_name: msg_log_name, interval_key: interval_key, stats_msg_log_name: stats_msg_log_name,
     pipeline_key: pipeline_key, aggregate_interval: aggregate_interval, category: category, bins: bins, all_bins: all_bins,
-    time_diff: time_diff, start_time: _start_time, app_name: app_name} = state
+    time_diff: time_diff, start_time: _start_time, app_name: app_name, send_to_statsd: send_to_statsd} = state
     :timer.sleep(2500)
     current_time = calculate_time_diff(time_diff)
     logs_start_time = current_time - aggregate_interval
@@ -62,6 +63,9 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
     latency_bins_percentile_stats_msg = generate_latency_bins_percentile_stats_msg(latency_bins_percentile_data, app_name, pipeline_key, current_time)
     {:ok, ^latency_bins_percentile_stats_msg} = store_latest_latency_bins_percentile_stats_msg(stats_msg_log_name, latency_bins_percentile_stats_msg)
     broadcast_latest_latency_bins_percentile_stats_msg(category, app_name, pipeline_key, interval_key, latency_bins_percentile_stats_msg)
+    if send_to_statsd do
+      broadcast_latest_latency_bins_percentile_stats_via_statix(app_name, pipeline_key, latency_bins_percentile_stats_msg)
+    end
     send(self(), :calculate_and_publish_latency_percentage_bins_msgs)
     {:noreply, state}
   end
@@ -110,6 +114,32 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
     event = "latency-percentile-bin-stats:" <> interval_key
     MetricsReporterUI.Endpoint.broadcast! topic, event, stats_msg
   end
+
+  defp broadcast_latest_latency_bins_percentile_stats_via_statix(app_name, pipeline_key, latency_percentage_bins_msg) do
+    if is_sendable_stat(pipeline_key) do
+      for  {key, latency_bin}  <-  latency_percentage_bins_msg["latency_stats"]  do
+        stat_name = generate_percentile_stat_name(app_name, latency_percentage_bins_msg["pipeline_key"], key)
+        MetricsReporterUI.Statix.gauge(stat_name, latency_bin)
+      end
+    end
+  end
+
+  defp generate_percentile_stat_name(app_name, pipeline_key, percentile) do
+    stat_name = app_name <> "." <> pipeline_key <> ".latency"
+    stat_name = case percentile do
+      "50.0"  -> stat_name <> ".percentile50"
+      "95.0"  -> stat_name <> ".percentile95"
+      "99.0"  -> stat_name <> ".percentile99"
+      "99.9"  -> stat_name <> ".percentile999"
+      "99.99" -> stat_name <> ".percentile9999"
+    end
+  end
+
+  defp is_sendable_stat(pipeline_key) do
+    !String.contains?(pipeline_key, ["*", "source", ":", "@"])
+  end
+
+
 
   defp store_latest_latency_percentage_bins_msg(msg_log_name, latency_percentage_bins_msg) do
     :ok = MessageLog.Supervisor.lookup_or_create(msg_log_name)

@@ -5,6 +5,11 @@ defmodule MetricsReporterUI do
   # for more information on OTP Applications
   def start(_type, _args) do
     import Supervisor.Spec, warn: false
+    send_to_statsd = Application.get_env(:metrics_reporter_ui, :send_to_statsd)
+    if send_to_statsd do
+      # connect statix to statsd
+      :ok = MetricsReporterUI.Statix.connect()
+    end
 
     children = [
       # Start the endpoint when the application starts
