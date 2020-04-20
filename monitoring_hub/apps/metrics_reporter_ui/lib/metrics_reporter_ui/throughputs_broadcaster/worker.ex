@@ -19,18 +19,19 @@ defmodule MetricsReporterUI.ThroughputsBroadcaster.Worker do
     app_name: app_name, category: category, msg_timestamp: msg_timestamp] = args
     msg_log_name = message_log_name(app_name, category, pipeline_key, interval_key)
     time_diff = calculate_time_diff(msg_timestamp)
+    send_to_statsd = Application.get_env(:metrics_reporter_ui, :send_to_statsd)
     send(self(), :get_and_broadcast_latest_throughput_msgs)
     {:ok, %{
       log_name: log_name, interval_key: interval_key, category: category, app_name: app_name,
       msg_log_name: msg_log_name, pipeline_key: pipeline_key,
-      time_diff: time_diff, start_time: msg_timestamp
+      time_diff: time_diff, start_time: msg_timestamp, send_to_statsd: send_to_statsd
     }}
   end
 
   def handle_info(:get_and_broadcast_latest_throughput_msgs, state) do
     %{log_name: log_name, interval_key: interval_key, msg_log_name: msg_log_name,
       app_name: app_name, category: category, pipeline_key: pipeline_key,
-      time_diff: time_diff, start_time: start_time} = state
+      time_diff: time_diff, start_time: start_time, send_to_statsd: send_to_statsd} = state
       :timer.sleep(1000)
       current_time = calculate_time_diff(time_diff)
       reporting_period = 2
@@ -48,6 +49,10 @@ defmodule MetricsReporterUI.ThroughputsBroadcaster.Worker do
       event_name = get_event_name(interval_key)
       {:ok, _app_config} = AppConfigStore.add_metrics_channel_to_app_config(app_name, category, topic_name)
       broadcast_latest_throughput_msgs(topic_name, event_name, app_name, pipeline_key, complete_throughput_msgs)
+      last_msg = List.last(complete_throughput_msgs)
+      if send_to_statsd do
+        broadcast_latest_throughput_msg_via_statix(app_name, pipeline_key, last_msg)
+      end
       send(self(), :get_and_broadcast_latest_throughput_msgs)
       {:noreply, state}
   end
@@ -68,6 +73,17 @@ defmodule MetricsReporterUI.ThroughputsBroadcaster.Worker do
       MetricsReporterUI.Endpoint.broadcast! topic, event, %{"data" => throughput_msgs,
         "pipeline_key" => pipeline_key,
         "app_name" => app_name}
+  end
+
+  defp broadcast_latest_throughput_msg_via_statix(app_name, pipeline_key, throughput_msg) do
+      if is_sendable_stat(pipeline_key) do
+         stat_name = app_name <> "." <> throughput_msg["pipeline_key"] <> ".throughput"
+         MetricsReporterUI.Statix.increment(stat_name, throughput_msg["total_throughput"])
+      end
+  end
+
+  defp is_sendable_stat(pipeline_key) do
+    !String.contains?(pipeline_key, ["*", "source", ":", "@"])
   end
 
   defp via_tuple(log_name, interval_key) do

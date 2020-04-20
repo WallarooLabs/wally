@@ -71,4 +71,5 @@ config :logger, level: :info
 import_config "prod.secret.exs"
 
 config :metrics_reporter_ui,
-  bins_type: System.get_env("BINS_TYPE") || "${BINS_TYPE}"
+  bins_type: System.get_env("BINS_TYPE") || "${BINS_TYPE}",
+  send_to_statsd: System.get_env("SEND_TO_STATSD")

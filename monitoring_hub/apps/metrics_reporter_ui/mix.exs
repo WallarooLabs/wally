@@ -41,6 +41,7 @@ defmodule MetricsReporterUI.Mixfile do
      {:distillery, "~> 1.5.2"},
      {:phoenix_tcp, git: "https://github.com/WallarooLabs/phoenix_tcp.git", branch: "update-deps"},
      {:monitoring_hub_utils, in_umbrella: true},
-     {:metrics_reporter, in_umbrella: true}]
+     {:metrics_reporter, in_umbrella: true},
+     {:statix, "~> 1.4.0"}]
   end
 end
