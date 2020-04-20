@@ -276,6 +276,8 @@ After startup, the `master-crasher.sh` script will run until:
 
 Usage: `Usage: $0 num-desired [crash options...]`
 
+Alternative 1st argument: `reset-only` to kill all processes related to `master-crasher.sh` and to delete all relevant state files in `/tmp`.
+
 Mandatory 1st argument: Number of desired Wallaroo workers at the start of the script.  The number of Wallaroo workers is constant, unless an optional loop to grow or shrink the cluster is also run.
 
 Optional arguments:
@@ -283,6 +285,7 @@ Optional arguments:
 * `no-ack-progress` : Do not run the `run_ack_progress_loop` subprocess.
 * `no-registry-process` : Do not run the `run_registry_progress_loop` subprocess.
 * `no-sanity` : Do not run the `run_sanity_loop` subprocess.
+* `no-clean-old-gzip-files` : Do not run the `run_clean_old_gzip_files` subprocess.
 * `crashN` where N=integer : Run a `run_crash_worker_loop` subprocess, which periodically crashes & restarts a worker process.
     * `0` = the `initialier` worker, `1` or larger is the `workerN` worker, e.g., `worker3`.
 * `grow` : Run the `run_grow_shrink_loop` subprocess with the argument `grow`
@@ -326,12 +329,59 @@ Output paths for files created by various parts of the system are:
 
 ### Additional use notes for `master-crasher.sh`
 
-Every time that the `run_crash_worker_loop` crashes a worker process, the output file for that worker, `/tmp/wallaroo.N`, is renamed to `/tmp/wallaroo.N.T` where T is the UNIX epoch time of the crash.  That file is the compressed with the `gzip` utility.
+The `master-crasher.sh` script generates a lot of shell subprocesses.  It is very difficult to coordinate stopping or killing all of them.
+* If you want to stop a running `master-crasher.sh` process & all of its subprocesses, I recommend using `Control-z` to pause all subprocesses (works well) instead of `Control-c` to kill all subprocesses (because it doesn't work well).
+* If you want to re-run `master-crasher.sh`, just run it again.  The `reset` steps that are run by using `master-crasher.sh reset-only` are also run, prior to starting any new processes for the new test run.
 
-* The VM or container or physical machine that executes `master-crasher.sh` should have enough CPU and disk space to execute all the Wallaroo workers & sources & sink, `master-crasher.sh`'s sanity checking, and also the periodic CPU-intensive `gzip` processes.
-* The `/tmp` file system can run out of disk space eventually.
-    * I recommend running a process like this to set a limit on the maximum number of crash history files in `/tmp` to the 20 most recent ones:
-        * `while [ 1 ]; do ls -t /tmp/wallaroo.*.*gz  | sed 1,20d | xargs rm; sleep 30; done`
+Every time that the `run_crash_worker_loop` crashes a worker process, the output file for that worker, `/tmp/wallaroo.N`, is renamed to `/tmp/wallaroo.N.T` where T is the UNIX epoch time of the crash.  That file is the compressed with the `gzip` utility.
+* The `run_clean_old_gzip_files` subprocess runs a loop that will keep the last 5 `gzip`'ed files for each worker and delete all older files.
+* For any worker process that does not have an explicit `run_crash_worker_loop` running, it is possible that the `/tmp/wallaroo.N` console output from Wallaroo will grow so large that it fills the `/tmp` file system.
+    * For any long-running test, it is strongly recommended that all workers that are not crashed frequently should instead be crashed every few minutes, by putting the suffix `.slow` on the `crashN` argument.  The occasional crash will create an opportunity for the console log file to be rotated and compressed and eventually pruned automatically.
+        * Disk space problem: `master-crasher.sh 3 crash0`
+        * No disk space problem: `master-crasher.sh 3 crash0 crash1.slow crash2.slow`
+
+The VM or container or physical machine that executes `master-crasher.sh` should have enough CPU and disk space to execute all the Wallaroo workers & sources & sink, `master-crasher.sh`'s sanity checking, and also the periodic CPU-intensive `gzip` processes.
+
+The sleep intervals for the `run_crash_worker_loop` are not configurable yet.  This may cause problems for cases when you wish to crash multiple workers + sink all in the same run (e.g., `master-crasher.sh 4 crash-source crash0 crash1 crash2 crash3 crash-sink`).  Crashing so many components at once can create situations where almost all Wallaroo checkpoints are aborted because of a process crash and/or the sink is disconnected so that Wallaroo cannot process data at all.
+
+### Example outout
+
+```
+$ master-crasher.sh 6 crash-source crash0 crash1 crash2 crash3 crash4 crash5 crash-sink
+WARNING: all useful state files are deleted by this script!
+Worker initializer: port = 7103
+Worker worker1: port = 7113
+Worker worker2: port = 7123
+Worker worker3: port = 7133
+Worker worker4: port = 7143
+Worker worker5: port = 7153
+Success
+RUN: run_crash_worker_loop 0
+RUN: run_crash_worker_loop 1
+RUN: run_crash_worker_loop 2
+RUN: run_crash_worker_loop 3
+RUN: run_crash_worker_loop 4
+RUN: run_crash_worker_loop 5
+RUN: run_crash_sink_loop
+Start time: 1587413104000
+Done, yay ... waiting
+,cS,rSc1c3c0c5c2,r2r3r5c4,r1r0,r4,{RP},c4c2c1c5r5c0c3r4r1,r2,r0r3,c0cS,r0c5c1rSc3r1c2r3c4,r2r4,{RP}r5,c5,c0r5r0c4c2r4,c1c3,r2r1,r3,c4c0c3c5r4,r5c2c1r2r3r0{RP}cSr1,c3rS,c1c0c5r3,c2c4r1,r0r5r2,r4,c2c1c3r1c4c0c5,r4r3{RP}r2r5,r0,,c1c5,c3c0c4r5c2r0r4r3,r2r1cSrS,c2c3,{RP}c0c4c1r... etc etc....
+,r5,c5,c3{RP},run_ack_progress_loop: successful ack not seen in /tmp/sender.out.A
+End time: 1587413477000
+Duration: 373000
+Pause the world!
+End time: 1587413477000
+Duration: 373000
+[2]+  Stopped                 master-crasher.sh 6 crash-source crash0 crash1 crash2 crash3 crash4 crash5 crash-sink
+$ 
+```
+
+### TODO debugging tips
+
+TODO # of routing keys/env var
+TODO compiling with debug
+TODO compiling with debug + lots of other verbose spam
+
 
 ###### TODO write up bug where source isn't started @ first step -> Wallaroo Fail().
 
