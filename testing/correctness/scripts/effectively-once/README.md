@@ -376,17 +376,22 @@ Duration: 373000
 $ 
 ```
 
-### TODO debugging tips
+### Debugging tips
 
-TODO # of routing keys/env var
-TODO compiling with debug
-TODO compiling with debug + lots of other verbose spam
+1. NOTE: The `master-crasher.sh` script always starts processes in a specific (and almost always deterministic) manner.  As a result, it cannot hit bugs such as [Bug 3123](https://github.com/WallarooLabs/wallaroo/issues/3123), which only happens when Wallaroo is started before the connector sink is ready to accept TCP connections.
 
+1. To reduce workload, or to reduce the number of routing keys in the system by reducing the number of `at_least_once_line_file_feed` sender processes, change the value of the `MULTIPLE_KEYS_LIST` environment variable.
+    * For example, `MULTIPLE_KEYS_LIST='A B C D'` or `MULTIPLE_KEYS_LIST='A'`
 
-###### TODO write up bug where source isn't started @ first step -> Wallaroo Fail().
+2. Compile with `debug=true`.
+
+3. Compile with `PONYCFLAGS="--debug -Dcheckpoint_trace -Didentify_routing_ids"`
+    * Also add `-Dverbose_debug` for additional verbose printing of connector source & sink payloads.
 
 
 ## Testing Recipes
+
+If you cannot use `master-crasher.sh` for a particular task, or if you wish to explore using some of the utility scripts that `master-crasher.sh` uses, then read on!
 
 ### Prerequisites
 
