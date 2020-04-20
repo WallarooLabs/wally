@@ -265,19 +265,73 @@ The `master-crasher.sh` script is a high level test script that automates a larg
     * For each `MULTIPLE_KEYS_LIST` input file, check the output of the routing key's sink (using the `1-to-1-passthrough-verify.sh` utility) to verify that Wallaroo has not dropped/duplicated/reordered any messages.
     * Check for successful checkpoints.  If a checkpoint has not happened within a certain period of time, then halt the system because we suspect that Wallaroo may have deadlocked.
 
+### master-crasher.sh command line arguments
+
+After startup, the `master-crasher.sh` script will run until:
+1. An error has been detected, so `pause_the_world` is run and all activity is paused to permit easier debugging.
+2. The `/tmp` file system is 100% full, which can cause spurious errors, particularly with the `1-to-1-passthrough-verify.sh` script.
+    * See the `Additional use notes` section.
+3. An EOF indicator has been found for at least one `at_least_once_line_file_feed` sender process.
+    * This is the one case where halting is not a test failure.
+
+Usage: `Usage: $0 num-desired [crash options...]`
+
+Mandatory 1st argument: Number of desired Wallaroo workers at the start of the script.  The number of Wallaroo workers is constant, unless an optional loop to grow or shrink the cluster is also run.
+
+Optional arguments:
+* `crash-sink` : Run the `run_crash_sink_loop` subprocess, which periodically crashes & restarts the sink process `aloc_sink`.
+* `no-ack-progress` : Do not run the `run_ack_progress_loop` subprocess.
+* `no-registry-process` : Do not run the `run_registry_progress_loop` subprocess.
+* `no-sanity` : Do not run the `run_sanity_loop` subprocess.
+* `crashN` where N=integer : Run a `run_crash_worker_loop` subprocess, which periodically crashes & restarts a worker process.
+    * `0` = the `initialier` worker, `1` or larger is the `workerN` worker, e.g., `worker3`.
+* `grow` : Run the `run_grow_shrink_loop` subprocess with the argument `grow`
+* `shrink` : Run the `run_grow_shrink_loop` subprocess with the argument `shrink`
+    * An argument like `grow-and-shrink` can be used to run a single `run_grow_shrink_loop` subprocess that will randomly choose to either grow or shrink the cluster.
+* `run_customX` : Run a custom test subprocess with the name `run_customX`.
+
 ### master-crasher.sh output guide
 
 * `,` : An iteration of the `run_sanity_loop` is running. This loop checks the output of each routing key using the `1-to-1-passthrough-verify.sh` script.
-* `cS` and `rS` : 
-* `:s` : 
-* `cN` and `rN` where N=integer : 
-* `:cN` : 
-* `{AP}` : 
-* `{RP}` : 
-* `Join N.` where N=integer : 
-* `Shrink N` where N=integer : 
+* `cS` and `rS` : Crash/restart the sink process.
+* `:s` : Skip an iteration of crashing/restarting the sink.
+    * This action is taken only when Wallaroo's `poll_ready` status is false for long periods of time.
+* `cN` and `rN` where N=integer : Crash/restart worker N.
+    * `0` = the `initialier` worker, `1` or larger is the `workerN` worker, e.g., `worker3`.
+* `:cN` : Skip an iteration of crashing/restarting worker N
+    * This action is taken only when Wallaroo's `poll_ready` status is false for long periods of time.
+* `{AP}` : An iteration of the `run_ack_progress_loop` is running.  This loop checks for at least one successful ack, as reported by the `at_least_once_line_file_feed` sender processes.  If a checkpoint has not happened within 5 minutes, then `pause_the_world` is run: we assume that Wallaroo has deadlocked or livelocked.
+* `{RP}` : An iteration of the `run_registry_progress_loop` is running.  This loop checks that a sender process has been able to successfully NOTIFY for a stream ID.  A failure here suggests that a bug in the Stream ID Registry system has been found.
+* `Join N.` where N=integer : A Wallaroo worker process is joining the cluster.
+* `Shrink N` where N=integer : A Wallaroo worker process is leaving the cluster
+* `Pause the world!` : Some kind of sanity check has failed.
+    * The `pause_the_world` function takes drastic action.
+    * All Wallaroo workers and the `master-crasher.sh` processes are paused using a `SIGSTOP` signal.
+    * Manual intervention is required at this point.  Something is wrong.  It's time to debug the system.
 
+### Files & directories created by `master-crasher.sh`
 
+Output paths for files created by various parts of the system are:
+* `/tmp/wallaroo.N` : output by Wallaroo worker process N.
+    * `0` = the `initialier` worker, `1` or larger is the `workerN` worker, e.g., `worker3`.
+* `/tmp/wallaroo.N.T` : output by Wallaroo worker process N that was crashed at UNIX epoch time T.  These files are very useful for certain debugging tasks.  For example, sometimes you need to know what happened while a now-dead Wallaroo worker was doing 40 seconds before a problem was detected now.
+* `/tmp/sender.out.X` : Output from the `at_least_once_line_file_feed` process for routing key X.
+* `/tmp/input-file.X.txt` : Input for `at_least_once_line_file_feed` for routing key X
+* `/tmp/stabilize.doit*` : Prefix for the files used to manage when a crasher subprocess should temporarily halt its crashing activity.
+* `/tmp/res` : If this file is created, then `master-crasher.sh` is halting because a sender process has indicated EOF/end of input file. 
+* `/tmp/sink-out` : This directory contains the output of the `aloc_sink` process
+    * `/tmp/sink-out/stdout-stderr` : The stdout and stderr output from the `aloc_sink` process.
+    * `/tmp/sink-out/output.W` : sink output for worker `W`
+    * `/tmp/sink-out/output.W.txnlog` : 2PC transaction log for the sink output for worker `W`.
+
+### Additional use notes for `master-crasher.sh`
+
+Every time that the `run_crash_worker_loop` crashes a worker process, the output file for that worker, `/tmp/wallaroo.N`, is renamed to `/tmp/wallaroo.N.T` where T is the UNIX epoch time of the crash.  That file is the compressed with the `gzip` utility.
+
+* The VM or container or physical machine that executes `master-crasher.sh` should have enough CPU and disk space to execute all the Wallaroo workers & sources & sink, `master-crasher.sh`'s sanity checking, and also the periodic CPU-intensive `gzip` processes.
+* The `/tmp` file system can run out of disk space eventually.
+    * I recommend running a process like this to set a limit on the maximum number of crash history files in `/tmp` to the 20 most recent ones:
+        * `while [ 1 ]; do ls -t /tmp/wallaroo.*.*gz  | sed 1,20d | xargs rm; sleep 30; done`
 
 ###### TODO write up bug where source isn't started @ first step -> Wallaroo Fail().
 

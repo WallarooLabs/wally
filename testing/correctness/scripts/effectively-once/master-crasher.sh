@@ -87,6 +87,7 @@ print_duration () {
 }
 
 pause_the_world () {
+    echo 'Pause the world!'
     killall -STOP passthrough
     if [ `uname -s` = Linux ]; then
         print_duration
