@@ -243,12 +243,43 @@ The environment variables found in the [sample-env-vars.sh](sample-env-vars.sh) 
 
 The `master-crasher.sh` script is a one-size-fits-many orchestration script that takes care of the following general steps on a single machine.  No special container orchestration or OS features are required.  All processes are assigned non-conflicting TCP ports for use on a single host/virtual machine.
 
+### master-crasher.sh overview
+
+The `master-crasher.sh` script is a high level test script that automates a large number of tasks that are tedious to perform manually and also correctly.
+
 1. Kill all Python processes related to sources & sinks, Wallaroo processes, etc. and delete their related files in `/tmp`.
 
-2. Start the sink, Wallaroo, and source/sender processes to create a Wallaroo cluster of a desired size.
-    * TODO SLF LEFT OFF HERE
+2. Start the sink, Wallaroo, and 1 or more source/sender processes to create a Wallaroo cluster of a desired size.
+    * The env var `MULTIPLE_KEYS_LIST` determines how many sender processes will be started.
 
-TODO write up bug where source isn't started @ first step -> Wallaroo Fail().
+3. Optionally, start a number of independent subshell processes that run a sleep-crash-restart loop for source, Wallaroo worker, and/or sink processes.
+    * There is little between these subprocesses, which means that it is possible to create situations where Wallaroo can never make a successful checkpoint because at least one source/worker/sink component is dead.
+    * I highly recommend monitoring the progress of successful checkpoints via the `at_least_once_line_file_feed` sender proc's output.
+    * This sleep-crash-restart loop will abort with an error if it detects that a Wallaroo worker process has crashed on its own (i.e., without assistance from the loop).
+
+4. Optionally, run subshell processes that will grow and/or shrink the cluster.
+
+5. Optionally, run a special subshell process to test a particular combination of operations. This feature is useful for debugging particular use cases or bug scenarios.
+
+6. Run additional subshell processes to check for sanity and forward progress.
+    * For each `MULTIPLE_KEYS_LIST` input file, check the output of the routing key's sink (using the `1-to-1-passthrough-verify.sh` utility) to verify that Wallaroo has not dropped/duplicated/reordered any messages.
+    * Check for successful checkpoints.  If a checkpoint has not happened within a certain period of time, then halt the system because we suspect that Wallaroo may have deadlocked.
+
+### master-crasher.sh output guide
+
+* `,` : An iteration of the `run_sanity_loop` is running. This loop checks the output of each routing key using the `1-to-1-passthrough-verify.sh` script.
+* `cS` and `rS` : 
+* `:s` : 
+* `cN` and `rN` where N=integer : 
+* `:cN` : 
+* `{AP}` : 
+* `{RP}` : 
+* `Join N.` where N=integer : 
+* `Shrink N` where N=integer : 
+
+
+
+###### TODO write up bug where source isn't started @ first step -> Wallaroo Fail().
 
 
 ## Testing Recipes
