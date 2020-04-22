@@ -287,7 +287,7 @@ Optional arguments:
 * `no-sanity` : Do not run the `run_sanity_loop` subprocess.
 * `no-clean-old-gzip-files` : Do not run the `run_clean_old_gzip_files` subprocess.
 * `crashN` where N=integer : Run a `run_crash_worker_loop` subprocess, which periodically crashes & restarts a worker process.
-    * `0` = the `initialier` worker, `1` or larger is the `workerN` worker, e.g., `worker3`.
+    * `0` = the `initializer` worker, `1` or larger is the `workerN` worker, e.g., `worker3`.
 * `grow` : Run the `run_grow_shrink_loop` subprocess with the argument `grow`
 * `shrink` : Run the `run_grow_shrink_loop` subprocess with the argument `shrink`
     * An argument like `grow-and-shrink` can be used to run a single `run_grow_shrink_loop` subprocess that will randomly choose to either grow or shrink the cluster.
@@ -300,7 +300,7 @@ Optional arguments:
 * `:s` : Skip an iteration of crashing/restarting the sink.
     * This action is taken only when Wallaroo's `poll_ready` status is false for long periods of time.
 * `cN` and `rN` where N=integer : Crash/restart worker N.
-    * `0` = the `initialier` worker, `1` or larger is the `workerN` worker, e.g., `worker3`.
+    * `0` = the `initializer` worker, `1` or larger is the `workerN` worker, e.g., `worker3`.
 * `:cN` : Skip an iteration of crashing/restarting worker N
     * This action is taken only when Wallaroo's `poll_ready` status is false for long periods of time.
 * `{AP}` : An iteration of the `run_ack_progress_loop` is running.  This loop checks for at least one successful ack, as reported by the `at_least_once_line_file_feed` sender processes.  If a checkpoint has not happened within 5 minutes, then `pause_the_world` is run: we assume that Wallaroo has deadlocked or livelocked.
@@ -316,7 +316,7 @@ Optional arguments:
 
 Output paths for files created by various parts of the system are:
 * `/tmp/wallaroo.N` : output by Wallaroo worker process N.
-    * `0` = the `initialier` worker, `1` or larger is the `workerN` worker, e.g., `worker3`.
+    * `0` = the `initializer` worker, `1` or larger is the `workerN` worker, e.g., `worker3`.
 * `/tmp/wallaroo.N.T` : output by Wallaroo worker process N that was crashed at UNIX epoch time T.  These files are very useful for certain debugging tasks.  For example, sometimes you need to know what happened while a now-dead Wallaroo worker was doing 40 seconds before a problem was detected now.
 * `/tmp/sender.out.X` : Output from the `at_least_once_line_file_feed` process for routing key X.
 * `/tmp/input-file.X.txt` : Input for `at_least_once_line_file_feed` for routing key X
@@ -380,12 +380,12 @@ $
 
 1. NOTE: The `master-crasher.sh` script always starts processes in a specific (and almost always deterministic) manner.  As a result, it cannot hit bugs such as [Bug 3123](https://github.com/WallarooLabs/wallaroo/issues/3123), which only happens when Wallaroo is started before the connector sink is ready to accept TCP connections.
 
-1. To reduce workload, or to reduce the number of routing keys in the system by reducing the number of `at_least_once_line_file_feed` sender processes, change the value of the `MULTIPLE_KEYS_LIST` environment variable.
+2. To reduce workload, or to reduce the number of routing keys in the system by reducing the number of `at_least_once_line_file_feed` sender processes, change the value of the `MULTIPLE_KEYS_LIST` environment variable.
     * For example, `MULTIPLE_KEYS_LIST='A B C D'` or `MULTIPLE_KEYS_LIST='A'`
 
-2. Compile with `debug=true`.
+3. Compile with `debug=true`.
 
-3. Compile with `PONYCFLAGS="--debug -Dcheckpoint_trace -Didentify_routing_ids"`
+4. Compile with `PONYCFLAGS="--debug -Dcheckpoint_trace -Didentify_routing_ids"`
     * Also add `-Dverbose_debug` for additional verbose printing of connector source & sink payloads.
 
 
