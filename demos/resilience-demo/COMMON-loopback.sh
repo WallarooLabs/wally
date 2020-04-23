@@ -9,7 +9,8 @@
 # Common variables for controlling the other scripts in this directory.
 # I have been testing these scripts using AWS EC2 instances of type
 # t3.medium + AMI: Ubuntu Server 16.04 LTS (HVM), SSD Volume Type,
-# ami-04169656fea786776 in the us-east-1 region.
+# ami-04169656fea786776 in the us-east-1 region or
+# ami-0552e3455b9bc8d50 in the us-east-2 region.
 
 # Assumptions:
 #
@@ -58,7 +59,7 @@ USER=`whoami`
 REPO_URL=https://github.com/WallarooLabs/wallaroo.git
 
 # Source branch name to test with
-REPO_BRANCH=resilience-demo-patches
+REPO_BRANCH=0.6.1
 
 # If the environment variable WALLAROO_BIN is set, then use it
 # for the path to our Wallaroo executable.
@@ -79,8 +80,10 @@ ORDERS_PORT=7000
 # DOS server-related flags: if USE_DOS_SERVER=n then following two
 # variables will be ignored.
 USE_DOS_SERVER=y
-DOS_SERVER_EXT=$SERVER1_EXT
-DOS_SERVER=$SERVER1
+DOS_SERVER1_EXT=$SERVER1_EXT
+DOS_SERVER1=$SERVER1
+DOS_SERVER2_EXT=$SERVER2_EXT
+DOS_SERVER2=$SERVER2
 
 # Choice for data copy step from former/dead worker -> new worker:
 # if "n", then rsync all /tmp/market-spread-worker2* files;

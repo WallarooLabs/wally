@@ -3,15 +3,15 @@
 . ./COMMON.sh
 
 ./99-stop-everything.sh
-ssh -n $USER@$SERVER1_EXT "rm -f /tmp/${WALLAROO_NAME}* /tmp/run-dir/*" > /dev/null 2>&1 &
-ssh -n $USER@$SERVER2_EXT "rm -f /tmp/${WALLAROO_NAME}* /tmp/run-dir/*" > /dev/null 2>&1 &
-ssh -n $USER@$SERVER3_EXT "rm -f /tmp/${WALLAROO_NAME}* /tmp/run-dir/*" > /dev/null 2>&1 &
+for i in $SERVER1_EXT $SERVER2_EXT $SERVER3_EXT $SERVER4_EXT; do
+    ssh -n $USER@$i "rm -f /tmp/${WALLAROO_NAME}* /tmp/*.checkpoint_ids /tmp/*.connection-addresses /tmp/*.evlog* /tmp/*.journal /tmp/*.local-keys /tmp/*.local-topology /tmp/*.tcp-control /tmp/*.tcp-data /tmp/*.workers /tmp/run-dir/*" > /dev/null 2>&1 &
+done
 wait
 
 . ./START-DOS-SERVER.sh
 
 echo Start MUI
-ssh -n $USER@$SERVER1_EXT "~$USER/wallaroo-tutorial/wallaroo-0.5.2/bin/metrics_ui/AppRun start" &
+ssh -n $USER@$SERVER1_EXT "~$USER/wallaroo-tutorial/wallaroo-0.6.1/bin/metrics_ui/AppRun start" &
 sleep 1
 
 if [ ! -z "$START_RECEIVER_CMD" ]; then
@@ -21,7 +21,8 @@ if [ ! -z "$START_RECEIVER_CMD" ]; then
     ssh -n $USER@$SERVER1_EXT "cd wallaroo ; $CMD > /tmp/run-dir/receiver.out 2>&1" > /dev/null 2>&1 &
 else
     echo Start receiver
-    ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio --ponypin -l ${SERVER1}:5555 > /tmp/run-dir/receiver.out 2>&1" > /dev/null 2>&1 &
+    echo ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio --listen ${SERVER1}:5555 > /tmp/run-dir/receiver.out 2>&1"
+    ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -l ${SERVER1}:5555 > /tmp/run-dir/receiver.out 2>&1" > /dev/null 2>&1 &
     sleep 2
 fi
 

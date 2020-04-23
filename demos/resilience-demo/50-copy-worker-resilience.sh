@@ -13,17 +13,21 @@ else
     eval 'TARGET_EXT=$SERVER'$3'_EXT'
 fi
 
+# Wallaroo changed its work file naming scheme.
+# Let's try to figure out what the new scheme is.
+WALLAROO_NAME_BASE=`ssh -n $USER@$SERVER1_EXT "ls /tmp/*initializer*.evlog | sed \"s:.*/\([^-]*\)-.*:\1:\""`
+
 if [ $RESTORE_VIA_JOURNAL_DUMP = y ]; then
     echo Rsync journal file from DOS server $DOS_SERVER1 to $TARGET
-    ssh -n $USER@$TARGET_EXT "rm -vf /tmp/${WALLAROO_NAME}-worker${SOURCE_WORKER}*"
+    ssh -n $USER@$TARGET_EXT "rm -vf \"/tmp/${WALLAROO_NAME_BASE}-worker${SOURCE_WORKER}*\""
     ssh -A -n $USER@$TARGET_EXT "rsync -raH -v -e 'ssh -o \"StrictHostKeyChecking no\"' ${DOS_SERVER1}:/tmp/dos-data/worker${SOURCE_WORKER}/\* /tmp"
 
     echo Extract journalled I/O ops from the journal file
     # ssh -n $USER@$TARGET_EXT "echo BEFORE ; ls -l /tmp/mar*"
-    ssh -n $USER@$TARGET_EXT "touch /tmp/${WALLAROO_NAME}-worker${SOURCE_WORKER}.local-keys"
-    ssh -n $USER@$TARGET_EXT "cd wallaroo ; python ./testing/tools/dos-dumb-object-service/journal-dump.py /tmp/${WALLAROO_NAME}-worker${SOURCE_WORKER}.journal"
-    echo Copy ${WALLAROO_NAME}-worker${SOURCE_WORKER}.evlog.journal '->' ${WALLAROO_NAME}-worker${SOURCE_WORKER}.evlog
-    ssh -n $USER@$TARGET_EXT "cp /tmp/${WALLAROO_NAME}-worker${SOURCE_WORKER}.evlog.journal /tmp/${WALLAROO_NAME}-worker${SOURCE_WORKER}.evlog"
+    ssh -n $USER@$TARGET_EXT "touch \"/tmp/${WALLAROO_NAME_BASE}-worker${SOURCE_WORKER}.local-keys\""
+    ssh -n $USER@$TARGET_EXT "cd wallaroo ; python ./testing/tools/dos-dumb-object-service/journal-dump.py \"/tmp/${WALLAROO_NAME_BASE}-worker${SOURCE_WORKER}.journal\""
+    echo Copy ${WALLAROO_NAME_BASE}-worker${SOURCE_WORKER}.evlog.journal '->' ${WALLAROO_NAME_BASE}-worker${SOURCE_WORKER}.evlog
+    ssh -n $USER@$TARGET_EXT "cp \"/tmp/${WALLAROO_NAME_BASE}-worker${SOURCE_WORKER}.evlog.journal\" \"/tmp/${WALLAROO_NAME_BASE}-worker${SOURCE_WORKER}.evlog\""
     # ssh -n $USER@$TARGET_EXT "echo AFTER ; ls -l /tmp/mar*"
     # sleep 3
 else
@@ -31,7 +35,7 @@ else
     echo "NOTE: rsync all resilience files directly from 'failed' worker (cheating)"
     echo
 
-    ssh -A -n $USER@$TARGET_EXT "rsync -raH -v -e 'ssh -o \"StrictHostKeyChecking no\"' ${SOURCE}:/tmp/${WALLAROO_NAME}\* /tmp"
+    ssh -A -n $USER@$TARGET_EXT "rsync -raH -v -e 'ssh -o \"StrictHostKeyChecking no\"' ${SOURCE}:/tmp/\"${WALLAROO_NAME_BASE}\"\* /tmp"
 fi
 
 echo
