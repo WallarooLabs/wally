@@ -26,7 +26,7 @@ A lot has changed in the last 2 years.  But I'm still not enough of an Ansible w
 
 ### Prerequisite: OR ELSE: use 1 machine + 127.0.0.1
 
-Technically, it is possible to run these demos on a single machine, using the loopback interface / 127.0.0.1/8 network.  Let's check that each worker is assigned unique TCP ports, etc. ... LEFT OFF HERE.
+Technically, it is possible to run these demos on a single machine, using the loopback interface / 127.0.0.1/8 network.  Let's check that each worker is assigned unique TCP ports, etc. ... yes, that's correct.  It is not necessary to assign IP address aliases to your loopback interface.  Whew.
 
 NOTE: I've tested this using 1 fresh Ubuntu Xenial VM.  I have not tested it on macOS.  Most of these scripts probably run fine on macOS, but the `00*` and `10*` scripts are very Linux-centric, sorry.
 
