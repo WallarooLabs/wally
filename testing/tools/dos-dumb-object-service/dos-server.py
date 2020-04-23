@@ -46,9 +46,9 @@ class DOS_Server(SocketServer.BaseRequestHandler):
                 length_bytes = self.request.recv(4, socket.MSG_WAITALL)
                 if len(length_bytes) < 4:
                     break
-                #if debug: print 'DBG: bytes %d %d %d %d' % (int(length_bytes[0]), int(length_bytes[1]), int(length_bytes[2]), int(length_bytes[3]))
-                (c1, c2, c3, c4,) = struct.unpack('>BBBB', length_bytes)
-                if debug: print 'DBG: bytes %d %d %d %d' % (c1, c2, c3, c4)
+                if debug:
+                    (c1, c2, c3, c4,) = struct.unpack('>BBBB', length_bytes)
+                    print 'DBG: bytes %d %d %d %d' % (c1, c2, c3, c4)
                 (length,) = struct.unpack('>I', length_bytes)
                 if debug: print 'DBG: waiting for {} bytes from {}'.format(length, self.client_address)
                 bytes = self.request.recv(length, socket.MSG_WAITALL)

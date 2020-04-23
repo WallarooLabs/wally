@@ -3,7 +3,8 @@
 # Common variables for controlling the other scripts in this directory.
 # I have been testing these scripts using AWS EC2 instances of type
 # t3.medium + AMI: Ubuntu Server 16.04 LTS (HVM), SSD Volume Type,
-# ami-04169656fea786776 in the us-east-1 region.
+# ami-04169656fea786776 in the us-east-1 region or
+# ami-0552e3455b9bc8d50 in the us-east-2 region.
 
 # Assumptions:
 #
@@ -52,7 +53,7 @@ USER=ubuntu
 REPO_URL=https://github.com/WallarooLabs/wallaroo.git
 
 # Source branch name to test with
-REPO_BRANCH=master
+REPO_BRANCH=0.6.1
 
 # If the environment variable WALLAROO_BIN is set, then use it
 # for the path to our Wallaroo executable.

@@ -14,7 +14,7 @@ parser.add_option('-v', default=False, dest='verbose', action='store_true',
 
 try:
     f = open(args[0], 'r')
-except e:
+except Exception as e:
     print 'cannot open %s: %s' % (args[0], e)
     sys.exit(1)
     
@@ -67,7 +67,7 @@ while True:
                 try:
                     if options.verbose: print 'DBG: set_length %s %d' % (output_file, offset)
                     of.truncate(offset)
-                except e:
+                except Exception as e:
                     print 'I/O ERROR: truncate: %s %d: %s' % (output_file, offset, e)
                     exit(1)
         if op == 1:
@@ -86,7 +86,7 @@ while True:
                     if options.verbose: print 'DBG: set_length %s %d' % (output_file, offset)
                     of.seek(offset)
                     of.write(data)
-                except e:
+                except Exception as e:
                     print 'I/O ERROR: writev: %s %d: %s' % (output_file, offset, e)
                     exit(1)
         if op == 2:
