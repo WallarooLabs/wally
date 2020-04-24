@@ -19,15 +19,15 @@ Connections start with a handshake that establishes a session. The session encom
 
 The worker that receives the handshake will respond with an OK or ERROR frame. The ERROR frame will end the connection, and the connector will need to reopen a socket to attempt a new connection. On success, the OK frame will include a credit count to allow stream flow to start.
 
-With a credit count established for this session, we may start sending frames. Before we send application messages, each stream is named with a notification frame type.  Notification frames establish a mapping between the stream's fully qualified name and the id which frames will use when transmitting MESSAGE frames <sup>A6</sup>. Stream notification frames consume one credit.
+With a credit count established for this session, the client may start sending frames. Before sending application messages, each stream is named with a notification frame type.  Notification frames establish a mapping between the stream's fully qualified name and the id which frames will use when transmitting MESSAGE frames <sup>A6</sup>. Stream notification frames consume one credit.
 
-Once a stream notification as been sent, the open stream can have any number of application messages for that stream sent so long as the credit count remains above zero. In order to replenish credits, Wallaroo is expected to send ACK frames to the connector. This will include the number of credits to be added to the session's current count. This allows the connector to do bookkeeping and make progress as long as Wallaroo is keeping up.
+Once a stream notification as been sent, the open stream can have any number of application messages for that stream sent so long as the credit count remains above zero. In order to replenish credits, Wallaroo is expected to send ACK frames to the connector. The ACK will include the number of credits to be added to the session's current count. This allows the connector client to do bookkeeping and make progress as long as Wallaroo is keeping up.
 
 The protocol has been given plenty of room to grow and may be optimized over time. Most of the machinery is designed to allow trivial implementations which can be replaced with more sophisticated algorithms later. An example is credit flow can be adjusted in order to achieve target buffer sizes while avoiding pipeline stalls by using a PID controller rather than a fixed pipeline depth upon session initialization.
 
 Authentication of endpoints and/or encryption of the TCP session via TLS is not supported in the current implementation.  We do not expect changes to this connector protocol when adding TLS endpoint authentication and/or session encryption.
 
-The term point of reference is use in an attempt to avoid too much baggage with any given medium. These could be things like partition offsets in Kafka, file names, counters, dotted logical clocks, timestamps, etc.
+The term "point of reference" is used in an attempt to avoid too much baggage with any given medium. A point of reference can include partition offsets in Kafka, file names, counters, dotted logical clocks, timestamps, etc.
 
 ---
 
@@ -81,7 +81,7 @@ Type specs:
     non_neg_integer().
 ```
 
-Constructors follow.  Note that all integers larger than 8 bits are encoded in little endian byte order.
+Constructors follow.  Note that all integers larger than 8 bits are encoded in big endian byte order.
 
 ```erlang
 -spec frame(iodata()) -> iolist().
@@ -123,7 +123,7 @@ point_of_reference(_) ->
 
 ```
 
-Aside: The iolist type in Erlang is a sequencing mechanism. The literal byte representation of each part is used in these cases and the resulting octet stream runs from the first to the last element of the list (recursively). Some of these constructors have multiple clauses. These are pattern matches on the parameters and will execute the fist match from top to bottom. Lower case words like `undefined` are atoms in Erlang and can be thought of like primitives in Pony.
+Aside: The iolist type in Erlang is a sequencing mechanism. The literal byte representation of each part is used in these cases and the resulting octet stream runs from the first to the last element of the list (recursively). Some of these constructors have multiple clauses. These are pattern matches on the parameters and will execute the first match from top to bottom. Lower case words like `undefined` are atoms in Erlang and can be thought of like primitives in Pony.
 
 `short_bytes` described the encoding of short strings or small opaque binary data using a 16bit byte-length prefix. `u32` is an unsigned integer with 32 bits of range. Fields are specified as unsigned when possible. Languages which don't have primitive unsigned integers will need to take care when decoding this protocol but shouldn't have much difficulty encoding if two's complement is handled properly in the encoder.
 
@@ -148,7 +148,7 @@ hello(Revision, Cookie, ProgramName, InstanceName) ->
     ]).
 
 -spec ok(positive_integer()) -> frame().
-ok(InitialCredits, PointsOfReference) ->
+ok(InitialCredits) ->
     frame([
         ?OK,
         u32(InitialCredits)
@@ -168,7 +168,7 @@ This section assumes transport discovery and configuration has been handled else
 
 Upon connection, the connector must send a HELLO frame which establishes the protocol version and includes some descriptive metadata about the script as well as a preconfigured nonce called a cookie. These fields allows the Wallaroo worker to determine if it belongs with to the application or cluster and if so, how to route application messages.
 
-The cookie is optional and can have it's length set to zero if you haven't configured one somewhere <sup>C0</sup>. This will be default for easy development but it'll be encouraged to be used in a deployed cluster to prevent accidental and unwanted connections from being made, especially in the case where more than one cluster may be run. It is not a strong security mechanism by itself but designing by the rule of defense in depth, this becomes a reasonable mitigation.
+The cookie is optional and can have its length set to zero if you haven't configured one somewhere <sup>C0</sup>. This will be default for easy development but it'll be encouraged to be used in a deployed cluster to prevent accidental and unwanted connections from being made, especially in the case where more than one cluster may be run. It is not a strong security mechanism by itself but designing by the rule of defense in depth, this becomes a reasonable mitigation.
 
 In response to the HELLO frame, the worker should send either an OK frame or an ERROR frame. ERRORs will include a short reason meant for the programmer or operator. OK frames will include the initial credit count.
 
@@ -274,7 +274,7 @@ Sending a MESSAGE with a StreamId that has not been properly described using a n
 
 If a connector is resuming from Wallaroo's provided point of reference, the connector should provide that point of reference in the notification for the stream. Otherwise, the connector should provide the value zero.
 
-The worker should keep note of these mappings for metrics and debugging purposes. Each StreamId should also maintain some state, specifically whether the stream is open or closed (via EOS_MESSAGE).
+The Wallaroo worker should keep note of these mappings for metrics and debugging purposes. Each StreamId should also maintain some state, specifically whether the stream is open or closed (via EOS_MESSAGE).
 
 For any single stream, Wallaroo assumes that the MessageId in MESSAGE frames are strictly increasing.
 
@@ -292,7 +292,7 @@ A stream that has been closed by an EOS_MESSAGE may be used again later, by send
 
 ### ACK
 
-The worker should acknowledge frames of all types. These do not need to be 1-1 acknowledgments but it may be convenient to write it as such initially since all frames take one credit and each session needs to have these continuously replenished to avoid stuttered flow <sup>D2</sup>. ACK frames serve this purpose, almost like a regular heartbeat. Technically an ACK could be sent with zero credits but we don't currently see this as a very useful feature <sup>D3</sup>.
+The Wallaroo worker should acknowledge frames of all types. These do not need to be 1-1 acknowledgments but it may be convenient to write it as such initially since all frames take one credit and each session needs to have these continuously replenished to avoid stuttered flow <sup>D2</sup>. ACK frames serve this purpose, almost like a regular heartbeat. Technically an ACK could be sent with zero credits but we don't currently see this as a very useful feature <sup>D3</sup>.
 
 When Wallaroo has processed a barrier and completed a checkpoint, then, for each stream, the last received MessageId prior to the barrier will be sent to the connector client in an ACK frame to report processing progress <sup>D4</sup>.  All MESSAGEs with MessageIds less than the reported point of reference are included in the checkpoint.
 
@@ -362,9 +362,9 @@ Each stream during a session must be in one of the following states:
 
 ```
                   +------------+-------------+--------------+
-                  |            | +--------+  |              |
-                  |            | |        |  |              |
-                  |            | |        V  |              V
+                  |            | +----------\|/-----------+ |
+                  |            | |           |            | |
+                  |            | |           |            V V
  +-------+     +------+     +------+     +--------+     +------------+
  | Start +---->|Notify|---->| Open +---->| Closed +---->| Terminated |
  +-------+     | Sent |     |      |     |        |     |            |
@@ -426,6 +426,9 @@ In the Closed state, the following actions are valid:
 - ACK: Worker -> Connector
     * These can arrive asynchronously and should be processed accordingly
     * The next state is closed
+- RESTART: Worker -> Connector
+    * Worker is requesting that all streams be reprocessed
+    * The next state is Terminated
 
 In the Terminated state, no actions are valid: the worker will close the session and ignore any frames received after the RESTART frame has been sent.
 
@@ -437,16 +440,16 @@ The protocol described in this document was originally designed for use with Wal
 
 As used with connector sources, the word "worker" applies to a Wallaroo worker process, and the word "connector" applies to an external Wallaroo data source.  When applied to Wallaroo data sinks, the roles are reversed:
 
-    - A Wallaroo worker initiates the TCP connection to a connector sink.
-    - A Wallaroo worker sends HELLO, NOTIFY, MESSAGE, and EOS_MESSAGE frames to a connector sink.
-    - A connector sinks sends OK, NOTIFY_ACK, ACK, and RESTART frames to a Wallaroo worker
+* A Wallaroo worker initiates the TCP connection to a connector sink.
+* A Wallaroo worker sends HELLO, NOTIFY, MESSAGE, and EOS_MESSAGE frames to a connector sink.
+* A connector sinks sends OK, NOTIFY_ACK, ACK, and RESTART frames to a Wallaroo worker
 
 ### 2. Use of StreamIds is extremely limited
 
 A connector source may use as many streams (with unique StreamIds) as the entire Wallaroo system may require.  A connector sink, however, only uses two StreamIds:
 
-    - StreamId 1: The MESSAGE frame contains application output data via a Wallaroo sink actor.
-    - StreamId 0: The MESSAGE frame contains a Two Phase Commit (2PC) protocol message.
+* StreamId 1: The MESSAGE frame contains application output data sent by a Wallaroo sink actor.
+* StreamId 0: The MESSAGE frame contains a Two Phase Commit (2PC) protocol message.
 
 This allocation of StreamIDs may need to change as features such as sink `parallelism` factor (see below) are added.
 
@@ -462,42 +465,61 @@ NOTE: For both multi-worker Wallaroo clusters and the in-progress `parallelism` 
 
 A connector source's StreamIds are logically separate from each other. In contrast, the StreamIds of connector sinks are tightly coupled:
 
-    - The delivery order of all MESSAGE frames by the TCP stream has meaning and must be preserved by the data sink.
-    - The interleaving of StreamId 0 (2PC) and StreamId 1 (application sink output) frames is strictly limited.
+* The delivery order of all MESSAGE frames by the TCP stream has meaning and must be preserved by the data sink.
+* The interleaving of StreamId 0 (2PC) and StreamId 1 (application sink output) frames is strictly limited.
 
-While a round of the 2PC protocol is in progress, i.e. a MESSAGE frame in StreamId 0 with a Phase 1 request and ends with MESSAGE frame in StreamId 0 Phase 2 request, Wallaroo MUST NOT send any application MESSAGEs in StreamId 1 or any other StreamId > 0.  This restriction can be onerous to Wallaroo, but it also provides the greatest applicability to connector sinks of all types and capabilities.  This restriction may change in later protocol implementations.
+While a round of the 2PC protocol is in progress, i.e. begins with a MESSAGE frame in StreamId 0 containing a Phase 1 request and ends with MESSAGE frame in StreamId 0 containing a Phase 2 request, Wallaroo MUST NOT send any application MESSAGEs in StreamId 1 or any other StreamId > 0.  This restriction can be onerous to Wallaroo, but it also provides the greatest applicability to connector sinks of all types and capabilities.  This restriction may change in later protocol implementations.
 
 ### 5. The Two Phase Commit (2PC) protocol controls the connector sink's durability guarantees
 
 Periodically, Wallaroo will use a Two Phase Commit (2PC) protocol to coordinate the reliable delivery of application sink messages to one or more connector sinks.  The most common trigger of a round of 2PC is a Wallaroo state checkpoint.
 
-During a Wallaroo state checkpoint, a checkpoint barrier token is sent by each Wallaroo source down all Wallaroo pipelines until all barrier tokens are received by Wallaroo sink actors.  Each connector sink actor then starts a round of 2PC with the external connector sink.  If any connector sink votes ABORT during phase 1, then the barrier protocol will eventually cause all connector sinks to send ABORT during phase 2.  If all connector sinks vote COMMIT during phase 1, then the barrier protocol will eventually cause all connector sinks to send COMMIT during phase 2.
+NOTE: Wallaroo state checkpoints are enabled only when Wallaroo is compiled with support for resilience, i.e., `make resilience=on`.  If resilinece is not enabled, Wallaroo will not use 2PC with connector sinks.
 
-A MESSAGE frame that contains a 2PC phase 1 request will specify the byte offset range(s) of the data sent to the sink for the logical time range that is managed by the Wallaroo global checkpoint protocol.
+During a Wallaroo state checkpoint, a checkpoint barrier token is sent by each Wallaroo source down all Wallaroo pipelines until all barrier tokens are received by Wallaroo sink actors.  Each connector sink actor then starts a round of 2PC with the external connector sink.  If any connector sink votes ABORT during Phase 1, then the barrier protocol will eventually cause all connector sinks to send ABORT during Phase 2.  If all connector sinks vote COMMIT during Phase 1, then the barrier protocol will eventually cause all connector sinks to send COMMIT during Phase 2.
 
-The connector sink should be able to manage the durability of the data in this byte offset range(s).  If the connector sink cannot manage durability of this sink data, then the connector sink must always vote COMMIT during phase 1; such a sink then cannot provide the end-to-end message delivery guarantees that the connector sink protocol is intended to provide.  In such cases, we recommend that the Wallaroo TCPSink be used instead.
+A MESSAGE frame that contains a 2PC Phase 1 request will specify the byte offset range(s) of the data sent to the sink for the logical time range that is managed by the Wallaroo global checkpoint protocol.
 
-When the connector sink receives a 2PC phase 2 request:
+The connector sink should be able to manage the durability of the data in this byte offset range(s).  If the connector sink cannot manage durability of this sink data, then the connector sink must always vote COMMIT during Phase 1; such a sink then cannot provide the end-to-end message delivery guarantees that the connector sink protocol is intended to provide.  In such cases, we recommend that the Wallaroo TCPSink be used instead.
 
-    - If the phase 2 decision is COMMIT, then the connector sink must make the application sink data in the transaction's byte range(s) durable, using whatever app-specific means necessary.  For example:
-        - For file I/O, to write to a file(s) + flush(es) + fsync(s), etc.
-        - For a relational database, to commit any pending transactions that were created by the sink data.
-    - If the phase 2 decision is ABORT, then the connector sink must discard all application sink data in the transaction's byte range(s).
+#### 5.a When the connector sink received a 2PC Phase 1 request
+
+If the sink choose to reply with a Phase 1 COMMIT, then the sink is responsible for buffering all data received since the last 2PC round.  The sink data cannot be re-sent by Wallaroo if the sink is careless and destroys/loses/corrupts the data that it has received.
+
+If the sink chooses to reply with a Phase 1 ABORT message, then the sink has no responsibility for the data received since the last 2PC round.  Wallaroo must abort the entire checkpoint in response to this ABORT message, and, therefore, Wallaroo must send a Phase 2 ABORT decision to all sinks.
+
+#### 5.b. When the connector sink receives a 2PC Phase 2 request
+
+If the Phase 2 decision is COMMIT, then the connector sink must make the application sink data in the transaction's byte range(s) durable, using whatever app-specific means necessary.  For example:
+* For file I/O, to write to a file(s) + flush(es) + fsync(s), etc.
+* For a relational database, to commit any pending transactions that were created by the sink data.
+
+If the Phase 2 decision is ABORT, then the connector sink must discard all application sink data in the transaction's byte range(s).
+
+#### 5.c. About aloc_sink's 2PC implementation
+
+Wallaroo's connector sink implementation, `aloc_sink`, manages its sink data with respect to 2PC in the following manner:
+
+1. Sink data that is not yet committed by a 2PC round is written to its output file.
+2. The state of all 2PC commands received and the COMMIT/ABORT decisions made locally are stored in a separate file, stored in the same directory as the sink data output file but with a `.txnlog` suffix.
+    * See also: Section 6 below.
+3. Any 3rd party that reads data from the sink's output file must not act upon what is found in the output file until a 2PC COMMIT record is found in the `.txnlog` file for a specific range of bytes in the sink's output file.
+    * In the case of Wallaroo's `aloc_sink` test cases, the 3rd party reader is a Python test harness.
 
 ### 6. Durable storage of 2PC state
 
 A connector sink must provide durable storage for the state of all 2PC state. At a minimum, a connector sink must commit to stable storage:
 
-    - all transaction IDs in phase 1 + the local commit/abort decision
-    - all sink data in the byte range(s) specified by a phase 1 local COMMIT decision
+* all transaction IDs in Phase 1 + the local commit/abort decision
+* all sink data in the byte range(s) specified by a Phase 1 local COMMIT decision
 
 In the event of a connector sink crash, this persistent data must be used to comply with subsequent 2PC queries as the Wallaroo system works through its recovery protocols.
 
 ### 7. Protocol credits not used
 
-Wallaroo's connector sink implementation, `aloc_sink` is not managing the protocol's credit system and will rely solely on TCP backpressure for its own backpressure signalling.
+Wallaroo's connector sink implementation, `aloc_sink`, is not managing the protocol's credit system and will rely solely on TCP backpressure for its own backpressure signalling.
 
-### 2PC protocol messages
+### 8. 2PC protocol messages
 
 ```erlang
 -define(TWOPC_LIST_UNCOMMITTED,  201).
@@ -559,7 +581,7 @@ twopc_phase2(TxnId, Commit) ->
     ]).
 
 %% The twopc_reply message is used by the connector sink to reply
-%% both to 2PC phase 1 and phase 2 messages.
+%% both to 2PC Phase 1 and Phase 2 messages.
 %% NOTE: The encoding is nearly identical to the twopc_phase2 message.
 
 twopc_reply(TxnId, Commit) -> frame()
@@ -619,7 +641,7 @@ notifier
 
 listener
   -> check local registry
-    -> accept @ (see below
+    -> accept @ (see below)
     -> reject @ (see below)
   -> check global registry @ (see below)
 

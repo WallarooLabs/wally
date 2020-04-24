@@ -704,7 +704,7 @@ class AsyncServer(asynchat.async_chat, object):
 
     def close(self, delete_from_active_workers = True):
         logging.info("Closing the connection for {}, delete_from_active_workers = {}".format(self._worker_name, delete_from_active_workers))
-        logging.info("last received id by stream for {}:\n\t{}".format(
+        logging.info("last received id by stream for {}:  {}".format(
             self._worker_name, self._streams))
         super(AsyncServer, self).close()
         try:

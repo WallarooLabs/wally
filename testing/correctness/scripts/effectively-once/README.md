@@ -13,6 +13,17 @@ to test plain TCP sources and sinks also.  To test TCP source and
 sinks, the `WALLAROO_TCP_SOURCE_SINK` environment variable must be set
 to `true`.
 
+The order of presentation for major sections of this document are:
+
+* How to build
+* Basics about how to stop & start clusters, crash & restart workers, etc.
+    * For most use cases, I expect that you'd use the `master-crasher.sh` script for managing the entire testing lifecycle.
+* How to run & test clusters using a high-level automated script ("`master-crasher.sh`")
+    * This is my recommended method for testing.
+* How to run & test clusters using low-level shell scripts ("Testing Recipes")
+    * These scripts were designed for higher-level orchestration, by something like the `master-crasher.sh` script.  They are a bit cumbersome to use manually, but I've found them to be useful on rare occasions.
+
+
 ## Build prerequisites
 
 * I've only run this stuff on Linux, but the scripts have now been
@@ -20,6 +31,12 @@ to `true`.
 
     * I've been using an Ubuntu Xenial/16.04 LTS virtual machine with
       2 virtual CPUs and 4GB RAM.
+
+* Include this directory in your `PATH`:
+
+```
+export PATH=${PATH}:.
+```
 
 * You'll need the `logtail` utility installed.  Download
   https://github.com/kadashu/logtail/blob/master/logtail and put it
@@ -62,10 +79,7 @@ logging detail is required, I recommend setting the
 example:
 
 ```
-export WALLAROO_BIN=$HOME/wallaroo/examples/pony/passthrough/passthrough
-    or else
 export WALLAROO_BIN=$WALLAROO_TOP/examples/pony/passthrough/passthrough
-
 export WALLAROO_THRESHOLDS='*.8' # Turns on verbose logging @ debug level
 ```
 
@@ -74,7 +88,7 @@ Finally, all of the Bourne/Bash shell variables in the
 
 ```
 . ./sample-env-vars.sh
-    or else
+    or else (to use regular TCP sources & sinks instead of effectively-once)
 . ./sample-env-vars.sh.tcp-source+sink
 ```
 
@@ -107,16 +121,16 @@ already running.
 
 ```
 ./start-initializer.sh -n 1
-poll-ready.sh -v -a
+./poll-ready.sh -v 0
 ```
 
 ### Start an N-worker Wallaroo cluster
 
 The naming convention for the workers is:
 
-- 1st: `initializer`
-- 2nd: `worker1`
-- 3rd: `worker2`
+- 0th: `initializer`
+- 1st: `worker1`
+- 2nd: `worker2`
 - ...etc...
 
 WARNING: DO NOT USE THE `start-worker.sh` script to start
@@ -129,12 +143,15 @@ Let's start a 4-worker cluster by first starting `initializer` and
 then starting `worker1` through `worker3`.
 
 ```
+./reset.sh
+$WALLAROO_TOP/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 > /tmp/sink-out/stdout-stderr 2>&1 &
+
 DESIRED=4
 ./start-initializer.sh -n $DESIRED
 sleep 1
 DESIRED_1=`expr $DESIRED - 1`
 for i in `seq 1 $DESIRED_1`; do ./start-worker.sh -n $DESIRED $i; sleep 1; done
-./poll-ready.sh -v -a
+./poll-all-ready.sh -v
 ```
 
 ### Join a worker to an existing Wallaroo cluster
@@ -149,8 +166,8 @@ Let's join `worker4`.
 
 ```
 ./join-worker.sh -n 1 4
-sleep 1
-./poll-ready.sh -v -a
+sleep 2
+./poll-all-ready.sh -v
 ```
 
 ### Join N workers to an existing Wallaroo cluster
@@ -167,8 +184,7 @@ a worker joining very close in time to another worker's join.
 Let's start 4 workers: `worker5` through `worker8`.
 
 ```
-for i in `seq 5 8`; do ./join-worker.sh -n 4 $i; sleep 1; done
-./poll-ready.sh -v -a
+for i in `seq 5 8`; do ./join-worker.sh -n 4 $i; sleep 2; ./poll-all-ready.sh -v; done
 ```
 
 ### Shrink the cluster by 1 worker
@@ -183,7 +199,7 @@ Let's shrink `worker6`.
 ```
 ./shrink-worker.sh 6
 sleep 1
-./poll-ready.sh -v -a
+./poll-all-ready.sh -v
 ```
 
 ### Crash worker `N`
@@ -196,32 +212,193 @@ Let's crash `initializer`.
 ```
 ./crash-worker.sh 0
 sleep 1
-./poll-ready.sh -v -a
+./poll-ready.sh -v -w 2 0
 ```
 
 ### Restart the `initializer` after a crash
 
 ```
 ./start-initializer.sh
+sleep 1
+./poll-ready.sh -v 0
+./poll-all-ready.sh ; if [ $? -eq 0 ]; then echo All ready; else echo Bummer; fi
 ```
 
 ### Restart worker `N` instead of `initializer` after a crash
 
-Let's restart 1 worker, `worker5`.
+Let's crash & restart 1 worker, `worker5`.
 
 ```
+./crash-worker.sh 5
+sleep 1
 ./start-worker.sh -n 1 5
+sleep 1
+./poll-all-ready.sh -v
 ```
+
+
+## `master-crasher.sh`
+
+The environment variables found in the [sample-env-vars.sh](sample-env-vars.sh) control many aspects of the total system under test.  This section will mention a few useful variables to experiment with.
+
+The `master-crasher.sh` script is a one-size-fits-many orchestration script that takes care of the following general steps on a single machine.  No special container orchestration or OS features are required.  All processes are assigned non-conflicting TCP ports for use on a single host/virtual machine.
+
+### master-crasher.sh overview
+
+The `master-crasher.sh` script is a high level test script that automates a large number of tasks that are tedious to perform manually and also correctly.
+
+1. Kill all Python processes related to sources & sinks, Wallaroo processes, etc. and delete their related files in `/tmp`.
+
+2. Start the sink, Wallaroo, and 1 or more source/sender processes to create a Wallaroo cluster of a desired size.
+    * The env var `MULTIPLE_KEYS_LIST` determines how many sender processes will be started.
+
+3. Optionally, start a number of independent subshell processes that run a sleep-crash-restart loop for source, Wallaroo worker, and/or sink processes.
+    * There is little between these subprocesses, which means that it is possible to create situations where Wallaroo can never make a successful checkpoint because at least one source/worker/sink component is dead.
+    * I highly recommend monitoring the progress of successful checkpoints via the `at_least_once_line_file_feed` sender proc's output.
+    * This sleep-crash-restart loop will abort with an error if it detects that a Wallaroo worker process has crashed on its own (i.e., without assistance from the loop).
+
+4. Optionally, run subshell processes that will grow and/or shrink the cluster.
+
+5. Optionally, run a special subshell process to test a particular combination of operations. This feature is useful for debugging particular use cases or bug scenarios.
+
+6. Run additional subshell processes to check for sanity and forward progress.
+    * For each `MULTIPLE_KEYS_LIST` input file, check the output of the routing key's sink (using the `1-to-1-passthrough-verify.sh` utility) to verify that Wallaroo has not dropped/duplicated/reordered any messages.
+    * Check for successful checkpoints.  If a checkpoint has not happened within a certain period of time, then halt the system because we suspect that Wallaroo may have deadlocked.
+
+### master-crasher.sh command line arguments
+
+After startup, the `master-crasher.sh` script will run until:
+1. An error has been detected, so `pause_the_world` is run and all activity is paused to permit easier debugging.
+2. The `/tmp` file system is 100% full, which can cause spurious errors, particularly with the `1-to-1-passthrough-verify.sh` script.
+    * See the `Additional use notes` section.
+3. An EOF indicator has been found for at least one `at_least_once_line_file_feed` sender process.
+    * This is the one case where halting is not a test failure.
+
+Usage: `Usage: $0 num-desired [crash options...]`
+
+Alternative 1st argument: `reset-only` to kill all processes related to `master-crasher.sh` and to delete all relevant state files in `/tmp`.
+
+Mandatory 1st argument: Number of desired Wallaroo workers at the start of the script.  The number of Wallaroo workers is constant, unless an optional loop to grow or shrink the cluster is also run.
+
+Optional arguments:
+* `crash-sink` : Run the `run_crash_sink_loop` subprocess, which periodically crashes & restarts the sink process `aloc_sink`.
+* `no-ack-progress` : Do not run the `run_ack_progress_loop` subprocess.
+* `no-registry-process` : Do not run the `run_registry_progress_loop` subprocess.
+* `no-sanity` : Do not run the `run_sanity_loop` subprocess.
+* `no-clean-old-gzip-files` : Do not run the `run_clean_old_gzip_files` subprocess.
+* `crashN` where N=integer : Run a `run_crash_worker_loop` subprocess, which periodically crashes & restarts a worker process.
+    * `0` = the `initializer` worker, `1` or larger is the `workerN` worker, e.g., `worker3`.
+* `grow` : Run the `run_grow_shrink_loop` subprocess with the argument `grow`
+* `shrink` : Run the `run_grow_shrink_loop` subprocess with the argument `shrink`
+    * An argument like `grow-and-shrink` can be used to run a single `run_grow_shrink_loop` subprocess that will randomly choose to either grow or shrink the cluster.
+* `run_customX` : Run a custom test subprocess with the name `run_customX`.
+
+### master-crasher.sh output guide
+
+* `,` : An iteration of the `run_sanity_loop` is running. This loop checks the output of each routing key using the `1-to-1-passthrough-verify.sh` script.
+* `cS` and `rS` : Crash/restart the sink process.
+* `:s` : Skip an iteration of crashing/restarting the sink.
+    * This action is taken only when Wallaroo's `poll_ready` status is false for long periods of time.
+* `cN` and `rN` where N=integer : Crash/restart worker N.
+    * `0` = the `initializer` worker, `1` or larger is the `workerN` worker, e.g., `worker3`.
+* `:cN` : Skip an iteration of crashing/restarting worker N
+    * This action is taken only when Wallaroo's `poll_ready` status is false for long periods of time.
+* `{AP}` : An iteration of the `run_ack_progress_loop` is running.  This loop checks for at least one successful ack, as reported by the `at_least_once_line_file_feed` sender processes.  If a checkpoint has not happened within 5 minutes, then `pause_the_world` is run: we assume that Wallaroo has deadlocked or livelocked.
+* `{RP}` : An iteration of the `run_registry_progress_loop` is running.  This loop checks that a sender process has been able to successfully NOTIFY for a stream ID.  A failure here suggests that a bug in the Stream ID Registry system has been found.
+* `Join N.` where N=integer : A Wallaroo worker process is joining the cluster.
+* `Shrink N` where N=integer : A Wallaroo worker process is leaving the cluster
+* `Pause the world!` : Some kind of sanity check has failed.
+    * The `pause_the_world` function takes drastic action.
+    * All Wallaroo workers and the `master-crasher.sh` processes are paused using a `SIGSTOP` signal.
+    * Manual intervention is required at this point.  Something is wrong.  It's time to debug the system.
+
+### Files & directories created by `master-crasher.sh`
+
+Output paths for files created by various parts of the system are:
+* `/tmp/wallaroo.N` : output by Wallaroo worker process N.
+    * `0` = the `initializer` worker, `1` or larger is the `workerN` worker, e.g., `worker3`.
+* `/tmp/wallaroo.N.T` : output by Wallaroo worker process N that was crashed at UNIX epoch time T.  These files are very useful for certain debugging tasks.  For example, sometimes you need to know what happened while a now-dead Wallaroo worker was doing 40 seconds before a problem was detected now.
+* `/tmp/sender.out.X` : Output from the `at_least_once_line_file_feed` process for routing key X.
+* `/tmp/input-file.X.txt` : Input for `at_least_once_line_file_feed` for routing key X
+* `/tmp/stabilize.doit*` : Prefix for the files used to manage when a crasher subprocess should temporarily halt its crashing activity.
+* `/tmp/res` : If this file is created, then `master-crasher.sh` is halting because a sender process has indicated EOF/end of input file. 
+* `/tmp/sink-out` : This directory contains the output of the `aloc_sink` process
+    * `/tmp/sink-out/stdout-stderr` : The stdout and stderr output from the `aloc_sink` process.
+    * `/tmp/sink-out/output.W` : sink output for worker `W`
+    * `/tmp/sink-out/output.W.txnlog` : 2PC transaction log for the sink output for worker `W`.
+
+### Additional use notes for `master-crasher.sh`
+
+The `master-crasher.sh` script generates a lot of shell subprocesses.  It is very difficult to coordinate stopping or killing all of them.
+* If you want to stop a running `master-crasher.sh` process & all of its subprocesses, I recommend using `Control-z` to pause all subprocesses (works well) instead of `Control-c` to kill all subprocesses (because it doesn't work well).
+* If you want to re-run `master-crasher.sh`, just run it again.  The `reset` steps that are run by using `master-crasher.sh reset-only` are also run, prior to starting any new processes for the new test run.
+
+Every time that the `run_crash_worker_loop` crashes a worker process, the output file for that worker, `/tmp/wallaroo.N`, is renamed to `/tmp/wallaroo.N.T` where T is the UNIX epoch time of the crash.  That file is the compressed with the `gzip` utility.
+* The `run_clean_old_gzip_files` subprocess runs a loop that will keep the last 5 `gzip`'ed files for each worker and delete all older files.
+* For any worker process that does not have an explicit `run_crash_worker_loop` running, it is possible that the `/tmp/wallaroo.N` console output from Wallaroo will grow so large that it fills the `/tmp` file system.
+    * For any long-running test, it is strongly recommended that all workers that are not crashed frequently should instead be crashed every few minutes, by putting the suffix `.slow` on the `crashN` argument.  The occasional crash will create an opportunity for the console log file to be rotated and compressed and eventually pruned automatically.
+        * Disk space problem: `master-crasher.sh 3 crash0`
+        * No disk space problem: `master-crasher.sh 3 crash0 crash1.slow crash2.slow`
+
+The VM or container or physical machine that executes `master-crasher.sh` should have enough CPU and disk space to execute all the Wallaroo workers & sources & sink, `master-crasher.sh`'s sanity checking, and also the periodic CPU-intensive `gzip` processes.
+
+The sleep intervals for the `run_crash_worker_loop` are not configurable yet.  This may cause problems for cases when you wish to crash multiple workers + sink all in the same run (e.g., `master-crasher.sh 4 crash-source crash0 crash1 crash2 crash3 crash-sink`).  Crashing so many components at once can create situations where almost all Wallaroo checkpoints are aborted because of a process crash and/or the sink is disconnected so that Wallaroo cannot process data at all.
+
+### Example outout
+
+```
+$ master-crasher.sh 6 crash-source crash0 crash1 crash2 crash3 crash4 crash5 crash-sink
+WARNING: all useful state files are deleted by this script!
+Worker initializer: port = 7103
+Worker worker1: port = 7113
+Worker worker2: port = 7123
+Worker worker3: port = 7133
+Worker worker4: port = 7143
+Worker worker5: port = 7153
+Success
+RUN: run_crash_worker_loop 0
+RUN: run_crash_worker_loop 1
+RUN: run_crash_worker_loop 2
+RUN: run_crash_worker_loop 3
+RUN: run_crash_worker_loop 4
+RUN: run_crash_worker_loop 5
+RUN: run_crash_sink_loop
+Start time: 1587413104000
+Done, yay ... waiting
+,cS,rSc1c3c0c5c2,r2r3r5c4,r1r0,r4,{RP},c4c2c1c5r5c0c3r4r1,r2,r0r3,c0cS,r0c5c1rSc3r1c2r3c4,r2r4,{RP}r5,c5,c0r5r0c4c2r4,c1c3,r2r1,r3,c4c0c3c5r4,r5c2c1r2r3r0{RP}cSr1,c3rS,c1c0c5r3,c2c4r1,r0r5r2,r4,c2c1c3r1c4c0c5,r4r3{RP}r2r5,r0,,c1c5,c3c0c4r5c2r0r4r3,r2r1cSrS,c2c3,{RP}c0c4c1r... etc etc....
+,r5,c5,c3{RP},run_ack_progress_loop: successful ack not seen in /tmp/sender.out.A
+End time: 1587413477000
+Duration: 373000
+Pause the world!
+End time: 1587413477000
+Duration: 373000
+[2]+  Stopped                 master-crasher.sh 6 crash-source crash0 crash1 crash2 crash3 crash4 crash5 crash-sink
+$ 
+```
+
+### Debugging tips
+
+1. NOTE: The `master-crasher.sh` script always starts processes in a specific (and almost always deterministic) manner.  As a result, it cannot hit bugs such as [Bug 3123](https://github.com/WallarooLabs/wallaroo/issues/3123), which only happens when Wallaroo is started before the connector sink is ready to accept TCP connections.
+
+2. To reduce workload, or to reduce the number of routing keys in the system by reducing the number of `at_least_once_line_file_feed` sender processes, change the value of the `MULTIPLE_KEYS_LIST` environment variable.
+    * For example, `MULTIPLE_KEYS_LIST='A B C D'` or `MULTIPLE_KEYS_LIST='A'`
+
+3. Compile with `debug=true`.
+
+4. Compile with `PONYCFLAGS="--debug -Dcheckpoint_trace -Didentify_routing_ids"`
+    * Also add `-Dverbose_debug` for additional verbose printing of connector source & sink payloads.
 
 
 ## Testing Recipes
+
+If you cannot use `master-crasher.sh` for a particular task, or if you wish to explore using some of the utility scripts that `master-crasher.sh` uses, then read on!
 
 ### Prerequisites
 
 Create a large input file, approx 12MB, using the commands:
 
 ```
-./remove-input-files.sh
+./delete-input-files.sh
 ./create-input-files.sh
 ```
 
@@ -243,23 +420,43 @@ In Window 1:
 
 * Run `reset.sh`
 * Start the Wallaroo cluster with the desired number of workers.
-* Be sure to run `poll-ready.sh -a -v` to verify that all workers are ready for work.
+* Be sure to run `poll-all-ready.sh -v` to verify that all workers are ready for work.
 
 In Window 2:
 
 ```
-env PYTHONPATH=$WALLAROO_TOP/machida/lib:examples/python/celsius_connectors $WALLAROO_TOP/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.A.txt 21222 |& tee /tmp/feed.out
+env PYTHONPATH=$WALLAROO_TOP/machida/lib:examples/python/celsius_connectors $WALLAROO_TOP/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.A.txt 21222 > /tmp/sender.out 2>&1 &
+tail -f /tmp/sender.out | egrep 'acked.*is_open=True'
 ```
 
-In Window 1:
+The `tail -f` process is watching for stream ack events.  If the cluster is working correctly, these events should be logged approximately every 1 second.  Stream ack events pause when some part of the Wallaroo cluster (source, Wallaroo worker(s), sink) have crashed and have not been restarted.  After all procs have restarted, the stream ack events should resume.
+
+The input file, `/tmp/input-file.A.txt`, is approximately 12MB in size.  Once the sender has reached the end of the file, the `at_least_once_line_file_feed` process will periodically reconnect and re-send.  This logic is present in cases when new data might be appended to the input file.  Our test procedures does not use this feature.
+
+In Window 3:
 
 ```
-while [ 1 ]; do ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt  ; if [ $? -ne 0 ]; then killall -STOP passthrough; echo STOPPED; break; fi ; sleep 1; done
+while [ 1 ]; do /bin/echo -n ,; ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt  ; if [ $? -ne 0 ]; then killall -STOP passthrough; echo STOPPED; break; fi ; sleep 1; done
 ```
 
 ### Repeatedly crashing and restarting the sink
 
-TODO replace hack
+This is a long 1-liner that I've used for testing, before `master-crasher.sh` was written.
+
+Prerequisites:
+
+* Start the sink
+* Start the Wallaroo cluster of desired size
+* Start the `at_least_once_line_file_feed` sender for the `/tmp/input-file.A.txt` file.  Also, monitor with the `is_open=True` loop.
+
+This 1-liner will do the following 100 times:
+
+1. Kill the sink with a combination of `ps`, `grep`, `awk`, and `xargs kill`.
+2. Sleep a random amount of time, 2-3 seconds.
+3. Restart the sink process.
+4. Run the `1-to-1-passthrough-verify.sh` script to verify that no sink data has been lost, duplicated, or re-ordered.
+
+This test should be monitored with the `is_open=True` grep command.  One sign of failure is that `is_open=True` entries are no longer logged; such a failure can indicate that the Stream ID registry has become corrupted, or that a Wallaroo worker has crashed.
 
 ```
 for i in `seq 1 100`; do ps axww | grep aloc_sink | grep -v grep | awk '{print $1}' | xargs kill ; amount=`date | sed -e 's/.*://' -e 's/ .*//'`; echo i is $i, amount is $amount; sleep 2.$amount ; env PYTHONPATH=$WALLAROO_TOP/machida/lib $WALLAROO_TOP/testing/correctness/tests/aloc_sink/aloc_sink /tmp/sink-out/output /tmp/sink-out/abort 7200 >> /tmp/sink-out/stdout-stderr 2>&1 & sleep 2 ; ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt ; if [ $? -eq 0 ]; then echo OK; else killall -STOP passthrough ; echo STOPPED; break; fi ; egrep -v 'DEBUG|INFO' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then killall -STOP passthrough ; echo STOP-grep; break; fi; done
@@ -267,22 +464,35 @@ for i in `seq 1 100`; do ps axww | grep aloc_sink | grep -v grep | awk '{print $
 
 ### Repeatedly crashing and restarting a non-initializer worker
 
-TODO replace hack
+Prerequisites:
+
+* Start the sink
+* Start the Wallaroo cluster of desired size
+* Start the `at_least_once_line_file_feed` sender for the `/tmp/input-file.A.txt` file.  Also, monitor with the `is_open=True` loop.
+
+This 2-liner will do the following 100 times:
+
+1. Kill the worker named by $TO_CRASH.
+2. Sleep a random amount of time, 2-3 seconds.
+3. Restart the crashed worker.
+4. Run the `1-to-1-passthrough-verify.sh` script to verify that no sink data has been lost, duplicated, or re-ordered.
+
+This test should be monitored with the `is_open=True` grep loop.  See also: previous subsection. In the event of a Wallaroo failure, the output from the crashed/restarted Wallaroo workers is kept in files named `/tmp/wallaroo.$TO_CRASH.{crash iteration number}.`
 
 ```
 TO_CRASH=1
-for i in `seq 1 100`; do echo -n $i; crash-worker.sh $TO_CRASH ; sleep 0.2 ; mv /tmp/wallaroo.$TO_CRASH /tmp/wallaroo.$TO_CRASH.$i ; gzip -f /tmp/wallaroo.$TO_CRASH.$i & start-worker.sh $TO_CRASH ; sleep 1.2; poll-ready.sh -w 2 -a; if [ $? -ne 0 ]; then echo BREAK0; break; fi; egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then echo BREAK; break; fi; ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt; if [ $? -ne 0 ]; then echo BREAK2; break; fi ;sleep 0.2; done
+for i in `seq 1 100`; do echo -n $i; crash-worker.sh $TO_CRASH ; sleep 0.2 ; mv /tmp/wallaroo.$TO_CRASH /tmp/wallaroo.$TO_CRASH.$i ; gzip -f /tmp/wallaroo.$TO_CRASH.$i & start-worker.sh $TO_CRASH ; sleep 1.2; poll-all-ready.sh -w 2; if [ $? -ne 0 ]; then echo BREAK0; break; fi; egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then echo BREAK; break; fi; ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt; if [ $? -ne 0 ]; then echo BREAK2; break; fi ;sleep 0.2; done
 ```
 
 ### Repeatedly crashing and restarting the initializer worker
 
-TODO replace hack
+See prerequisites & advice from previous subsection.
 
-NOTE: There's a limitation in the Python connector client
+WARNING: There's a limitation in the Python connector client
 w.r.t. reconnecting after a close.  Read below for more detail.
 
 ```
-for i in `seq 1 100`; do echo -n $i; crash-worker.sh 0 ; sleep 0.2 ; mv /tmp/wallaroo.0 /tmp/wallaroo.0.$i ; gzip -f /tmp/wallaroo.0.$i & start-initializer.sh ; sleep 1.2; poll-ready.sh -w 2 -a; if [ $? -ne 0 ]; then echo BREAK0; break; fi; egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then echo BREAK; break; fi; ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt; if [ $? -ne 0 ]; then echo BREAK2; break; fi ;sleep 0.2; done
+for i in `seq 1 100`; do echo -n $i; crash-worker.sh 0 ; sleep 0.2 ; mv /tmp/wallaroo.0 /tmp/wallaroo.0.$i ; gzip -f /tmp/wallaroo.0.$i & start-initializer.sh ; sleep 1.2; poll-all-ready.sh -w 2; if [ $? -ne 0 ]; then echo BREAK0; break; fi; egrep 'ERROR|FATAL|CRIT' /tmp/sink-out/stdout-stderr ; if [ $? -eq 0 ]; then echo BREAK; break; fi; ./1-to-1-passthrough-verify.sh A /tmp/input-file.A.txt; if [ $? -ne 0 ]; then echo BREAK2; break; fi ;sleep 0.2; done
 ```
 
 The Python connector client is not 100% reliable in reconnecting to
@@ -295,8 +505,9 @@ restart the `at_least_once_line_file_feed` script.
 
 ### Repeatedly crashing and restarting the source
 
-TODO replace hack
+See prerequisites & advice from previous subsection.
 
 ```
 while [ 1 ]; do env PYTHONPATH=$WALLAROO_TOP/machida/lib:$WALLAROO_TOP/examples/python/celsius_connectors $WALLAROO_TOP/testing/correctness/scripts/effectively-once/at_least_once_line_file_feed /tmp/input-file.A.txt 41000 & amount=`date | sed -e 's/.*://' -e 's/ .*//'`; echo amount is $amount; sleep 1.$amount ; kill -9 `ps axww | grep -v grep | grep feed | awk '{print $1}'`; sleep 0.$amount; done
 ```
+

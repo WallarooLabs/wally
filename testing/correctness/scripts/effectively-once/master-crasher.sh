@@ -1,5 +1,18 @@
 #!/bin/sh
 
+reset () {
+    reset.sh
+    ps axww | grep master-crasher.sh | grep -v $$ | awk '{print $1}' | xargs kill -9 > /dev/null 2>&1
+    stop_sink > /dev/null 2>&1
+    stop_sender > /dev/null 2>&1
+}
+
+if [ "$1" = "reset-only" ]; then
+    reset
+    echo "Halting after reset"
+    exit 0
+fi
+
 DESIRED=$1
 if [ -z "$DESIRED" ]; then
     usage=yes
@@ -29,13 +42,6 @@ export WALLAROO_THRESHOLDS='*.8'
 
 export SENDER_OUTFILE=/tmp/sender.out
 export STABILIZE_PREFIX=/tmp/stabilize.doit
-
-reset () {
-    reset.sh
-    ps axww | grep master-crasher.sh | grep -v $$ | awk '{print $1}' | xargs kill -9 > /dev/null 2>&1
-    stop_sink > /dev/null 2>&1
-    stop_sender > /dev/null 2>&1
-}
 
 start_sink () {
     if [ "$WALLAROO_TCP_SOURCE_SINK" = "true" ]; then
@@ -87,6 +93,7 @@ print_duration () {
 }
 
 pause_the_world () {
+    echo 'Pause the world!'
     killall -STOP passthrough
     if [ `uname -s` = Linux ]; then
         print_duration
@@ -377,6 +384,16 @@ run_sanity_loop () {
     echo "SANITY LOOP FAILURE: pause the world"
     print_duration
     pause_the_world
+}
+
+run_clean_old_gzip_files () {
+    while [ 1 ]; do
+        workers=`ls /tmp/wallaroo.*.*gz 2>&1 | grep -v 'cannot access' | sed -e 's/[^.]*\.//' -e 's/\..*//' | uniq`
+        for w in $workers "dummy-no-such-worker"; do
+            ls -t /tmp/wallaroo.$w.*gz 2>&1 | sed '1,5d' | xargs rm -f
+        done
+        sleep 10
+    done &
 }
 
 get_worker_names () {
@@ -770,6 +787,7 @@ start_senders &
 run_ack_progress_loop=true
 run_registry_progress_loop=true
 run_sanity=true
+run_clean_old_gzip_files=true
 for arg in $*; do
     case $arg in
         crash-sink)
@@ -787,6 +805,10 @@ for arg in $*; do
         no-sanity)
             echo NO RUN: run_sanity_loop
             run_sanity=false
+            ;;
+        no-clean-old-gzip-files)
+            echo NO RUN: run_clean_old_gzip_files
+            run_clean_old_gzip_files=false
             ;;
         crash[0-9]*)
             worker=`echo $arg | sed -e 's/crash//' -e 's/\..*//'`
@@ -826,6 +848,9 @@ if [ $run_registry_progress_loop = true ]; then
 fi
 if [ $run_sanity = true ]; then
     run_sanity_loop &
+fi
+if [ $run_clean_old_gzip_files = true ]; then
+    run_clean_old_gzip_files &
 fi
 
 echo Start time: $START_TIME
