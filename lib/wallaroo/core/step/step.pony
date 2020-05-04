@@ -50,7 +50,7 @@ use @l[I32](severity: LogSeverity, category: LogCategory, fmt: Pointer[U8] tag, 
 actor Step is (Producer & Consumer & BarrierProcessor)
   let _auth: AmbientAuth
   let _worker_name: WorkerName
-  var _id: U128
+  var _id: RoutingId
   let _runner: Runner
   var _router: Router = EmptyRouter
   let _metrics_reporter: MetricsReporter
@@ -80,7 +80,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   var _seq_id_initialized_on_recovery: Bool = false
   let _recovery_replayer: RecoveryReconnecter
 
-  let _outgoing_boundaries: Map[String, OutgoingBoundary] =
+  let _outgoing_boundaries: Map[WorkerName, OutgoingBoundary] =
     _outgoing_boundaries.create()
 
   // Watermarks
