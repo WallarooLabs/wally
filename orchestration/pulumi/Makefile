@@ -26,7 +26,7 @@ subnet_name="$(cluster_name)-$(location)_snet"
 nsg_name="$(cluster_name)-$(location)_nsg"
 vmss_name="$(cluster_name)-$(location)_vmss"
 ppg_name="$(cluster_name)-$(location)_ppg"
-cluster_os_image?="Canonical:UbuntuServer:16.04-LTS:latest" ## Image to use for cluster
+cluster_os_image?="Canonical:UbuntuServer:18.04-LTS:latest" ## Image to use for cluster
 
 ansible_playbook_path ?= ## Path to custom ansible playbook
 extra_ansible_vars ?= ## Extra ansible vars to use with custom playbook
@@ -35,6 +35,9 @@ inventory_script := inventory.$(cluster_name)-$(location).yaml
 ansible_user ?= ubuntu
 all_instances := 'wallaroo-*'
 follower_instances := 'wallaroo-followers'
+
+sync_dir ?= ## Directory to sync to cluster
+dest_dir ?= ## Directory to placed synced directory in cluster
 
 # if debug shell command output requested
 ifdef DEBUG_SHELL
@@ -116,6 +119,11 @@ ifeq ($(use_proximity_placement_group),true)
 endif
 
 cluster_full_pem := $(shell echo $(cluster_pem))
+rsync_opts := \"--exclude=.git -aHxv --numeric-ids --delete --progress \
+          -e 'ssh -T -x -o StrictHostKeyChecking=no -o Compression=no \
+          -i $(cluster_full_pem)'
+user_rsync_opts ?= # User provdied rsync options
+rsync_opts := $(rsync_opts) $(user_rsync_opts)
 
 .PHONY: all up init init-pulumi-vnet-stack init-pulumi-cluster-stack sleep60 cluster\
 	configure create-vnet create-ppg create-vmss import-vmss destroy-vmss\
@@ -172,6 +180,21 @@ sync-wallaroo: check-cluster-name ## Rsync wallaroo repo to nodes
           recursive=yes rsync_opts=\"--exclude=.git -e 'ssh  -o StrictHostKeyChecking=no \
           -i $(cluster_full_pem)'\""
 	@echo "\033[36m==> Successfully ran ansible to rsync wallaroo repo to cluster \
+'$(cluster_name)' in location '$(location)' at provider '$(provider)'!\033[0m"
+
+sync-dir: check-cluster-name ## Rsync directory to nodes
+	@echo "\033[36m==> Running ansible to rsync provided directory to cluster \
+'$(cluster_name)' in location '$(location)' at provider '$(provider)'...\033[0m"
+	ansible $(all_instances) \
+          -i ../ansible/$(inventory_script) --ssh-common-args="-o StrictHostKeyChecking=no \
+          -i  $(cluster_full_pem)"  -u $(ansible_user) -m file -a "path=$(abspath $(dir $(dest_dir))) mode=0777 \
+          state=directory" --become
+	ansible $(all_instances) \
+          -i ../ansible/$(inventory_script) --ssh-common-args="-o StrictHostKeyChecking=no \
+          -i  $(cluster_full_pem)"  -u $(ansible_user) -m synchronize -a "src=$(abspath \
+          $(dir $(sync_dir))) dest=$(abspath $(dir $(dest_dir))) \
+          recursive=yes rsync_opts=$(rsync_opts)\""
+	@echo "\033[36m==> Successfully ran ansible to rsync provided directory to cluster \
 '$(cluster_name)' in location '$(location)' at provider '$(provider)'!\033[0m"
 
 

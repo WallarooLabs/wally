@@ -122,17 +122,17 @@
     state: present
   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
-- name: add llvm apt repo
-  apt_repository:
-    repo: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.9 main'
-    state: present
-  when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
+# - name: add llvm apt repo
+#   apt_repository:
+#     repo: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.9 main'
+#     state: present
+#   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
-- name: add llvm src apt repo
-  apt_repository:
-    repo: 'deb-src http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.9 main'
-    state: present
-  when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
+# - name: add llvm src apt repo
+#   apt_repository:
+#     repo: 'deb-src http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.9 main'
+#     state: present
+#   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
 - name: Install dev packages
   apt: name={{ item }} state=latest update_cache=yes
@@ -165,14 +165,14 @@
     version: master
   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
-- name: checkout to latest ponyc release
-  shell: git checkout $(git describe --tags `git rev-list --tags --max-count=1`)
+- name: checkout to ponyc 0.29.0 release
+  shell: git checkout 0.29.0
   args:
     chdir: /src/ponyc
   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
-- name: compile and install latest ponyc release
-  command: sudo LLVM_CONFIG=/usr/lib/llvm-3.9/bin/llvm-config make config=release install
+- name: compile and install ponyc 0.29.0 release
+  command: sudo LLVM_CONFIG=/usr/lib/llvm-3.9/bin/llvm-config make config=release install default_pic=true default_ssl=openssl_1.1.x
   args:
     chdir: /src/ponyc
     creates: /src/ponyc/build
