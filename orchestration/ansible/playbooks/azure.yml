@@ -2,6 +2,9 @@
 - hosts: wallaroo-leaders:wallaroo-followers
   gather_facts: False
   tasks:
+  - name: disable timesync
+    raw: systemctl stop systemd-timesyncd && systemctl disable systemd-timesyncd
+    become: yes
   - name: update apt
     raw: which python || apt-get update
     become: yes

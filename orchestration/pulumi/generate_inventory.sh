@@ -12,6 +12,21 @@ leader_instance_ips=$(az vmss list-instance-public-ips -n $vmss_name -g $resourc
 follower_instance_ips=$(az vmss list-instance-public-ips -n $vmss_name -g $resource_group_name \
 	| jq ".[$num_leaders:$total] | .[].ipAddress")
 
+INDEX=1
+for ipAddress in $leader_instance_ips; do
+	echo "[wallaroo-leader-$INDEX]"
+	echo "$ipAddress"
+	let INDEX=${INDEX}+1
+done
+
+INDEX=1
+for ipAddress in $follower_instance_ips; do
+	echo "[wallaroo-follower-$INDEX]"
+	echo "$ipAddress"
+	let INDEX=${INDEX}+1
+done
+
+
 echo "[wallaroo-leaders]"
 for ipAddress in $leader_instance_ips; do
 	echo "$ipAddress"
