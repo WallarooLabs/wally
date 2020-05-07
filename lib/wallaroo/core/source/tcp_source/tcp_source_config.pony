@@ -84,22 +84,26 @@ class val TCPSourceConfigOptions
 class val TCPSourceConfig[In: Any val] is SourceConfig
   let handler: FramedSourceHandler[In] val
   let parallelism: USize
+  let max_size: USize
   let _worker_source_config: WorkerTCPSourceConfig
 
   new val create(source_name': SourceName,
     handler': FramedSourceHandler[In] val, host': String, service': String,
-    valid': Bool, parallelism': USize = 10)
+    valid': Bool, parallelism': USize = 10, max_size': USize = 16384)
   =>
     handler = handler'
     parallelism = parallelism'
+    max_size = max_size'
     _worker_source_config = WorkerTCPSourceConfig(source_name', host',
       service', valid')
 
   new val from_options(handler': FramedSourceHandler[In] val,
-    opts: TCPSourceConfigOptions, parallelism': USize = 10)
+    opts: TCPSourceConfigOptions, parallelism': USize = 10,
+    max_size': USize = 16384)
   =>
     handler = handler'
     parallelism = parallelism'
+    max_size = max_size'
     _worker_source_config = WorkerTCPSourceConfig(opts.source_name, opts.host,
       opts.service, opts.valid)
 
