@@ -98,8 +98,8 @@ primitive RandomFixNbboGenerator
     else
       bid = price + number_generator()
       var max_inc: F64 = 0.05 - 0.01
-      var inc_val: F64 = (number_generator.rand_int((max_inc * 100).u64())
-      / 100).f64()
+      let inc_base = number_generator.rand_int((max_inc * 100).u64()).f64()
+      var inc_val: F64 = inc_base / 100
       offer = bid + inc_val
     end
 
