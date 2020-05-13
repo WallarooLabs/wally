@@ -135,7 +135,7 @@
         passno: 0
   roles:
   - { role: common, become: yes }
-  - { role: jacoelho.softwareraid, become: yes, when: disks_list | length > 0}
+  # - { role: jacoelho.softwareraid, become: yes, when: disks_list | length > 0}
 
 # Configure and deploy leader servers.
 - hosts: wallaroo-leaders
