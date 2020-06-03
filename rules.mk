@@ -88,6 +88,10 @@ ifndef ponyc_arch_args
   ponyc_arch_args :=
 endif
 
+ifndef gen_wallaroo_default_targets
+  gen_wallaroo_default_targets := true
+endif
+
 wallaroo_version = $(shell cat $(ROOT_PATH)/VERSION)
 
 # function to lazily initialize a variable on first use and to only evaluate the expression once
@@ -505,6 +509,7 @@ ROOT_TARGET_SUFFIX := $(if $(filter $(abs_wallaroo_dir),$(abspath $(ROOT_PATH)))
 .PHONY: build build-docker build-monhub build-pony clean clean-docker clean-monhub clean-pony list push-docker test-monhub test-pony test docker-arch-check monhub-arch-check help build-docker-pony push-docker-pony build-docker-monhub push-docker-monhub
 
 # default targets
+define wallaroo-default-goal
 .DEFAULT_GOAL := build
 build: build-$(ROOT_TARGET_SUFFIX) ## Build all projects (pony & monhub) (DEFAULT)
 test: unit-tests integration-tests ## Test all projects (pony & monhub)
@@ -523,6 +528,11 @@ build-docker-monhub: build-docker-monhub-all ## Build docker containers for all 
 push-docker-monhub: push-docker-monhub-all ## Push docker containers for all monhub projects
 build-docker: build-docker-$(ROOT_TARGET_SUFFIX) ## Build all docker images
 push-docker: push-docker-$(ROOT_TARGET_SUFFIX) ## Push all docker images
+endef
+
+ifeq ($(gen_wallaroo_default_targets),true)
+  $(eval $(call wallaroo-default-goal))
+endif
 
 # rule to print info about make variables, works only with make 3.81 and above
 # to use invoke make with a target of print-VARNAME, e.g.,
