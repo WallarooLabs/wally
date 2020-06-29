@@ -122,18 +122,6 @@
     state: present
   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
-# - name: add llvm apt repo
-#   apt_repository:
-#     repo: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.9 main'
-#     state: present
-#   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
-
-# - name: add llvm src apt repo
-#   apt_repository:
-#     repo: 'deb-src http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.9 main'
-#     state: present
-#   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
-
 - name: Install dev packages
   apt: name={{ item }} state=latest update_cache=yes
   with_items:
