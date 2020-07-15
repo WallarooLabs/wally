@@ -19,6 +19,10 @@ Proximity Placement Group, etc. The state for this is stored in Pulumi.
 The cluster module depends on the `azure-vnet` module and will fail if the `azure-vnet` module
 hasn't been created yet.
 
+### Azure-VM
+
+The Azure VM module handles creating the single virtual machine in Azure and the related network components, etc. The state for this is stored in Pulumi. This module was designed for use in creating base images in Azure since this cannot be done via a VMSS.
+
 ## Configuration
 
 ### General
@@ -122,6 +126,26 @@ The following examples are to illustrate the features available and common use c
   `make check-ptpd-offsets cluster_name=sample`
 * Run a custom ansible playbook in a cluster with name `sample` in location `eastus`:
   `make ansible-custom-playbook cluster_name=sample location=eastus ansible_playbook_path="../custom/path/to/playbook" extra_ansible_vars="custom_var=test" ansible_user=wallaroo`
+
+### Azure VM Examples
+
+Examples for orchestrating an Azure VM. This should primarily be used for OS image creations and single machine clusters.
+
+* Create and configure (with ansible) a VM with name `sample` in location
+  `eastus` and using VM Sku `Standard_F48s_v2`:
+  `make vm cluster_name=sample location=eastus vm_sku=Standard_F48s_v2`
+* Configure (with ansible) a VM with name `sample` in location
+  `eastus` and using VM Sku `Standard_F48s_v2`:
+  `make configure cluster_name=sample location=eastus vm_sku=Standard_F48s_v2`
+* Destroy a VM with name `sample` in location
+  `eastus` and using VM Sku `Standard_F48s_v2`:
+  `make destroy-vm cluster_name=sample location=eastus vm_sku=Standard_F48s_v2`
+* Initialize Pulumi stack for a VM with name `sample` in location
+  `eastus` and using VM Sku `Standard_F48s_v2`:
+  `make init-vm cluster_name=sample location=eastus vm_sku=Standard_F48s_v2`
+* Generate inventory file for an exisiting VM with name `sample` in location
+  `eastus`:
+  `make generate-vm-inventory cluster_name=sample location=eastus`
 
 ## Debugging Ansible for Azure
 

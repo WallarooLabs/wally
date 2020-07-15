@@ -23,18 +23,24 @@ num_instances_arg=$(shell echo $$(( $(num_leaders) + $(num_followers) )))
 resource_group_name="$(cluster_name)-$(location)_rg"
 vnet_name="$(cluster_name)-$(location)_vnet"
 subnet_name="$(cluster_name)-$(location)_snet"
+ip_name="$(cluster_name)-$(location)_ip"
+nic_name="$(cluster_name)-$(location)_nic"
 nsg_name="$(cluster_name)-$(location)_nsg"
 vmss_name="$(cluster_name)-$(location)_vmss"
+vm_name="$(cluster_name)-$(location)_vm"
 ppg_name="$(cluster_name)-$(location)_ppg"
 cluster_os_image?="Canonical:UbuntuServer:18.04-LTS:latest" ## Image to use for cluster
+custom_os_image ?= ## Custom OS Image to use for vm creation
 
 ansible_playbook_path ?= ## Path to custom ansible playbook
 extra_ansible_vars ?= ## Extra ansible vars to use with custom playbook
 
 inventory_script := inventory.$(cluster_name)-$(location).yaml
 ansible_user ?= ubuntu
+ansible_password ?= ubuntu
 all_instances := 'wallaroo-*'
 follower_instances := 'wallaroo-followers'
+ssh_path?="/home/${ansible_user}/.ssh/authorized_keys"
 
 sync_dir ?= ## Directory to sync to cluster
 dest_dir ?= ## Directory to placed synced directory in cluster
@@ -137,11 +143,15 @@ sleep60: # sleep 60 seconds
 cluster: in_cluster=true
 cluster: check-cluster-name init up sleep60 generate-inventory configure ## Creates a cluster and configures it with Ansible
 
+vm: check-cluster-name init-vm create-vm sleep60 generate-vm-inventory configure ## Creates a VM and configures it with Ansible
+
 init: check-cluster-name init-pulumi-vnet-stack init-pulumi-cluster-stack ## Initialize Pulumi stacks
+init-vm: check-cluster-name init-pulumi-vm-stack ## Initialize Pulumi VM stack
 
 up: check-cluster-name create-vnet create-ppg create-vmss import-vmss
 
 destroy: check-cluster-name destroy-vmss destroy-ppg destroy-vnet destroy-cluster-state destroy-vnet-state delete-inventory-file ## Run cluster and vnet destroy steps
+destroy-vm: check-cluster-name destroy-vm-cloud destroy-vm-state delete-inventory-file ## Run vm destroy steps
 
 check-ptpd-offsets: check-cluster-name ## Check ptpd offsets for all followers in the cluster
 	@echo "\033[36m==> Running ansible ptpd check for followers in cluster \
@@ -229,6 +239,13 @@ init-pulumi-cluster-stack: check-cluster-name ## Initialize pulumi cluster stack
 	@echo "\033[36m==> Successfully confirmed Cluster Pulumi Stack is created for location \
 '$(location)' at provider '$(provider)'!\033[0m"
 
+init-pulumi-vm-stack: check-cluster-name ## Initialize pulumi vnet stack
+		@echo "\033[36m==> Confirming Virtual Machine Pulumi Stack is created for location \
+'$(location)' at provider '$(provider)'...\033[0m"
+	cd $(provider)-vm && pulumi stack init '$(cluster_name)-$(location)'
+	@echo "\033[36m==> Successfully confirmed Virtual Machine Pulumi Stack is created for location \
+'$(location)' at provider '$(provider)'!\033[0m"
+
 create-vnet: check-cluster-name ## Create vnet
 		@echo "vnet name: '$(vnet_name)'"
 	@echo "\033[36m==> Confirming Virtual Network is created in location \
@@ -242,6 +259,28 @@ create-vnet: check-cluster-name ## Create vnet
 	--config "$(provider)-vnet:project-name=$(cluster_project_name)" \
 	--yes --non-interactive
 	@echo "\033[36m==> Successfully confirmed Virtual Network is created in location \
+'$(location)' at provider '$(provider)'!\033[0m"
+
+create-vm: check-cluster-name ## Create vm
+	@echo "\033[36m==> Confirming Virtual Machine is created in location \
+'$(location)' at provider '$(provider)'...\033[0m"
+	cd $(provider)-vm && pulumi up -s '$(cluster_name)-$(location)' \
+	--config "$(provider)-vm:location=$(location)" \
+	--config "$(provider)-vm:resourcegroup-name=$(resource_group_name)" \
+	--config "$(provider)-vm:vm-name=$(vm_name)" \
+	--config "$(provider)-vm:vnet-name=$(vnet_name)" \
+	--config "$(provider)-vm:ip-name=$(ip_name)" \
+	--config "$(provider)-vm:nic-name=$(nic_name)" \
+	--config "$(provider)-vm:os-image=$(cluster_os_image)" \
+	--config "$(provider)-vm:custom-os-image-id=$(custom_os_image)" \
+	--config "$(provider)-vm:vm-sku=$(vm_sku)" \
+	--config "$(provider)-vm:username=$(ansible_user)" \
+	--config "$(provider)-vm:password=$(ansible_password)" \
+	--config "$(provider)-vm:ssh-path=$(ssh_path)" \
+	--config "$(provider)-vm:ssh-key-data=$(shell cat ${cluster_pub})" \
+	--config "$(provider)-vm:project-name=$(cluster_project_name)" \
+	--yes --non-interactive
+	@echo "\033[36m==> Successfully confirmed Virtual Machine is created in location \
 '$(location)' at provider '$(provider)'!\033[0m"
 
 create-ppg: check-cluster-name ## Create PPG
@@ -304,12 +343,26 @@ destroy-cluster-state: check-cluster-name ## Destroy Cluster Pulumi Stack state
 	cd $(provider)-cluster && pulumi stack rm '$(cluster_name)-$(location)' --yes --non-interactive
 	@echo "\033[36m==> Cluster Pulumi Stack state successfully destroyed!\033[0m"
 
+destroy-vm-cloud: check-cluster-name ## Destroy VM in location
+	@echo "\033[36m==> Destroying Virtual Machine in location '$(location)' at provider '$(provider)'...\033[0m"
+	cd $(provider)-vm && pulumi destroy -s '$(cluster_name)-$(location)' --yes
+	@echo "\033[36m==> Successfully confirmed Virtual Machine is destroyed in location \
+'$(location)' at provider '$(provider)'!\033[0m"
+
+destroy-vm-state: check-cluster-name ## Destroy Cluster Pulumi Stack state
+	@echo "\033[36m==> Destroying Virtual Machine Pulumi Stack state...\033[0m"
+	cd $(provider)-vm && pulumi stack rm '$(cluster_name)-$(location)' --yes --non-interactive
+	@echo "\033[36m==> Virtual Machine Pulumi Stack state successfully destroyed!\033[0m"
+
 check-cluster-name: ## Check for valid cluster name
 	$(if $(cluster_name),,$(error 'cluster_name' cannot be empty!))
 	$(if $(filter $(cluster_name),$(shell echo '$(cluster_name)' | sed 's/[^-a-zA-Z0-9]//g')),,$(error 'cluster_name' can only have [-a-zA-Z0-9] in it!))
 
 generate-inventory: ## Generates inventory file
 	./generate_inventory.sh $(vmss_name) $(resource_group_name) $(num_leaders) $(num_followers) > ../ansible/inventory.$(cluster_name)-$(location).yaml
+
+generate-vm-inventory: ## Generates VM inventory file
+	./generate_vm_inventory.sh $(vm_name) $(resource_group_name) > ../ansible/inventory.$(cluster_name)-$(location).yaml
 
 delete-inventory-file: ## Deletes inventory file
 	rm ../ansible/inventory.$(cluster_name)-$(location).yaml
