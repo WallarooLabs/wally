@@ -1,0 +1,28 @@
+name: azure-vm
+runtime: nodejs
+description: Azure Virtual Machine and related Resources creation and management
+template:
+  config:
+    azure-vm:location:
+      description: The Azure location to use (`eastus`, `eastus2`,`centralus`, `westus2`)
+      default: eastus
+    azure-vm:vm-name:
+      description: The Azure Virtual Machine name to use
+      default: wallaroo-dev_vm
+    azure-vm:resourcegroup-name:
+      description: The Azure Resource Group name to use
+      default: wallaroo-dev_rg
+    azure-vm:vnet-name:
+      description: The Azure Virtual Network name to use
+    azure-vm:nic-name:
+      description: The Azure Network Interface name to use
+      default: wallaroo-dev_nic
+    azure-vm:ip-name:
+      description: The Azure Public IP name to use
+      default: wallaroo-dev_ip
+    azure-vm:project-name:
+      description: The project name for tagging purporses.
+      default: orch-dev
+    azure-vm:os-image:
+      description: The Azure OS Image to use
+      default: Canonical:UbuntuServer:18.04-LTS:latest
