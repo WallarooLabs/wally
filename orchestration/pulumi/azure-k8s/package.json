@@ -1,0 +1,11 @@
+{
+    "name": "azure-k8s",
+    "main": "index.js",
+    "dependencies": {
+        "@pulumi/azure": "^1.0.0",
+        "@pulumi/azuread": "^1.8.0",
+        "@pulumi/kubernetes": "^1.0.0",
+        "@pulumi/pulumi": "^1.0.0",
+        "@pulumi/random": "^1.0.0"
+    }
+}

@@ -29,6 +29,14 @@ nsg_name="$(cluster_name)-$(location)_nsg"
 vmss_name="$(cluster_name)-$(location)_vmss"
 vm_name="$(cluster_name)-$(location)_vm"
 ppg_name="$(cluster_name)-$(location)_ppg"
+app_name="$(cluster_name)-k8s-$(location)_app"
+np_name="default"
+sp_name="$(cluster_name)-k8s-$(location)_sp"
+app_name="$(cluster_name)-k8s-$(location)_app"
+k8s_dns_prefix="$(cluster_name)-k8s-$(location)"
+
+k8s_network_policy ?= "calico"## Network Policy to use for k8s
+kubernetes_version ?= "1.18.4"## Kubernetes version to use
 cluster_os_image?="Canonical:UbuntuServer:18.04-LTS:latest" ## Image to use for cluster
 custom_os_image ?= ## Custom OS Image to use for vm creation
 
@@ -40,7 +48,7 @@ ansible_user ?= ubuntu
 ansible_password ?= ubuntu
 all_instances := 'wallaroo-*'
 follower_instances := 'wallaroo-followers'
-ssh_path?="/home/${ansible_user}/.ssh/authorized_keys"
+ssh_path ?="/home/${ansible_user}/.ssh/authorized_keys"
 
 sync_dir ?= ## Directory to sync to cluster
 dest_dir ?= ## Directory to placed synced directory in cluster
@@ -239,11 +247,19 @@ init-pulumi-cluster-stack: check-cluster-name ## Initialize pulumi cluster stack
 	@echo "\033[36m==> Successfully confirmed Cluster Pulumi Stack is created for location \
 '$(location)' at provider '$(provider)'!\033[0m"
 
+
 init-pulumi-vm-stack: check-cluster-name ## Initialize pulumi vnet stack
 		@echo "\033[36m==> Confirming Virtual Machine Pulumi Stack is created for location \
 '$(location)' at provider '$(provider)'...\033[0m"
 	cd $(provider)-vm && pulumi stack init '$(cluster_name)-$(location)'
 	@echo "\033[36m==> Successfully confirmed Virtual Machine Pulumi Stack is created for location \
+'$(location)' at provider '$(provider)'!\033[0m"
+
+init-pulumi-k8s-stack: check-cluster-name ## Initialize pulumi k8s cluster stack
+	@echo "\033[36m==> Confirming k8s Cluster Pulumi Stack is created for location \
+'$(location)' at provider '$(provider)'...\033[0m"
+	cd $(provider)-k8s && pulumi stack init '$(cluster_name)-$(location)'
+	@echo "\033[36m==> Successfully confirmed k8s Cluster Pulumi Stack is created for location \
 '$(location)' at provider '$(provider)'!\033[0m"
 
 create-vnet: check-cluster-name ## Create vnet
@@ -302,6 +318,28 @@ create-vmss: check-cluster-name ## Create VMSS
 	@echo "\033[36m==> Successfully confirmed VM Scale Set is created in location \
 '$(location)' at provider '$(provider)'!\033[0m"
 
+create-k8s: check-cluster-name ## Create k8s cluster
+	@echo "\033[36m==> Confirming k8s cluster is created in location \
+'$(location)' at provider '$(provider)'...\033[0m"
+	cd $(provider)-k8s && pulumi up -s '$(cluster_name)-$(location)' \
+	--config "$(provider)-k8s:location=$(location)" \
+	--config "$(provider)-k8s:resourcegroup-name=$(resource_group_name)" \
+	--config "$(provider)-k8s:aks-cluster-name=$(cluster_name)" \
+	--config "$(provider)-k8s:app-name=$(app_name)" \
+	--config "$(provider)-k8s:node-pool-name=$(np_name)" \
+	--config "$(provider)-k8s:sp-name=$(sp_name)" \
+	--config "$(provider)-k8s:kubernetes-version=$(kubernetes_version)" \
+	--config "$(provider)-k8s:dns-prefix=$(k8s_dns_prefix)" \
+	--config "$(provider)-k8s:network-policy=$(k8s_network_policy)" \
+	--config "$(provider)-k8s:node-count=$(num_instances_arg)" \
+	--config "$(provider)-k8s:vm-sku=$(vm_sku)" \
+	--config "$(provider)-k8s:username=$(ansible_user)" \
+	--config "$(provider)-k8s:ssh-key-data=$(shell cat ${cluster_pub})" \
+	--config "$(provider)-k8s:project-name=$(cluster_project_name)" \
+	--yes --non-interactive
+	@echo "\033[36m==> Successfully confirmed k8s is created in location \
+'$(location)' at provider '$(provider)'!\033[0m"
+
 import-vmss: check-cluster-name ## Import exisiting VMSS into Pulumi stack
 import-vmss: vmss_id=$(shell az vmss show -g $(resource_group_name) -n $(vmss_name) -o json | jq '.id')
 import-vmss:
@@ -333,6 +371,12 @@ destroy-vnet: check-cluster-name ## Destroy VNet in location
 	@echo "\033[36m==> Successfully confirmed VNet is destroyed in location \
 '$(location)' at provider '$(provider)'!\033[0m"
 
+destroy-k8s: check-cluster-name ## Destroy k8s cluster in location
+	@echo "\033[36m==> Destroyingk8s Cluster in location '$(location)' at provider '$(provider)'...\033[0m"
+	cd $(provider)-k8s && pulumi destroy -s '$(cluster_name)-$(location)' --yes
+	@echo "\033[36m==> Successfully confirmed k8s Cluster is destroyed in location \
+'$(location)' at provider '$(provider)'!\033[0m"
+
 destroy-vnet-state: check-cluster-name ## Destroy VNet Pulumi Stack state
 	@echo "\033[36m==> Destroying VNet Pulumi Stack state...\033[0m"
 	cd $(provider)-vnet && pulumi stack rm '$(cluster_name)-$(location)' --yes --non-interactive
@@ -353,6 +397,11 @@ destroy-vm-state: check-cluster-name ## Destroy Cluster Pulumi Stack state
 	@echo "\033[36m==> Destroying Virtual Machine Pulumi Stack state...\033[0m"
 	cd $(provider)-vm && pulumi stack rm '$(cluster_name)-$(location)' --yes --non-interactive
 	@echo "\033[36m==> Virtual Machine Pulumi Stack state successfully destroyed!\033[0m"
+
+destroy-k8s-state: check-cluster-name ## Destroy k8s Cluster Pulumi Stack state
+	@echo "\033[36m==> Destroying k8s Cluster Pulumi Stack state...\033[0m"
+	cd $(provider)-k8s && pulumi stack rm '$(cluster_name)-$(location)' --yes --non-interactive
+	@echo "\033[36m==> k8s Cluster Pulumi Stack state successfully destroyed!\033[0m"
 
 check-cluster-name: ## Check for valid cluster name
 	$(if $(cluster_name),,$(error 'cluster_name' cannot be empty!))

@@ -5,7 +5,7 @@ So far we have only implemented Azure as the provider.
 
 ## Modules
 
-The two modules are `azure-vnet` and `azure-cluster`.
+The three modules are `azure-vnet`, `azure-cluster`, and `azure-k8s` .
 
 ### Azure-VNet
 
@@ -22,6 +22,10 @@ hasn't been created yet.
 ### Azure-VM
 
 The Azure VM module handles creating the single virtual machine in Azure and the related network components, etc. The state for this is stored in Pulumi. This module was designed for use in creating base images in Azure since this cannot be done via a VMSS.
+
+### Azure-k8s
+
+The k8s module handles creating the Azure AKS kubernetes along with the network policy, Service Principal, etc. The state for this is stored in Pulumi.
 
 ## Configuration
 
@@ -146,6 +150,18 @@ Examples for orchestrating an Azure VM. This should primarily be used for OS ima
 * Generate inventory file for an exisiting VM with name `sample` in location
   `eastus`:
   `make generate-vm-inventory cluster_name=sample location=eastus`
+
+#### k8s Examples
+
+Currently, there is minimal configuration provided for spinning up an Azure AKS cluster. Below are the steps once can take to spin up and tear down a cluster.
+
+* Initialize Pulumi k8s Stack with the `cluster_name` of `testkube` in the default location: `make init-pulumi-k8s-stack cluster_name=testkube`
+
+* Use Pulumi to create k8s/AKS cluster with one virtual machine and using the `Standard_F32s_v2` VM Sku in the default location: ` make init-pulumi-k8s-stack cluster_name=testkube num_followers=0 vm_sku=Standard_F32s_v2`
+
+* Use Pulumi to destroy the k8s/AKS cluster `testkube`: `make destroy-k8s cluster_name=testkube`
+
+* Destroy the Pulumi stack state for the k8s/AKS cluster `testkube`: `make destroy-k8s-state cluster_name=testkube`
 
 ## Debugging Ansible for Azure
 
