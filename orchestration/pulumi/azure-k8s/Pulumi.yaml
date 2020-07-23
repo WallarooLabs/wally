@@ -1,0 +1,43 @@
+name: azure-k8s
+runtime: nodejs
+description: Azure k8s AKS Cluster and related Resources creation and management
+template:
+  config:
+    azure-k8s:location:
+      description: The Azure location to use (`eastus`, `eastus2`,`centralus`, `westus2`)
+      default: eastus
+    azure-k8s:resourcegroup-name:
+      description: The Azure Resource Group name to use
+      default: wallaroo-dev_rg
+    azure-k8s:sp-name:
+      description: The Azure Service Principal name to use
+      default: wallaroo-dev_sp
+    azure-k8s:app-name:
+      description: The app name to use for the Service Principal
+    azure-k8s:aks-cluster-name:
+      description: The Azure AKS Cluster name to use
+    azure-k8s:node-pool-name:
+      description: The Azure AKS node pool name to use
+      default: default
+    azure-k8s:node-count:
+      description: The Azure AKS node count to use
+    azure-k8s:network-policy:
+      description: The Azure AKS network policy to use (`azure`, `calico`)
+      default: calico
+    azure-k8s:ssh-key-data:
+      description: The ssh key data to use
+    azure-k8s:project-name:
+      description: The project name for tagging purporses.
+      default: orch-dev
+    azure-k8s:vm-sku:
+      description: The vm sku to use for the VMs.
+    azure-k8s:dns-prefix:
+      description: The dns prefix to use for the k8s.
+    azure-k8s:username:
+      description: The username to use for the VMs.
+      default: ubuntu
+    azure-k8s:kubernetes-version:
+      description: The kubernetes version to use.
+      default: 1.18.4
+    azure-k8s:vm-sku:
+      description: The vm sku to use for the VMs.
