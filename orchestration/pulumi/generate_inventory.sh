@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #set -x
 vmss_name=$1
 resource_group_name=$2
