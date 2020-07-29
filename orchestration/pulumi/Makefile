@@ -150,6 +150,7 @@ sleep60: # sleep 60 seconds
 
 cluster: in_cluster=true
 cluster: check-cluster-name init up sleep60 generate-inventory configure ## Creates a cluster and configures it with Ansible
+cluster-k8s: check-cluster-name init-pulumi-k8s-stack create-k8s enable-k8s-dashboard enable-k8s-http-routing set-k8s-context ## Creates a kubernetes cluster, enables the dashboard and http application routing addons, retrieves credentials and sets context
 
 vm: check-cluster-name init-vm create-vm sleep60 generate-vm-inventory configure ## Creates a VM and configures it with Ansible
 
@@ -159,7 +160,11 @@ init-vm: check-cluster-name init-pulumi-vm-stack ## Initialize Pulumi VM stack
 up: check-cluster-name create-vnet create-ppg create-vmss import-vmss
 
 destroy: check-cluster-name destroy-vmss destroy-ppg destroy-vnet destroy-cluster-state destroy-vnet-state delete-inventory-file ## Run cluster and vnet destroy steps
+<<<<<<< HEAD
 destroy-vm: check-cluster-name destroy-vm-cloud destroy-vm-state delete-inventory-file ## Run vm destroy steps
+=======
+destroy-k8s: check-cluster-name destroy-k8s-cluster destroy-k8s-state ## Run Kubernetes destroy steps
+>>>>>>> Adds single cluster up and destroy commands for Kubernetes clusters
 
 check-ptpd-offsets: check-cluster-name ## Check ptpd offsets for all followers in the cluster
 	@echo "\033[36m==> Running ansible ptpd check for followers in cluster \
@@ -371,8 +376,8 @@ destroy-vnet: check-cluster-name ## Destroy VNet in location
 	@echo "\033[36m==> Successfully confirmed VNet is destroyed in location \
 '$(location)' at provider '$(provider)'!\033[0m"
 
-destroy-k8s: check-cluster-name ## Destroy k8s cluster in location
-	@echo "\033[36m==> Destroyingk8s Cluster in location '$(location)' at provider '$(provider)'...\033[0m"
+destroy-k8s-cluster: check-cluster-name ## Destroy k8s cluster in location
+	@echo "\033[36m==> Destroying k8s Cluster in location '$(location)' at provider '$(provider)'...\033[0m"
 	cd $(provider)-k8s && pulumi destroy -s '$(cluster_name)-$(location)' --yes
 	@echo "\033[36m==> Successfully confirmed k8s Cluster is destroyed in location \
 '$(location)' at provider '$(provider)'!\033[0m"
@@ -402,6 +407,39 @@ destroy-k8s-state: check-cluster-name ## Destroy k8s Cluster Pulumi Stack state
 	@echo "\033[36m==> Destroying k8s Cluster Pulumi Stack state...\033[0m"
 	cd $(provider)-k8s && pulumi stack rm '$(cluster_name)-$(location)' --yes --non-interactive
 	@echo "\033[36m==> k8s Cluster Pulumi Stack state successfully destroyed!\033[0m"
+
+enable-k8s-dashboard: check-cluster-name ## Enable Kubernetes dashboard addon
+	@echo "\033[36m==> Enabling Kubernetes Dashboard addon in location \
+'$(location)' at provider '$(provider)'...\033[0m"
+	az aks enable-addons --name $(cluster_name) --resource-group $(resource_group_name) \
+	--addons kube-dashboard
+	@echo "\033[36m==> Successfully enabled Kubernetes Dashboard addon in location \
+'$(location)' at provider '$(provider)' for cluster '$(cluster_name)'!\033[0m"
+
+enable-k8s-http-routing: check-cluster-name ## Enable Kubernetes http application routing addon
+	@echo "\033[36m==> Enabling Kubernetes http application routing addon in location \
+'$(location)' at provider '$(provider)'...\033[0m"
+	az aks enable-addons --name $(cluster_name) --resource-group $(resource_group_name) \
+	--addons http_application_routing
+	@echo "\033[36m==> Successfully enabled Kubernetes http application routing addon in location \
+'$(location)' at provider '$(provider)' for cluster '$(cluster_name)'!\033[0m"
+
+display-k8s-http-routing-zone-name: check-cluster-name ## Displays Kubernetes http application routing zone name
+	@echo "\033[36m==> Retrieving Kubernetes http application routing zone name in location \
+'$(location)' at provider '$(provider)' for cluster '$(cluster_name)'...\033[0m"
+	az aks show --name $(cluster_name) --resource-group $(resource_group_name) \
+	--query addonProfiles.httpApplicationRouting.config.HTTPApplicationRoutingZoneName -o table
+	@echo "\033[36m==> Successfully retrieved Kubernetes http application routing zone name in location \
+'$(location)' at provider '$(provider)' for cluster '$(cluster_name)'!\033[0m"
+
+
+set-k8s-context: check-cluster-name ## Displays Kubernetes http application routing zone name
+	@echo "\033[36m==> Retrieves Kubernetes credentials and setting context in location \
+'$(location)' at provider '$(provider)' for cluster '$(cluster_name)'...\033[0m"
+	az aks get-credentials --name $(cluster_name) --resource-group $(resource_group_name) \
+	--overwrite-existing
+	@echo "\033[36m==> Successfully retrieved Kubernetes credentials and set context in location \
+'$(location)' at provider '$(provider)' for cluster '$(cluster_name)'!\033[0m"
 
 check-cluster-name: ## Check for valid cluster name
 	$(if $(cluster_name),,$(error 'cluster_name' cannot be empty!))
