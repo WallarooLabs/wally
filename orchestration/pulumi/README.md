@@ -153,15 +153,24 @@ Examples for orchestrating an Azure VM. This should primarily be used for OS ima
 
 #### k8s Examples
 
-Currently, there is minimal configuration provided for spinning up an Azure AKS cluster. Below are the steps once can take to spin up and tear down a cluster.
+Currently, there is minimal configuration provided for spinning up an Azure AKS cluster. Below are the steps one can take to spin up and tear down a cluster.
 
-* Initialize Pulumi k8s Stack with the `cluster_name` of `testkube` in the default location: `make init-pulumi-k8s-stack cluster_name=testkube`
+* Spin up a Kubernetes cluster with the `cluster_name` of `testkube` in the default location: `make cluster-k8s cluster_name=testkube num_followers=0 vm_sku=Standard_F48s_v2 cluster_project_name=dev`
+    * `cluster-k8s` does the following:
+      - initializes the Pulumi state for the Kubernetes Cluster
+      - creates the Kubernetes cluster in Azure
+      - enables the HTTP routing addon
+      - enables the Kubernetes Dashboard addon
+      - sets the current Kubernetes context to the context for the newly created cluster
 
-* Use Pulumi to create k8s/AKS cluster with one virtual machine and using the `Standard_F32s_v2` VM Sku in the default location: ` make init-pulumi-k8s-stack cluster_name=testkube num_followers=0 vm_sku=Standard_F32s_v2`
+* Destroy the k8s/AKS cluster `testkube`: `make destroy-k8s cluster_name=testkube cluster_project_name=dev`
+    * `destroy-k8s` does the following:
+      - destroys the AKS cluster
+      - destroys the associated Pulumi state
 
-* Use Pulumi to destroy the k8s/AKS cluster `testkube`: `make destroy-k8s cluster_name=testkube`
+* Display the HTTP Routing Zone for an existing `kubetest` cluster: `make display-k8s-http-routing-zone-name cluster_name=kubetest cluster_project_name=dev`
 
-* Destroy the Pulumi stack state for the k8s/AKS cluster `testkube`: `make destroy-k8s-state cluster_name=testkube`
+* Manually set the current Kubernetes context to the context for an existing k8s cluster with the cluster name `kubetest`: `make set-k8s-context cluster_name=kubetest num_followers=0 vm_sku=Standard_F48s_v2 cluster_project_name=dev`
 
 ## Debugging Ansible for Azure
 

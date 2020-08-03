@@ -160,11 +160,10 @@ init-vm: check-cluster-name init-pulumi-vm-stack ## Initialize Pulumi VM stack
 up: check-cluster-name create-vnet create-ppg create-vmss import-vmss
 
 destroy: check-cluster-name destroy-vmss destroy-ppg destroy-vnet destroy-cluster-state destroy-vnet-state delete-inventory-file ## Run cluster and vnet destroy steps
-<<<<<<< HEAD
+
 destroy-vm: check-cluster-name destroy-vm-cloud destroy-vm-state delete-inventory-file ## Run vm destroy steps
-=======
+
 destroy-k8s: check-cluster-name destroy-k8s-cluster destroy-k8s-state ## Run Kubernetes destroy steps
->>>>>>> Adds single cluster up and destroy commands for Kubernetes clusters
 
 check-ptpd-offsets: check-cluster-name ## Check ptpd offsets for all followers in the cluster
 	@echo "\033[36m==> Running ansible ptpd check for followers in cluster \
