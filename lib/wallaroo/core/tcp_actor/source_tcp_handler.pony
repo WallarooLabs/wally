@@ -11,9 +11,11 @@ class val SourceTCPHandlerBuilder
     SourceTCPHandler(tcp_actor)
 
   fun for_connection(fd: U32, init_size: USize = 64, max_size: USize = 16384,
-    tcp_actor: TCPActor ref, muted: Bool): TestableTCPHandler
+    max_received_count: USize = 50, tcp_actor: TCPActor ref, muted: Bool):
+    TestableTCPHandler
   =>
-    SourceTCPHandler(tcp_actor, fd, init_size, max_size, muted)
+    SourceTCPHandler(tcp_actor, fd, init_size, max_size, max_received_count,
+      muted)
 
 class SourceTCPHandler is TestableTCPHandler
   let _tcp_actor: TCPActor ref
@@ -46,7 +48,8 @@ class SourceTCPHandler is TestableTCPHandler
   var _throttled: Bool = false
 
   new create(tcp_actor: TCPActor ref, fd: U32 = -1, init_size: USize = 64,
-    max_size: USize = 16384, muted: Bool = false)
+    max_size: USize = 16384, max_received_count: USize = 50,
+    muted: Bool = false)
   =>
     """
     A new connection accepted on a server.
@@ -66,6 +69,7 @@ class SourceTCPHandler is TestableTCPHandler
     _read_buf_offset = 0
     _init_size = init_size
     _max_size = max_size
+    _max_received_count = max_received_count
 
     _readable = true
     _closed = false

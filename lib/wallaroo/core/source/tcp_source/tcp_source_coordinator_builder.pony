@@ -47,6 +47,7 @@ class val TCPSourceCoordinatorBuilder[In: Any val] is SourceCoordinatorBuilder
   let _target_router: Router
   let _parallelism: USize
   let _max_size: USize
+  let _max_received_count: USize
   let _handler: FramedSourceHandler[In] val
   let _host: String
   let _service: String
@@ -60,7 +61,8 @@ class val TCPSourceCoordinatorBuilder[In: Any val] is SourceCoordinatorBuilder
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     recovering: Bool, target_router: Router = EmptyRouter,
-    parallelism: USize, max_size: USize, handler: FramedSourceHandler[In] val,
+    parallelism: USize, max_size: USize, max_received_count: USize,
+    handler: FramedSourceHandler[In] val,
     host: String, service: String, valid: Bool)
   =>
     _worker_name = worker_name
@@ -79,6 +81,7 @@ class val TCPSourceCoordinatorBuilder[In: Any val] is SourceCoordinatorBuilder
     _target_router = target_router
     _parallelism = parallelism
     _max_size = max_size
+    _max_received_count = max_received_count
     _handler = handler
     _host = host
     _service = service
@@ -90,7 +93,8 @@ class val TCPSourceCoordinatorBuilder[In: Any val] is SourceCoordinatorBuilder
       _metrics_reporter.clone(), _router_registry,
       _outgoing_boundary_builders, _event_log, _auth, _layout_initializer,
       _recovering, _target_router, _parallelism, _handler,
-      _host, _service, _valid where max_size = _max_size)
+      _host, _service, _valid where max_size = _max_size,
+      max_received_count = _max_received_count)
 
 class val TCPSourceCoordinatorBuilderBuilder[In: Any val] is
   SourceCoordinatorBuilderBuilder
@@ -122,7 +126,8 @@ class val TCPSourceCoordinatorBuilderBuilder[In: Any val] is
         consume metrics_reporter, router_registry, outgoing_boundary_builders,
         event_log, auth, layout_initializer, recovering, target_router,
         _source_config.parallelism, _source_config.max_size,
-        _source_config.handler, config.host, config.service, config.valid)
+        _source_config.max_received_count, _source_config.handler, config.host,
+        config.service, config.valid)
     else
       Unreachable()
       TCPSourceCoordinatorBuilder[In](worker_name, pipeline_name,
@@ -130,5 +135,6 @@ class val TCPSourceCoordinatorBuilderBuilder[In: Any val] is
         consume metrics_reporter, router_registry, outgoing_boundary_builders,
         event_log, auth, layout_initializer, recovering, target_router,
         _source_config.parallelism, _source_config.max_size,
-        _source_config.handler, "0", "0", false)
+        _source_config.max_received_count, _source_config.handler, "0", "0",
+        false)
     end

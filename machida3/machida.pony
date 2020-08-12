@@ -955,8 +955,12 @@ primitive _SourceConfig
         USize.from[I64](@PyLong_AsLong(@PyTuple_GetItem(source_config_tuple, 7)))
       end
 
+      let max_received_count: USize = recover val
+        USize.from[I64](@PyLong_AsLong(@PyTuple_GetItem(source_config_tuple, 8)))
+      end
+
       TCPSourceConfig[(PyData val | None)](source_name, decoder, host, port,
-        valid, parallelism, max_size)
+        valid, parallelism, max_size, max_received_count)
     | "kafka-internal" =>
       let ksclip = KafkaSourceConfigCLIParser(env.out, source_name)
       let ksco = ksclip.parse_options(env.args)?

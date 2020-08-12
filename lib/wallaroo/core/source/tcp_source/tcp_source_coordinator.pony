@@ -93,6 +93,7 @@ actor TCPSourceCoordinator[In: Any val] is SourceCoordinator
   var _closed: Bool = false
   var _init_size: USize = 0
   var _max_size: USize = 0
+  var _max_received_count: USize = 50
 
   let _connected_sources: SetIs[TCPSource[In]] = _connected_sources.create()
   let _available_sources: Array[TCPSource[In]] = _available_sources.create()
@@ -112,7 +113,8 @@ actor TCPSourceCoordinator[In: Any val] is SourceCoordinator
     recovering: Bool, target_router: Router = EmptyRouter,
     parallelism: USize, handler: FramedSourceHandler[In] val,
     host: String, service: String, valid: Bool,
-    init_size: USize = 64, max_size: USize = 16384)
+    init_size: USize = 64, max_size: USize = 16384,
+    max_received_count: USize = 50)
   =>
     """
     Listens for both IPv4 and IPv6 connections.
@@ -143,6 +145,7 @@ actor TCPSourceCoordinator[In: Any val] is SourceCoordinator
     _limit = parallelism
     _init_size = init_size
     _max_size = max_size
+    _max_received_count = max_received_count
 
     match router
     | let pr: StatePartitionRouter =>
@@ -331,7 +334,7 @@ actor TCPSourceCoordinator[In: Any val] is SourceCoordinator
     """
     try
       let source = _available_sources.pop()?
-      source.accept(ns, _init_size, _max_size)
+      source.accept(ns, _init_size, _max_size, _max_received_count)
       _connected_sources.set(source)
       _count = _count + 1
     else
