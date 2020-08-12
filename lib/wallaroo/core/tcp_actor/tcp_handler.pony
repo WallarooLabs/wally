@@ -38,7 +38,8 @@ interface val TestableTCPHandlerBuilder
   fun apply(tcp_actor: TCPActor ref): TestableTCPHandler
 
   fun for_connection(fd: U32, init_size: USize = 64, max_size: USize = 16384,
-    tcp_actor: TCPActor ref, muted: Bool): TestableTCPHandler
+    max_received_count: USize = 50, tcp_actor: TCPActor ref, muted: Bool):
+    TestableTCPHandler
   =>
     //!@ Temporary fix because of Pony wallaroo_labs/mort import bug
     tcp_actor.fail()

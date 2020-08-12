@@ -510,7 +510,7 @@ def encoder(func):
 
 
 class TCPSourceConfig(object):
-    def __init__(self, name, host, port, decoder, valid=True, parallelism=10, max_size=16384):
+    def __init__(self, name, host, port, decoder, valid=True, parallelism=10, max_size=16384, max_received_count=50):
         self._host = host
         self._port = port
         self._name = name
@@ -518,10 +518,11 @@ class TCPSourceConfig(object):
         self._valid = valid
         self._parallelism = parallelism
         self._max_size = max_size
+        self._max_received_count = max_received_count
 
     def to_tuple(self):
         return ("tcp", self._name, self._host, self._port, self._decoder,
-                self._valid, self._parallelism, self._max_size)
+                self._valid, self._parallelism, self._max_size, self._max_received_count)
 
 
 class GenSourceConfig(object):

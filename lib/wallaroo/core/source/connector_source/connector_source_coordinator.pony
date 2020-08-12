@@ -100,6 +100,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
   var _closed: Bool = false
   var _init_size: USize
   var _max_size: USize
+  var _max_received_count: USize
 
   let _connected_sources: SetIs[(RoutingId, ConnectorSource[In])] =
     _connected_sources.create()
@@ -132,7 +133,8 @@ actor ConnectorSourceCoordinator[In: Any val] is
     handler: FramedSourceHandler[In] val,
     host: String, service: String, cookie: String,
     max_credits: U32, refill_credits: U32,
-    init_size: USize = 64, max_size: USize = 16384)
+    init_size: USize = 64, max_size: USize = 16384,
+    max_received_count: USize = 50)
   =>
     """
     Listens for both IPv4 and IPv6 connections.
@@ -166,6 +168,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
     _limit = parallelism
     _init_size = init_size
     _max_size = max_size
+    _max_received_count = max_received_count
 
     // Pass LocalConnectorStreamRegistry the parameters it needs to create
     // its own instance of the GlobalConnectorStreamRegistry
@@ -386,7 +389,7 @@ actor ConnectorSourceCoordinator[In: Any val] is
     """
     try
       (let source_id, let source) = _available_sources.pop()?
-      source.accept(ns, _init_size, _max_size)
+      source.accept(ns, _init_size, _max_size, _max_received_count)
       _connected_sources.set((source_id, source))
       _count = _count + 1
     else

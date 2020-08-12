@@ -168,7 +168,9 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
         _source_id.string().cstring())
     end
 
-  be accept(fd: U32, init_size: USize = 64, max_size: USize = 16384) =>
+  be accept(fd: U32, init_size: USize = 64, max_size: USize = 16384,
+    max_received_count: USize = 50)
+  =>
     """
     A new connection accepted on a server.
     """
@@ -178,7 +180,7 @@ actor ConnectorSource[In: Any val] is (Source & TCPActor)
       // Get new session id for new connection
       _session_id = _routing_id_gen()
       _tcp_handler = _tcp_handler_builder.for_connection(fd, init_size,
-        max_size, this, _muted)
+        max_size, max_received_count, this, _muted)
       _tcp_handler.accept()
     end
 
