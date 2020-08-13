@@ -37,4 +37,4 @@ The commands available are:
 
 * `pulumi refresh` to refresh the local cache with remote state
 
-Documentation for additional stack commands can be found at: https://www.pulumi.com/docs/reference/cli/pulumi_stack/
+See the [Pulumi stack documentation](https://www.pulumi.com/docs/reference/cli/pulumi_stack/) for additional stack commands.
