@@ -172,6 +172,8 @@ Currently, there is minimal configuration provided for spinning up an Azure AKS 
 
 * Manually set the current Kubernetes context to the context for an existing k8s cluster with the cluster name `kubetest`: `make set-k8s-context cluster_name=kubetest num_followers=0 vm_sku=Standard_F48s_v2 cluster_project_name=dev`
 
+* Configure and display a public IP for ssh use into the AKS Node for an existing `kubetest` cluster: `make k8s-ssh-config cluster_name=kubetest`
+
 ## Debugging Ansible for Azure
 
 Test ansible communication with the all cluster nodes:
