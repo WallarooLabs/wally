@@ -440,6 +440,13 @@ set-k8s-context: check-cluster-name ## Displays Kubernetes http application rout
 	@echo "\033[36m==> Successfully retrieved Kubernetes credentials and set context in location \
 '$(location)' at provider '$(provider)' for cluster '$(cluster_name)'!\033[0m"
 
+k8s-ssh-config: check-cluster-name ## Configs k8s node to be ssh-abll
+	@echo "\033[36m==> Set Kubernetes Node to be ssh-able in location \
+'$(location)' at provider '$(provider)' for cluster '$(cluster_name)'...\033[0m"
+	./aks-ssh-config.sh $(cluster_name)
+	@echo "\033[36m==> Successfully set Kubernetes Node to be ssh-able in location \
+'$(location)' at provider '$(provider)' for cluster '$(cluster_name)'!\033[0m"
+
 check-cluster-name: ## Check for valid cluster name
 	$(if $(cluster_name),,$(error 'cluster_name' cannot be empty!))
 	$(if $(filter $(cluster_name),$(shell echo '$(cluster_name)' | sed 's/[^-a-zA-Z0-9]//g')),,$(error 'cluster_name' can only have [-a-zA-Z0-9] in it!))
