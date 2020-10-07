@@ -148,14 +148,14 @@ actor Connections is Cluster
           host'.cstring(), port'.cstring())
 
         let listener = TCPListener(auth, consume notifier, consume host',
-            consume port')
+            consume port' where read_buffer_size = 65536)
          _register_disposable(listener)
       else
         @printf[I32](("could not recover host and port from file (replace " +
           " with Fail())\n").cstring())
       end
     else
-      let listener = TCPListener(auth, consume notifier, host, port)
+      let listener = TCPListener(auth, consume notifier, host, port where read_buffer_size = 65536)
       _register_disposable(listener)
     end
 
