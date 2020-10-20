@@ -22,7 +22,7 @@ Wally can be installed via our handy Wallaroo Up command. Check out our [install
 
 ## APIs
 
-The primary API for Wally is written in [Pony][pony]. If you are interested in writing Wally applications in other high-performance languages such as C, C++ or Rust, [drop us a line][commercial-support-email]; we'd be happy to engage on a commercial basis in creating language bindings that meet your needs.
+The primary API for Wally is written in [Pony][pony]. Wally applications are written using this Pony API.
 
 ## Usage
 
