@@ -1,17 +1,13 @@
-<p align="center"><a href="https://www.wallaroolabs.com/"><img src="wallaroo-logo.png" alt="WallarooLabs logo" width="400"/></a></p>
-<h2 align="center">Build and scale real-time applications</h2>
-
----
 [![CircleCI](https://circleci.com/gh/WallarooLabs/wallaroo.svg?style=shield)](https://circleci.com/gh/WallarooLabs/wallaroo)
 [![GitHub license](https://img.shields.io/badge/license-apache%202-blue.svg)][wallaroo-license-readme]
 [![GitHub version](https://badge.fury.io/gh/WallarooLabs%2Fwallaroo.svg)](http://badge.fury.io/gh/WallarooLabs%2Fwallaroo)
 [![Groups.io][group-badge]][group-link]
 
-## What is Wallaroo?
+## What is Wally?
 
-Wallaroo is a fast stream-processing framework. Wallaroo makes it easy to react to data in real-time. By eliminating infrastructure complexity, going from prototype to production has never been simpler.
+Wally is a fast stream-processing framework. Wally makes it easy to react to data in real-time. By eliminating infrastructure complexity, going from prototype to production has never been simpler.
 
-When we set out to build Wallaroo, we had several high-level goals in mind:
+When we set out to build Wally, we had several high-level goals in mind:
 
 - Create a dependable and resilient distributed computing framework
 - Take care of the complexities of distributed computing "plumbing," allowing developers to focus on their business logic
@@ -20,19 +16,17 @@ When we set out to build Wallaroo, we had several high-level goals in mind:
 - Manage in-memory state for the application
 - Allow applications to scale as needed, even when they are live and up-and-running
 
-You can learn more about [Wallaroo][home-page] from our ["Hello Wallaroo!" blog post][hello-wallaroo-post].
-
 ## Getting Started
 
-Wallaroo can be installed via our handy Wallaroo Up command. Check out our [installation][installation-options] page to learn more.
+Wally can be installed via our handy Wallaroo Up command. Check out our [installation][installation-options] page to learn more.
 
 ## APIs
 
-The primary API for Wallaroo is written in [Pony][pony]. If you are interested in writing Wallaroo applications in other high-performance languages such as C, C++ or Rust, [drop us a line][commercial-support-email]; we'd be happy to engage on a commercial basis in creating language bindings that meet your needs.
+The primary API for Wally is written in [Pony][pony]. If you are interested in writing Wally applications in other high-performance languages such as C, C++ or Rust, [drop us a line][commercial-support-email]; we'd be happy to engage on a commercial basis in creating language bindings that meet your needs.
 
 ## Usage
 
-Once you've installed Wallaroo, Take a look at some of our examples. A great place to start are our [word_count][word_count] or [market spread][market-spread] examples in [Pony](pony-examples).
+Once you've installed Wally, Take a look at some of our examples. A great place to start are our [word_count][word_count] or [market spread][market-spread] examples in [Pony](pony-examples).
 
 ```pony
 """
@@ -145,11 +139,9 @@ primitive RunningTotalEncoder
 
 ## Documentation
 
-Are you the sort who just wants to get going? Dive right into our [documentation][documentation] then! It will get you up and running with Wallaroo.
+Are you the sort who just wants to get going? Dive right into our [documentation][documentation] then! It will get you up and running with Wally.
 
-More information is also on our [blog][blog-link]. There you can find more insight into what we are working on and industry use-cases.
-
-> Wallaroo currently exists as a mono-repo. All the source that is Wallaroo is located in this repo. See [repo directory structure][repo-directory-structure-link] for more information.
+> Wally currently exists as a mono-repo. All the source that is Wally is located in this repo. See [repo directory structure][repo-directory-structure-link] for more information.
 
 You can also take a look at our [FAQ][faq].
 
@@ -168,11 +160,10 @@ We welcome contributions. Please see our [Contribution Guide][contribution-guide
 
 ## License
 
-Wallaroo is licensed under the [Apache version 2][apache-2-license] license.
+Wally is licensed under the [Apache version 2][apache-2-license] license.
 
 [apache-2-license]: https://www.apache.org/licenses/LICENSE-2.0
 [repo-directory-structure-link]: MONOREPO.md
-[blog-link]: https://blog.wallaroolabs.com/
 [cla]: https://gist.github.com/WallarooLabsTeam/e06d4fed709e0e7035fdaa7249bf88fb
 [commercial-support-email]: mailto:sales@wallaroolabs.com
 [contribution-guide]: CONTRIBUTING.md
@@ -180,7 +171,6 @@ Wallaroo is licensed under the [Apache version 2][apache-2-license] license.
 [faq]: https://wallaroolabs.com/faq
 [group-badge]: https://img.shields.io/badge/mailing%20list-join%20%E2%86%92-%23551A8B.svg
 [group-link]: https://groups.io/g/wallaroo
-[hello-wallaroo-post]: https://blog.wallaroolabs.com/2017/03/hello-wallaroo/
 [home-page]: https://www.wallaroolabs.com/
 [installation-options]: https://docs.wallaroolabs.com/pony-installation
 [word_count]: examples/pony/word_count/
