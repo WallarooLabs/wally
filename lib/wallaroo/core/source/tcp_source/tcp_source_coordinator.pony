@@ -158,6 +158,8 @@ actor TCPSourceCoordinator[In: Any val] is SourceCoordinator
 
     @printf[I32]((pipeline_name + " source will listen (but not yet) on "
           + host + ":" + service + "\n").cstring())
+    @printf[I32]((pipeline_name + " TCP Source max buffer size: "
+          + max_size.string()+ "\n").cstring())
 
     for i in Range(0, _limit) do
       let name = _worker_name + ":" + _pipeline_name + " source " + i.string()
