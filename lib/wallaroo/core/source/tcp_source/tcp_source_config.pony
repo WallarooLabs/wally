@@ -55,30 +55,37 @@ primitive TCPSourceConfigCLIParser
         let source_name_and_address = input.split("@")
         let source_name_data = source_name_and_address(0)?
         let address_data = source_name_and_address(1)?.split(":")
-        opts.update(source_name_data,
-          TCPSourceConfigOptions(address_data(0)?, address_data(1)?,
-          source_name_data))
+
+        let opt = match address_data.size()
+        | 2 => TCPSourceConfigOptions(address_data(0)?, address_data(1)?, source_name_data)
+        | 3 => TCPSourceConfigOptions(address_data(0)?, address_data(1)?, source_name_data
+            where max_size'=address_data(2)?.usize()?)
+        else
+          error
+        end
+        opts.update(source_name_data, opt)
       else
         FatalUserError("Inputs must be in the `source_name@host:service`" +
-          " format!")
+          " or `source_name@host:service:max_size` format!")
       end
     end
-
-  opts(source_name)?
+    opts(source_name)?
 
 class val TCPSourceConfigOptions
   let host: String
   let service: String
   let source_name: SourceName
   let valid: Bool
+  let max_size: USize
 
   new val create(host': String, service': String,
-    source_name': SourceName, valid': Bool = true)
+    source_name': SourceName, valid': Bool = true, max_size': USize = 16384)
   =>
     host = host'
     service = service'
     source_name = source_name'
     valid = valid'
+    max_size = max_size'
 
 
 class val TCPSourceConfig[In: Any val] is SourceConfig
@@ -106,8 +113,8 @@ class val TCPSourceConfig[In: Any val] is SourceConfig
   =>
     handler = handler'
     parallelism = parallelism'
-    max_size = max_size'
     max_received_count = max_received_count'
+    max_size = opts.max_size
     _worker_source_config = WorkerTCPSourceConfig(opts.source_name, opts.host,
       opts.service, opts.valid)
 
@@ -119,6 +126,7 @@ class val TCPSourceConfig[In: Any val] is SourceConfig
 
   fun worker_source_config(): WorkerSourceConfig =>
     _worker_source_config
+
 
 class val WorkerTCPSourceConfig is WorkerSourceConfig
   let host: String

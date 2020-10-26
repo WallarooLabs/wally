@@ -548,7 +548,11 @@ The class used to define the properties of a Wallaroo TCPSource.
 
 `frame_handler` is a primitive or class that must implement the `FramedSourceHandler` interface.
 
-`TCPSourceConfigCLIParser` is a helper which accepts a `source`, a String representing the Source name and `env.args` which is the arguments provided to the application. These arguments are then parsed to provide a `TCPSourceConfigOptions` which has the source name, host, and service port.
+`TCPSourceConfigCLIParser` is a helper which accepts a `source`, a String representing the Source name and `env.args` which is the arguments provided to the application. These arguments are then parsed to provide a `TCPSourceConfigOptions` which has the source name, host, and service port, and optional maxiumum message size. The format is either `source_name@host:service` or `source_name@host:service:max_size`. For example,
+
+```
+mysource1@3.4.5.6:7100:500000
+```
 
 #### KafkaSource
 
