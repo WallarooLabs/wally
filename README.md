@@ -1,4 +1,4 @@
-[![CircleCI](https://circleci.com/gh/WallarooLabs/wallaroo.svg?style=shield)](https://circleci.com/gh/WallarooLabs/wallaroo)
+[![CircleCI](https://circleci.com/gh/WallarooLabs/wally.svg?style=shield)](https://circleci.com/gh/WallarooLabs/wally)
 [![GitHub license](https://img.shields.io/badge/license-apache%202-blue.svg)][wallaroo-license-readme]
 [![GitHub version](https://badge.fury.io/gh/WallarooLabs%2Fwallaroo.svg)](http://badge.fury.io/gh/WallarooLabs%2Fwallaroo)
 [![Groups.io][group-badge]][group-link]
