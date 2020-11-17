@@ -49,6 +49,7 @@ actor Main
     var partition: String = ""
     var start_from: U64 = 0
     var vary_by: U64 = 0
+    var host_addrs: Array[Array[String]] = recover Array[Array[String]] end
 
     if run_tests then
       TestMain(env)
@@ -81,7 +82,7 @@ actor Main
         for option in options do
           match option
           | ("host", let arg: String) =>
-            h_arg = arg.split(":")
+            h_arg = arg.split(",")
           | ("messages", let arg: I64) =>
             m_arg = arg.usize()
           | ("file", let arg: String) =>
@@ -112,14 +113,21 @@ actor Main
         end
 
         if h_arg is None then
-          @printf[I32]("Must supply required '--host' argument\n".cstring())
+          @printf[I32](
+            ("Must supply required '--host' argument, " +
+             "separated by ',' if supplying multiple hosts\n").cstring())
           required_args_are_present = false
         else
-          if (h_arg as Array[String]).size() != 2 then
-            @printf[I32](
-              "'--host' argument should be in format: '127.0.0.1:8080\n"
-              .cstring())
-            required_args_are_present = false
+          for host_arg in (h_arg as Array[String]).values() do
+            let host_addr = host_arg.split(":")
+            if host_addr.size() != 2 then
+              @printf[I32](
+                "'--host' arguments should be in format: '127.0.0.1:8080\n"
+                .cstring())
+              required_args_are_present = false
+            else
+              host_addrs.push(consume host_addr)
+            end
           end
         end
 
@@ -160,16 +168,19 @@ actor Main
 
         if required_args_are_present then
           let messages_to_send = m_arg as USize
-          let to_host_addr = h_arg as Array[String]
+          let to_host_socks: Array[TCPConnection] iso = recover iso Array[TCPConnection] end
 
           let store = Store(write_to_file, env.root as AmbientAuth)
           let coordinator = Coordinator(env, store)?
 
           let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
-          let to_host_socket = TCPConnection(tcp_auth,
-            ToHostNotify(coordinator),
-            to_host_addr(0)?,
-            to_host_addr(1)?)
+          for host_addr in host_addrs.values() do
+            let to_host_sock = TCPConnection(tcp_auth,
+              ToHostNotify(coordinator),
+              host_addr(0)?,
+              host_addr(1)?)
+            to_host_socks.push(to_host_sock)
+          end
 
           let data_source =
             match f_arg
@@ -201,7 +212,7 @@ actor Main
 
           let sa = SendingActor(
             messages_to_send,
-            to_host_socket,
+            consume to_host_socks,
             store,
             coordinator,
             consume data_source,
@@ -252,7 +263,8 @@ type WorkerState is (Waiting | Ready | Failed)
 
 actor Coordinator
   let _env: Env
-  var _to_host_socket: ((TCPConnection | None), WorkerState) = (None, Waiting)
+  var _to_host_socks: Array[(TCPConnection, WorkerState)] = 
+    recover Array[(TCPConnection, WorkerState)] end
   var _sending_actor: (SendingActor | None) = None
   let _store: Store
 
@@ -261,7 +273,7 @@ actor Coordinator
     _store = store
 
   be to_host_socket(sock: TCPConnection, state: WorkerState) =>
-    _to_host_socket = (sock, state)
+    _to_host_socks.push((sock, state))
     if state is Failed then
       @printf[I32]("Unable to connect\n".cstring())
       sock.dispose()
@@ -274,10 +286,10 @@ actor Coordinator
     _sending_actor = sa
 
   be finished() =>
-    try
-      let x = _to_host_socket._1 as TCPConnection
-      x.dispose()
-    end
+    for to_host_sock in _to_host_socks.values() do
+      let sock = to_host_sock._1
+      sock.dispose()
+    end 
     _store.dispose()
 
   be pause_sending(v: Bool) =>
@@ -287,7 +299,15 @@ actor Coordinator
     end
 
   fun _go_if_ready() =>
-    if _to_host_socket._2 is Ready then
+    var worker_state: WorkerState = Waiting
+    var ready_count: USize = 0
+    for to_host_sock in _to_host_socks.values() do
+      if to_host_sock._2 is Ready then
+        ready_count = ready_count + 1
+      end
+    end
+    if ready_count == _to_host_socks.size() then worker_state = Ready end
+    if worker_state is Ready then
       try
         let y = _sending_actor as SendingActor
         y.go()
@@ -301,7 +321,7 @@ actor Coordinator
 actor SendingActor
   let _messages_to_send: USize
   var _messages_sent: USize = USize(0)
-  let _to_host_socket: TCPConnection
+  let _to_host_socks: Array[TCPConnection] val
   let _store: Store
   let _coordinator: Coordinator
   let _timers: Timers
@@ -318,9 +338,11 @@ actor SendingActor
   let _rng: MT
   var _drunk_walk: USize = 0
   var _walks_remaining: USize = 1000
+  var _host_idx: USize = 0
+  let _host_socks_size: USize
 
   new create(messages_to_send: USize,
-    to_host_socket: TCPConnection,
+    to_host_socks: Array[TCPConnection] val,
     store: Store,
     coordinator: Coordinator,
     data_source: Iterator[ByteSeq] iso,
@@ -332,7 +354,7 @@ actor SendingActor
     vary_by: U64)
   =>
     _messages_to_send = messages_to_send
-    _to_host_socket = to_host_socket
+    _to_host_socks = to_host_socks
     _store = store
     _coordinator = coordinator
     _data_source = consume data_source
@@ -345,6 +367,7 @@ actor SendingActor
     _wb = Writer
     _vary_by = vary_by
     _rng = MT(Time.millis())
+    _host_socks_size = _to_host_socks.size()
 
   be go() =>
     let t = Timer(SendBatch(this), 0, _interval)
@@ -405,8 +428,18 @@ actor SendingActor
         end
       end
 
-      for i in _wb.done().values() do
-        _to_host_socket.write(i)
+      for (i, v) in _wb.done().pairs() do
+        try
+          _to_host_socks(_host_idx)?.write(v)
+          // we only want to switch hosts if we've written both the header + msg
+          if (i % 2) != 0 then
+            _host_idx = _host_idx + 1
+            if _host_idx >= _host_socks_size then _host_idx = 0 end
+          end
+        else
+          @printf[I32](("Error accessing host socket at index: " +
+            _host_idx.string() + "\n").cstring())
+        end
       end
       if _write_to_file then
         _store.sentv(consume d', WallClock.nanoseconds())
