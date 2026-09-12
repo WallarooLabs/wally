@@ -16,26 +16,54 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
+"""
+Provides utilities for generating and formatting FIX messages and market data.
+"""
+
 use "random"
 use "time"
 use "collections"
 use "wallaroo_labs/fix"
 
+"""
+Stores instrument name, ticker, and price information.
+"""
 class InstrumentData
   let _name: String val
   let _ticker: String val
   let _price: F64
 
+  """
+  Creates instrument data with the given name, ticker, and price.
+  """
   new val create(name': String, ticker': String, price': F64) =>
     _name = name'
     _ticker = ticker'
     _price = price'
 
+  """
+  Returns the instrument name.
+  """
   fun name(): String val => _name
-  fun ticker(): String val => _ticker
-  fun price(): F64 val => _price
 
+  """
+  Returns the instrument ticker symbol.
+  """
+  fun ticker(): String val => _ticker
+
+  """
+  Returns the instrument price.
+  """
+  fun price(): F64 => _price
+
+"""
+Parses instrument data from a comma-separated string.
+"""
 primitive InstrumentParser
+  """
+  Parses a string into instrument data.
+  Returns None when the input cannot be parsed.
+  """
   fun apply(i: String): (InstrumentData val | None) =>
     try
       let split = i.split(",")
@@ -47,6 +75,9 @@ primitive InstrumentParser
       None
     end
 
+"""
+Generates random numbers and alphanumeric strings.
+"""
 class RandomNumberGenerator
   let _rand: Random
   let _alphanumerics: Array[String] =
@@ -55,18 +86,33 @@ class RandomNumberGenerator
     "S";"T";"U";"V";"W";"X";"Y";"Z";"a";"b";"c";"d";"e";"f";"g";"h"; "i";"j"
     "k";"l";"m";"n";"o";"p";"q";"r";"s";"t";"u";"v";"w";"x";"y";"z"]
 
+  """
+  Creates a random number generator with the given seed.
+  """
   new create(seed: U64 = Time.nanos()) =>
     _rand = MT(seed)
 
+  """
+  Returns a random real number.
+  """
   fun ref apply(): F64 =>
     _rand.real()
 
+  """
+  Returns the underlying random number generator.
+  """
   fun ref random(): Random =>
     _rand
 
+  """
+  Returns a random integer less than the given value.
+  """
   fun ref rand_int(n: U64): U64 =>
     _rand.int(n)
 
+  """
+  Generates a random alphanumeric string of the given length.
+  """
   fun ref rand_alphanumeric(length: U64): String =>
     var string = "".clone()
     let alphanumerics_length = _alphanumerics.size().u64()
@@ -81,7 +127,13 @@ class RandomNumberGenerator
     end
     string
 
+"""
+Generates random FIX NBBO messages for an instrument.
+"""
 primitive RandomFixNbboGenerator
+  """
+  Creates a FIX NBBO message using generated bid and offer prices.
+  """
   fun apply(instrument: InstrumentData val,
     number_generator: RandomNumberGenerator,
     is_rejected: Bool,
@@ -105,7 +157,13 @@ primitive RandomFixNbboGenerator
 
     FixNbboMessage(symbol, timestamp, bid, offer)
 
+"""
+Generates random FIX order messages for an instrument.
+"""
 primitive RandomFixOrderGenerator
+  """
+  Creates a FIX order message with randomly generated order details.
+  """
   fun apply(instrument: InstrumentData val,
     dice: Dice,
     number_generator: RandomNumberGenerator,
@@ -129,6 +187,9 @@ primitive RandomFixOrderGenerator
     FixOrderMessage(side, client_id, order_id, symbol,
       order_qty, price, timestamp)
 
+"""
+Formats FIX order, NBBO, and heartbeat messages as strings.
+"""
 class FixMessageStringify
   let _quote: String = """""""
   let _delimiter: String = "\x01"
@@ -148,6 +209,9 @@ class FixMessageStringify
   let _new_line: String = "\n"
   let _client_prefix: String = "CLIENT"
 
+  """
+  Formats a FIX order message as a string.
+  """
   fun order(fix_order_message: FixOrderMessage val): String =>
     let side_num =
       match fix_order_message.side()
@@ -187,6 +251,9 @@ class FixMessageStringify
       .>append(_new_line)
       ).clone()
 
+  """
+  Formats a FIX NBBO message as a string.
+  """
   fun nbbo(fix_nbbo_message: FixNbboMessage val): String =>
     (_quote.clone()
       .>append(_fix_version)
@@ -209,6 +276,9 @@ class FixMessageStringify
       .>append(_new_line)
     ).clone()
 
+  """
+  Formats a FIX heartbeat message with the given timestamp.
+  """
   fun heartbeat(timestamp: String): String =>
     (_quote.clone()
       .>append(_fix_version)
