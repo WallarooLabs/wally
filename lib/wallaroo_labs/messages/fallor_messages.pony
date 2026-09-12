@@ -19,7 +19,14 @@ Copyright 2017 The Wallaroo Authors.
 use "buffered"
 use "net"
 
+"""
+Encodes Fallor messages into a byte sequence for transmission.
+"""
 primitive FallorMsgEncoder
+
+"""
+Encodes a string or sequence of strings into the Fallor message format.
+"""
   fun apply(data: (String | Seq[String] val), wb: Writer = Writer):
     Array[ByteSeq] val
   =>
@@ -51,6 +58,9 @@ primitive FallorMsgEncoder
     end
     wb.done()
 
+"""
+Encodes a timestamp and raw data into a Fallor message.
+"""
   fun timestamp_raw(timestamp: U64, data: Array[U8] val,
     wb: Writer = Writer): Array[ByteSeq] val
   =>
@@ -60,10 +70,21 @@ primitive FallorMsgEncoder
     wb.write(data)
     wb.done()
 
+"""
+Decodes Fallor messages from a byte sequence into strings.
+"""
 primitive FallorMsgDecoder
+
+"""
+Decodes a Fallor message into an array of strings.
+"""
   fun apply(data: Array[U8] val): Array[String] val ? =>
     _decode(data)?
 
+
+"""
+Decodes the contents of a Fallor message into an array of strings.
+"""
   fun _decode(data: Array[U8] val): Array[String] val ? =>
     let rb = Reader
     rb.append(data)
@@ -80,6 +101,9 @@ primitive FallorMsgDecoder
 
     consume arr
 
+"""
+Decodes a Fallor message containing a timestamp and returns both values as strings.
+"""
   fun with_timestamp(data: Array[U8] val): Array[String] val ? =>
     let arr: Array[String] iso = recover Array[String] end
     let rb = Reader
