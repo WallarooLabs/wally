@@ -22,7 +22,24 @@ Instruments CI error logs as a streaming pipeline to analyze:
 """
 
 import json
-import wallaroo
+
+try:
+    import wallaroo
+except ImportError:
+    class _WallarooMock(object):
+        @staticmethod
+        def key_extractor(f):
+            return f
+
+        @staticmethod
+        def state_computation(*args, **kwargs):
+            return lambda f: f
+
+        @staticmethod
+        def encoder(f):
+            return f
+
+    wallaroo = _WallarooMock()
 
 
 def application_setup(args):
@@ -54,15 +71,20 @@ class FileErrorStats(object):
     def __init__(self):
         self.total_runs = 0
         self.total_failures = 0
-        self.consecutive_failures = 0
+        self.test_consecutive_failures = {}
 
-    def record_run(self, failed):
+    def record_run(self, test_name, failed):
         self.total_runs += 1
         if failed:
             self.total_failures += 1
-            self.consecutive_failures += 1
+            self.test_consecutive_failures[test_name] = (
+                self.test_consecutive_failures.get(test_name, 0) + 1
+            )
         else:
-            self.consecutive_failures = 0
+            self.test_consecutive_failures[test_name] = 0
+
+    def consecutive_failures_for(self, test_name):
+        return self.test_consecutive_failures.get(test_name, 0)
 
     @property
     def failure_rate(self):
@@ -102,10 +124,11 @@ def extract_file_key(event):
 @wallaroo.state_computation(name="analyze file errors", state=FileErrorStats)
 def track_and_analyze_file_errors(event, state):
     is_failure = event.status == "FAIL"
-    state.record_run(is_failure)
+    state.record_run(event.test_name, is_failure)
 
     # 1. Alert on consecutive recurring test failures (flaky / persistent regression)
-    if state.consecutive_failures >= 3:
+    # Consecutive failures are isolated per individual test within the file
+    if state.consecutive_failures_for(event.test_name) >= 3:
         return CIAlert(
             alert_type="RECURRING_FAILURE",
             file_path=event.file_path,
@@ -114,8 +137,8 @@ def track_and_analyze_file_errors(event, state):
             rate=state.failure_rate,
         )
 
-    # 2. Alert on high failure rate threshold (rate > 25% after at least 4 runs)
-    if state.total_runs >= 4 and state.failure_rate >= 0.25 and is_failure:
+    # 2. Alert on high failure rate threshold (rate strictly > 25% after at least 4 runs)
+    if state.total_runs >= 4 and state.failure_rate > 0.25 and is_failure:
         return CIAlert(
             alert_type="HIGH_FAILURE_RATE",
             file_path=event.file_path,
@@ -138,6 +161,7 @@ class CILogGenerator(object):
     test_files = [
         ("lib/wallaroo/tcp_sink.pony", "test_tcp_connection_retry"),
         ("machida/machida.py", "test_stateful_partitioning"),
+        ("machida/machida.py", "test_worker_handshake"),
         ("examples/python/word_count/word_count.py", "test_word_count_pipeline"),
         ("connectors/kafka/source.pony", "test_kafka_offset_commit"),
     ]
@@ -149,10 +173,15 @@ class CILogGenerator(object):
         self.counter += 1
         file_path, test_name = self.test_files[self.counter % len(self.test_files)]
 
-        # Simulate failures periodically to trigger detection thresholds
-        if self.counter % 5 == 0 or (file_path == "machida/machida.py" and self.counter > 6):
+        # Simulate failures to trigger alerts with test-level isolation
+        # test_stateful_partitioning fails repeatedly (RECURRING_FAILURE)
+        # while test_worker_handshake passes, verifying test isolation inside machida/machida.py
+        if test_name == "test_stateful_partitioning" and self.counter > 4:
             status = "FAIL"
             err = "AssertionError: expected connection state READY"
+        elif self.counter % 7 == 0:
+            status = "FAIL"
+            err = "TimeoutError: connection timed out"
         else:
             status = "PASS"
             err = ""

@@ -24,16 +24,30 @@ Continuous Integration pipelines generate streams of test execution outputs. Thi
    [encode_ci_alert] (JSON Sink)
 ```
 
+## Input Configuration
+
+The application uses an internal generator source (`CILogGenerator`), which synthesizes streaming CI test execution logs across multiple source files and tests. Because input is generated automatically by Wallaroo upon initialization, no external TCP `--in` input address parameter is required.
+
 ## Running the Application
 
 ### Running with Machida (Python 2.7 / 3)
+
+Start Machida (or `machida3` for Python 3):
 
 ```bash
 machida --application-module ci_log_analyzer \
   --out 127.0.0.1:5555 \
   --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6000 \
-  --data 127.0.0.1:6001
+  --data 127.0.0.1:6001 \
+  --name worker-name --external 127.0.0.1:5050 --cluster-initializer \
+  --ponythreads=1 --ponynoblock
 ```
 
-Or using `machida3` for Python 3.
+### Running the Validation Tests
+
+To run the unit test validation directly:
+
+```bash
+python3 _validate.py --unit-tests-only
+```
